@@ -513,6 +513,8 @@ export async function POST(request: NextRequest) {
         type: "withdrawal",
         title: "تم إنشاء طلب السحب",
         message: "تم إنشاء طلب سحب " + amount + " " + assetCode + " على شبكة " + networkName + ".",
+      }).catch((notificationError) => {
+        console.error("WITHDRAWAL NOTIFICATION:", notificationError);
       });
 
       return NextResponse.json(

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     await connectDB();
     const settings = await getPlatformSettings();
 
-    const [invitedCount, activeCountRows, depositTotals] = await Promise.all([
+    const [invitedCount, activeCountRows, depositTotals, referrals] = await Promise.all([
       User.countDocuments({ referredBy: { $exists: true, $ne: null } }),
       DepositRequest.aggregate([
         { $match: { status: "approved" } },
@@ -32,6 +32,30 @@ export async function GET(request: NextRequest) {
         { $match: { "depositor.referredBy": { $type: "objectId" } } },
         { $group: { _id: "$asset", amount: { $sum: "$amount" }, deposits: { $sum: 1 } } },
         { $sort: { _id: 1 } }
+      ]),
+      User.aggregate([
+        { $match: { referredBy: { $type: "objectId" } } },
+        { $sort: { createdAt: -1 } },
+        { $limit: 500 },
+        { $lookup: { from: "users", localField: "referredBy", foreignField: "_id", as: "referrer" } },
+        { $unwind: { path: "$referrer", preserveNullAndEmptyArrays: true } },
+        { $lookup: {
+          from: DepositRequest.collection.name,
+          let: { referredUserId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $and: [ { $eq: ["$userId", "$referredUserId"] }, { $eq: ["$status", "approved"] } ] } } },
+            { $group: { _id: "$asset", amount: { $sum: "$amount" }, deposits: { $sum: 1 } } },
+            { $sort: { _id: 1 } }
+          ],
+          as: "depositsByAsset"
+        } },
+        { $project: {
+          _id: { $toString: "$_id" },
+          name: 1, username: 1, email: 1, createdAt: 1,
+          referrerName: "$referrer.name", referrerUsername: "$referrer.username", referrerEmail: "$referrer.email",
+          active: { $gt: [{ $size: "$depositsByAsset" }, 0] },
+          depositsByAsset: 1
+        } }
       ])
     ]);
 
@@ -50,7 +74,16 @@ export async function GET(request: NextRequest) {
           amount: Number(row.amount || 0),
           deposits: Number(row.deposits || 0)
         }))
-      }
+      },
+      referrals: referrals.map((row: any) => ({
+        ...row,
+        _id: String(row._id),
+        depositsByAsset: Array.isArray(row.depositsByAsset) ? row.depositsByAsset.map((item: any) => ({
+          asset: String(item._id || "USDT").toUpperCase(),
+          amount: Number(item.amount || 0),
+          deposits: Number(item.deposits || 0),
+        })) : [],
+      }))
     });
   } catch (error) {
     console.error("ADMIN REFERRAL GET:", error);

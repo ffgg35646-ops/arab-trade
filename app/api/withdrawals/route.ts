@@ -54,19 +54,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const kycGuard =
-      await requireVerifiedIdentity(request);
-
-    if (!kycGuard.ok) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: kycGuard.message,
-        },
-        { status: kycGuard.status }
-      );
-    }
-
     const user = await getCurrentUser(request);
 
     if (!user) {

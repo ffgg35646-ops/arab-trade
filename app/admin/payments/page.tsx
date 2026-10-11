@@ -37,9 +37,6 @@ export default function PaymentsAdminPage() {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    await Promise.resolve();
-    setLoading(true);
-    setError("");
 
     try {
       const res = await fetch("/api/admin/payment", {

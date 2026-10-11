@@ -12,6 +12,7 @@ export interface IUserPackage {
   lockedEarnings: number;
   totalRealizedEarnings: number;
   totalWithdrawn: number;
+  firstWithdrawalStatus: "available" | "pending" | "completed";
   cancellationRefund: number;
   activatedAt: Date;
   cancelledAt?: Date | null;
@@ -32,6 +33,7 @@ const UserPackageSchema = new Schema<IUserPackage>(
     lockedEarnings: { type: Number, default: 0, min: 0 },
     totalRealizedEarnings: { type: Number, default: 0, min: 0 },
     totalWithdrawn: { type: Number, default: 0, min: 0 },
+    firstWithdrawalStatus: { type: String, enum: ["available", "pending", "completed"], default: "available", index: true },
     cancellationRefund: { type: Number, default: 0, min: 0 },
     activatedAt: { type: Date, default: Date.now },
     cancelledAt: { type: Date, default: null },

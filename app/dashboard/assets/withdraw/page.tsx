@@ -184,8 +184,7 @@ export default function WithdrawPage() {
       setMethods(rows);
 
       setBalances(
-        walletData.wallets?.spot?.balances ||
-          []
+        walletData.spot?.balances || walletData.wallet?.balances || []
       );
 
       setHistory(

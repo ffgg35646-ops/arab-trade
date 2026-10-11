@@ -10,6 +10,7 @@ import LedgerEntry from "@/models/LedgerEntry";
 import Notification from "@/models/Notification";
 import ReferralCommission from "@/models/ReferralCommission";
 import DepositBalance from "@/models/DepositBalance";
+import BlockchainDepositClaim from "@/models/BlockchainDepositClaim";
 
 export async function GET(
   request: NextRequest
@@ -123,6 +124,10 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: false, message: "قيمة الإيداع أو العملة غير صحيحة" }, { status: 400 });
     }
 
+    if (status === "approved" && String(initial.txHash || "").trim()) {
+      await BlockchainDepositClaim.init();
+    }
+
     const session = await mongoose.startSession();
     let processed: any = null;
 
@@ -146,6 +151,30 @@ export async function PATCH(request: NextRequest) {
         }
 
         if (status === "approved") {
+          const txHash = String(current.txHash || "").trim().toLowerCase();
+          if (txHash) {
+            const duplicateDeposit = await DepositRequest.findOne({
+              _id: { $ne: current._id },
+              txHash: current.txHash,
+              creditedAt: { $ne: null },
+            }).session(session).lean();
+            if (duplicateDeposit) throw new Error("DEPOSIT_TXHASH_ALREADY_CREDITED");
+
+            try {
+              await BlockchainDepositClaim.create([{
+                txHash,
+                depositRequestId: current._id,
+                userId: current.userId,
+                asset,
+                network: String(current.network || "").toUpperCase(),
+                amount,
+              }], { session });
+            } catch (claimError: any) {
+              if (claimError?.code === 11000) throw new Error("DEPOSIT_TXHASH_ALREADY_CREDITED");
+              throw claimError;
+            }
+          }
+
           const credited = await DepositBalance.findOneAndUpdate(
             { userId: current.userId, asset },
             {
@@ -232,10 +261,12 @@ export async function PATCH(request: NextRequest) {
       });
     } catch (settlementError) {
       const code = settlementError instanceof Error ? settlementError.message : "";
-      if (code === "DEPOSIT_ALREADY_PROCESSED") {
+      if (code === "DEPOSIT_ALREADY_PROCESSED" || code === "DEPOSIT_TXHASH_ALREADY_CREDITED") {
         return NextResponse.json({
           success: false,
-          message: "تمت معالجة طلب الإيداع بالفعل، ولم تتم إضافة الرصيد مرة أخرى.",
+          message: code === "DEPOSIT_TXHASH_ALREADY_CREDITED"
+            ? "رقم المعاملة هذا استُخدم لاعتماد إيداع آخر. لم تتم إضافة أي رصيد."
+            : "تمت معالجة طلب الإيداع بالفعل، ولم تتم إضافة الرصيد مرة أخرى.",
         }, { status: 409 });
       }
       console.error("ADMIN DEPOSIT SETTLEMENT:", settlementError);

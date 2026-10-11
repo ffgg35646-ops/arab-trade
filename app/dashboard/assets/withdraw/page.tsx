@@ -406,7 +406,7 @@ export default function WithdrawPage() {
           throw new Error("أول طلب سحب من هذه الباقة ما زال قيد المراجعة.");
         }
         if (packageFirstWithdrawal && numericAmount > Number(selectedPackage.investedAmount || 0)) {
-          throw new Error(`الحد الأقصى لأول سحب هو مبلغ تفعيل الباقة: ${selectedPackage.investedAmount} USDT`);
+          throw new Error(`الحد الأقصى لأول سحب هو مبلغ تفعيل الباقة: ${selectedPackage?.investedAmount || 0} USDT`);
         }
         if (numericAmount > selectedPackage.availableEarnings) {
           throw new Error("مبلغ السحب أكبر من الرصيد المتاح في هذه الباقة");

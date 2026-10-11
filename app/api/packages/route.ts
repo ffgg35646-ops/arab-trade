@@ -133,6 +133,136 @@ export async function POST(request: NextRequest) {
       }, { status: 201 });
     }
 
+    if (action === "change") {
+      if (!mongoose.Types.ObjectId.isValid(packageId) || !mongoose.Types.ObjectId.isValid(userPackageId)) {
+        return NextResponse.json({ success: false, message: "اختر الباقة الحالية والباقة الجديدة بصورة صحيحة" }, { status: 400 });
+      }
+
+      const [plan, current] = await Promise.all([
+        InvestmentPackage.findOne({ _id: packageId, enabled: true }).lean(),
+        UserPackage.findOne({ _id: userPackageId, userId: user._id, status: "active" }).lean(),
+      ]);
+      if (!plan) return NextResponse.json({ success: false, message: "الباقة الجديدة غير موجودة أو متوقفة" }, { status: 404 });
+      if (!current) return NextResponse.json({ success: false, message: "الباقة الحالية ليست نشطة أو لا تخص هذا المستخدم" }, { status: 404 });
+      if (Number(current.lockedEarnings || 0) > 0) {
+        return NextResponse.json({ success: false, message: "لا يمكن تغيير الباقة بينما يوجد طلب سحب من أرباحها قيد المراجعة." }, { status: 409 });
+      }
+
+      const price = Number(plan.price);
+      const asset = String(plan.asset || "USDT").toUpperCase();
+      const refund = roundAmount(Number(current.investedAmount || 0) * 0.5);
+      const session = await mongoose.startSession();
+      let changedPackage: any = null;
+
+      try {
+        await session.withTransaction(async () => {
+          const stillEnabled = await InvestmentPackage.findOne({ _id: plan._id, enabled: true }).session(session);
+          if (!stillEnabled) throw new Error("TARGET_PACKAGE_DISABLED");
+
+          const cancelled = await UserPackage.findOneAndUpdate(
+            { _id: current._id, userId: user._id, status: "active", lockedEarnings: 0 },
+            { $set: { status: "cancelled", cancelledAt: new Date(), cancellationRefund: refund } },
+            { new: true, session }
+          );
+          if (!cancelled) throw new Error("CURRENT_PACKAGE_CHANGED");
+
+          const debited = await DepositBalance.findOneAndUpdate(
+            { userId: user._id, asset, available: { $gte: price } },
+            { $inc: { available: -price } },
+            { new: true, session }
+          );
+          if (!debited) throw new Error("INSUFFICIENT_DEPOSIT_BALANCE");
+
+          let wallet = await Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).session(session);
+          if (!wallet) {
+            wallet = new Wallet({ userId: user._id, type: "spot", mode: "live", balances: [] });
+          }
+          const oldAsset = String(cancelled.asset || "USDT").toUpperCase();
+          let walletBalance = wallet.balances.find((item: any) => String(item.asset).toUpperCase() === oldAsset);
+          const before = Number(walletBalance?.available || 0);
+          if (!walletBalance) {
+            wallet.balances.push({ asset: oldAsset, available: refund, locked: 0 });
+            walletBalance = wallet.balances[wallet.balances.length - 1] as any;
+          } else {
+            walletBalance.available = Number((before + refund).toFixed(12));
+          }
+          await wallet.save({ session });
+
+          await LedgerEntry.create([{
+            userId: user._id,
+            scope: "user",
+            asset: oldAsset,
+            mode: "live",
+            type: "adjustment",
+            amount: refund,
+            balanceBefore: before,
+            balanceAfter: Number(walletBalance.available || 0),
+            referenceId: "package-change:" + String(cancelled._id),
+            note: "استرداد 50% من قيمة الباقة السابقة " + cancelled.packageName + " عند تغيير الباقة",
+          }], { session });
+
+          const created = await UserPackage.create([{
+            userId: user._id,
+            packageId: plan._id,
+            packageName: plan.name,
+            investedAmount: price,
+            asset,
+            durationDays: Number(plan.durationDays),
+            status: "active",
+            availableEarnings: 0,
+            lockedEarnings: 0,
+            totalRealizedEarnings: 0,
+            totalWithdrawn: 0,
+            firstWithdrawalStatus: "available",
+            cancellationRefund: 0,
+            activatedAt: new Date(),
+          }], { session });
+          changedPackage = created[0];
+
+          await PackageLedger.create([
+            {
+              userId: user._id,
+              userPackageId: cancelled._id,
+              type: "cancellation_refund",
+              asset: oldAsset,
+              amount: refund,
+              note: "تغيير الباقة: استرداد 50% من قيمة " + cancelled.packageName + " إلى رصيد السحب العام",
+            },
+            {
+              userId: user._id,
+              userPackageId: changedPackage._id,
+              type: "activation",
+              asset,
+              amount: -price,
+              note: "تفعيل باقة " + plan.name + " من رصيد الإيداع عند تغيير الباقة",
+            },
+          ], { session });
+        });
+      } catch (changeError) {
+        const code = changeError instanceof Error ? changeError.message : "";
+        if (code === "INSUFFICIENT_DEPOSIT_BALANCE" || code === "CURRENT_PACKAGE_CHANGED" || code === "TARGET_PACKAGE_DISABLED") {
+          const status = code === "INSUFFICIENT_DEPOSIT_BALANCE" ? 400 : 409;
+          const message = code === "INSUFFICIENT_DEPOSIT_BALANCE"
+            ? "رصيد الإيداع غير كافٍ لتفعيل الباقة الجديدة؛ لم يتم إلغاء الباقة الحالية أو تغيير أي رصيد."
+            : code === "TARGET_PACKAGE_DISABLED"
+              ? "الباقة الجديدة توقفت أثناء العملية؛ لم يتم تغيير الأرصدة."
+              : "حالة الباقة الحالية تغيرت؛ حدّث الصفحة قبل المحاولة مرة أخرى.";
+          return NextResponse.json({ success: false, message }, { status });
+        }
+        console.error("PACKAGE CHANGE:", changeError);
+        return NextResponse.json({ success: false, message: "فشل تغيير الباقة، وتم التراجع عن جميع تغييرات الأرصدة." }, { status: 500 });
+      } finally {
+        await session.endSession();
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "تم تغيير الباقة بنجاح. خُصمت قيمة الباقة الجديدة من رصيد الإيداع، وأضيف 50% من قيمة تفعيل الباقة السابقة إلى رصيد السحب العام.",
+        userPackage: changedPackage,
+        cancellationRefund: refund,
+      });
+    }
+
     if (action === "cancel") {
       if (!mongoose.Types.ObjectId.isValid(userPackageId)) {
         return NextResponse.json({ success: false, message: "معرف الباقة غير صحيح" }, { status: 400 });

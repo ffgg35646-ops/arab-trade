@@ -22,6 +22,19 @@ interface ReferralStats {
   depositsByAsset: { asset: string; amount: number; deposits: number }[];
 }
 
+interface ReferralAccount {
+  _id: string;
+  name?: string;
+  username?: string;
+  email?: string;
+  createdAt?: string;
+  referrerName?: string;
+  referrerUsername?: string;
+  referrerEmail?: string;
+  active: boolean;
+  depositsByAsset: { asset: string; amount: number; deposits: number }[];
+}
+
 export default function ReferralPage() {
   const [settings, setSettings] = useState<ReferralSettings>({
     commissionPercent: 10,
@@ -32,6 +45,7 @@ export default function ReferralPage() {
     activeReferralCount: 0,
     depositsByAsset: [],
   });
+  const [referrals, setReferrals] = useState<ReferralAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -65,6 +79,7 @@ export default function ReferralPage() {
         activeReferralCount: Number(result.stats?.activeReferralCount || 0),
         depositsByAsset: Array.isArray(result.stats?.depositsByAsset) ? result.stats.depositsByAsset : [],
       });
+      setReferrals(Array.isArray(result.referrals) ? result.referrals : []);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -293,6 +308,57 @@ export default function ReferralPage() {
                   </div>
                 </button>
               </section>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-[#08111e] p-5 md:p-6">
+              <div className="mb-4">
+                <h2 className="text-lg font-black">سجل الإحالات حسب المستخدم</h2>
+                <p className="mt-1 text-xs leading-6 text-slate-500">يعرض صاحب الإحالة، والحساب المدعو، وحالة النشاط وفق الإيداع الخارجي المعتمد. تُعرض القيم مفصّلة حسب العملة.</p>
+              </div>
+              {referrals.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">لا توجد حسابات مرتبطة بإحالة حتى الآن.</div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-white/10">
+                  <table className="min-w-full text-right text-sm">
+                    <thead className="bg-[#050a13] text-xs text-slate-400">
+                      <tr>
+                        <th className="whitespace-nowrap px-4 py-3">المستخدم المدعو</th>
+                        <th className="whitespace-nowrap px-4 py-3">صاحب الإحالة</th>
+                        <th className="whitespace-nowrap px-4 py-3">الحالة</th>
+                        <th className="whitespace-nowrap px-4 py-3">الإيداعات المعتمدة</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {referrals.map((item) => (
+                        <tr key={item._id} className="border-t border-white/10 align-top">
+                          <td className="px-4 py-3">
+                            <div className="font-bold">{item.name || item.username || "مستخدم"}</div>
+                            <div className="mt-1 text-xs text-slate-500">{item.email || "—"}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div>{item.referrerName || item.referrerUsername || "—"}</div>
+                            <div className="mt-1 text-xs text-slate-500">{item.referrerEmail || "—"}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={item.active ? "rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300" : "rounded-full bg-slate-700/40 px-3 py-1 text-xs font-bold text-slate-400"}>
+                              {item.active ? "نشط — لديه إيداع معتمد" : "غير نشط"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {item.depositsByAsset.length === 0 ? <span className="text-xs text-slate-600">لا توجد إيداعات معتمدة</span> : item.depositsByAsset.map((deposit) => (
+                              <div key={deposit.asset} className="mb-1 whitespace-nowrap text-xs">
+                                <span className="font-bold text-cyan-300">{deposit.asset}</span>
+                                {" · "}{new Intl.NumberFormat("en-US", { maximumFractionDigits: 8 }).format(deposit.amount)}
+                                {" · "}{deposit.deposits} إيداع
+                              </div>
+                            ))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-start">

@@ -279,28 +279,15 @@ export async function POST(
         }
 
         // Same txHash must not credit another deposit
-        const escapedTxHash = String(current.txHash).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\        const duplicate =
-          await DepositRequest.findOne({
-            _id: {
-              $ne: current._id,
-            },
-            txHash:
-              current.txHash,
-            creditedAt: {
-              $ne: null,
-            },
-          })
-            .session(session)
-            .lean();");
+        const normalizedTxHash = String(current.txHash).trim().toLowerCase();
         const duplicate =
           await DepositRequest.findOne({
             _id: { $ne: current._id },
-            txHash: { $regex: "^" + escapedTxHash + "$", $options: "i" },
             creditedAt: { $ne: null },
+            $expr: { $eq: [{ $toLower: "$txHash" }, normalizedTxHash] },
           })
             .session(session)
             .lean();
-
         if (duplicate) {
           throw new Error(
             "DUPLICATE_TXHASH"

@@ -86,7 +86,7 @@ export default function ReferralPage() {
   }, []);
 
   useEffect(() => {
-    void loadSettings();
+    void Promise.resolve().then(() => { void loadSettings(); });
   }, [loadSettings]);
 
   async function saveSettings() {

@@ -42,7 +42,9 @@ export default function AdminPackagesPage() {
       setError(e instanceof Error ? e.message : "تعذر تحميل الباقات");
     } finally { setLoading(false); }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void Promise.resolve().then(() => { void load(); });
+  }, [load]);
 
   function editPlan(plan: Plan) {
     setEditingId(plan._id);

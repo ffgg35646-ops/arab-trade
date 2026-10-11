@@ -3,9 +3,8 @@ import { jwtVerify } from "jose";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 
-const secretText = process.env.AUTH_SECRET;
-
 export async function getCurrentUser(request: NextRequest) {
+  const secretText = process.env.AUTH_SECRET;
   if (!secretText) return null;
 
   const token = request.cookies.get("arabtrade_session")?.value;

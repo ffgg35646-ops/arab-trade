@@ -471,6 +471,8 @@ export async function PATCH(
       title,
       message,
       read: false,
+    }).catch((notificationError) => {
+      console.error("WITHDRAWAL ADMIN NOTIFICATION:", notificationError);
     });
 
     return NextResponse.json({

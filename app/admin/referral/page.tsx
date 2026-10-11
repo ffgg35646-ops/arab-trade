@@ -16,10 +16,21 @@ interface ReferralSettings {
   enabled: boolean;
 }
 
+interface ReferralStats {
+  invitedCount: number;
+  activeReferralCount: number;
+  depositsByAsset: { asset: string; amount: number; deposits: number }[];
+}
+
 export default function ReferralPage() {
   const [settings, setSettings] = useState<ReferralSettings>({
     commissionPercent: 10,
     enabled: true,
+  });
+  const [stats, setStats] = useState<ReferralStats>({
+    invitedCount: 0,
+    activeReferralCount: 0,
+    depositsByAsset: [],
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,6 +59,11 @@ export default function ReferralPage() {
       setSettings({
         commissionPercent: Number(result.referral?.commissionPercent ?? 10),
         enabled: result.referral?.enabled !== false,
+      });
+      setStats({
+        invitedCount: Number(result.stats?.invitedCount || 0),
+        activeReferralCount: Number(result.stats?.activeReferralCount || 0),
+        depositsByAsset: Array.isArray(result.stats?.depositsByAsset) ? result.stats.depositsByAsset : [],
       });
     } catch (loadError) {
       setError(
@@ -162,6 +178,43 @@ export default function ReferralPage() {
           </div>
         ) : (
           <>
+            <section className="rounded-2xl border border-white/10 bg-[#08111e] p-5 md:p-6">
+              <div className="mb-4">
+                <h2 className="text-lg font-black">نشاط الإحالات والإيداعات المؤكدة</h2>
+                <p className="mt-1 text-xs leading-6 text-slate-500">
+                  تُعد الإحالة نشطة بعد اعتماد إيداع خارجي لحساب المستخدم المدعو. الأرصدة معروضة حسب العملة دون جمع عملات مختلفة.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-white/10 bg-[#050a13] p-4">
+                  <div className="text-xs text-slate-500">إجمالي المستخدمين المدعوين</div>
+                  <div className="mt-2 text-2xl font-black">{stats.invitedCount}</div>
+                </div>
+                <div className="rounded-xl border border-emerald-400/15 bg-emerald-400/[0.04] p-4">
+                  <div className="text-xs text-slate-500">إحالات لديها إيداع معتمد</div>
+                  <div className="mt-2 text-2xl font-black text-emerald-300">{stats.activeReferralCount}</div>
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="mb-2 text-xs font-bold text-slate-400">الإيداعات المعتمدة من الحسابات المدعوة</div>
+                {stats.depositsByAsset.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-white/10 p-4 text-sm text-slate-500">لا توجد إيداعات إحالة معتمدة حتى الآن.</div>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {stats.depositsByAsset.map((item) => (
+                      <div key={item.asset} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#050a13] px-4 py-3">
+                        <span className="text-xs font-bold text-cyan-200">{item.asset}</span>
+                        <div className="text-left">
+                          <div className="font-black">{new Intl.NumberFormat("en-US", { maximumFractionDigits: 8 }).format(item.amount)}</div>
+                          <div className="mt-1 text-[10px] text-slate-600">{item.deposits} إيداع معتمد</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+
             <div className="grid gap-5 lg:grid-cols-2">
               <section className="rounded-2xl border border-white/10 bg-[#08111e] p-6 md:p-7">
                 <div className="mb-5 flex items-center gap-3">

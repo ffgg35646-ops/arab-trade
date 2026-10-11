@@ -21,6 +21,7 @@ interface ReferralUser {
   email?: string;
   createdAt: string;
   active: boolean;
+  depositsByAsset: { asset: string; amount: number; count: number }[];
 }
 
 interface CommissionSummary {
@@ -339,6 +340,7 @@ export default function ReferralPage() {
                           <tr className="border-b border-white/10 text-xs text-slate-500">
                             <th className="px-3 py-3 font-semibold">المستخدم</th>
                             <th className="px-3 py-3 font-semibold">تاريخ التسجيل</th>
+                            <th className="px-3 py-3 font-semibold">الإيداع الخارجي المعتمد</th>
                             <th className="px-3 py-3 font-semibold">الحالة</th>
                           </tr>
                         </thead>
@@ -353,6 +355,20 @@ export default function ReferralPage() {
                               </td>
                               <td className="px-3 py-4 text-xs text-slate-400">
                                 {formatDate(referral.createdAt)}
+                              </td>
+                              <td className="px-3 py-4">
+                                {referral.depositsByAsset?.length ? (
+                                  <div className="space-y-1.5">
+                                    {referral.depositsByAsset.map((item) => (
+                                      <div key={item.asset} className="text-xs text-slate-300">
+                                        <span className="font-bold text-cyan-200">{new Intl.NumberFormat("en-US", { maximumFractionDigits: 8 }).format(item.amount)}</span>{" "}
+                                        <span className="text-slate-500">{item.asset}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-slate-600">لا يوجد إيداع معتمد</span>
+                                )}
                               </td>
                               <td className="px-3 py-4">
                                 <span className={referral.active ? "inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300" : "inline-flex rounded-full border border-slate-700 bg-slate-800/60 px-3 py-1 text-xs text-slate-400"}>

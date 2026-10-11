@@ -37,6 +37,9 @@ type PackageAccount = {
   status: "active" | "cancelled";
   availableEarnings: number;
   lockedEarnings: number;
+  investedAmount: number;
+  totalWithdrawn: number;
+  firstWithdrawalStatus?: "available" | "pending" | "completed";
 };
 
 export default function WithdrawPage() {
@@ -241,6 +244,10 @@ export default function WithdrawPage() {
   );
 
   const selectedPackage = packageAccounts.find((item) => item._id === selectedPackageId);
+  const packageFirstStatus = selectedPackage?.firstWithdrawalStatus || (Number(selectedPackage?.totalWithdrawn || 0) > 0 ? "completed" : "available");
+  const packageFirstWithdrawalPending = withdrawalSource === "package" && packageFirstStatus === "pending";
+  const packageFirstWithdrawal = withdrawalSource === "package" && packageFirstStatus === "available";
+  const packageWithdrawalMax = selectedPackage ? (packageFirstWithdrawal ? Math.min(Number(selectedPackage.availableEarnings || 0), Number(selectedPackage.investedAmount || 0)) : Number(selectedPackage.availableEarnings || 0)) : 0;
   const selectedBalance =
     withdrawalSource === "package"
       ? Number(selectedPackage?.availableEarnings || 0)
@@ -394,6 +401,12 @@ export default function WithdrawPage() {
         }
         if (selected.asset !== "USDT") {
           throw new Error("سحب أرباح الباقة متاح حاليًا بعملة USDT فقط");
+        }
+        if (packageFirstWithdrawalPending) {
+          throw new Error("أول طلب سحب من هذه الباقة ما زال قيد المراجعة.");
+        }
+        if (packageFirstWithdrawal && numericAmount > Number(selectedPackage.investedAmount || 0)) {
+          throw new Error(`الحد الأقصى لأول سحب هو مبلغ تفعيل الباقة: ${selectedPackage.investedAmount} USDT`);
         }
         if (numericAmount > selectedPackage.availableEarnings) {
           throw new Error("مبلغ السحب أكبر من الرصيد المتاح في هذه الباقة");
@@ -566,7 +579,7 @@ export default function WithdrawPage() {
                         </option>
                       ))}
                     </select>
-                    <p className="mt-2 text-xs leading-5 text-slate-500">يتم السحب من الرصيد المتاح لهذه الباقة فقط. رصيد الإيداع الخارجي لا يُسحب مباشرة.</p>
+                    <p className="mt-2 text-xs leading-5 text-slate-500">يتم السحب من رصيد هذه الباقة فقط، ورصيد الإيداع الخارجي لا يُسحب مباشرة.</p>{packageFirstWithdrawalPending ? <p className="mt-2 text-xs font-bold text-amber-300">أول طلب سحب من الباقة قيد المراجعة؛ انتظر حسمه قبل طلب آخر.</p> : packageFirstWithdrawal ? <p className="mt-2 text-xs font-bold text-cyan-300">الحد الأقصى لأول سحب هو مبلغ تفعيل الباقة ({selectedPackage.investedAmount} USDT). بعد حسم أول طلب، يمكنك سحب الرصيد المحقق المتاح دون شرط إحالات.</p> : <p className="mt-2 text-xs text-slate-500">أول طلب سحب حُسم بالفعل؛ يمكنك سحب رصيد الباقة المحقق والمتاح وفق حدود المنصة.</p>}
                   </div>
                 )}
 
@@ -706,7 +719,9 @@ export default function WithdrawPage() {
                           )
                         }
                         placeholder="المبلغ"
-                        className="w-full rounded-xl border border-white/10 bg-[#050a13] px-4 py-3"
+                        max={withdrawalSource === "package" ? packageWithdrawalMax : undefined}
+                        disabled={packageFirstWithdrawalPending}
+                        className="w-full rounded-xl border border-white/10 bg-[#050a13] px-4 py-3 disabled:opacity-50"
                         required
                       />
                     </div>

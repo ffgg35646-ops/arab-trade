@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
         // Active means at least one externally funded deposit was approved.
         active: depositsByUser.size,
         enabled: settings?.referral?.enabled !== false,
-        commissionPercent: Number(settings?.referral?.commissionPercent ?? 10),
+        commissionPercent: Number(settings?.referral?.commissionPercent ?? 0),
         referrals: referredUsers.map((referral) => ({
           _id: String(referral._id),
           name: referral.name,

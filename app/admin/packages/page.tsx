@@ -30,8 +30,6 @@ export default function AdminPackagesPage() {
 
   const load = useCallback(async () => {
     try {
-      await Promise.resolve();
-      setLoading(true);
       const res = await fetch("/api/admin/packages", { credentials: "include", cache: "no-store" });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || "تعذر تحميل الباقات");
@@ -104,7 +102,7 @@ export default function AdminPackagesPage() {
       <section className="rounded-3xl border border-white/10 bg-gradient-to-l from-blue-500/[0.13] via-[#08111e] to-cyan-400/[0.03] p-6 md:p-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3"><div className="rounded-2xl border border-cyan-300/15 bg-cyan-400/10 p-3 text-cyan-300"><Package size={25}/></div><div><h1 className="text-2xl font-black md:text-3xl">إدارة الباقات وأرصدة كل باقة</h1><p className="mt-2 text-sm leading-6 text-slate-400">إدارة خطط التفعيل ومتابعة حسابات المستخدمين وتسجيل العوائد المحققة.</p></div></div>
-          <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-bold disabled:opacity-50"><RefreshCw size={16} className={loading ? "animate-spin" : ""}/>تحديث</button>
+          <button type="button" onClick={() => { setLoading(true); setError(""); void load(); }} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-bold disabled:opacity-50"><RefreshCw size={16} className={loading ? "animate-spin" : ""}/>تحديث</button>
         </div>
       </section>
       {message && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.07] p-4 text-sm text-emerald-300"><CheckCircle2 size={17}/>{message}</div>}

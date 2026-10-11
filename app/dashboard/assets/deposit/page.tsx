@@ -16,6 +16,7 @@ type Method = {
   enabled: boolean;
   depositEnabled?: boolean;
   withdrawalEnabled?: boolean;
+  source?: string;
 };
 
 export default function DepositPage() {
@@ -30,6 +31,7 @@ export default function DepositPage() {
 
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [verifyingId, setVerifyingId] = useState("");
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -92,6 +94,45 @@ export default function DepositPage() {
       ) || null,
     [methods, selectedId]
   );
+
+  async function verifyBlockchainDeposit(item: DepositRecord) {
+    const id = String(item._id || item.id || "");
+    if (!id || !item.txHash) return;
+    setVerifyingId(id);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch("/api/blockchain/verify-deposit", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        if (json.confirmed === false) {
+          setMessage(`لم يتم تأكيد الإيداع بعد: ${Number(json.confirmations || 0)} من ${Number(json.requiredConfirmations || 1)} تأكيدات. يمكنك المحاولة مجددًا لاحقًا.`);
+        } else {
+          throw new Error(json.message || "تعذر التحقق من الإيداع");
+        }
+      } else {
+        setMessage(json.alreadyProcessed
+          ? "تم التحقق من أن هذا الإيداع عولج بالفعل."
+          : `تم التحقق من المعاملة وإضافة ${Number(json.amount || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} ${json.asset} إلى رصيد الإيداع.`);
+      }
+
+      const latest = await fetch("/api/deposits", { credentials: "include", cache: "no-store" });
+      const latestData = await latest.json().catch(() => ({}));
+      if (latest.ok && latestData.success) {
+        setDeposits(Array.isArray(latestData.deposits) ? latestData.deposits : []);
+        setDepositBalances(Array.isArray(latestData.depositBalances) ? latestData.depositBalances : []);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذر التحقق من الإيداع");
+    } finally {
+      setVerifyingId("");
+    }
+  }
 
   async function submit(
     e: React.FormEvent<HTMLFormElement>
@@ -393,9 +434,16 @@ export default function DepositPage() {
                     {item.txHash && <div className="mt-2 max-w-xl break-all font-mono text-[10px] text-slate-600">TX: {item.txHash}</div>}
                     {item.adminNote && <div className="mt-2 text-xs text-slate-400">ملاحظة الإدارة: {item.adminNote}</div>}
                   </div>
-                  <span className={item.status === "approved" ? "rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300" : item.status === "rejected" ? "rounded-full bg-red-400/10 px-3 py-1 text-xs font-bold text-red-300" : "rounded-full bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-200"}>
-                    {item.status === "approved" ? "معتمد — أضيف لرصيد الإيداع" : item.status === "rejected" ? "مرفوض" : "قيد المراجعة"}
-                  </span>
+                  <div className="flex flex-col items-start gap-2">
+                    <span className={item.status === "approved" ? "rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300" : item.status === "rejected" ? "rounded-full bg-red-400/10 px-3 py-1 text-xs font-bold text-red-300" : "rounded-full bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-200"}>
+                      {item.status === "approved" ? "معتمد — أضيف لرصيد الإيداع" : item.status === "rejected" ? "مرفوض" : "قيد المراجعة"}
+                    </span>
+                    {item.status === "pending" && item.txHash && methods.some((method) => method.source === "asset-network" && method.asset === item.asset && method.network.toUpperCase() === item.network.toUpperCase()) && (
+                      <button type="button" disabled={Boolean(verifyingId)} onClick={() => void verifyBlockchainDeposit(item)} className="rounded-lg border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-2 text-xs font-bold text-cyan-200 disabled:opacity-50">
+                        {verifyingId === String(item._id || item.id) ? "جاري التحقق..." : "التحقق من البلوكشين"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

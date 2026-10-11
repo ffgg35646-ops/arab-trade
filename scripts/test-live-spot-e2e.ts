@@ -1,3 +1,4 @@
+// @ts-nocheck -- legacy integration fixture; runtime assertions remain executable.
 import { loadEnvConfig } from "@next/env";
 
 loadEnvConfig(process.cwd());

@@ -5,6 +5,7 @@ import { requireAdminLeader } from "@/lib/admin-auth";
 import InvestmentPackage from "@/models/InvestmentPackage";
 import UserPackage from "@/models/UserPackage";
 import DepositBalance from "@/models/DepositBalance";
+import PackageLedger from "@/models/PackageLedger";
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
     if (!admin) return NextResponse.json({ success: false, message: "غير مصرح" }, { status: 401 });
 
     await connectDB();
-    const [packages, userPackages, depositBalances] = await Promise.all([
+    const [packages, userPackages, depositBalances, packageLedger] = await Promise.all([
       InvestmentPackage.find({}).sort({ sortOrder: 1, price: 1 }).lean(),
       UserPackage.find({})
         .populate("userId", "name username email")
@@ -22,6 +23,12 @@ export async function GET(request: NextRequest) {
       DepositBalance.find({ available: { $gt: 0 } })
         .populate("userId", "name username email")
         .sort({ asset: 1, available: -1 })
+        .limit(500)
+        .lean(),
+      PackageLedger.find({})
+        .populate("userId", "name username email")
+        .populate("userPackageId", "packageName")
+        .sort({ createdAt: -1 })
         .limit(500)
         .lean(),
     ]);
@@ -47,6 +54,20 @@ export async function GET(request: NextRequest) {
           name: row.userId.name,
           username: row.userId.username,
           email: row.userId.email,
+        } : null,
+      })),
+      packageLedger: packageLedger.map((row: any) => ({
+        ...row,
+        _id: String(row._id),
+        userId: row.userId ? {
+          _id: String(row.userId._id),
+          name: row.userId.name,
+          username: row.userId.username,
+          email: row.userId.email,
+        } : null,
+        userPackageId: row.userPackageId ? {
+          _id: String(row.userPackageId._id),
+          packageName: row.userPackageId.packageName,
         } : null,
       })),
     });

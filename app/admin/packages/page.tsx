@@ -7,6 +7,7 @@ import { CheckCircle2, Loader2, Package, Plus, RefreshCw, Save, ShieldAlert, X }
 type Plan = { _id: string; name: string; description: string; price: number; asset: string; durationDays: number; enabled: boolean; sortOrder: number };
 type UserPackage = { _id: string; packageName: string; investedAmount: number; asset: string; status: string; availableEarnings: number; lockedEarnings: number; totalRealizedEarnings: number; totalWithdrawn: number; activatedAt: string; userId?: { _id: string; name?: string; username?: string; email?: string } | null };
 type DepositBalance = { _id: string; asset: string; available: number; locked: number; userId?: { _id: string; name?: string; username?: string; email?: string } | null };
+type LedgerRow = { _id: string; type: string; asset: string; amount: number; note?: string; createdAt: string; userId?: { name?: string; username?: string; email?: string } | null; userPackageId?: { packageName?: string } | null };
 const emptyForm = { name: "", description: "", price: "", durationDays: "30", sortOrder: "0", enabled: true };
 const money = (value: number) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 }).format(Number(value || 0));
 
@@ -14,6 +15,7 @@ export default function AdminPackagesPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [accounts, setAccounts] = useState<UserPackage[]>([]);
   const [depositBalances, setDepositBalances] = useState<DepositBalance[]>([]);
+  const [packageLedger, setPackageLedger] = useState<LedgerRow[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -34,6 +36,7 @@ export default function AdminPackagesPage() {
       setPlans(Array.isArray(json.packages) ? json.packages : []);
       setAccounts(Array.isArray(json.userPackages) ? json.userPackages : []);
       setDepositBalances(Array.isArray(json.depositBalances) ? json.depositBalances : []);
+      setPackageLedger(Array.isArray(json.packageLedger) ? json.packageLedger : []);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذر تحميل الباقات");
@@ -135,6 +138,12 @@ export default function AdminPackagesPage() {
       <section className="rounded-2xl border border-white/10 bg-[#08111e] p-5 md:p-6">
         <h2 className="font-black">حسابات الباقات لدى المستخدمين</h2><p className="mt-1 text-xs leading-6 text-slate-500">معرف حساب الباقة يستخدم لتسجيل عائد محقق فعليًا.</p>
         {loading ? <div className="py-8 text-center text-slate-500">جاري التحميل...</div> : accounts.length === 0 ? <div className="mt-4 rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">لا توجد حسابات باقات حتى الآن.</div> : <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[900px] text-right text-sm"><thead><tr className="border-b border-white/10 text-xs text-slate-500"><th className="px-3 py-3">المستخدم</th><th className="px-3 py-3">الباقة / الحالة</th><th className="px-3 py-3">قيمة التفعيل</th><th className="px-3 py-3">سحب الباقة المتاح</th><th className="px-3 py-3">عائد محقق</th><th className="px-3 py-3">المعرف</th><th className="px-3 py-3">الإجراء</th></tr></thead><tbody>{accounts.map((account) => <tr key={account._id} className="border-b border-white/5"><td className="px-3 py-4"><div className="font-bold">{account.userId?.name || account.userId?.username || "مستخدم"}</div><div className="mt-1 text-xs text-slate-500">{account.userId?.email || "—"}</div></td><td className="px-3 py-4">{account.packageName}<div className="mt-1 text-xs text-slate-500">{account.status === "active" ? "نشطة" : "ملغاة"}</div></td><td className="px-3 py-4">{money(account.investedAmount)} {account.asset}</td><td className="px-3 py-4 text-emerald-300">{money(account.availableEarnings)} {account.asset}</td><td className="px-3 py-4">{money(account.totalRealizedEarnings)} {account.asset}</td><td className="px-3 py-4"><button type="button" onClick={() => setCreditId(account._id)} className="max-w-44 break-all text-left font-mono text-[10px] text-cyan-300 underline">{account._id}</button></td><td className="px-3 py-4"><button type="button" onClick={() => setCreditId(account._id)} disabled={account.status !== "active"} className="rounded-lg bg-blue-600/20 px-3 py-2 text-xs font-bold text-blue-200 disabled:opacity-40">تسجيل عائد</button></td></tr>)}</tbody></table></div>}
+      </section>
+
+      <section className="rounded-2xl border border-white/10 bg-[#08111e] p-5 md:p-6">
+        <h2 className="font-black">سجل حركات جميع الباقات</h2>
+        <p className="mt-1 text-xs leading-6 text-slate-500">سجل تدقيقي للتفعيلات والاستردادات والعوائد المحققة وطلبات السحب.</p>
+        {loading ? <div className="py-6 text-center text-slate-500">جاري التحميل...</div> : packageLedger.length === 0 ? <div className="mt-4 rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">لا توجد حركات مسجلة.</div> : <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[850px] text-right text-sm"><thead><tr className="border-b border-white/10 text-xs text-slate-500"><th className="px-3 py-3">التاريخ</th><th className="px-3 py-3">المستخدم</th><th className="px-3 py-3">الباقة</th><th className="px-3 py-3">نوع الحركة</th><th className="px-3 py-3">المبلغ</th><th className="px-3 py-3">المرجع / الملاحظة</th></tr></thead><tbody>{packageLedger.map((row) => <tr key={row._id} className="border-b border-white/5"><td className="px-3 py-4 text-xs text-slate-500">{new Date(row.createdAt).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</td><td className="px-3 py-4"><div className="font-bold">{row.userId?.name || row.userId?.username || "مستخدم"}</div><div className="text-xs text-slate-500">{row.userId?.email || "—"}</div></td><td className="px-3 py-4">{row.userPackageId?.packageName || "—"}</td><td className="px-3 py-4 text-xs">{row.type}</td><td className={Number(row.amount) < 0 ? "px-3 py-4 font-black text-red-300" : "px-3 py-4 font-black text-emerald-300"}>{Number(row.amount) > 0 ? "+" : ""}{money(row.amount)} {row.asset}</td><td className="max-w-72 px-3 py-4 text-xs text-slate-400">{row.note || "—"}</td></tr>)}</tbody></table></div>}
       </section>
 
       <section className="rounded-2xl border border-cyan-300/15 bg-[#07101d] p-5 md:p-6">

@@ -16,10 +16,15 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
 
     await connectDB();
-    const [packages, depositBalances, userPackages] = await Promise.all([
+    const [packages, depositBalances, userPackages, packageLedger] = await Promise.all([
       InvestmentPackage.find({ enabled: true }).sort({ sortOrder: 1, price: 1 }).lean(),
       DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
       UserPackage.find({ userId: user._id }).sort({ createdAt: -1 }).limit(100).lean(),
+      PackageLedger.find({ userId: user._id })
+        .populate("userPackageId", "packageName")
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .lean(),
     ]);
 
     return NextResponse.json({
@@ -27,6 +32,14 @@ export async function GET(request: NextRequest) {
       packages,
       depositBalances,
       userPackages,
+      packageLedger: packageLedger.map((row: any) => ({
+        ...row,
+        _id: String(row._id),
+        userPackageId: row.userPackageId ? {
+          _id: String(row.userPackageId._id),
+          packageName: row.userPackageId.packageName,
+        } : null,
+      })),
       policy: {
         dailyReturnsAutomatic: false,
         earningsNotice: "يضاف إلى رصيد الباقة العائد المحقق فعليًا والمسجل في النظام فقط. لا يتم إنشاء أرباح يومية مضمونة تلقائيًا.",

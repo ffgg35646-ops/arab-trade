@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
           from: DepositRequest.collection.name,
           let: { referredUserId: "$_id" },
           pipeline: [
-            { $match: { $expr: { $and: [ { $eq: ["$userId", "$referredUserId"] }, { $eq: ["$status", "approved"] } ] } } },
+            { $match: { $expr: { $and: [ { $eq: ["$userId", "$$referredUserId"] }, { $eq: ["$status", "approved"] } ] } } },
             { $group: { _id: "$asset", amount: { $sum: "$amount" }, deposits: { $sum: 1 } } },
             { $sort: { _id: 1 } }
           ],

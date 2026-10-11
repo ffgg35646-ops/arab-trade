@@ -405,7 +405,7 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      withdrawal,
+      withdrawal: settledWithdrawal,
     });
   } catch (error) {
     console.error(

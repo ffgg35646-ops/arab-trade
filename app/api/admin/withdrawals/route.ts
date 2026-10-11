@@ -248,7 +248,7 @@ export async function PATCH(
           userPackageId: packageAccount._id,
           type: nextStatus === "rejected" ? "withdrawal_reversal" : "withdrawal",
           asset: withdrawal.asset,
-          amount: nextStatus === "rejected" ? 0 : -amount,
+          amount: nextStatus === "rejected" ? amount : -amount,
           note: adminNote || (nextStatus === "rejected"
             ? "تم رفض طلب السحب؛ أُعيد مبلغ الطلب " + amount + " " + withdrawal.asset + " إلى الرصيد المتاح للباقة"
             : "تم تنفيذ طلب سحب من رصيد أرباح الباقة بقيمة " + amount + " " + withdrawal.asset),

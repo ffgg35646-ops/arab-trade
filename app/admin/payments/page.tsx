@@ -80,7 +80,7 @@ export default function PaymentsAdminPage() {
   }, []);
 
   useEffect(() => {
-    void load();
+    void Promise.resolve().then(() => { void load(); });
   }, [load]);
 
   function updatePayment(

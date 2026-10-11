@@ -1,4 +1,6 @@
 import Link from "next/link";
+
+export const dynamic = "force-dynamic";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import {
   ArrowRight,

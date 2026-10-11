@@ -1,0 +1,635 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+type Asset = {
+  name: string;
+  symbol: string;
+  enabled: boolean;
+  tradingEnabled: boolean;
+};
+
+type Balance = {
+  asset: string;
+  available: number;
+  locked: number;
+};
+
+type Order = {
+  _id: string;
+  symbol: string;
+  side: "buy" | "sell";
+  type: "limit" | "market";
+  price: number;
+  quantity: number;
+  quoteAmount: number;
+  status: string;
+  createdAt?: string;
+};
+
+type BookOrder = {
+  _id: string;
+  price: number;
+  quantity: number;
+  createdAt?: string;
+};
+
+type Trade = {
+  _id: string;
+  symbol: string;
+  price: number;
+  quantity: number;
+  quoteAmount: number;
+  createdAt?: string;
+};
+
+export default function ProTradePage() {
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [balances, setBalances] = useState<Balance[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [bids, setBids] = useState<BookOrder[]>([]);
+  const [asks, setAsks] = useState<BookOrder[]>([]);
+
+  const [symbol, setSymbol] = useState("BTCUSDT");
+  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [price, setPrice] = useState("");
+  const [quantity, setQuantity] = useState("");
+
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  const [base, quote] = useMemo(() => {
+    const known = assets
+      .map((a) => a.symbol.toUpperCase())
+      .sort((a, b) => b.length - a.length);
+
+    for (const q of known) {
+      if (symbol.endsWith(q) && symbol.length > q.length) {
+        return [symbol.slice(0, -q.length), q];
+      }
+    }
+
+    return ["BTC", "USDT"];
+  }, [assets, symbol]);
+
+  const baseBalance =
+    balances.find((b) => b.asset === base)?.available || 0;
+
+  const quoteBalance =
+    balances.find((b) => b.asset === quote)?.available || 0;
+
+  async function loadAll() {
+    setLoading(true);
+    setError("");
+
+    try {
+      const [assetsRes, walletRes, ordersRes, bookRes, tradesRes] =
+        await Promise.all([
+          fetch("/api/assets", { cache: "no-store" }),
+          fetch("/api/wallet", {
+            credentials: "include",
+            cache: "no-store",
+          }),
+          fetch(`/api/orders?symbol=${encodeURIComponent(symbol)}`, {
+            credentials: "include",
+            cache: "no-store",
+          }),
+          fetch(
+            `/api/orderbook?symbol=${encodeURIComponent(symbol)}&limit=30`,
+            { cache: "no-store" }
+          ),
+          fetch(
+            `/api/trades?symbol=${encodeURIComponent(symbol)}`,
+            {
+              credentials: "include",
+              cache: "no-store",
+            }
+          ),
+        ]);
+
+      const [
+        assetsData,
+        walletData,
+        ordersData,
+        bookData,
+        tradesData,
+      ] = await Promise.all([
+        assetsRes.json(),
+        walletRes.json(),
+        ordersRes.json(),
+        bookRes.json(),
+        tradesRes.json(),
+      ]);
+
+      if (!assetsRes.ok || !assetsData.success) {
+        throw new Error(assetsData.message || "تعذر تحميل الأصول");
+      }
+
+      if (!walletRes.ok || !walletData.success) {
+        throw new Error(walletData.message || "تعذر تحميل المحفظة");
+      }
+
+      if (!ordersRes.ok || !ordersData.success) {
+        throw new Error(ordersData.message || "تعذر تحميل الأوامر");
+      }
+
+      if (!bookRes.ok || !bookData.success) {
+        throw new Error(bookData.message || "تعذر تحميل دفتر الأوامر");
+      }
+
+      if (!tradesRes.ok || !tradesData.success) {
+        throw new Error(tradesData.message || "تعذر تحميل الصفقات");
+      }
+
+      setAssets(
+        Array.isArray(assetsData.assets)
+          ? assetsData.assets.filter((a: Asset) => a.enabled && a.tradingEnabled)
+          : []
+      );
+
+      setBalances(
+        walletData.wallets?.spot?.balances || []
+      );
+
+      setOrders(
+        Array.isArray(ordersData.orders)
+          ? ordersData.orders
+          : []
+      );
+
+      setBids(
+        Array.isArray(bookData.bids)
+          ? bookData.bids
+          : []
+      );
+
+      setAsks(
+        Array.isArray(bookData.asks)
+          ? bookData.asks
+          : []
+      );
+
+      setTrades(
+        Array.isArray(tradesData.trades)
+          ? tradesData.trades
+          : []
+      );
+
+      if (bookData.asks?.[0]?.price && !price) {
+        setPrice(String(bookData.asks[0].price));
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "حدث خطأ أثناء التحميل");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadAll();
+  }, [symbol]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      loadAll();
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, [symbol]);
+
+  async function createOrder(e: React.FormEvent) {
+    e.preventDefault();
+
+    setSubmitting(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const numericPrice = Number(price);
+      const numericQuantity = Number(quantity);
+
+      if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
+        throw new Error("أدخل سعرًا صحيحًا");
+      }
+
+      if (!Number.isFinite(numericQuantity) || numericQuantity <= 0) {
+        throw new Error("أدخل كمية صحيحة");
+      }
+
+      const quoteAmount = numericPrice * numericQuantity;
+
+      if (side === "buy" && quoteAmount > quoteBalance) {
+        throw new Error(`رصيد ${quote} غير كافٍ`);
+      }
+
+      if (side === "sell" && numericQuantity > baseBalance) {
+        throw new Error(`رصيد ${base} غير كافٍ`);
+      }
+
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          symbol,
+          side,
+          type: "limit",
+          price: numericPrice,
+          quantity: numericQuantity,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "تعذر إنشاء الأمر");
+      }
+
+      setMessage(data.message || "تم إنشاء الأمر");
+      setQuantity("");
+
+      await loadAll();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "حدث خطأ");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function cancelOrder(orderId: string) {
+    setError("");
+    setMessage("");
+
+    try {
+      const res = await fetch("/api/orders/cancel", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ orderId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "تعذر إلغاء الأمر");
+      }
+
+      setMessage(data.message || "تم إلغاء الأمر");
+      await loadAll();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "حدث خطأ");
+    }
+  }
+
+  const openOrders = orders.filter(
+    (order) => order.status === "open"
+  );
+
+  return (
+    <main
+      dir="rtl"
+      className="min-h-screen bg-[#050a13] text-white"
+    >
+      <div className="mx-auto max-w-[1500px] px-3 py-4 md:px-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold md:text-2xl">
+              التداول الفوري
+            </h1>
+            <p className="mt-1 text-xs text-slate-500">
+              الأسعار والطلبات والأرصدة مأخوذة من النظام مباشرة.
+            </p>
+          </div>
+
+          <select
+            value={symbol}
+            onChange={(e) => {
+              setSymbol(e.target.value);
+              setPrice("");
+            }}
+            className="rounded-xl border border-white/10 bg-[#07101d] px-4 py-2 text-sm"
+          >
+            {assets.length === 0 ? (
+              <option value="BTCUSDT">BTCUSDT</option>
+            ) : (
+              assets
+                .map((a) => a.symbol)
+                .filter(Boolean)
+                .map((s) => (
+                  <option key={s} value={`${s}USDT`}>
+                    {s}USDT
+                  </option>
+                ))
+            )}
+          </select>
+        </div>
+
+        {error && (
+          <div className="mb-3 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
+        {message && (
+          <div className="mb-3 rounded-xl border border-green-500/20 bg-green-500/5 p-3 text-sm text-green-300">
+            {message}
+          </div>
+        )}
+
+        <div className="grid gap-3 lg:grid-cols-[1fr_360px]">
+          <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#07101d]">
+            <div className="grid min-h-[520px] grid-cols-1 lg:grid-cols-[1fr_300px]">
+              <div className="border-b border-white/10 lg:border-b-0 lg:border-l">
+                <div className="flex h-12 items-center justify-between border-b border-white/10 px-4">
+                  <span className="font-semibold">{symbol}</span>
+                  <button
+                    onClick={loadAll}
+                    className="text-xs text-slate-400 hover:text-white"
+                  >
+                    تحديث
+                  </button>
+                </div>
+
+                <div className="flex h-[470px] items-center justify-center">
+                  <div className="text-center">
+                    <div className="mb-2 text-sm text-slate-500">
+                      مخطط السعر
+                    </div>
+                    <div className="text-xs text-slate-600">
+                      اربط مخططك الحالي بـبيانات السوق من المصدر الفعلي.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="border-b border-white/10 px-4 py-3 font-semibold">
+                  دفتر الأوامر
+                </div>
+
+                <div className="grid grid-cols-3 px-4 py-2 text-[11px] text-slate-500">
+                  <span>السعر</span>
+                  <span>الكمية</span>
+                  <span>القيمة</span>
+                </div>
+
+                <div className="max-h-44 overflow-hidden px-4">
+                  {asks
+                    .slice()
+                    .reverse()
+                    .slice(0, 12)
+                    .map((row) => (
+                      <button
+                        key={row._id}
+                        onClick={() => setPrice(String(row.price))}
+                        className="grid w-full grid-cols-3 py-1 text-left text-xs hover:bg-white/5"
+                      >
+                        <span className="text-red-300">
+                          {row.price}
+                        </span>
+                        <span>{row.quantity}</span>
+                        <span>
+                          {(row.price * row.quantity).toFixed(4)}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+
+                <div className="border-y border-white/10 px-4 py-3 text-center font-semibold">
+                  {bids[0]?.price || asks[0]?.price || "--"}
+                </div>
+
+                <div className="max-h-44 overflow-hidden px-4">
+                  {bids.slice(0, 12).map((row) => (
+                    <button
+                      key={row._id}
+                      onClick={() => setPrice(String(row.price))}
+                      className="grid w-full grid-cols-3 py-1 text-left text-xs hover:bg-white/5"
+                    >
+                      <span className="text-green-300">
+                        {row.price}
+                      </span>
+                      <span>{row.quantity}</span>
+                      <span>
+                        {(row.price * row.quantity).toFixed(4)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-3 border-t border-white/10">
+                  <div className="px-4 py-3 text-sm font-semibold">
+                    الصفقات الأخيرة
+                  </div>
+
+                  <div className="max-h-36 overflow-auto px-4 pb-4">
+                    {trades.slice(0, 12).map((trade) => (
+                      <div
+                        key={trade._id}
+                        className="grid grid-cols-3 py-1 text-xs"
+                      >
+                        <span>{trade.price}</span>
+                        <span>{trade.quantity}</span>
+                        <span className="text-slate-500">
+                          {trade.createdAt
+                            ? new Date(trade.createdAt).toLocaleTimeString(
+                                "ar-EG"
+                              )
+                            : "-"}
+                        </span>
+                      </div>
+                    ))}
+
+                    {trades.length === 0 && (
+                      <div className="py-4 text-center text-xs text-slate-600">
+                        لا توجد صفقات.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <aside className="rounded-2xl border border-white/10 bg-[#07101d]">
+            <div className="border-b border-white/10 p-4">
+              <div className="mb-3 flex rounded-xl bg-white/[0.03] p-1">
+                <button
+                  onClick={() => setSide("buy")}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm ${
+                    side === "buy"
+                      ? "bg-white text-black"
+                      : "text-slate-400"
+                  }`}
+                >
+                  شراء
+                </button>
+
+                <button
+                  onClick={() => setSide("sell")}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm ${
+                    side === "sell"
+                      ? "bg-white text-black"
+                      : "text-slate-400"
+                  }`}
+                >
+                  بيع
+                </button>
+              </div>
+
+              <form onSubmit={createOrder} className="space-y-3">
+                <div className="text-xs text-slate-500">
+                  متاح:{" "}
+                  {side === "buy"
+                    ? `${quoteBalance} ${quote}`
+                    : `${baseBalance} ${base}`}
+                </div>
+
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="السعر"
+                  className="w-full rounded-xl border border-white/10 bg-[#050a13] px-4 py-3 text-sm outline-none"
+                  required
+                />
+
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  placeholder={`الكمية ${base}`}
+                  className="w-full rounded-xl border border-white/10 bg-[#050a13] px-4 py-3 text-sm outline-none"
+                  required
+                />
+
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs text-slate-400">
+                  القيمة التقديرية:{" "}
+                  {Number(price || 0) * Number(quantity || 0)} {quote}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full rounded-xl bg-white px-4 py-3 text-sm font-bold text-black disabled:opacity-40"
+                >
+                  {submitting
+                    ? "جاري التنفيذ..."
+                    : side === "buy"
+                      ? `شراء ${base}`
+                      : `بيع ${base}`}
+                </button>
+              </form>
+            </div>
+
+            <div className="border-b border-white/10 p-4">
+              <h2 className="mb-3 text-sm font-semibold">
+                أوامري المفتوحة
+              </h2>
+
+              <div className="space-y-2">
+                {openOrders.length === 0 && (
+                  <div className="text-xs text-slate-600">
+                    لا توجد أوامر مفتوحة.
+                  </div>
+                )}
+
+                {openOrders.map((order) => (
+                  <div
+                    key={order._id}
+                    className="rounded-xl border border-white/5 bg-white/[0.02] p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold">
+                        {order.side === "buy" ? "شراء" : "بيع"} {order.symbol}
+                      </span>
+
+                      <button
+                        onClick={() => cancelOrder(order._id)}
+                        className="text-xs text-red-300 hover:text-red-200"
+                      >
+                        إلغاء
+                      </button>
+                    </div>
+
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-slate-500">
+                      <span>السعر {order.price}</span>
+                      <span>الكمية {order.quantity}</span>
+                      <span>القيمة {order.quoteAmount}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-4 text-xs text-slate-500">
+              <div>الرصيد المتاح {quote}: {quoteBalance}</div>
+              <div className="mt-1">الرصيد المتاح {base}: {baseBalance}</div>
+            </div>
+          </aside>
+        </div>
+
+        <section className="mt-3 rounded-2xl border border-white/10 bg-[#07101d]">
+          <div className="border-b border-white/10 px-4 py-4 font-semibold">
+            سجل الأوامر
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[850px] text-right text-sm">
+              <thead className="bg-white/[0.03] text-slate-500">
+                <tr>
+                  <th className="p-3">الزوج</th>
+                  <th className="p-3">الجانب</th>
+                  <th className="p-3">السعر</th>
+                  <th className="p-3">الكمية المتبقية</th>
+                  <th className="p-3">القيمة</th>
+                  <th className="p-3">الحالة</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-white/5">
+                {orders.map((order) => (
+                  <tr key={order._id}>
+                    <td className="p-3 font-semibold">
+                      {order.symbol}
+                    </td>
+                    <td className="p-3">
+                      {order.side === "buy" ? "شراء" : "بيع"}
+                    </td>
+                    <td className="p-3">{order.price}</td>
+                    <td className="p-3">{order.quantity}</td>
+                    <td className="p-3">{order.quoteAmount}</td>
+                    <td className="p-3">{order.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {loading && (
+            <div className="p-8 text-center text-slate-600">
+              جاري تحميل بيانات التداول...
+            </div>
+          )}
+
+          {!loading && orders.length === 0 && (
+            <div className="p-8 text-center text-slate-600">
+              لا توجد أوامر.
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}

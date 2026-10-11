@@ -1,0 +1,160 @@
+[
+  {
+    "file": "app/dashboard/page.tsx",
+    "status": "bound",
+    "present": [
+      "/api/auth/me",
+      "/api/wallet",
+      "/api/notifications",
+      "/api/orders"
+    ],
+    "missing": []
+  },
+  {
+    "file": "app/dashboard/assets/page.tsx",
+    "status": "partial",
+    "present": [],
+    "missing": [
+      "/api/wallet",
+      "/api/assets"
+    ]
+  },
+  {
+    "file": "app/dashboard/orders/page.tsx",
+    "status": "bound",
+    "present": [
+      "/api/orders",
+      "/api/orderbook"
+    ],
+    "missing": []
+  },
+  {
+    "file": "app/dashboard/orders/history/page.tsx",
+    "status": "partial",
+    "present": [],
+    "missing": [
+      "/api/orders"
+    ]
+  },
+  {
+    "file": "app/dashboard/trades/page.tsx",
+    "status": "partial",
+    "present": [],
+    "missing": [
+      "/api/trades"
+    ]
+  },
+  {
+    "file": "app/dashboard/notifications/page.tsx",
+    "status": "bound",
+    "present": [
+      "/api/notifications",
+      "/api/notifications/preferences"
+    ],
+    "missing": []
+  },
+  {
+    "file": "app/dashboard/referral/page.tsx",
+    "status": "bound",
+    "present": [
+      "/api/referral",
+      "/api/referral/commissions"
+    ],
+    "missing": []
+  },
+  {
+    "file": "app/dashboard/rewards/page.tsx",
+    "status": "partial",
+    "present": [],
+    "missing": [
+      "/api/rewards"
+    ]
+  },
+  {
+    "file": "app/dashboard/account/security/page.tsx",
+    "status": "bound",
+    "present": [
+      "/api/account/2fa",
+      "/api/account/sessions"
+    ],
+    "missing": []
+  },
+  {
+    "file": "app/dashboard/account/statement/page.tsx",
+    "status": "partial",
+    "present": [],
+    "missing": [
+      "/api/account/statement"
+    ]
+  },
+  {
+    "file": "app/dashboard/account/reports/page.tsx",
+    "status": "partial",
+    "present": [],
+    "missing": [
+      "/api/account/reports"
+    ]
+  },
+  {
+    "file": "app/protrade/page.tsx",
+    "status": "bound",
+    "present": [
+      "/api/assets",
+      "/api/market",
+      "/api/trading/market",
+      "/api/orders",
+      "/api/orderbook",
+      "/api/trades"
+    ],
+    "missing": []
+  },
+  {
+    "file": "app/protrade/[pair]/page.tsx",
+    "status": "bound",
+    "present": [
+      "/api/assets",
+      "/api/orders",
+      "/api/orderbook",
+      "/api/trades"
+    ],
+    "missing": []
+  },
+  {
+    "file": "app/protrade/pro/page.tsx",
+    "status": "bound",
+    "present": [
+      "/api/assets",
+      "/api/orders",
+      "/api/orderbook",
+      "/api/trades"
+    ],
+    "missing": []
+  },
+  {
+    "file": "app/margin/page.tsx",
+    "status": "bound",
+    "present": [
+      "/api/assets",
+      "/api/margin/positions"
+    ],
+    "missing": []
+  },
+  {
+    "file": "app/margin/[pair]/page.tsx",
+    "status": "bound",
+    "present": [
+      "/api/assets",
+      "/api/margin/positions"
+    ],
+    "missing": []
+  },
+  {
+    "file": "app/futures/page.tsx",
+    "status": "bound",
+    "present": [
+      "/api/assets",
+      "/api/futures/positions"
+    ],
+    "missing": []
+  }
+]

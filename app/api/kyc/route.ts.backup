@@ -1,0 +1,374 @@
+import { NextRequest, NextResponse } from "next/server";
+import { connectDB } from "@/lib/mongodb";
+import { getCurrentUser } from "@/lib/current-user";
+import KycRequest from "@/models/KycRequest";
+import User from "@/models/User";
+import { randomUUID } from "crypto";
+import { promises as fs } from "fs";
+import path from "path";
+
+const ALLOWED_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+const MAX_FILE_SIZE = 8 * 1024 * 1024;
+
+function safeExtension(type: string) {
+  if (type === "image/png") return ".png";
+  if (type === "image/webp") return ".webp";
+  return ".jpg";
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request);
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "غير مسجل الدخول",
+        },
+        { status: 401 }
+      );
+    }
+
+    await connectDB();
+
+    const latest = await KycRequest.findOne({
+      userId: user._id,
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return NextResponse.json({
+      success: true,
+      kyc: latest
+        ? {
+            id: String(latest._id),
+            status: latest.status,
+            rejectionReason: latest.rejectionReason || null,
+            createdAt: latest.createdAt,
+            updatedAt: latest.updatedAt,
+          }
+        : null,
+    });
+  } catch (error) {
+    console.error("KYC GET ERROR:", error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: "تعذر تحميل حالة التوثيق",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request);
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "غير مسجل الدخول",
+        },
+        { status: 401 }
+      );
+    }
+
+    await connectDB();
+
+    const dbUser = await User.findById(user._id).select(
+      "_id name email isVerified isActive"
+    );
+
+    if (!dbUser || !dbUser.isActive) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "الحساب غير متاح",
+        },
+        { status: 403 }
+      );
+    }
+
+    if (!dbUser.isVerified) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "يجب تأكيد البريد الإلكتروني أولًا",
+        },
+        { status: 403 }
+      );
+    }
+
+    const approved = await KycRequest.exists({
+      userId: dbUser._id,
+      status: "approved",
+    });
+
+    if (approved) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "الحساب موثق بالفعل",
+        },
+        { status: 400 }
+      );
+    }
+
+    const pending = await KycRequest.exists({
+      userId: dbUser._id,
+      status: "pending",
+    });
+
+    if (pending) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "لديك طلب توثيق قيد المراجعة بالفعل",
+        },
+        { status: 400 }
+      );
+    }
+
+    const form = await request.formData();
+
+    const fullName = String(form.get("fullName") || "").trim();
+    const dateOfBirth = String(form.get("dateOfBirth") || "").trim();
+    const nationality = String(form.get("nationality") || "").trim();
+
+    const documentTypeValue = String(
+      form.get("documentType") || ""
+    ).trim();
+
+    const documentType =
+      documentTypeValue === "passport" ||
+      documentTypeValue === "national_id"
+        ? documentTypeValue
+        : null;
+
+    const documentNumber = String(
+      form.get("documentNumber") || ""
+    ).trim();
+
+    const issuingCountry = String(
+      form.get("issuingCountry") || ""
+    ).trim();
+
+    const issueDate = String(
+      form.get("issueDate") || ""
+    ).trim();
+
+    const expiryDate = String(
+      form.get("expiryDate") || ""
+    ).trim();
+
+    const documentFrontFile = form.get("documentFrontFile");
+    const documentBackFile = form.get("documentBackFile");
+    const selfieFile = form.get("selfieFile");
+
+    if (
+      !fullName ||
+      !dateOfBirth ||
+      !nationality ||
+      !documentNumber ||
+      !issuingCountry
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "أكمل جميع بيانات الهوية المطلوبة",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!documentType) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "نوع الوثيقة غير صالح",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      !(documentFrontFile instanceof File) ||
+      !(selfieFile instanceof File)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "يجب رفع صورة الوثيقة وصورة السيلفي",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      !ALLOWED_TYPES.has(documentFrontFile.type) ||
+      !ALLOWED_TYPES.has(selfieFile.type)
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "الصور المسموح بها JPG أو PNG أو WEBP فقط",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      documentFrontFile.size > MAX_FILE_SIZE ||
+      selfieFile.size > MAX_FILE_SIZE
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "حجم كل صورة يجب ألا يتجاوز 8MB",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (documentType === "national_id") {
+      if (!(documentBackFile instanceof File)) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "يجب رفع صورة ظهر البطاقة الشخصية",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (!ALLOWED_TYPES.has(documentBackFile.type)) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "صورة ظهر البطاقة يجب أن تكون JPG أو PNG أو WEBP",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (documentBackFile.size > MAX_FILE_SIZE) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "حجم صورة ظهر البطاقة يجب ألا يتجاوز 8MB",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    const folder = path.join(
+      process.cwd(),
+      "private",
+      "kyc",
+      String(dbUser._id),
+      randomUUID()
+    );
+
+    await fs.mkdir(folder, { recursive: true });
+
+    const frontPath = path.join(
+      folder,
+      `document-front${safeExtension(documentFrontFile.type)}`
+    );
+
+    const selfiePath = path.join(
+      folder,
+      `selfie${safeExtension(selfieFile.type)}`
+    );
+
+    await fs.writeFile(
+      frontPath,
+      Buffer.from(await documentFrontFile.arrayBuffer())
+    );
+
+    await fs.writeFile(
+      selfiePath,
+      Buffer.from(await selfieFile.arrayBuffer())
+    );
+
+    let backPath: string | undefined;
+
+    if (
+      documentType === "national_id" &&
+      documentBackFile instanceof File
+    ) {
+      backPath = path.join(
+        folder,
+        `document-back${safeExtension(documentBackFile.type)}`
+      );
+
+      await fs.writeFile(
+        backPath,
+        Buffer.from(await documentBackFile.arrayBuffer())
+      );
+    }
+
+    const kyc = await KycRequest.create({
+      userId: dbUser._id,
+
+      fullName,
+      dateOfBirth,
+      nationality,
+
+      documentType,
+      documentNumber,
+      issuingCountry,
+
+      issueDate: issueDate || undefined,
+      expiryDate: expiryDate || undefined,
+
+      documentFrontPath: path.relative(
+        process.cwd(),
+        frontPath
+      ),
+
+      documentBackPath: backPath
+        ? path.relative(process.cwd(), backPath)
+        : undefined,
+
+      selfiePath: path.relative(
+        process.cwd(),
+        selfiePath
+      ),
+
+      status: "pending",
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: "تم إرسال وثائق التوثيق للمراجعة بنجاح",
+        kyc: {
+          id: String(kyc._id),
+          status: kyc.status,
+        },
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("KYC POST ERROR:", error);
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: "تعذر إرسال طلب التوثيق",
+      },
+      { status: 500 }
+    );
+  }
+}

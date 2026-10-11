@@ -1,69 +1,136 @@
-import Image from "next/image";
+import Hero from "@/components/Hero";
+import MarketTerminal from "@/components/MarketTerminal";
+import Footer from "@/components/Footer";
+import Navbar from "@/components/Navbar";
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+    <div dir="rtl" className="min-h-screen overflow-x-hidden bg-[#050a13] text-white">
+      <Navbar />
+
+      <main>
+        <Hero />
+
+        <MarketTerminal />
+
+        <section id="markets" className="mx-auto max-w-7xl px-4 py-20 lg:px-8">
+          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="mb-2 text-xs font-bold text-[#3b82f6]">
+                LIVE MARKETS
+              </div>
+
+              <h2 className="text-3xl font-black text-white sm:text-4xl">
+                أهم الأسواق الآن
+              </h2>
+
+              <p className="mt-3 text-sm leading-7 text-white/40">
+                تابع حركة أبرز الأصول والأسعار والتغيرات اليومية من مكان واحد.
+              </p>
+            </div>
+
+            <button className="w-fit rounded-xl border border-white/10 bg-[#07101d]/[0.03] px-4 py-2 text-sm font-bold text-white/70">
+              عرض جميع الأسواق
+            </button>
+          </div>
+
+          <div className="overflow-hidden rounded-[24px] border border-white/5 bg-[#07101d]">
+            <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 border-b border-white/5 px-5 py-4 text-xs font-semibold text-white/30">
+              <span>الأصل</span>
+              <span>السعر</span>
+              <span>التغير 24س</span>
+              <span>الحجم</span>
+            </div>
+
+            {[
+              ["Bitcoin", "BTC", "$118,240.42", "+2.43%", "$42.8B"],
+              ["Ethereum", "ETH", "$4,521.88", "+1.87%", "$21.4B"],
+              ["Solana", "SOL", "$201.74", "-0.64%", "$5.8B"],
+              ["BNB", "BNB", "$712.30", "+1.12%", "$2.9B"],
+              ["XRP", "XRP", "$2.74", "+3.28%", "$7.3B"],
+            ].map(([name, symbol, price, change, volume]) => (
+              <div
+                key={symbol}
+                className="grid grid-cols-[1.5fr_1fr_1fr_1fr] items-center gap-4 border-b border-white/[0.04] px-5 py-5 last:border-0 hover:bg-[#07101d]/[0.02]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#07101d]/[0.05] text-xs font-black text-[#3b82f6]">
+                    {symbol.slice(0, 2)}
+                  </div>
+
+                  <div>
+                    <div className="text-sm font-bold text-white">{name}</div>
+                    <div className="mt-0.5 text-[11px] text-white/30">
+                      {symbol}/USDT
+                    </div>
+                  </div>
+                </div>
+
+                <span className="text-sm font-semibold text-white">{price}</span>
+
+                <span
+                  className={`text-sm font-bold ${
+                    change.startsWith("+")
+                      ? "text-[#22c55e]"
+                      : "text-[#ef4444]"
+                  }`}
+                >
+                  {change}
+                </span>
+
+                <span className="text-sm text-white/45">{volume}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="trading" className="mx-auto max-w-7xl px-4 pb-20 lg:px-8">
+          <div className="grid gap-6 lg:grid-cols-3">
+            {[
+              ["أدوات تداول متقدمة", "راقب السوق وحلل الحركة عبر واجهة واضحة وسريعة."],
+              ["أسعار وتحركات مباشرة", "تابع الأصول المهمة بدون مغادرة المنصة."],
+              ["تجربة مصممة للسرعة", "تنقل سهل وواجهة مناسبة للكمبيوتر والهاتف."],
+            ].map(([title, description]) => (
+              <div
+                key={title}
+                className="rounded-[24px] border border-white/5 bg-[#07101d] p-6"
+              >
+                <div className="h-11 w-11 rounded-2xl bg-[#3b82f6]/10" />
+                <h3 className="mt-6 text-lg font-extrabold text-white">{title}</h3>
+                <p className="mt-3 text-sm leading-7 text-white/40">
+                  {description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section
+          id="about"
+          className="mx-auto max-w-7xl px-4 pb-20 lg:px-8"
+        >
+          <div className="rounded-[28px] border border-[#3b82f6]/10 bg-gradient-to-r from-[#3b82f6]/10 via-transparent to-transparent p-8 sm:p-12">
+            <div className="max-w-3xl">
+              <div className="text-xs font-bold text-[#3b82f6]">
+                منصة واحدة • تجربة متكاملة
+              </div>
+
+              <h2 className="mt-4 text-3xl font-black text-white sm:text-4xl">
+                كل ما تحتاجه لمتابعة السوق في مكان واحد
+              </h2>
+
+              <p className="mt-5 text-sm leading-8 text-white/40 sm:text-base">
+                من متابعة الأسعار إلى دراسة حركة السوق واكتشاف الفرص، تم تصميم
+                عرب تريد لتكون واجهة مالية حديثة وسهلة الاستخدام.
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
+
+      <div id="contact">
+        <Footer />
+      </div>
     </div>
   );
 }

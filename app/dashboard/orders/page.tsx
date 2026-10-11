@@ -1,0 +1,1847 @@
+"use client";
+
+import Link from "next/link";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  ExternalLink,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+import InternalNavbar from "@/components/InternalNavbar";
+import InternalSidebar from "@/components/InternalSidebar";
+
+type Tab =
+  | "open"
+  | "history"
+  | "trades";
+
+type MarketType =
+  | "all"
+  | "spot"
+  | "margin"
+  | "futures";
+
+type Side =
+  | "all"
+  | "buy"
+  | "sell";
+
+interface Order {
+  _id?: string;
+  id?: string;
+
+  symbol?: string;
+  pair?: string;
+
+  side?: string;
+  type?: string;
+  orderType?: string;
+  market?: string;
+  marketType?: string;
+
+  price?: number | string | null;
+  quantity?: number | string | null;
+  qty?: number | string | null;
+
+  executedQty?: number | string | null;
+  filledQty?: number | string | null;
+
+  originalQuantity?: number | string | null;
+  filledQuantity?: number | string | null;
+  remainingQuantity?: number | string | null;
+  fillPercent?: number | string | null;
+
+  leverage?: number | string | null;
+  marginMode?: string;
+  reduceOnly?: boolean;
+
+  avgPrice?: number | string | null;
+  averagePrice?: number | string | null;
+
+  status?: string;
+
+  createdAt?: string;
+  updatedAt?: string;
+
+  fee?: number | string | null;
+  feeAsset?: string;
+
+  total?: number | string | null;
+
+  clientOrderId?: string;
+  orderId?: string;
+
+  timeInForce?: string;
+}
+
+interface Trade {
+  _id?: string;
+  id?: string;
+
+  symbol?: string;
+  pair?: string;
+
+  side?: string;
+
+  price?: number | string | null;
+  quantity?: number | string | null;
+  qty?: number | string | null;
+
+  fee?: number | string | null;
+  feeAsset?: string;
+
+  realizedPnl?: number | string | null;
+  pnl?: number | string | null;
+
+  createdAt?: string;
+
+  orderId?: string;
+  tradeId?: string;
+
+  buyOrderId?: string;
+  sellOrderId?: string;
+  buyerId?: string;
+  sellerId?: string;
+
+  feeBuyer?: number | string | null;
+  feeSeller?: number | string | null;
+  buyerFeeAsset?: string;
+  sellerFeeAsset?: string;
+
+  role?: "buyer" | "seller";
+  userOrderId?: string;
+  counterOrderId?: string;
+}
+
+interface OrdersResponse {
+  success?: boolean;
+  data?: unknown;
+  orders?: unknown;
+}
+
+interface TradesResponse {
+  success?: boolean;
+  data?: unknown;
+  trades?: unknown;
+}
+
+function toArray<T>(
+  value: unknown
+): T[] {
+  if (Array.isArray(value)) {
+    return value as T[];
+  }
+
+  if (
+    value &&
+    typeof value === "object"
+  ) {
+    const obj = value as Record<
+      string,
+      unknown
+    >;
+
+    if (Array.isArray(obj.items)) {
+      return obj.items as T[];
+    }
+
+    if (Array.isArray(obj.results)) {
+      return obj.results as T[];
+    }
+
+    if (Array.isArray(obj.data)) {
+      return obj.data as T[];
+    }
+
+    if (Array.isArray(obj.orders)) {
+      return obj.orders as T[];
+    }
+
+    if (Array.isArray(obj.trades)) {
+      return obj.trades as T[];
+    }
+  }
+
+  return [];
+}
+
+function normalizeSide(
+  value: unknown
+): "buy" | "sell" | "unknown" {
+  const side = String(
+    value ?? ""
+  )
+    .trim()
+    .toLowerCase();
+
+  if (
+    side === "buy" ||
+    side === "long"
+  ) {
+    return "buy";
+  }
+
+  if (
+    side === "sell" ||
+    side === "short"
+  ) {
+    return "sell";
+  }
+
+  return "unknown";
+}
+
+function normalizeStatus(
+  value: unknown
+): string {
+  return String(
+    value ?? ""
+  )
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeMarket(
+  item: Order
+): MarketType {
+  const value = String(
+    item.marketType ??
+      item.market ??
+      ""
+  )
+    .trim()
+    .toLowerCase();
+
+  if (
+    value.includes("future")
+  ) {
+    return "futures";
+  }
+
+  if (
+    value.includes("margin")
+  ) {
+    return "margin";
+  }
+
+  return "spot";
+}
+
+function getId(
+  item: Order | Trade
+): string {
+  const value = item._id ?? item.id ?? item.orderId;
+
+  if (value !== undefined && value !== null) {
+    return String(value);
+  }
+
+  if ("tradeId" in item && item.tradeId) {
+    return String(item.tradeId);
+  }
+
+  return "";
+}
+
+function numberValue(
+  value: unknown
+): number | null {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed)
+    ? parsed
+    : null;
+}
+
+function formatNumber(
+  value: unknown,
+  maximumFractionDigits = 8
+): string {
+  const number = numberValue(value);
+
+  if (number === null) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat(
+    "en-US",
+    {
+      minimumFractionDigits: 0,
+      maximumFractionDigits,
+    }
+  ).format(number);
+}
+
+function formatDate(
+  value: unknown
+): string {
+  if (!value) {
+    return "—";
+  }
+
+  const date = new Date(
+    String(value)
+  );
+
+  if (
+    Number.isNaN(date.getTime())
+  ) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat(
+    "ar-EG",
+    {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }
+  ).format(date);
+}
+
+function getSymbol(
+  item: Order | Trade
+): string {
+  return String(
+    (item as Order).symbol ??
+      (item as Order).pair ??
+      "—"
+  ).toUpperCase();
+}
+
+function getPrice(
+  item: Order | Trade
+): number | null {
+  return numberValue(
+    (item as Order).price
+  );
+}
+
+function getQuantity(
+  item: Order | Trade
+): number | null {
+  const order = item as Order;
+
+  return numberValue(
+    order.quantity ??
+      order.qty ??
+      order.originalQuantity
+  );
+}
+
+function getFilled(
+  order: Order
+): number | null {
+  return numberValue(
+    order.filledQuantity ??
+      order.executedQty ??
+      order.filledQty
+  );
+}
+
+function getOrderStatusLabel(
+  value: unknown
+): string {
+  const status =
+    normalizeStatus(value);
+
+  if (
+    status === "open" ||
+    status === "new" ||
+    status === "pending"
+  ) {
+    return "مفتوح";
+  }
+
+  if (
+    status === "filled" ||
+    status === "completed" ||
+    status === "executed"
+  ) {
+    return "مكتمل";
+  }
+
+  if (
+    status === "canceled" ||
+    status === "cancelled"
+  ) {
+    return "ملغي";
+  }
+
+  if (
+    status === "rejected"
+  ) {
+    return "مرفوض";
+  }
+
+  if (
+    status === "expired"
+  ) {
+    return "منتهي";
+  }
+
+  if (
+    status === "triggered"
+  ) {
+    return "تم التفعيل";
+  }
+
+  if (
+    status === "processing"
+  ) {
+    return "قيد المعالجة";
+  }
+
+  if (
+    status === "partially_filled" ||
+    status === "partial"
+  ) {
+    return "منفذ جزئيًا";
+  }
+
+  return value
+    ? String(value)
+    : "—";
+}
+
+function getTypeLabel(
+  value: unknown
+): string {
+  const type =
+    String(
+      value ?? ""
+    )
+      .trim()
+      .toLowerCase();
+
+  if (
+    type === "market"
+  ) {
+    return "سوق";
+  }
+
+  if (
+    type === "limit"
+  ) {
+    return "حد";
+  }
+
+  if (
+    type === "stop" ||
+    type === "stop_limit"
+  ) {
+    return "إيقاف";
+  }
+
+  if (
+    type === "stop_market"
+  ) {
+    return "إيقاف سوق";
+  }
+
+  return value
+    ? String(value)
+    : "—";
+}
+
+function SideBadge({
+  side,
+}: {
+  side: unknown;
+}) {
+  const normalized =
+    normalizeSide(side);
+
+  if (
+    normalized === "buy"
+  ) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+        <ArrowDownLeft size={13} />
+        شراء
+      </span>
+    );
+  }
+
+  if (
+    normalized === "sell"
+  ) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-lg bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-300">
+        <ArrowUpRight size={13} />
+        بيع
+      </span>
+    );
+  }
+
+  return (
+    <span className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-slate-400">
+      —
+    </span>
+  );
+}
+
+function StatusBadge({
+  status,
+}: {
+  status: unknown;
+}) {
+  const normalized =
+    normalizeStatus(status);
+
+  const isOpen =
+    normalized === "open" ||
+    normalized === "new" ||
+    normalized === "pending";
+
+  const isDone =
+    normalized === "filled" ||
+    normalized === "completed" ||
+    normalized === "executed";
+
+  const isCanceled =
+    normalized === "canceled" ||
+    normalized === "cancelled";
+
+  if (isOpen) {
+    return (
+      <span className="rounded-lg bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-300">
+        مفتوح
+      </span>
+    );
+  }
+
+  if (isDone) {
+    return (
+      <span className="rounded-lg bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+        مكتمل
+      </span>
+    );
+  }
+
+  if (isCanceled) {
+    return (
+      <span className="rounded-lg bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-400">
+        ملغي
+      </span>
+    );
+  }
+
+  if (
+    normalized === "rejected"
+  ) {
+    return (
+      <span className="rounded-lg bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-300">
+        مرفوض
+      </span>
+    );
+  }
+
+  return (
+    <span className="rounded-lg bg-white/5 px-2.5 py-1 text-xs text-slate-400">
+      {getOrderStatusLabel(status)}
+    </span>
+  );
+}
+
+function EmptyState({
+  title,
+  description,
+  onRefresh,
+  refreshing,
+}: {
+  title: string;
+  description: string;
+  onRefresh: () => void;
+  refreshing: boolean;
+}) {
+  return (
+    <div className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03]">
+        <SlidersHorizontal
+          size={25}
+          className="text-slate-500"
+        />
+      </div>
+
+      <h3 className="mt-5 text-lg font-semibold text-white">
+        {title}
+      </h3>
+
+      <p className="mt-2 max-w-md text-xs leading-6 text-slate-500">
+        {description}
+      </p>
+
+      <button
+        type="button"
+        onClick={onRefresh}
+        disabled={refreshing}
+        className="mt-6 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-medium text-slate-300 transition hover:bg-white/[0.06] disabled:opacity-50"
+      >
+        <RefreshCw
+          size={14}
+          className={
+            refreshing
+              ? "animate-spin"
+              : ""
+          }
+        />
+        تحديث
+      </button>
+    </div>
+  );
+}
+
+export default function OrdersPage() {
+  const [tab, setTab] =
+    useState<Tab>("open");
+
+  const [
+    market,
+    setMarket,
+  ] = useState<MarketType>("all");
+
+  const [
+    side,
+    setSide,
+  ] = useState<Side>("all");
+
+  const [
+    search,
+    setSearch,
+  ] = useState("");
+
+  const [
+    orders,
+    setOrders,
+  ] = useState<Order[]>([]);
+
+  const [
+    trades,
+    setTrades,
+  ] = useState<Trade[]>([]);
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
+
+  const [
+    error,
+    setError,
+  ] = useState("");
+
+  const [
+    selectedOrder,
+    setSelectedOrder,
+  ] = useState<Order | null>(
+    null
+  );
+
+  const [
+    cancellingId,
+    setCancellingId,
+  ] = useState("");
+
+  const loadData =
+    useCallback(
+      async (
+        silent = false
+      ) => {
+        if (silent) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+
+        setError("");
+
+        try {
+          const [
+            spotOrdersResponse,
+            spotTradesResponse,
+            futuresOrdersResponse,
+          ] = await Promise.all([
+            fetch(
+              "/api/orders",
+              {
+                credentials: "include",
+                cache: "no-store",
+              }
+            ),
+
+            fetch(
+              "/api/trades",
+              {
+                credentials: "include",
+                cache: "no-store",
+              }
+            ),
+
+            fetch(
+              "/api/futures/trades",
+              {
+                credentials: "include",
+                cache: "no-store",
+              }
+            ),
+
+            fetch(
+              "/api/futures/orders",
+              {
+                credentials: "include",
+                cache: "no-store",
+              }
+            ),
+          ]);
+
+          let spotOrders: Order[] = [];
+          let spotTrades: Trade[] = [];
+          let futuresOrders: Order[] = [];
+
+          if (spotOrdersResponse.ok) {
+            const json =
+              (await spotOrdersResponse.json()) as OrdersResponse;
+
+            spotOrders = toArray<Order>(
+              json.orders ?? json.data ?? []
+            ).map((item) => ({
+              ...item,
+              market: "spot",
+              marketType: "spot",
+            }));
+          }
+
+          if (spotTradesResponse.ok) {
+            const json =
+              (await spotTradesResponse.json()) as TradesResponse;
+
+            spotTrades = toArray<Trade>(
+              json.trades ?? json.data ?? []
+            );
+          }
+
+          if (futuresOrdersResponse.ok) {
+            const json =
+              (await futuresOrdersResponse.json()) as OrdersResponse;
+
+            futuresOrders = toArray<Order>(
+              json.orders ?? json.data ?? []
+            ).map((item) => ({
+              ...item,
+              market: "futures",
+              marketType: "futures",
+            }));
+          }
+
+          if (
+            !spotOrdersResponse.ok &&
+            !spotTradesResponse.ok &&
+            !futuresOrdersResponse.ok
+          ) {
+            throw new Error(
+              "تعذر تحميل بيانات الأوامر والتداول."
+            );
+          }
+
+          setOrders([
+            ...spotOrders,
+            ...futuresOrders,
+          ].sort((a,b)=>{
+            return (
+              new Date(b.createdAt ?? 0).getTime() -
+              new Date(a.createdAt ?? 0).getTime()
+            );
+          }));
+
+          setTrades(
+            spotTrades
+          );
+        } catch (
+          loadError
+        ) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "تعذر تحميل البيانات."
+          );
+        } finally {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      },
+      []
+    );
+
+  useEffect(() => {
+    void loadData();
+
+    const timer =
+      window.setInterval(
+        () => {
+          void loadData(true);
+        },
+        8000
+      );
+
+    return () =>
+      window.clearInterval(
+        timer
+      );
+  }, [loadData]);
+
+  const openOrders =
+    useMemo(() => {
+      return orders.filter(
+        (item) => {
+          const status =
+            normalizeStatus(
+              item.status
+            );
+
+          return (
+            status === "open" ||
+            status === "new" ||
+            status === "pending" ||
+            status ===
+              "partially_filled" ||
+            status === "partial"
+          );
+        }
+      );
+    }, [orders]);
+
+  const filteredOrders =
+    useMemo(() => {
+      let source =
+        tab === "open"
+          ? openOrders
+          : orders;
+
+      return source.filter(
+        (item) => {
+          if (
+            market !== "all" &&
+            normalizeMarket(item) !==
+              market
+          ) {
+            return false;
+          }
+
+          if (
+            side !== "all" &&
+            normalizeSide(item.side) !==
+              side
+          ) {
+            return false;
+          }
+
+          const query =
+            search
+              .trim()
+              .toLowerCase();
+
+          if (!query) {
+            return true;
+          }
+
+          const symbol =
+            getSymbol(item)
+              .toLowerCase();
+
+          const orderId =
+            String(
+              item.orderId ??
+                item.clientOrderId ??
+                getId(item)
+            ).toLowerCase();
+
+          return (
+            symbol.includes(query) ||
+            orderId.includes(query)
+          );
+        }
+      );
+    }, [
+      market,
+      openOrders,
+      orders,
+      search,
+      side,
+      tab,
+    ]);
+
+  const filteredTrades =
+    useMemo(() => {
+      return trades.filter(
+        (item) => {
+          /*
+           * الـTrade model الحالي الموجود في الباك إند
+           * هو Spot Trade. لا ننسب Trade إلى Futures
+           * بدون API/Model تنفيذ عقود حقيقي.
+           */
+          if (
+            market !== "all" &&
+            market !== "spot"
+          ) {
+            return false;
+          }
+
+          if (
+            side !== "all" &&
+            normalizeSide(item.side) !==
+              side
+          ) {
+            return false;
+          }
+
+          const query =
+            search
+              .trim()
+              .toLowerCase();
+
+          if (!query) {
+            return true;
+          }
+
+          const symbol =
+            getSymbol(item)
+              .toLowerCase();
+
+          const tradeId =
+            String(
+              item.tradeId ??
+                item.orderId ??
+                getId(item)
+            ).toLowerCase();
+
+          return (
+            symbol.includes(query) ||
+            tradeId.includes(query)
+          );
+        }
+      );
+    }, [
+      market,
+      search,
+      side,
+      trades,
+    ]);
+
+  async function cancelOrder(
+    order: Order
+  ) {
+    const id = getId(order);
+
+    if (!id) {
+      return;
+    }
+
+    const marketType =
+      normalizeMarket(order);
+
+    if (
+      marketType !== "spot" &&
+      marketType !== "futures"
+    ) {
+      return;
+    }
+
+    try {
+      setCancellingId(id);
+      setError("");
+
+      const endpoint =
+        marketType === "futures"
+          ? "/api/futures/orders/cancel"
+          : "/api/orders/cancel";
+
+      const response =
+        await fetch(endpoint, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            id,
+          }),
+        });
+
+      const json =
+        await response
+          .json()
+          .catch(() => ({}));
+
+      if (!response.ok || !json.success) {
+        throw new Error(
+          json.message ||
+            json.error ||
+            "تعذر إلغاء الأمر"
+        );
+      }
+
+      setSelectedOrder(null);
+
+      await loadData(true);
+    } catch (cancelError) {
+      setError(
+        cancelError instanceof Error
+          ? cancelError.message
+          : "تعذر إلغاء الأمر"
+      );
+    } finally {
+      setCancellingId("");
+    }
+  }
+
+  const activeRows =
+    tab === "trades"
+      ? filteredTrades
+      : filteredOrders;
+
+  return (
+    <div
+      className="min-h-screen bg-[#050a13] text-white"
+      dir="rtl"
+    >
+      <InternalNavbar />
+
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-[1700px]">
+        <InternalSidebar />
+
+        <main className="min-w-0 flex-1">
+          <div className="p-4 md:p-6 lg:p-8">
+            <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#07101d]">
+              <div className="border-b border-white/10 px-5 py-5 md:px-7">
+                <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+                  <div>
+                    <div className="text-[10px] font-medium tracking-[0.18em] text-slate-600">
+                      ORDERS & TRADES
+                    </div>
+
+                    <h1 className="mt-2 text-2xl font-bold text-white md:text-3xl">
+                      الأوامر
+                    </h1>
+
+                    <p className="mt-2 text-xs leading-6 text-slate-500">
+                      إدارة أوامرك ومراجعة سجل التنفيذ والتداول من مكان واحد.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href="/protrade"
+                      className="inline-flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-blue-400"
+                    >
+                      فتح منصة التداول
+                      <ExternalLink
+                        size={14}
+                      />
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void loadData(
+                          true
+                        )
+                      }
+                      className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-medium text-slate-300 transition hover:bg-white/[0.06]"
+                    >
+                      <RefreshCw
+                        size={14}
+                        className={
+                          refreshing
+                            ? "animate-spin"
+                            : ""
+                        }
+                      />
+                      تحديث
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-b border-white/10 px-4 md:px-7">
+                <div className="flex items-center gap-1 overflow-x-auto">
+                  {[
+                    {
+                      key: "open" as const,
+                      label: "الأوامر المفتوحة",
+                      count:
+                        openOrders.length,
+                    },
+                    {
+                      key: "history" as const,
+                      label: "سجل الأوامر",
+                      count:
+                        orders.length,
+                    },
+                    {
+                      key: "trades" as const,
+                      label: "سجل التداول",
+                      count:
+                        trades.length,
+                    },
+                  ].map(
+                    (item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() =>
+                          setTab(
+                            item.key
+                          )
+                        }
+                        className={`relative whitespace-nowrap px-4 py-4 text-xs font-semibold transition ${
+                          tab ===
+                          item.key
+                            ? "text-blue-300"
+                            : "text-slate-500 hover:text-slate-200"
+                        }`}
+                      >
+                        <span>
+                          {
+                            item.label
+                          }
+                        </span>
+
+                        <span className="mr-2 rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] text-slate-500">
+                          {
+                            item.count
+                          }
+                        </span>
+
+                        {tab ===
+                        item.key ? (
+                          <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-blue-400" />
+                        ) : null}
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-3 border-b border-white/10 p-4 md:grid-cols-2 xl:grid-cols-[1.4fr_0.7fr_0.7fr] md:p-5">
+                <label className="relative block">
+                  <Search
+                    size={16}
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-600"
+                  />
+
+                  <input
+                    value={search}
+                    onChange={(event) =>
+                      setSearch(
+                        event.target.value
+                      )
+                    }
+                    placeholder="ابحث عن زوج أو رقم أمر"
+                    className="h-11 w-full rounded-xl border border-white/10 bg-[#050a13] px-10 text-xs text-white outline-none placeholder:text-slate-600 focus:border-blue-400/40"
+                  />
+                </label>
+
+                <select
+                  value={market}
+                  onChange={(event) =>
+                    setMarket(
+                      event.target
+                        .value as MarketType
+                    )
+                  }
+                  className="h-11 rounded-xl border border-white/10 bg-[#050a13] px-3 text-xs text-slate-300 outline-none focus:border-blue-400/40"
+                >
+                  <option value="all">
+                    كل الأسواق
+                  </option>
+
+                  <option value="spot">
+                    التداول الفوري
+                  </option>
+
+                  <option value="margin">
+                    الهامش
+                  </option>
+
+                  <option value="futures">
+                    العقود الآجلة
+                  </option>
+                </select>
+
+                <select
+                  value={side}
+                  onChange={(event) =>
+                    setSide(
+                      event.target
+                        .value as Side
+                    )
+                  }
+                  className="h-11 rounded-xl border border-white/10 bg-[#050a13] px-3 text-xs text-slate-300 outline-none focus:border-blue-400/40"
+                >
+                  <option value="all">
+                    شراء وبيع
+                  </option>
+
+                  <option value="buy">
+                    شراء
+                  </option>
+
+                  <option value="sell">
+                    بيع
+                  </option>
+                </select>
+              </div>
+
+              {error ? (
+                <div className="border-b border-red-500/20 bg-red-500/[0.04] px-5 py-4 text-xs text-red-300">
+                  {error}
+                </div>
+              ) : null}
+
+              <div className="overflow-x-auto">
+                {loading ? (
+                  <div className="flex min-h-[320px] items-center justify-center">
+                    <div className="flex items-center gap-3 text-xs text-slate-500">
+                      <RefreshCw
+                        size={16}
+                        className="animate-spin"
+                      />
+                      جاري تحميل البيانات...
+                    </div>
+                  </div>
+                ) : tab ===
+                  "trades" ? (
+                  filteredTrades.length ===
+                  0 ? (
+                    <EmptyState
+                      title="لا توجد تداولات"
+                      description="ستظهر هنا عمليات التداول المنفذة فعليًا من حسابك."
+                      onRefresh={() =>
+                        void loadData(
+                          true
+                        )
+                      }
+                      refreshing={
+                        refreshing
+                      }
+                    />
+                  ) : (
+                    <table className="min-w-[950px] w-full text-right">
+                      <thead className="border-b border-white/10 bg-white/[0.015]">
+                        <tr className="text-[10px] font-medium text-slate-600">
+                          <th className="px-5 py-4">
+                            الزوج
+                          </th>
+                          <th className="px-5 py-4">
+                            الاتجاه
+                          </th>
+                          <th className="px-5 py-4">
+                            السعر
+                          </th>
+                          <th className="px-5 py-4">
+                            الكمية
+                          </th>
+                          <th className="px-5 py-4">
+                            القيمة
+                          </th>
+                          <th className="px-5 py-4">
+                            الرسوم
+                          </th>
+                          <th className="px-5 py-4">
+                            الوقت
+                          </th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+                        {filteredTrades.map(
+                          (item) => {
+                            const price =
+                              getPrice(
+                                item
+                              );
+
+                            const quantity =
+                              getQuantity(
+                                item
+                              );
+
+                            const total =
+                              price !==
+                                null &&
+                              quantity !==
+                                null
+                                ? price *
+                                  quantity
+                                : null;
+
+                            return (
+                              <tr
+                                key={getId(
+                                  item
+                                )}
+                                className="border-b border-white/[0.06] transition hover:bg-white/[0.02]"
+                              >
+                                <td className="px-5 py-4">
+                                  <span className="font-semibold text-white">
+                                    {
+                                      getSymbol(
+                                        item
+                                      )
+                                    }
+                                  </span>
+                                </td>
+
+                                <td className="px-5 py-4">
+                                  <SideBadge
+                                    side={
+                                      item.side
+                                    }
+                                  />
+                                </td>
+
+                                <td className="px-5 py-4 font-mono text-xs text-slate-300">
+                                  {formatNumber(
+                                    price,
+                                    8
+                                  )}
+                                </td>
+
+                                <td className="px-5 py-4 font-mono text-xs text-slate-300">
+                                  {formatNumber(
+                                    quantity,
+                                    8
+                                  )}
+                                </td>
+
+                                <td className="px-5 py-4 font-mono text-xs text-slate-300">
+                                  {formatNumber(
+                                    total,
+                                    8
+                                  )}
+                                </td>
+
+                                <td className="px-5 py-4 font-mono text-xs text-slate-400">
+                                  {formatNumber(
+                                    item.fee,
+                                    8
+                                  )}
+                                  {item.feeAsset
+                                    ? ` ${item.feeAsset}`
+                                    : ""}
+                                </td>
+
+                                <td className="px-5 py-4 text-[10px] text-slate-500">
+                                  {formatDate(
+                                    item.createdAt
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          }
+                        )}
+                      </tbody>
+                    </table>
+                  )
+                ) : filteredOrders.length ===
+                  0 ? (
+                  <EmptyState
+                    title={
+                      tab ===
+                      "open"
+                        ? "لا توجد أوامر مفتوحة"
+                        : "لا يوجد سجل أوامر"
+                    }
+                    description={
+                      tab ===
+                      "open"
+                        ? "عند إنشاء أمر تداول ووجوده في حالة مفتوحة سيظهر هنا."
+                        : "ستظهر هنا أوامر التداول المسجلة فعليًا في حسابك."
+                    }
+                    onRefresh={() =>
+                      void loadData(
+                        true
+                      )
+                    }
+                    refreshing={
+                      refreshing
+                    }
+                  />
+                ) : (
+                  <table className="min-w-[1100px] w-full text-right">
+                    <thead className="border-b border-white/10 bg-white/[0.015]">
+                      <tr className="text-[10px] font-medium text-slate-600">
+                        <th className="px-5 py-4">
+                          الزوج
+                        </th>
+
+                        <th className="px-5 py-4">
+                          الجانب
+                        </th>
+
+                        <th className="px-5 py-4">
+                          النوع
+                        </th>
+
+                        <th className="px-5 py-4">
+                          السعر
+                        </th>
+
+                        <th className="px-5 py-4">
+                          الكمية
+                        </th>
+
+                        <th className="px-5 py-4">
+                          المنفذ
+                        </th>
+
+                        <th className="px-5 py-4">
+                          الحالة
+                        </th>
+
+                        <th className="px-5 py-4">
+                          الوقت
+                        </th>
+
+                        <th className="px-5 py-4">
+                          التفاصيل
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {filteredOrders.map(
+                        (item) => {
+                          const quantity =
+                            getQuantity(
+                              item
+                            );
+
+                          const filled =
+                            getFilled(
+                              item
+                            );
+
+                          return (
+                            <tr
+                              key={getId(
+                                item
+                              )}
+                              className="border-b border-white/[0.06] transition hover:bg-white/[0.02]"
+                            >
+                              <td className="px-5 py-4">
+                                <span className="font-semibold text-white">
+                                  {
+                                    getSymbol(
+                                      item
+                                    )
+                                  }
+                                </span>
+
+                                <div className="mt-1 text-[9px] text-slate-600">
+                                  {normalizeMarket(
+                                    item
+                                  ) ===
+                                  "futures"
+                                    ? "Futures"
+                                    : normalizeMarket(
+                                        item
+                                      ) ===
+                                      "margin"
+                                    ? "Margin"
+                                    : "Spot"}
+                                </div>
+                              </td>
+
+                              <td className="px-5 py-4">
+                                <SideBadge
+                                  side={
+                                    item.side
+                                  }
+                                />
+                              </td>
+
+                              <td className="px-5 py-4 text-xs text-slate-400">
+                                {getTypeLabel(
+                                  item.type ??
+                                    item.orderType
+                                )}
+                              </td>
+
+                              <td className="px-5 py-4 font-mono text-xs text-slate-300">
+                                {formatNumber(
+                                  item.price,
+                                  8
+                                )}
+                              </td>
+
+                              <td className="px-5 py-4 font-mono text-xs text-slate-300">
+                                {formatNumber(
+                                  quantity,
+                                  8
+                                )}
+                              </td>
+
+                              <td className="px-5 py-4 font-mono text-xs text-slate-400">
+                                {formatNumber(
+                                  filled,
+                                  8
+                                )}
+                              </td>
+
+                              <td className="px-5 py-4">
+                                <StatusBadge
+                                  status={
+                                    item.status
+                                  }
+                                />
+                              </td>
+
+                              <td className="px-5 py-4 text-[10px] text-slate-500">
+                                {formatDate(
+                                  item.createdAt
+                                )}
+                              </td>
+
+                              <td className="px-5 py-4">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setSelectedOrder(
+                                        item
+                                      )
+                                    }
+                                    className="rounded-lg border border-white/10 p-2 text-slate-400 transition hover:bg-white/5 hover:text-white"
+                                    aria-label="تفاصيل الأمر"
+                                  >
+                                    <ExternalLink
+                                      size={14}
+                                    />
+                                  </button>
+
+                                  {(
+                                    normalizeStatus(
+                                      item.status
+                                    ) === "open" ||
+                                    normalizeStatus(
+                                      item.status
+                                    ) === "pending" ||
+                                    normalizeStatus(
+                                      item.status
+                                    ) === "new" ||
+                                    normalizeStatus(
+                                      item.status
+                                    ) === "partial" ||
+                                    normalizeStatus(
+                                      item.status
+                                    ) === "partially_filled"
+                                  ) ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        void cancelOrder(
+                                          item
+                                        )
+                                      }
+                                      disabled={
+                                        cancellingId ===
+                                        getId(item)
+                                      }
+                                      className="rounded-lg border border-red-500/20 bg-red-500/[0.06] px-2.5 py-1.5 text-[10px] font-semibold text-red-300 transition hover:bg-red-500/[0.12] disabled:opacity-50"
+                                    >
+                                      {cancellingId ===
+                                      getId(item)
+                                        ? "جارٍ..."
+                                        : "إلغاء"}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+                      )}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-3 border-t border-white/10 px-5 py-4 text-[10px] text-slate-600 md:flex-row md:items-center md:justify-between">
+                <span>
+                  يتم تحديث البيانات تلقائيًا.
+                </span>
+
+                <div className="flex items-center gap-3">
+                  <span>
+                    المعروض الآن:
+                  </span>
+
+                  <strong className="text-slate-400">
+                    {
+                      activeRows.length
+                    }
+                  </strong>
+                </div>
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+
+      {selectedOrder ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onMouseDown={() =>
+            setSelectedOrder(
+              null
+            )
+          }
+        >
+          <div
+            className="w-full max-w-xl overflow-hidden rounded-3xl border border-white/10 bg-[#07101d] shadow-2xl shadow-black/60"
+            onMouseDown={(
+              event
+            ) =>
+              event.stopPropagation()
+            }
+          >
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+              <div>
+                <div className="text-[9px] text-slate-600">
+                  ORDER DETAILS
+                </div>
+
+                <h2 className="mt-1 text-lg font-bold text-white">
+                  تفاصيل الأمر
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedOrder(
+                    null
+                  )
+                }
+                className="rounded-xl border border-white/10 p-2 text-slate-400 hover:bg-white/5 hover:text-white"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            <div className="grid gap-3 p-5 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-[#050a13] p-4">
+                <div className="text-[9px] text-slate-600">
+                  الزوج
+                </div>
+
+                <div className="mt-2 font-mono text-sm font-semibold text-white">
+                  {
+                    getSymbol(
+                      selectedOrder
+                    )
+                  }
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#050a13] p-4">
+                <div className="text-[9px] text-slate-600">
+                  الحالة
+                </div>
+
+                <div className="mt-2">
+                  <StatusBadge
+                    status={
+                      selectedOrder.status
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#050a13] p-4">
+                <div className="text-[9px] text-slate-600">
+                  الجانب
+                </div>
+
+                <div className="mt-2">
+                  <SideBadge
+                    side={
+                      selectedOrder.side
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#050a13] p-4">
+                <div className="text-[9px] text-slate-600">
+                  النوع
+                </div>
+
+                <div className="mt-2 text-xs text-slate-200">
+                  {getTypeLabel(
+                    selectedOrder.type ??
+                      selectedOrder.orderType
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#050a13] p-4">
+                <div className="text-[9px] text-slate-600">
+                  السعر
+                </div>
+
+                <div className="mt-2 font-mono text-xs text-slate-200">
+                  {formatNumber(
+                    selectedOrder.price,
+                    8
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#050a13] p-4">
+                <div className="text-[9px] text-slate-600">
+                  الكمية
+                </div>
+
+                <div className="mt-2 font-mono text-xs text-slate-200">
+                  {formatNumber(
+                    selectedOrder.originalQuantity ??
+                      selectedOrder.quantity ??
+                      selectedOrder.qty,
+                    8
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#050a13] p-4">
+                <div className="text-[9px] text-slate-600">
+                  المنفذ
+                </div>
+
+                <div className="mt-2 font-mono text-xs text-slate-200">
+                  {formatNumber(
+                    selectedOrder.filledQuantity ??
+                      selectedOrder.executedQty ??
+                      selectedOrder.filledQty,
+                    8
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#050a13] p-4">
+                <div className="text-[9px] text-slate-600">
+                  المتبقي
+                </div>
+
+                <div className="mt-2 font-mono text-xs text-slate-200">
+                  {formatNumber(
+                    selectedOrder.remainingQuantity ??
+                      selectedOrder.quantity,
+                    8
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#050a13] p-4">
+                <div className="text-[9px] text-slate-600">
+                  متوسط التنفيذ
+                </div>
+
+                <div className="mt-2 font-mono text-xs text-slate-200">
+                  {formatNumber(
+                    selectedOrder.avgPrice ??
+                      selectedOrder.averagePrice,
+                    8
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-[#050a13] p-4 sm:col-span-2">
+                <div className="text-[9px] text-slate-600">
+                  رقم الأمر
+                </div>
+
+                <div className="mt-2 break-all font-mono text-xs text-slate-300">
+                  {
+                    selectedOrder.orderId ??
+                    selectedOrder.clientOrderId ??
+                    getId(
+                      selectedOrder
+                    )
+                  }
+                </div>
+              </div>
+
+              {(normalizeStatus(
+                selectedOrder.status
+              ) === "open" ||
+                normalizeStatus(
+                  selectedOrder.status
+                ) === "pending" ||
+                normalizeStatus(
+                  selectedOrder.status
+                ) === "new") ? (
+                <div className="sm:col-span-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void cancelOrder(
+                        selectedOrder
+                      )
+                    }
+                    disabled={
+                      cancellingId ===
+                      getId(selectedOrder)
+                    }
+                    className="w-full rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-xs font-bold text-red-300 transition hover:bg-red-500/[0.12] disabled:opacity-50"
+                  >
+                    {cancellingId ===
+                    getId(selectedOrder)
+                      ? "جارٍ إلغاء الأمر..."
+                      : "إلغاء الأمر"}
+                  </button>
+                </div>
+              ) : null}
+
+              <div className="rounded-2xl border border-white/10 bg-[#050a13] p-4 sm:col-span-2">
+                <div className="text-[9px] text-slate-600">
+                  تاريخ الإنشاء
+                </div>
+
+                <div className="mt-2 text-xs text-slate-300">
+                  {formatDate(
+                    selectedOrder.createdAt
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}

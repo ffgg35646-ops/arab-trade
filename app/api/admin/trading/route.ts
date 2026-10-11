@@ -1,0 +1,39 @@
+import { NextRequest, NextResponse } from "next/server";
+import { connectDB } from "@/lib/mongodb";
+import { requireAdminLeader } from "@/lib/admin-auth";
+
+export async function GET(request: NextRequest) {
+  try {
+    const admin = await requireAdminLeader(request);
+    if (!admin) {
+      return NextResponse.json({ success: false, message: "غير مصرح" }, { status: 401 });
+    }
+
+    await connectDB();
+    const mongoose = await import('mongoose');
+    const db = mongoose.connection.db;
+
+    if (!db) {
+      throw new Error("Database connection unavailable");
+    }
+
+    const trades = await db.collection("trades")
+      .find({})
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .toArray();
+
+    const tradesSafe = trades.map((item) => ({
+      ...item,
+      _id: item._id ? String(item._id) : undefined
+    }));
+
+    return NextResponse.json({
+      success: true,
+      trades: tradesSafe
+    });
+  } catch (error) {
+    console.error("ADMIN DATA ERROR:", error);
+    return NextResponse.json({ success: false, message: "تعذر تحميل البيانات" }, { status: 500 });
+  }
+}

@@ -1,0 +1,705 @@
+{
+  "generatedAt": "2026-09-02T17:43:37.242449",
+  "apiRoutes": [
+    {
+      "route": "/api/account/2fa",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "file": "app/api/account/2fa/route.ts"
+    },
+    {
+      "route": "/api/account/api-keys",
+      "methods": [
+        "DELETE",
+        "GET",
+        "POST"
+      ],
+      "file": "app/api/account/api-keys/route.ts"
+    },
+    {
+      "route": "/api/account/ledger",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/account/ledger/route.ts"
+    },
+    {
+      "route": "/api/account/profile",
+      "methods": [
+        "PATCH"
+      ],
+      "file": "app/api/account/profile/route.ts"
+    },
+    {
+      "route": "/api/account/reports",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/account/reports/route.ts"
+    },
+    {
+      "route": "/api/account/security/password",
+      "methods": [
+        "POST"
+      ],
+      "file": "app/api/account/security/password/route.ts"
+    },
+    {
+      "route": "/api/account/sessions",
+      "methods": [
+        "DELETE",
+        "GET"
+      ],
+      "file": "app/api/account/sessions/route.ts"
+    },
+    {
+      "route": "/api/account/statement",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/account/statement/route.ts"
+    },
+    {
+      "route": "/api/admin/assets",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "file": "app/api/admin/assets/route.ts"
+    },
+    {
+      "route": "/api/admin/audit",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/admin/audit/route.ts"
+    },
+    {
+      "route": "/api/admin/deposits",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "file": "app/api/admin/deposits/route.ts"
+    },
+    {
+      "route": "/api/admin/rewards",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "file": "app/api/admin/rewards/route.ts"
+    },
+    {
+      "route": "/api/admin/settings",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "file": "app/api/admin/settings/route.ts"
+    },
+    {
+      "route": "/api/admin/users",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "file": "app/api/admin/users/route.ts"
+    },
+    {
+      "route": "/api/admin/withdrawals",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "file": "app/api/admin/withdrawals/route.ts"
+    },
+    {
+      "route": "/api/assets",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/assets/route.ts"
+    },
+    {
+      "route": "/api/auth/login",
+      "methods": [
+        "POST"
+      ],
+      "file": "app/api/auth/login/route.ts"
+    },
+    {
+      "route": "/api/auth/logout",
+      "methods": [
+        "POST"
+      ],
+      "file": "app/api/auth/logout/route.ts"
+    },
+    {
+      "route": "/api/auth/me",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/auth/me/route.ts"
+    },
+    {
+      "route": "/api/auth/register",
+      "methods": [
+        "POST"
+      ],
+      "file": "app/api/auth/register/route.ts"
+    },
+    {
+      "route": "/api/auth/verify",
+      "methods": [
+        "POST"
+      ],
+      "file": "app/api/auth/verify/route.ts"
+    },
+    {
+      "route": "/api/deposits",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "file": "app/api/deposits/route.ts"
+    },
+    {
+      "route": "/api/futures/positions",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/futures/positions/route.ts"
+    },
+    {
+      "route": "/api/margin/positions",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/margin/positions/route.ts"
+    },
+    {
+      "route": "/api/market",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/market/route.ts"
+    },
+    {
+      "route": "/api/notifications/preferences",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "file": "app/api/notifications/preferences/route.ts"
+    },
+    {
+      "route": "/api/notifications",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "file": "app/api/notifications/route.ts"
+    },
+    {
+      "route": "/api/orderbook",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/orderbook/route.ts"
+    },
+    {
+      "route": "/api/orders/cancel",
+      "methods": [
+        "POST"
+      ],
+      "file": "app/api/orders/cancel/route.ts"
+    },
+    {
+      "route": "/api/orders/match",
+      "methods": [
+        "POST"
+      ],
+      "file": "app/api/orders/match/route.ts"
+    },
+    {
+      "route": "/api/orders",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "file": "app/api/orders/route.ts"
+    },
+    {
+      "route": "/api/referral/commissions",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/referral/commissions/route.ts"
+    },
+    {
+      "route": "/api/referral",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/referral/route.ts"
+    },
+    {
+      "route": "/api/rewards",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "file": "app/api/rewards/route.ts"
+    },
+    {
+      "route": "/api/settings/contact",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/settings/contact/route.ts"
+    },
+    {
+      "route": "/api/trades",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/trades/route.ts"
+    },
+    {
+      "route": "/api/trading/market",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/trading/market/route.ts"
+    },
+    {
+      "route": "/api/transfers",
+      "methods": [
+        "POST"
+      ],
+      "file": "app/api/transfers/route.ts"
+    },
+    {
+      "route": "/api/wallet",
+      "methods": [
+        "GET"
+      ],
+      "file": "app/api/wallet/route.ts"
+    },
+    {
+      "route": "/api/withdrawals",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "file": "app/api/withdrawals/route.ts"
+    }
+  ],
+  "pages": [
+    {
+      "route": "/about",
+      "file": "app/about/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 106
+    },
+    {
+      "route": "/admin",
+      "file": "app/admin/page.tsx",
+      "apiRefs": [
+        "/api/admin/assets",
+        "/api/admin/settings",
+        "/api/auth/logout"
+      ],
+      "flags": [
+        "placeholder"
+      ],
+      "lines": 827
+    },
+    {
+      "route": "/contact",
+      "file": "app/contact/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 192
+    },
+    {
+      "route": "/dashboard/account",
+      "file": "app/dashboard/account/page.tsx",
+      "apiRefs": [
+        "/api/account/profile",
+        "/api/auth/me"
+      ],
+      "flags": [],
+      "lines": 148
+    },
+    {
+      "route": "/dashboard/account/payment",
+      "file": "app/dashboard/account/payment/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 41
+    },
+    {
+      "route": "/dashboard/account/reports",
+      "file": "app/dashboard/account/reports/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 48
+    },
+    {
+      "route": "/dashboard/account/security",
+      "file": "app/dashboard/account/security/page.tsx",
+      "apiRefs": [
+        "/api/account/security/password"
+      ],
+      "flags": [],
+      "lines": 129
+    },
+    {
+      "route": "/dashboard/account/statement",
+      "file": "app/dashboard/account/statement/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 39
+    },
+    {
+      "route": "/dashboard/account/verification",
+      "file": "app/dashboard/account/verification/page.tsx",
+      "apiRefs": [
+        "/api/auth/me"
+      ],
+      "flags": [],
+      "lines": 57
+    },
+    {
+      "route": "/dashboard/assets/deposit",
+      "file": "app/dashboard/assets/deposit/page.tsx",
+      "apiRefs": [
+        "/api/assets",
+        "/api/deposits"
+      ],
+      "flags": [
+        "placeholder"
+      ],
+      "lines": 269
+    },
+    {
+      "route": "/dashboard/assets",
+      "file": "app/dashboard/assets/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 75
+    },
+    {
+      "route": "/dashboard/assets/transfer",
+      "file": "app/dashboard/assets/transfer/page.tsx",
+      "apiRefs": [
+        "/api/transfers"
+      ],
+      "flags": [
+        "placeholder"
+      ],
+      "lines": 128
+    },
+    {
+      "route": "/dashboard/assets/withdraw",
+      "file": "app/dashboard/assets/withdraw/page.tsx",
+      "apiRefs": [
+        "/api/assets",
+        "/api/withdrawals"
+      ],
+      "flags": [
+        "placeholder"
+      ],
+      "lines": 233
+    },
+    {
+      "route": "/dashboard/certificates",
+      "file": "app/dashboard/certificates/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 37
+    },
+    {
+      "route": "/dashboard/funding",
+      "file": "app/dashboard/funding/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 53
+    },
+    {
+      "route": "/dashboard/notifications",
+      "file": "app/dashboard/notifications/page.tsx",
+      "apiRefs": [
+        "/api/notifications"
+      ],
+      "flags": [],
+      "lines": 96
+    },
+    {
+      "route": "/dashboard/orders/history",
+      "file": "app/dashboard/orders/history/page.tsx",
+      "apiRefs": [],
+      "flags": [
+        "placeholder"
+      ],
+      "lines": 45
+    },
+    {
+      "route": "/dashboard/orders",
+      "file": "app/dashboard/orders/page.tsx",
+      "apiRefs": [
+        "/api/orders",
+        "/api/orders/cancel"
+      ],
+      "flags": [],
+      "lines": 111
+    },
+    {
+      "route": "/dashboard",
+      "file": "app/dashboard/page.tsx",
+      "apiRefs": [
+        "/api/auth/me",
+        "/api/market"
+      ],
+      "flags": [],
+      "lines": 426
+    },
+    {
+      "route": "/dashboard/referral",
+      "file": "app/dashboard/referral/page.tsx",
+      "apiRefs": [
+        "/api/referral"
+      ],
+      "flags": [],
+      "lines": 94
+    },
+    {
+      "route": "/dashboard/rewards",
+      "file": "app/dashboard/rewards/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 52
+    },
+    {
+      "route": "/dashboard/settings",
+      "file": "app/dashboard/settings/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 73
+    },
+    {
+      "route": "/dashboard/subaccounts",
+      "file": "app/dashboard/subaccounts/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 48
+    },
+    {
+      "route": "/dashboard/trades",
+      "file": "app/dashboard/trades/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 41
+    },
+    {
+      "route": "/earn",
+      "file": "app/earn/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 150
+    },
+    {
+      "route": "/faq",
+      "file": "app/faq/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 78
+    },
+    {
+      "route": "/forgot-password",
+      "file": "app/forgot-password/page.tsx",
+      "apiRefs": [],
+      "flags": [
+        "placeholder"
+      ],
+      "lines": 75
+    },
+    {
+      "route": "/futures",
+      "file": "app/futures/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 173
+    },
+    {
+      "route": "/kol",
+      "file": "app/kol/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 45
+    },
+    {
+      "route": "/login",
+      "file": "app/login/page.tsx",
+      "apiRefs": [
+        "/api/auth/login"
+      ],
+      "flags": [
+        "placeholder"
+      ],
+      "lines": 193
+    },
+    {
+      "route": "/margin/[pair]",
+      "file": "app/margin/[pair]/page.tsx",
+      "apiRefs": [
+        "/api/market"
+      ],
+      "flags": [
+        "placeholder"
+      ],
+      "lines": 421
+    },
+    {
+      "route": "/margin",
+      "file": "app/margin/page.tsx",
+      "apiRefs": [
+        "/api/market"
+      ],
+      "flags": [],
+      "lines": 62
+    },
+    {
+      "route": "/markets",
+      "file": "app/markets/page.tsx",
+      "apiRefs": [
+        "/api/market"
+      ],
+      "flags": [
+        "placeholder"
+      ],
+      "lines": 452
+    },
+    {
+      "route": "/",
+      "file": "app/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 136
+    },
+    {
+      "route": "/privacy",
+      "file": "app/privacy/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 125
+    },
+    {
+      "route": "/protrade/[pair]",
+      "file": "app/protrade/[pair]/page.tsx",
+      "apiRefs": [],
+      "flags": [
+        "placeholder"
+      ],
+      "lines": 1084
+    },
+    {
+      "route": "/protrade",
+      "file": "app/protrade/page.tsx",
+      "apiRefs": [
+        "/api/market"
+      ],
+      "flags": [
+        "placeholder"
+      ],
+      "lines": 964
+    },
+    {
+      "route": "/protrade/pro",
+      "file": "app/protrade/pro/page.tsx",
+      "apiRefs": [
+        "/api/market"
+      ],
+      "flags": [
+        "placeholder"
+      ],
+      "lines": 420
+    },
+    {
+      "route": "/register",
+      "file": "app/register/page.tsx",
+      "apiRefs": [
+        "/api/auth/register"
+      ],
+      "flags": [
+        "placeholder"
+      ],
+      "lines": 283
+    },
+    {
+      "route": "/terms",
+      "file": "app/terms/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 154
+    },
+    {
+      "route": "/trading/copy",
+      "file": "app/trading/copy/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 78
+    },
+    {
+      "route": "/trading/futures",
+      "file": "app/trading/futures/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 78
+    },
+    {
+      "route": "/trading/grid",
+      "file": "app/trading/grid/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 78
+    },
+    {
+      "route": "/trading/margin",
+      "file": "app/trading/margin/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 78
+    },
+    {
+      "route": "/trading",
+      "file": "app/trading/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 43
+    },
+    {
+      "route": "/trading/spot",
+      "file": "app/trading/spot/page.tsx",
+      "apiRefs": [],
+      "flags": [],
+      "lines": 39
+    },
+    {
+      "route": "/verify-email",
+      "file": "app/verify-email/page.tsx",
+      "apiRefs": [
+        "/api/auth/verify"
+      ],
+      "flags": [
+        "placeholder"
+      ],
+      "lines": 144
+    }
+  ]
+}

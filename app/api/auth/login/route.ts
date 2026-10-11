@@ -1,0 +1,148 @@
+import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import { SignJWT } from "jose";
+import { connectDB } from "@/lib/mongodb";
+import User from "@/models/User";
+import { rateLimit } from "@/lib/rate-limit";
+
+const secretText = process.env.AUTH_SECRET;
+
+if (!secretText) {
+  throw new Error("AUTH_SECRET is not configured");
+}
+
+const secret = new TextEncoder().encode(secretText);
+
+export async function POST(request: NextRequest) {
+  const clientKey =
+    request.headers.get("x-forwarded-for") ||
+    request.headers.get("x-real-ip") ||
+    "unknown";
+
+  const RATE_LIMIT_login = rateLimit(
+    "login:" + clientKey,
+    10,
+    60000
+  );
+
+  if (!RATE_LIMIT_login.allowed) {
+    return NextResponse.json(
+      {
+        error: "تم تجاوز عدد الطلبات المسموح بها مؤقتًا",
+        retryAfter: Math.max(
+          0,
+          Math.ceil((RATE_LIMIT_login.resetAt - Date.now()) / 1000)
+        )
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(
+            Math.max(
+              1,
+              Math.ceil((RATE_LIMIT_login.resetAt - Date.now()) / 1000)
+            )
+          )
+        }
+      }
+    );
+  }
+
+  try {
+    const body = await request.json();
+
+    const identifier = String(body.identifier || "").trim().toLowerCase();
+    const password = String(body.password || "");
+
+    if (!identifier || !password) {
+      return NextResponse.json(
+        { success: false, message: "أدخل اسم المستخدم أو البريد الإلكتروني وكلمة المرور" },
+        { status: 400 }
+      );
+    }
+
+    await connectDB();
+
+    const user = await User.findOne({
+      $or: [{ email: identifier }, { username: identifier }],
+    }).select("+password");
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: "بيانات تسجيل الدخول غير صحيحة" },
+        { status: 401 }
+      );
+    }
+
+    if (!user.isVerified) {
+      return NextResponse.json(
+        { success: false, message: "يجب تأكيد البريد الإلكتروني أولًا" },
+        { status: 403 }
+      );
+    }
+
+    if (!user.isActive) {
+      return NextResponse.json(
+        { success: false, message: "الحساب غير مفعل حاليًا" },
+        { status: 403 }
+      );
+    }
+
+    const passwordValid = await bcrypt.compare(password, user.password);
+
+    if (!passwordValid) {
+      return NextResponse.json(
+        { success: false, message: "بيانات تسجيل الدخول غير صحيحة" },
+        { status: 401 }
+      );
+    }
+
+    const token = await new SignJWT({
+      userId: String(user._id),
+      username: user.username,
+      email: user.email,
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime("7d")
+      .sign(secret);
+
+    const response = NextResponse.json({
+      success: true,
+      message: "تم تسجيل الدخول بنجاح",
+      user: {
+        id: String(user._id),
+        name: user.name,
+        username: user.username,
+        email: user.email,
+      },
+    });
+
+    response.cookies.set("arabtrade_session", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
+    return response;
+  } catch (error) {
+    console.error("LOGIN ERROR TYPE:", typeof error);
+    console.error(
+      "LOGIN ERROR DETAILS:",
+      error instanceof Error
+        ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          }
+        : error
+    );
+
+    return NextResponse.json(
+      { success: false, message: "حدث خطأ أثناء تسجيل الدخول" },
+      { status: 500 }
+    );
+  }
+}

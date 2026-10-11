@@ -6,6 +6,10 @@ import DepositRequest from "@/models/DepositRequest";
 import Asset from "@/models/Asset";
 import DepositBalance from "@/models/DepositBalance";
 import LedgerEntry from "@/models/LedgerEntry";
+import Wallet from "@/models/Wallet";
+import User from "@/models/User";
+import PlatformSettings from "@/models/PlatformSettings";
+import ReferralCommission from "@/models/ReferralCommission";
 import Notification from "@/models/Notification";
 import {
   verifyBlockchainDeposit,
@@ -343,6 +347,68 @@ export async function POST(
         await current.save({
           session,
         });
+
+        // Approved on-chain deposits follow the same referral commission path as admin-approved deposits.
+        const referredUser = await User.findById(current.userId).select("referredBy").session(session).lean();
+        if (referredUser?.referredBy) {
+          const settings = await PlatformSettings.findOne({ key: "global" }).session(session).lean();
+          const enabled = settings?.referral?.enabled !== false;
+          const commissionPercent = Number(settings?.referral?.commissionPercent ?? 0);
+
+          if (enabled && Number.isFinite(commissionPercent) && commissionPercent > 0 && commissionPercent <= 100) {
+            const commission = Number((expectedAmount * commissionPercent / 100).toFixed(12));
+            if (commission > 0) {
+              const referrerId = referredUser.referredBy;
+              await ReferralCommission.create([{
+                referrerId,
+                referredUserId: current.userId,
+                tradeId: null,
+                amount: commission,
+                asset: String(current.asset).toUpperCase(),
+                rate: commissionPercent,
+                status: "available",
+              }], { session });
+
+              let wallet = await Wallet.findOne({
+                userId: referrerId,
+                type: "spot",
+                mode: "live",
+              }).session(session);
+              if (!wallet) {
+                wallet = new Wallet({
+                  userId: referrerId,
+                  type: "spot",
+                  mode: "live",
+                  balances: [],
+                });
+              }
+
+              const symbol = String(current.asset).toUpperCase();
+              const walletBalance = wallet.balances.find((item) => String(item.asset).toUpperCase() === symbol);
+              const before = Number(walletBalance?.available || 0);
+              if (!walletBalance) {
+                wallet.balances.push({ asset: symbol, available: commission, locked: 0 });
+              } else {
+                walletBalance.available = Number((before + commission).toFixed(12));
+              }
+              const after = before + commission;
+              await wallet.save({ session });
+
+              await LedgerEntry.create([{
+                userId: referrerId,
+                scope: "user",
+                asset: symbol,
+                mode: "live",
+                type: "referral",
+                amount: commission,
+                balanceBefore: before,
+                balanceAfter: after,
+                referenceId: `DEPOSIT:${current._id}`,
+                note: `عمولة إحالة ${commissionPercent}% من إيداع البلوكشين ${current.userId}`,
+              }], { session });
+            }
+          }
+        }
       }
     );
 

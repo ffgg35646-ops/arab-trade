@@ -236,7 +236,7 @@ export async function POST(request: NextRequest) {
               amount: -price,
               note: "تفعيل باقة " + plan.name + " من رصيد الإيداع عند تغيير الباقة",
             },
-          ], { session });
+          ], { session, ordered: true });
         });
       } catch (changeError) {
         const code = changeError instanceof Error ? changeError.message : "";

@@ -579,7 +579,7 @@ export default function WithdrawPage() {
                         </option>
                       ))}
                     </select>
-                    <p className="mt-2 text-xs leading-5 text-slate-500">يتم السحب من رصيد هذه الباقة فقط، ورصيد الإيداع الخارجي لا يُسحب مباشرة.</p>{packageFirstWithdrawalPending ? <p className="mt-2 text-xs font-bold text-amber-300">أول طلب سحب من الباقة قيد المراجعة؛ انتظر حسمه قبل طلب آخر.</p> : packageFirstWithdrawal ? <p className="mt-2 text-xs font-bold text-cyan-300">الحد الأقصى لأول سحب هو مبلغ تفعيل الباقة ({selectedPackage.investedAmount} USDT). بعد حسم أول طلب، يمكنك سحب الرصيد المحقق المتاح دون شرط إحالات.</p> : <p className="mt-2 text-xs text-slate-500">أول طلب سحب حُسم بالفعل؛ يمكنك سحب رصيد الباقة المحقق والمتاح وفق حدود المنصة.</p>}
+                    <p className="mt-2 text-xs leading-5 text-slate-500">يتم السحب من رصيد هذه الباقة فقط، ورصيد الإيداع الخارجي لا يُسحب مباشرة.</p>{packageFirstWithdrawalPending ? <p className="mt-2 text-xs font-bold text-amber-300">أول طلب سحب من الباقة قيد المراجعة؛ انتظر حسمه قبل طلب آخر.</p> : packageFirstWithdrawal ? <p className="mt-2 text-xs font-bold text-cyan-300">الحد الأقصى لأول سحب هو مبلغ تفعيل الباقة ({selectedPackage?.investedAmount || 0} USDT). بعد حسم أول طلب، يمكنك سحب الرصيد المحقق المتاح دون شرط إحالات.</p> : <p className="mt-2 text-xs text-slate-500">أول طلب سحب حُسم بالفعل؛ يمكنك سحب رصيد الباقة المحقق والمتاح وفق حدود المنصة.</p>}
                   </div>
                 )}
 

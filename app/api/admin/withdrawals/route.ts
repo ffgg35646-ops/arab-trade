@@ -7,6 +7,8 @@ import WithdrawalRequest from "@/models/WithdrawalRequest";
 import Wallet from "@/models/Wallet";
 import LedgerEntry from "@/models/LedgerEntry";
 import Notification from "@/models/Notification";
+import UserPackage from "@/models/UserPackage";
+import PackageLedger from "@/models/PackageLedger";
 
 function normalizeAsset(
   value: unknown
@@ -78,10 +80,8 @@ export async function GET(
           createdAt: -1,
         })
         .limit(limit)
-        .populate(
-          "userId",
-          "name username email"
-        )
+        .populate("userId", "name username email")
+        .populate("userPackageId", "packageName")
         .lean();
 
     return NextResponse.json({
@@ -212,6 +212,70 @@ export async function PATCH(
         success: true,
         withdrawal,
       });
+    }
+
+    if (withdrawal.source === "package") {
+      if (!withdrawal.userPackageId) {
+        return NextResponse.json({ success: false, message: "طلب السحب لا يحتوي على حساب الباقة" }, { status: 409 });
+      }
+
+      const amount = Number(withdrawal.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return NextResponse.json({ success: false, message: "قيمة السحب غير صحيحة" }, { status: 409 });
+      }
+
+      if (nextStatus === "rejected" || nextStatus === "completed") {
+        const increments = nextStatus === "rejected"
+          ? { $inc: { lockedEarnings: -amount, availableEarnings: amount } }
+          : { $inc: { lockedEarnings: -amount, totalWithdrawn: amount } };
+
+        const packageAccount = await UserPackage.findOneAndUpdate(
+          { _id: withdrawal.userPackageId, userId: withdrawal.userId, lockedEarnings: { $gte: amount } },
+          increments,
+          { new: true }
+        );
+
+        if (!packageAccount) {
+          return NextResponse.json({ success: false, message: "رصيد الباقة المقفل غير كافٍ أو حساب الباقة غير موجود" }, { status: 409 });
+        }
+
+        await PackageLedger.create({
+          userId: withdrawal.userId,
+          userPackageId: packageAccount._id,
+          type: nextStatus === "rejected" ? "withdrawal_reversal" : "withdrawal",
+          asset: withdrawal.asset,
+          amount: nextStatus === "rejected" ? amount : -amount,
+          note: adminNote || (nextStatus === "rejected" ? "إرجاع طلب سحب باقة مرفوض إلى رصيد الباقة" : "تنفيذ سحب من رصيد أرباح الباقة"),
+          createdBy: admin._id,
+        });
+      }
+
+      withdrawal.status = nextStatus as "approved" | "rejected" | "completed";
+      withdrawal.adminNote = adminNote;
+      await withdrawal.save();
+
+      const packageTitle = nextStatus === "rejected"
+        ? "تم رفض طلب سحب الباقة"
+        : nextStatus === "completed"
+          ? "تم تنفيذ سحب الباقة"
+          : "تمت الموافقة على سحب الباقة";
+      const packageMessage = adminNote || (
+        nextStatus === "rejected"
+          ? "تم إرجاع المبلغ إلى رصيد السحب المتاح للباقة."
+          : nextStatus === "completed"
+            ? "تم تنفيذ طلب السحب من رصيد الباقة."
+            : "تمت الموافقة على طلب السحب وهو قيد التنفيذ."
+      );
+
+      await Notification.create({
+        userId: withdrawal.userId,
+        type: "withdrawal",
+        title: packageTitle,
+        message: packageMessage,
+        read: false,
+      });
+
+      return NextResponse.json({ success: true, withdrawal });
     }
 
     const wallet =

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+type DepositBalance = { asset: string; available: number; locked: number };
+
 type Method = {
   _id: string;
   name: string;
@@ -17,6 +19,7 @@ type Method = {
 
 export default function DepositPage() {
   const [methods, setMethods] = useState<Method[]>([]);
+  const [depositBalances, setDepositBalances] = useState<DepositBalance[]>([]);
   const [selectedId, setSelectedId] = useState("");
 
   const [amount, setAmount] = useState("");
@@ -38,11 +41,16 @@ export default function DepositPage() {
     setError("");
 
     try {
-      const res = await fetch("/api/payment-options", {
-        cache: "no-store",
-      });
+      const [res, balanceRes] = await Promise.all([
+        fetch("/api/payment-options", { cache: "no-store" }),
+        fetch("/api/deposits", { credentials: "include", cache: "no-store" }),
+      ]);
 
       const json = await res.json();
+      const balanceJson = await balanceRes.json().catch(() => ({}));
+      setDepositBalances(
+        Array.isArray(balanceJson.depositBalances) ? balanceJson.depositBalances : []
+      );
 
       if (!res.ok || !json.success) {
         throw new Error(
@@ -178,8 +186,29 @@ export default function DepositPage() {
         </h1>
 
         <p className="mt-2 text-sm text-slate-500">
-          اختر وسيلة الدفع المفعلة من إدارة المنصة.
+          اختر وسيلة الدفع المفعلة من إدارة المنصة. الإيداعات الخارجية المعتمدة تضاف إلى رصيد الإيداع المنفصل.
         </p>
+
+        <section className="mt-5 rounded-2xl border border-cyan-300/15 bg-[#08111e] p-5">
+          <h2 className="text-sm font-bold text-slate-300">رصيد الإيداع المتاح</h2>
+          {depositBalances.length === 0 ? (
+            <p className="mt-2 text-xs text-slate-500">لا يوجد رصيد إيداع معتمد حتى الآن.</p>
+          ) : (
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {depositBalances.map((item) => (
+                <div key={item.asset} className="rounded-xl border border-white/10 bg-[#050a13] p-4">
+                  <div className="text-xs text-slate-500">{item.asset}</div>
+                  <div className="mt-2 text-xl font-black text-cyan-300">
+                    {Number(item.available || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })}
+                  </div>
+                  <div className="mt-1 text-[11px] text-slate-600">
+                    محجوز: {Number(item.locked || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         {error && (
           <div className="mt-5 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">

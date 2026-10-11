@@ -100,9 +100,11 @@ export default function Page() {
       }
     }
 
-    return [...set]
-      .filter((key) => !["__v"].includes(key))
-      .slice(0, 12);
+    const discovered = [...set].filter((key) => !["__v"].includes(key)).slice(0, 10);
+    for (const key of ["source", "userPackageId"]) {
+      if (set.has(key) && !discovered.includes(key)) discovered.push(key);
+    }
+    return discovered;
   }, [filtered]);
 
   function label(key: string) {
@@ -118,6 +120,8 @@ export default function Page() {
       txHash: "TX Hash",
       address: "العنوان",
       fee: "الرسوم",
+      source: "مصدر السحب",
+      userPackageId: "حساب الباقة",
       createdAt: "تاريخ الإنشاء",
       updatedAt: "التحديث",
     };

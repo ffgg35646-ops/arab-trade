@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 
 import { connectDB } from "@/lib/mongodb";
 import DepositRequest from "@/models/DepositRequest";
+import DepositBalance from "@/models/DepositBalance";
 import Asset from "@/models/Asset";
 import { getCurrentUser } from "@/lib/current-user";
 import { getPlatformSettings } from "@/lib/platform-settings";
@@ -38,16 +39,18 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
 
-    const deposits = await DepositRequest.find({
-      userId: user._id,
-    })
-      .sort({ createdAt: -1 })
-      .limit(100)
-      .lean();
+    const [deposits, depositBalances] = await Promise.all([
+      DepositRequest.find({ userId: user._id })
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .lean(),
+      DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
+    ]);
 
     return NextResponse.json({
       success: true,
       deposits,
+      depositBalances,
     });
   } catch (error) {
     console.error("DEPOSITS GET:", error);

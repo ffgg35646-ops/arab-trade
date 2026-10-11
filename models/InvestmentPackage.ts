@@ -1,0 +1,33 @@
+import mongoose, { Model, Schema } from "mongoose";
+
+export interface IInvestmentPackage {
+  name: string;
+  description: string;
+  price: number;
+  asset: string;
+  durationDays: number;
+  enabled: boolean;
+  sortOrder: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+const InvestmentPackageSchema = new Schema<IInvestmentPackage>(
+  {
+    name: { type: String, required: true, trim: true, minlength: 2, maxlength: 80 },
+    description: { type: String, default: "", trim: true, maxlength: 1200 },
+    price: { type: Number, required: true, min: 1 },
+    asset: { type: String, default: "USDT", uppercase: true, trim: true },
+    durationDays: { type: Number, required: true, min: 1, max: 3650 },
+    enabled: { type: Boolean, default: true, index: true },
+    sortOrder: { type: Number, default: 0, index: true },
+  },
+  { timestamps: true }
+);
+InvestmentPackageSchema.index({ enabled: 1, sortOrder: 1 });
+
+const InvestmentPackage =
+  (mongoose.models.InvestmentPackage as Model<IInvestmentPackage>) ||
+  mongoose.model<IInvestmentPackage>("InvestmentPackage", InvestmentPackageSchema);
+
+export default InvestmentPackage;

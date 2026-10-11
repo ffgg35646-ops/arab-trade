@@ -26,6 +26,7 @@ const sections = [
     children: [
       ["نظرة عامة", "/dashboard/assets"],
       ["الإيداع", "/dashboard/assets/deposit"],
+      ["الباقات", "/dashboard/packages"],
       ["السحب", "/dashboard/withdraw"],
       ["التداول الفوري", "/protrade"],
       ["الهامش", "/margin"],

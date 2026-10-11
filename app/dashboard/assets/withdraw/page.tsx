@@ -30,9 +30,21 @@ type SavedAddress = {
   address: string;
 };
 
+type PackageAccount = {
+  _id: string;
+  packageName: string;
+  asset: string;
+  status: "active" | "cancelled";
+  availableEarnings: number;
+  lockedEarnings: number;
+};
+
 export default function WithdrawPage() {
   const [methods, setMethods] = useState<Method[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
+  const [packageAccounts, setPackageAccounts] = useState<PackageAccount[]>([]);
+  const [withdrawalSource, setWithdrawalSource] = useState<"wallet" | "package">("wallet");
+  const [selectedPackageId, setSelectedPackageId] = useState("");
   const [savedAddresses, setSavedAddresses] = useState<
     SavedAddress[]
   >([]);
@@ -77,6 +89,7 @@ export default function WithdrawPage() {
         walletResponse,
         historyResponse,
         addressesResponse,
+        packageResponse,
       ] = await Promise.all([
         fetch("/api/payment-options", {
           cache: "no-store",
@@ -96,6 +109,10 @@ export default function WithdrawPage() {
           credentials: "include",
           cache: "no-store",
         }),
+        fetch("/api/packages", {
+          credentials: "include",
+          cache: "no-store",
+        }),
       ]);
 
       const methodsData =
@@ -109,6 +126,8 @@ export default function WithdrawPage() {
 
       const addressesData =
         await addressesResponse.json();
+
+      const packageData = await packageResponse.json().catch(() => ({}));
 
       if (
         !methodsResponse.ok ||
@@ -178,6 +197,18 @@ export default function WithdrawPage() {
           : []
       );
 
+      const packageRows: PackageAccount[] = Array.isArray(packageData.userPackages)
+        ? packageData.userPackages.filter((item: PackageAccount) =>
+            ["active", "cancelled"].includes(item.status) && item.asset === "USDT"
+          )
+        : [];
+      setPackageAccounts(packageRows);
+      setSelectedPackageId((current) =>
+        current && packageRows.some((item) => item._id === current)
+          ? current
+          : packageRows.find((item) => Number(item.availableEarnings || 0) > 0)?._id || packageRows[0]?._id || ""
+      );
+
       if (rows.length > 0) {
         setSelectedId(
           (current) =>
@@ -209,11 +240,11 @@ export default function WithdrawPage() {
     [methods, selectedId]
   );
 
+  const selectedPackage = packageAccounts.find((item) => item._id === selectedPackageId);
   const selectedBalance =
-    balances.find(
-      (balance) =>
-        balance.asset === selected?.asset
-    )?.available || 0;
+    withdrawalSource === "package"
+      ? Number(selectedPackage?.availableEarnings || 0)
+      : balances.find((balance) => balance.asset === selected?.asset)?.available || 0;
 
   const savedAddress = selected
     ? savedAddresses.find(
@@ -357,6 +388,18 @@ export default function WithdrawPage() {
         );
       }
 
+      if (withdrawalSource === "package") {
+        if (!selectedPackageId || !selectedPackage) {
+          throw new Error("اختر الباقة التي تريد السحب من رصيدها");
+        }
+        if (selected.asset !== "USDT") {
+          throw new Error("سحب أرباح الباقة متاح حاليًا بعملة USDT فقط");
+        }
+        if (numericAmount > selectedPackage.availableEarnings) {
+          throw new Error("مبلغ السحب أكبر من الرصيد المتاح في هذه الباقة");
+        }
+      }
+
       if (
         numericAmount <
         selected.minWithdrawal
@@ -391,6 +434,8 @@ export default function WithdrawPage() {
             network: selected.network,
             address: cleanAddress,
             amount: numericAmount,
+            source: withdrawalSource,
+            userPackageId: withdrawalSource === "package" ? selectedPackageId : undefined,
           }),
         }
       );
@@ -485,6 +530,47 @@ export default function WithdrawPage() {
 
               <div className="space-y-4">
                 <div>
+                  <label className="mb-2 block text-sm font-bold">مصدر رصيد السحب</label>
+                  <select
+                    value={withdrawalSource}
+                    onChange={(e) => {
+                      const next = e.target.value === "package" ? "package" : "wallet";
+                      setWithdrawalSource(next);
+                      if (next === "package") {
+                        const usdtMethod = methods.find((item) => item.asset === "USDT");
+                        if (usdtMethod) setSelectedId(usdtMethod._id);
+                        const account = packageAccounts.find((item) => Number(item.availableEarnings || 0) > 0);
+                        if (account) setSelectedPackageId(account._id);
+                      }
+                    }}
+                    className="w-full rounded-xl border border-white/10 bg-[#050a13] px-4 py-3"
+                  >
+                    <option value="wallet">رصيد السحب العام</option>
+                    <option value="package">رصيد أرباح باقة محددة</option>
+                  </select>
+                </div>
+
+                {withdrawalSource === "package" && (
+                  <div>
+                    <label className="mb-2 block text-sm font-bold">الباقة التي سيتم السحب منها</label>
+                    <select
+                      value={selectedPackageId}
+                      onChange={(e) => setSelectedPackageId(e.target.value)}
+                      required
+                      className="w-full rounded-xl border border-white/10 bg-[#050a13] px-4 py-3"
+                    >
+                      <option value="">اختر الباقة</option>
+                      {packageAccounts.map((item) => (
+                        <option key={item._id} value={item._id}>
+                          {item.packageName} — متاح {Number(item.availableEarnings || 0).toFixed(2)} USDT
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-2 text-xs leading-5 text-slate-500">يتم السحب من الرصيد المتاح لهذه الباقة فقط. رصيد الإيداع الخارجي لا يُسحب مباشرة.</p>
+                  </div>
+                )}
+
+                <div>
                   <label className="mb-2 block text-sm font-bold">
                     وسيلة السحب
                   </label>
@@ -503,7 +589,7 @@ export default function WithdrawPage() {
                       اختر وسيلة السحب
                     </option>
 
-                    {methods.map(
+                    {methods.filter((method) => withdrawalSource !== "package" || method.asset === "USDT").map(
                       (method) => (
                         <option
                           key={method._id}

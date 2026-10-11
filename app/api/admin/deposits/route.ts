@@ -11,6 +11,7 @@ import Wallet from "@/models/Wallet";
 import LedgerEntry from "@/models/LedgerEntry";
 import Notification from "@/models/Notification";
 import ReferralCommission from "@/models/ReferralCommission";
+import DepositBalance from "@/models/DepositBalance";
 
 export async function GET(
   request: NextRequest
@@ -196,83 +197,22 @@ export async function PATCH(
     }
 
     if (status === "approved") {
-      let wallet =
-        await Wallet.findOne({
-          userId:
-            deposit.userId,
-          type: "spot",
-        });
-
-      if (!wallet) {
-        wallet =
-          new Wallet({
-            userId:
-              deposit.userId,
-            type: "spot",
-            balances: [],
-          });
-      }
-
-      const asset =
-        String(
-          deposit.asset
-        )
-          .trim()
-          .toUpperCase();
-
-      let balance =
-        wallet.balances.find(
-          (b: any) =>
-            String(b.asset)
-              .toUpperCase() ===
-            asset
-        );
-
-      let before = 0;
-
-      if (!balance) {
-        wallet.balances.push({
-          asset,
-          available: amount,
-          locked: 0,
-        });
-
-        balance =
-          wallet.balances[
-            wallet.balances.length - 1
-          ] as any;
-      } else {
-        before =
-          Number(
-            (balance?.available || 0) ||
-              0
-          );
-
-        balance.available =
-          before + amount;
-      }
-
-      const after =
-        Number(
-          (balance?.available || 0) ||
-            amount
-        );
-
-      await wallet.save();
+      const asset = String(deposit.asset || "").trim().toUpperCase();
+      const credited = await DepositBalance.findOneAndUpdate(
+        { userId: deposit.userId, asset },
+        { $inc: { available: amount }, $setOnInsert: { userId: deposit.userId, asset, locked: 0 } },
+        { new: true, upsert: true, setDefaultsOnInsert: true }
+      );
 
       await LedgerEntry.create({
-        userId:
-          deposit.userId,
+        userId: deposit.userId,
         asset,
         type: "deposit",
         amount,
-        balanceBefore: before,
-        balanceAfter: after,
-        referenceId:
-          String(deposit._id),
-        note:
-          adminNote ||
-          `اعتماد إيداع ${deposit.network}`,
+        balanceBefore: Number(credited.available || 0) - amount,
+        balanceAfter: Number(credited.available || 0),
+        referenceId: String(deposit._id),
+        note: adminNote || "إيداع خارجي معتمد — أضيف إلى رصيد الإيداع المنفصل",
       });
 
       // ============================================
@@ -340,8 +280,10 @@ export async function PATCH(
         | "approved"
         | "rejected";
 
-    deposit.adminNote =
-      adminNote;
+    deposit.adminNote = adminNote;
+    if (status === "approved" && !deposit.creditedAt) {
+      deposit.creditedAt = new Date();
+    }
 
     await deposit.save();
 

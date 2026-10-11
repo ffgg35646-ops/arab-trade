@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { requireVerifiedIdentity } from "@/lib/require-kyc";
 import { connectDB } from "@/lib/mongodb";
@@ -9,6 +10,8 @@ import Notification from "@/models/Notification";
 import { getCurrentUser } from "@/lib/current-user";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import { rateLimit } from "@/lib/rate-limit";
+import UserPackage from "@/models/UserPackage";
+import PackageLedger from "@/models/PackageLedger";
 
 export async function GET(request: NextRequest) {
   const clientKey =
@@ -171,6 +174,8 @@ export async function POST(request: NextRequest) {
       .trim();
 
     const amount = Number(body.amount);
+    const source = body.source === "package" ? "package" : "wallet";
+    const userPackageId = String(body.userPackageId || "").trim();
 
     if (
       !assetCode ||
@@ -383,42 +388,57 @@ export async function POST(request: NextRequest) {
     }
 
     /*
-     * قفل الرصيد قبل إنشاء الطلب.
+     * قفل الرصيد من المحفظة العامة أو رصيد أرباح الباقة.
+     * رصيد الإيداع الخارجي منفصل ولا يسمح بسحبه مباشرة.
      */
-    const wallet =
-      await Wallet.findOneAndUpdate(
+    let lockedWallet = false;
+    let lockedUserPackage: any = null;
+
+    if (source === "package") {
+      if (assetCode !== "USDT" || !mongoose.Types.ObjectId.isValid(userPackageId)) {
+        return NextResponse.json(
+          { success: false, message: "اختر حساب باقة صحيحًا وبعملة USDT" },
+          { status: 400 }
+        );
+      }
+
+      lockedUserPackage = await UserPackage.findOneAndUpdate(
+        {
+          _id: userPackageId,
+          userId: user._id,
+          asset: assetCode,
+          status: { $in: ["active", "cancelled"] },
+          availableEarnings: { $gte: amount },
+        },
+        { $inc: { availableEarnings: -amount, lockedEarnings: amount } },
+        { new: true }
+      );
+
+      if (!lockedUserPackage) {
+        return NextResponse.json(
+          { success: false, message: "رصيد السحب المتاح في هذه الباقة غير كافٍ" },
+          { status: 400 }
+        );
+      }
+    } else {
+      const wallet = await Wallet.findOneAndUpdate(
         {
           userId: user._id,
           type: "spot",
           mode: "live",
-          balances: {
-            $elemMatch: {
-              asset: assetCode,
-              available: {
-                $gte: amount,
-              },
-            },
-          },
+          balances: { $elemMatch: { asset: assetCode, available: { $gte: amount } } },
         },
-        {
-          $inc: {
-            "balances.$.available": -amount,
-            "balances.$.locked": amount,
-          },
-        },
-        {
-          new: true,
-        }
+        { $inc: { "balances.$.available": -amount, "balances.$.locked": amount } },
+        { new: true }
       );
 
-    if (!wallet) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "الرصيد المتاح غير كافٍ",
-        },
-        { status: 400 }
-      );
+      if (!wallet) {
+        return NextResponse.json(
+          { success: false, message: "الرصيد المتاح غير كافٍ" },
+          { status: 400 }
+        );
+      }
+      lockedWallet = true;
     }
 
     try {
@@ -431,15 +451,30 @@ export async function POST(request: NextRequest) {
           fee,
           receiveAmount,
           address,
+          source,
+          userPackageId: source === "package" ? userPackageId : null,
           status: "pending",
           adminNote: "",
         });
+
+      if (source === "package" && lockedUserPackage) {
+        await PackageLedger.create({
+          userId: user._id,
+          userPackageId: lockedUserPackage._id,
+          type: "withdrawal",
+          asset: assetCode,
+          amount: -amount,
+          note: "إنشاء طلب سحب من رصيد أرباح الباقة رقم " + String(lockedUserPackage._id),
+        }).catch((ledgerError) => {
+          console.error("PACKAGE WITHDRAWAL LEDGER:", ledgerError);
+        });
+      }
 
       await Notification.create({
         userId: user._id,
         type: "withdrawal",
         title: "تم إنشاء طلب السحب",
-        message: `تم إنشاء طلب سحب ${amount} ${assetCode} على شبكة ${networkName}.`,
+        message: "تم إنشاء طلب سحب " + amount + " " + assetCode + " على شبكة " + networkName + ".",
       });
 
       return NextResponse.json(
@@ -456,20 +491,17 @@ export async function POST(request: NextRequest) {
        * لو إنشاء الطلب فشل بعد قفل الرصيد،
        * نرجع الرصيد مرة أخرى.
        */
-      await Wallet.updateOne(
-        {
-          userId: user._id,
-          type: "spot",
-          mode: "live",
-          "balances.asset": assetCode,
-        },
-        {
-          $inc: {
-            "balances.$.available": amount,
-            "balances.$.locked": -amount,
-          },
-        }
-      );
+      if (source === "package" && lockedUserPackage) {
+        await UserPackage.updateOne(
+          { _id: lockedUserPackage._id, userId: user._id },
+          { $inc: { availableEarnings: amount, lockedEarnings: -amount } }
+        );
+      } else if (lockedWallet) {
+        await Wallet.updateOne(
+          { userId: user._id, type: "spot", mode: "live", "balances.asset": assetCode },
+          { $inc: { "balances.$.available": amount, "balances.$.locked": -amount } }
+        );
+      }
 
       throw error;
     }

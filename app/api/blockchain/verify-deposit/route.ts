@@ -10,6 +10,7 @@ import Wallet from "@/models/Wallet";
 import User from "@/models/User";
 import PlatformSettings from "@/models/PlatformSettings";
 import ReferralCommission from "@/models/ReferralCommission";
+import BlockchainDepositClaim from "@/models/BlockchainDepositClaim";
 import Notification from "@/models/Notification";
 import {
   verifyBlockchainDeposit,
@@ -244,6 +245,7 @@ export async function POST(
     // -----------------------------------------------------
     // Atomic credit
     // -----------------------------------------------------
+    await BlockchainDepositClaim.init();
     session =
       await mongoose.startSession();
     let alreadyProcessedDuringTransaction = false;
@@ -287,6 +289,20 @@ export async function POST(
           throw new Error(
             "DUPLICATE_TXHASH"
           );
+        }
+
+        try {
+          await BlockchainDepositClaim.create([{
+            txHash: String(current.txHash).trim().toLowerCase(),
+            depositRequestId: current._id,
+            userId: current.userId,
+            asset: String(current.asset).toUpperCase(),
+            network: String(current.network).toUpperCase(),
+            amount: expectedAmount,
+          }], { session });
+        } catch (claimError: any) {
+          if (claimError?.code === 11000) throw new Error("DUPLICATE_TXHASH");
+          throw claimError;
         }
 
         let depositBalance = await DepositBalance.findOne({

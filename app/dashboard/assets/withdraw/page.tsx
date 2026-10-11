@@ -212,15 +212,14 @@ export default function WithdrawPage() {
       );
 
       if (rows.length > 0) {
-        setSelectedId(
-          (current) =>
-            current &&
-            rows.some(
-              (item) => item._id === current
-            )
-              ? current
-              : rows[0]._id
+        const currentId = rows.some((item) => item._id === selectedId) ? selectedId : rows[0]._id;
+        setSelectedId(currentId);
+        const currentMethod = rows.find((item) => item._id === currentId);
+        const loadedAddresses: SavedAddress[] = Array.isArray(addressesData.addresses) ? addressesData.addresses : [];
+        const knownAddress = loadedAddresses.find(
+          (item) => item.asset === currentMethod?.asset && item.network === currentMethod?.network
         );
+        setAddress(knownAddress?.address || "");
       }
     } catch (e) {
       setError(
@@ -260,20 +259,17 @@ export default function WithdrawPage() {
       )
     : undefined;
 
-  useEffect(() => {
-    if (savedAddress) {
-      setAddress(savedAddress.address);
-    } else {
-      setAddress("");
-    }
-
+  function selectMethod(id: string) {
+    setSelectedId(id);
+    const method = methods.find((item) => item._id === id);
+    const knownAddress = method && savedAddresses.find(
+      (item) => item.asset === method.asset && item.network === method.network
+    );
+    setAddress(knownAddress?.address || "");
     setAmount("");
     setError("");
     setMessage("");
-  }, [
-    selectedId,
-    savedAddress?.address,
-  ]);
+  }
 
   const amountNumber =
     Number(amount) || 0;
@@ -550,7 +546,7 @@ export default function WithdrawPage() {
                       setWithdrawalSource(next);
                       if (next === "package") {
                         const usdtMethod = methods.find((item) => item.asset === "USDT");
-                        if (usdtMethod) setSelectedId(usdtMethod._id);
+                        if (usdtMethod) selectMethod(usdtMethod._id);
                         const account = packageAccounts.find((item) => Number(item.availableEarnings || 0) > 0);
                         if (account) setSelectedPackageId(account._id);
                       }
@@ -589,11 +585,7 @@ export default function WithdrawPage() {
 
                   <select
                     value={selectedId}
-                    onChange={(e) =>
-                      setSelectedId(
-                        e.target.value
-                      )
-                    }
+                    onChange={(e) => selectMethod(e.target.value)}
                     className="w-full rounded-xl border border-white/10 bg-[#050a13] px-4 py-3"
                     required
                   >

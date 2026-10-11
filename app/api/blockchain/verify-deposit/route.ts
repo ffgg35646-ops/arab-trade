@@ -246,9 +246,11 @@ export async function POST(
     // -----------------------------------------------------
     session =
       await mongoose.startSession();
+    let alreadyProcessedDuringTransaction = false;
 
     await session.withTransaction(
       async () => {
+        alreadyProcessedDuringTransaction = false;
         const current =
           await DepositRequest.findOne({
             _id: deposit._id,
@@ -262,6 +264,7 @@ export async function POST(
         }
 
         if (current.creditedAt) {
+          alreadyProcessedDuringTransaction = true;
           return;
         }
 
@@ -411,6 +414,21 @@ export async function POST(
         }
       }
     );
+
+    if (alreadyProcessedDuringTransaction) {
+      return NextResponse.json({
+        success: true,
+        confirmed: true,
+        credited: true,
+        alreadyProcessed: true,
+        amount: expectedAmount,
+        asset: String(deposit.asset).toUpperCase(),
+        network: String(deposit.network).toUpperCase(),
+        txHash: deposit.txHash,
+        confirmations,
+        requiredConfirmations,
+      });
+    }
 
     // Notification is outside the financial transaction.
     try {

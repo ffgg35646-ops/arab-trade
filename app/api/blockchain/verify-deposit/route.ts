@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/current-user";
 import { connectDB } from "@/lib/mongodb";
 import DepositRequest from "@/models/DepositRequest";
 import Asset from "@/models/Asset";
-import Wallet from "@/models/Wallet";
+import DepositBalance from "@/models/DepositBalance";
 import LedgerEntry from "@/models/LedgerEntry";
 import Notification from "@/models/Notification";
 import {
@@ -282,74 +282,24 @@ export async function POST(
           );
         }
 
-        let wallet =
-          await Wallet.findOne({
-            userId:
-              current.userId,
-            type: "spot",
-            mode: "live",
-          }).session(session);
+        let depositBalance = await DepositBalance.findOne({
+          userId: current.userId,
+          asset: String(current.asset).toUpperCase(),
+        }).session(session);
 
-        if (!wallet) {
-          wallet =
-            new Wallet({
-              userId:
-                current.userId,
-              type: "spot",
-              mode: "live",
-              balances: [],
-            });
-        }
-
-        let balance =
-          wallet.balances.find(
-            (item: any) =>
-              String(
-                item.asset
-              ).toUpperCase() ===
-              String(
-                current.asset
-              ).toUpperCase()
-          );
-
-        const before =
-          Number(
-            balance?.available || 0
-          );
-
-        if (!balance) {
-          wallet.balances.push({
-            asset:
-              String(
-                current.asset
-              ).toUpperCase(),
-            available:
-              expectedAmount,
+        if (!depositBalance) {
+          depositBalance = new DepositBalance({
+            userId: current.userId,
+            asset: String(current.asset).toUpperCase(),
+            available: 0,
             locked: 0,
           });
-
-          balance =
-            wallet.balances[
-              wallet.balances.length - 1
-            ] as any;
-        } else {
-          balance.available =
-            Number(
-              (
-                before +
-                expectedAmount
-              ).toFixed(12)
-            );
         }
 
-        const after =
-          Number(
-            (balance as any).available || 0
-          );
-
-        await wallet.save({
-          session,
-        });
+        const before = Number(depositBalance.available || 0);
+        depositBalance.available = Number((before + expectedAmount).toFixed(12));
+        const after = Number(depositBalance.available || 0);
+        await depositBalance.save({ session });
 
         await LedgerEntry.create(
           [
@@ -378,7 +328,7 @@ export async function POST(
               referenceId:
                 `DEPOSIT:${current._id}`,
               note:
-                "Blockchain deposit credited",
+                "External blockchain deposit credited to separate deposit balance",
             },
           ],
           { session }

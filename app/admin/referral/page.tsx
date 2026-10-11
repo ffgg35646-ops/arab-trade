@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AdminPageFrame from "@/components/AdminPageFrame";
 import {
   CheckCircle2,
@@ -51,7 +51,7 @@ export default function ReferralPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  async function loadSettings() {
+  const loadSettings = useCallback(async () => {
     try {
       await Promise.resolve();
       setLoading(true);
@@ -86,11 +86,11 @@ export default function ReferralPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void loadSettings();
-  }, []);
+  }, [loadSettings]);
 
   async function saveSettings() {
     const commissionPercent = Number(settings.commissionPercent);

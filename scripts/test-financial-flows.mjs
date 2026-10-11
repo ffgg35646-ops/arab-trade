@@ -209,6 +209,13 @@ statusIs(duplicateApproval, 409, "duplicate deposit approval blocked");
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(depositBalance && depositBalance.available, 1000, "duplicate approval did not double credit");
 
+statusIs(await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TEST", address: "user-test-address", amount: 1000, source: "wallet" },
+}), 400, "external deposit balance is not directly withdrawable");
+depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
+closeTo(depositBalance.available, 1000, "failed direct withdrawal leaves external deposit balance untouched");
+
 const userReferral = await api("/api/referral", { as: "referrer" });
 ok(userReferral, "user referral API");
 assert.equal(userReferral.data.referral.active, 1, "user sees one active referral");
@@ -264,16 +271,49 @@ const firstWithdrawal = await api("/api/withdrawals", {
   body: { asset: "USDT", network: "TEST", address: "user-test-address", amount: 100, source: "package", userPackageId: String(package100._id) },
 });
 ok(firstWithdrawal, "first package withdrawal in activation limit", 201);
-const packageWithdrawalId = String(firstWithdrawal.data.withdrawal._id);
+const rejectedPackageWithdrawalId = String(firstWithdrawal.data.withdrawal._id);
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 500, "package available earnings decrease");
+closeTo(package100Doc.availableEarnings, 500, "package available earnings decrease while request is pending");
 closeTo(package100Doc.lockedEarnings, 100, "package withdrawal reserved as locked");
 assert.equal(package100Doc.firstWithdrawalStatus, "pending", "first package withdrawal marked pending");
+
+statusIs(await api("/api/packages", {
+  method: "POST",
+  body: { action: "cancel", userPackageId: String(package100._id) },
+}), 409, "package cancellation is blocked while package funds are locked");
+const stillActivePackage = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
+assert.equal(stillActivePackage.status, "active", "blocked cancellation leaves package active");
+closeTo(stillActivePackage.cancellationRefund, 0, "blocked cancellation does not book a refund");
 
 statusIs(await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TEST", address: "user-test-address", amount: 10, source: "package", userPackageId: String(package100._id) },
 }), 409, "another package withdrawal is blocked until the first is resolved");
+
+ok(await api("/api/admin/withdrawals", {
+  as: "admin", method: "PATCH",
+  body: { id: rejectedPackageWithdrawalId, status: "rejected", adminNote: "CI verify package balance restoration" },
+}), "admin rejects package withdrawal");
+package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
+closeTo(package100Doc.availableEarnings, 600, "rejected package withdrawal restores available earnings");
+closeTo(package100Doc.lockedEarnings, 0, "rejected package withdrawal unlocks funds");
+assert.equal(package100Doc.firstWithdrawalStatus, "available", "rejected first package withdrawal can be retried");
+
+const retryFirstWithdrawal = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TEST", address: "user-test-address", amount: 100, source: "package", userPackageId: String(package100._id) },
+});
+ok(retryFirstWithdrawal, "first package withdrawal can be retried after rejection", 201);
+const packageWithdrawalId = String(retryFirstWithdrawal.data.withdrawal._id);
+package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
+closeTo(package100Doc.availableEarnings, 500, "retried package withdrawal decreases available earnings");
+closeTo(package100Doc.lockedEarnings, 100, "retried package withdrawal locks funds again");
+assert.equal(package100Doc.firstWithdrawalStatus, "pending", "retried first package withdrawal marked pending");
+
+statusIs(await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TEST", address: "user-test-address", amount: 10, source: "package", userPackageId: String(package100._id) },
+}), 409, "second package withdrawal blocked while first request is pending");
 
 ok(await api("/api/admin/withdrawals", {
   as: "admin", method: "PATCH",
@@ -320,6 +360,20 @@ depositBalance = await db.collection("depositbalances").findOne({ userId: user._
 closeTo(depositBalance.available, 700, "package change debits new package price");
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
 closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 100, "package change refunds to general withdrawal wallet");
+
+await db.collection("depositbalances").updateOne({ userId: user._id, asset: "USDT" }, { $set: { available: 99 } });
+statusIs(await api("/api/packages", {
+  method: "POST",
+  body: { action: "change", packageId: String(plan100._id), userPackageId: String(package200._id) },
+}), 400, "package change is rejected when the new package price exceeds deposit balance");
+const activeAfterFailedChange = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package200._id)) });
+assert.equal(activeAfterFailedChange.status, "active", "failed package change rolls back old package cancellation");
+closeTo(activeAfterFailedChange.cancellationRefund, 0, "failed package change does not credit cancellation refund");
+depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
+closeTo(depositBalance.available, 99, "failed package change keeps deposit balance unchanged after insufficient-funds setup");
+userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 100, "failed package change does not credit general wallet");
+await db.collection("depositbalances").updateOne({ userId: user._id, asset: "USDT" }, { $set: { available: 700 } });
 
 ok(await api("/api/packages", { method: "POST", body: { action: "cancel", userPackageId: String(package200._id) } }), "user cancels package");
 const cancelledPackage = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package200._id)) });

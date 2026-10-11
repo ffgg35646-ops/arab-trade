@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
               balance.available = Number((before + refund).toFixed(12));
             }
 
-            const after = Number(balance.available || 0);
+            const after = Number(balance?.available || 0);
             await wallet.save({ session });
 
             await LedgerEntry.create([{

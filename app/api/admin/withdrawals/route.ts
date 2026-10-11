@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
 import { connectDB } from "@/lib/mongodb";
@@ -223,44 +224,62 @@ export async function PATCH(
       if (!Number.isFinite(amount) || amount <= 0) {
         return NextResponse.json({ success: false, message: "قيمة السحب غير صحيحة" }, { status: 409 });
       }
-
-      if (nextStatus === "rejected" || nextStatus === "completed") {
-        const increments = nextStatus === "rejected"
-          ? { $inc: { lockedEarnings: -amount, availableEarnings: amount } }
-          : { $inc: { lockedEarnings: -amount, totalWithdrawn: amount } };
-
-        const firstWithdrawalUpdate = withdrawal.isFirstPackageWithdrawal
-          ? { $set: { firstWithdrawalStatus: nextStatus === "rejected" ? "available" : "completed" } }
-          : {};
-
-        const packageAccount = await UserPackage.findOneAndUpdate(
-          { _id: withdrawal.userPackageId, userId: withdrawal.userId, lockedEarnings: { $gte: amount } },
-          { ...increments, ...firstWithdrawalUpdate },
-          { new: true }
-        );
-
-        if (!packageAccount) {
-          return NextResponse.json({ success: false, message: "رصيد الباقة المقفل غير كافٍ أو حساب الباقة غير موجود" }, { status: 409 });
-        }
-
-        await PackageLedger.create({
-          userId: withdrawal.userId,
-          userPackageId: packageAccount._id,
-          type: nextStatus === "rejected" ? "withdrawal_reversal" : "withdrawal",
-          asset: withdrawal.asset,
-          amount: nextStatus === "rejected" ? amount : -amount,
-          note: adminNote || (nextStatus === "rejected"
-            ? "تم رفض طلب السحب؛ أُعيد مبلغ الطلب " + amount + " " + withdrawal.asset + " إلى الرصيد المتاح للباقة"
-            : "تم تنفيذ طلب سحب من رصيد أرباح الباقة بقيمة " + amount + " " + withdrawal.asset),
-          createdBy: admin._id,
-        }).catch((ledgerError) => {
-          console.error("PACKAGE WITHDRAWAL FINAL LEDGER:", ledgerError);
-        });
+      if (nextStatus === "completed" && currentStatus !== "approved") {
+        return NextResponse.json({ success: false, message: "يجب الموافقة على طلب السحب قبل تنفيذ التحويل." }, { status: 409 });
       }
 
-      withdrawal.status = nextStatus as "approved" | "rejected" | "completed";
-      withdrawal.adminNote = adminNote;
-      await withdrawal.save();
+      const session = await mongoose.startSession();
+      let settledWithdrawal: any = null;
+      try {
+        await session.withTransaction(async () => {
+          const updatedRequest = await WithdrawalRequest.findOneAndUpdate(
+            { _id: withdrawal._id, status: currentStatus },
+            { $set: { status: nextStatus, adminNote, ...(nextStatus === "completed" ? { completedAt: new Date() } : {}) } },
+            { new: true, session }
+          );
+          if (!updatedRequest) throw new Error("WITHDRAWAL_STATUS_CHANGED");
+
+          if (nextStatus === "rejected" || nextStatus === "completed") {
+            const increments = nextStatus === "rejected"
+              ? { $inc: { lockedEarnings: -amount, availableEarnings: amount } }
+              : { $inc: { lockedEarnings: -amount, totalWithdrawn: amount } };
+            const firstWithdrawalUpdate = withdrawal.isFirstPackageWithdrawal
+              ? { $set: { firstWithdrawalStatus: nextStatus === "rejected" ? "available" : "completed" } }
+              : {};
+            const packageAccount = await UserPackage.findOneAndUpdate(
+              { _id: withdrawal.userPackageId, userId: withdrawal.userId, lockedEarnings: { $gte: amount } },
+              { ...increments, ...firstWithdrawalUpdate },
+              { new: true, session }
+            );
+            if (!packageAccount) throw new Error("PACKAGE_BALANCE_INVALID");
+
+            await PackageLedger.create([{
+              userId: withdrawal.userId,
+              userPackageId: packageAccount._id,
+              type: nextStatus === "rejected" ? "withdrawal_reversal" : "withdrawal",
+              asset: withdrawal.asset,
+              amount: nextStatus === "rejected" ? amount : -amount,
+              note: adminNote || (nextStatus === "rejected"
+                ? "تم رفض طلب السحب؛ أُعيد مبلغ الطلب " + amount + " " + withdrawal.asset + " إلى الرصيد المتاح للباقة"
+                : "تم تنفيذ طلب سحب من رصيد أرباح الباقة بقيمة " + amount + " " + withdrawal.asset),
+              createdBy: admin._id,
+            }], { session });
+          }
+          settledWithdrawal = updatedRequest;
+        });
+      } catch (settlementError) {
+        const code = settlementError instanceof Error ? settlementError.message : "";
+        const conflict = code === "WITHDRAWAL_STATUS_CHANGED" || code === "PACKAGE_BALANCE_INVALID";
+        console.error("ADMIN PACKAGE WITHDRAWAL SETTLEMENT:", settlementError);
+        return NextResponse.json({
+          success: false,
+          message: conflict
+            ? "تغيرت حالة طلب السحب أو رصيد الباقة بالتزامن. حدّث الصفحة وتحقق من الحالة قبل إعادة المحاولة."
+            : "تعذر إتمام تسوية سحب الباقة؛ لم يتم اعتماد أي تغيير جزئي في الأرصدة.",
+        }, { status: conflict ? 409 : 500 });
+      } finally {
+        await session.endSession();
+      }
 
       const packageTitle = nextStatus === "rejected"
         ? "تم رفض طلب سحب الباقة"
@@ -285,165 +304,74 @@ export async function PATCH(
         console.error("PACKAGE WITHDRAWAL NOTIFICATION:", notificationError);
       });
 
-      return NextResponse.json({ success: true, withdrawal });
+      return NextResponse.json({ success: true, withdrawal: settledWithdrawal });
     }
 
-    const wallet =
-      await Wallet.findOne({
-        userId:
-          withdrawal.userId,
-        type: "spot",
-      });
-
-    if (!wallet) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "محفظة المستخدم غير موجودة",
-        },
-        { status: 500 }
-      );
+    if (nextStatus === "completed" && currentStatus !== "approved") {
+      return NextResponse.json({ success: false, message: "يجب الموافقة على طلب السحب قبل تنفيذ التحويل." }, { status: 409 });
     }
 
-    const asset =
-      normalizeAsset(
-        withdrawal.asset
-      );
-
-    const balance =
-      wallet.balances.find(
-        (b: any) =>
-          normalizeAsset(
-            b.asset
-          ) === asset
-      );
-
-    const amount =
-      Number(
-        withdrawal.amount
-      );
-
-    if (
-      !balance ||
-      !Number.isFinite(
-        amount
-      ) ||
-      amount <= 0
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "بيانات الرصيد غير صحيحة",
-        },
-        { status: 409 }
-      );
-    }
-
-    if (
-      Number(
-        balance.locked || 0
-      ) + 1e-12 <
-      amount
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "الرصيد المقفل غير كافٍ",
-        },
-        { status: 409 }
-      );
-    }
-
-    if (
-      nextStatus ===
-      "rejected"
-    ) {
-      const availableBefore =
-        Number(
-          balance.available || 0
+    const session = await mongoose.startSession();
+    let settledWithdrawal: any = null;
+    try {
+      await session.withTransaction(async () => {
+        const updatedRequest = await WithdrawalRequest.findOneAndUpdate(
+          { _id: withdrawal._id, status: currentStatus },
+          { $set: { status: nextStatus, adminNote, ...(nextStatus === "completed" ? { completedAt: new Date() } : {}) } },
+          { new: true, session }
         );
+        if (!updatedRequest) throw new Error("WITHDRAWAL_STATUS_CHANGED");
 
-      balance.locked =
-        Number(
-          balance.locked || 0
-        ) - amount;
+        if (nextStatus === "rejected" || nextStatus === "completed") {
+          const wallet = await Wallet.findOne({
+            userId: withdrawal.userId,
+            type: "spot",
+          }).session(session);
+          if (!wallet) throw new Error("WALLET_NOT_FOUND");
 
-      balance.available =
-        availableBefore +
-        amount;
+          const asset = normalizeAsset(withdrawal.asset);
+          const balance = wallet.balances.find((item: any) => normalizeAsset(item.asset) === asset);
+          const amount = Number(withdrawal.amount);
+          if (!balance || !Number.isFinite(amount) || amount <= 0 || Number(balance.locked || 0) + 1e-12 < amount) {
+            throw new Error("WALLET_BALANCE_INVALID");
+          }
 
-      await wallet.save();
+          const availableBefore = Number(balance.available || 0);
+          balance.locked = Number(balance.locked || 0) - amount;
+          if (nextStatus === "rejected") {
+            balance.available = availableBefore + amount;
+          }
+          const availableAfter = Number(balance.available || 0);
+          await wallet.save({ session });
 
-      await LedgerEntry.create({
-        userId:
-          withdrawal.userId,
-        asset,
-        type: "withdrawal",
-        amount,
-        balanceBefore:
-          availableBefore,
-        balanceAfter:
-          availableBefore +
-          amount,
-        referenceId:
-          String(
-            withdrawal._id
-          ),
-        note:
-          adminNote ||
-          "تم رفض طلب السحب وإرجاع المبلغ",
+          await LedgerEntry.create([{
+            userId: withdrawal.userId,
+            asset,
+            type: "withdrawal",
+            amount: nextStatus === "rejected" ? amount : -amount,
+            balanceBefore: availableBefore,
+            balanceAfter: availableAfter,
+            referenceId: String(withdrawal._id),
+            note: adminNote || (nextStatus === "rejected"
+              ? "تم رفض طلب السحب وإرجاع المبلغ"
+              : "تم تنفيذ السحب"),
+          }], { session });
+        }
+        settledWithdrawal = updatedRequest;
       });
+    } catch (settlementError) {
+      const code = settlementError instanceof Error ? settlementError.message : "";
+      const conflict = ["WITHDRAWAL_STATUS_CHANGED", "WALLET_BALANCE_INVALID", "WALLET_NOT_FOUND"].includes(code);
+      console.error("ADMIN WALLET WITHDRAWAL SETTLEMENT:", settlementError);
+      return NextResponse.json({
+        success: false,
+        message: conflict
+          ? "تغيرت حالة طلب السحب أو الرصيد بالتزامن. حدّث الصفحة وتحقق من الحالة قبل إعادة المحاولة."
+          : "تعذر إتمام تسوية السحب؛ لم يتم اعتماد أي تغيير جزئي في الأرصدة.",
+      }, { status: conflict ? 409 : 500 });
+    } finally {
+      await session.endSession();
     }
-
-    if (
-      nextStatus ===
-      "completed"
-    ) {
-      const availableBalance =
-        Number(
-          balance.available || 0
-        );
-
-      balance.locked =
-        Number(
-          balance.locked || 0
-        ) - amount;
-
-      await wallet.save();
-
-      await LedgerEntry.create({
-        userId:
-          withdrawal.userId,
-        asset,
-        type: "withdrawal",
-        amount: -amount,
-        balanceBefore:
-          availableBalance,
-        balanceAfter:
-          availableBalance,
-        referenceId:
-          String(
-            withdrawal._id
-          ),
-        note:
-          adminNote ||
-          "تم تنفيذ السحب",
-      });
-    }
-
-    withdrawal.status =
-      nextStatus as
-        | "approved"
-        | "rejected"
-        | "completed";
-
-    withdrawal.adminNote =
-      adminNote;
-
-    await withdrawal.save();
 
     const title =
       nextStatus ===

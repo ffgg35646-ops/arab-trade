@@ -405,11 +405,19 @@ export async function POST(request: NextRequest) {
       }
 
       let firstStatus = currentPackage.firstWithdrawalStatus;
-      if (!firstStatus) {
-        firstStatus = Number(currentPackage.totalWithdrawn || 0) > 0 ? "completed" : "available";
+      if (firstStatus !== "pending" && Number(currentPackage.totalWithdrawn || 0) > 0) {
+        firstStatus = "completed";
+        if (currentPackage.firstWithdrawalStatus !== "completed") {
+          await UserPackage.updateOne(
+            { _id: currentPackage._id, firstWithdrawalStatus: { $ne: "pending" } },
+            { $set: { firstWithdrawalStatus: "completed" } }
+          );
+        }
+      } else if (!firstStatus) {
+        firstStatus = "available";
         await UserPackage.updateOne(
           { _id: currentPackage._id, firstWithdrawalStatus: { $exists: false } },
-          { $set: { firstWithdrawalStatus: firstStatus } }
+          { $set: { firstWithdrawalStatus: "available" } }
         );
       }
 

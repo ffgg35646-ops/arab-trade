@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 type DepositBalance = { asset: string; available: number; locked: number };
+type DepositRecord = { _id?: string; id?: string; asset: string; network: string; amount: number; status: string; txHash?: string; adminNote?: string; createdAt?: string };
 
 type Method = {
   _id: string;
@@ -20,6 +21,7 @@ type Method = {
 export default function DepositPage() {
   const [methods, setMethods] = useState<Method[]>([]);
   const [depositBalances, setDepositBalances] = useState<DepositBalance[]>([]);
+  const [deposits, setDeposits] = useState<DepositRecord[]>([]);
   const [selectedId, setSelectedId] = useState("");
 
   const [amount, setAmount] = useState("");
@@ -51,6 +53,7 @@ export default function DepositPage() {
       setDepositBalances(
         Array.isArray(balanceJson.depositBalances) ? balanceJson.depositBalances : []
       );
+      setDeposits(Array.isArray(balanceJson.deposits) ? balanceJson.deposits : []);
 
       if (!res.ok || !json.success) {
         throw new Error(
@@ -156,6 +159,12 @@ export default function DepositPage() {
       setAmount("");
       setTxHash("");
       setScreenshot(null);
+      const latest = await fetch("/api/deposits", { credentials: "include", cache: "no-store" });
+      const latestData = await latest.json().catch(() => ({}));
+      if (latest.ok && latestData.success) {
+        setDeposits(Array.isArray(latestData.deposits) ? latestData.deposits : []);
+        setDepositBalances(Array.isArray(latestData.depositBalances) ? latestData.depositBalances : []);
+      }
 
       const input = document.getElementById(
         "deposit-screenshot"
@@ -366,6 +375,32 @@ export default function DepositPage() {
             )}
           </>
         )}
+
+        <section className="mt-7 rounded-2xl border border-slate-800 bg-[#08111e] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-black">سجل طلبات الإيداع</h2>
+            <button type="button" onClick={() => void loadMethods()} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold">تحديث السجل</button>
+          </div>
+          {deposits.length === 0 ? (
+            <p className="mt-4 rounded-xl border border-dashed border-white/10 p-5 text-center text-sm text-slate-500">لم ترسل طلبات إيداع بعد.</p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {deposits.map((item, index) => (
+                <div key={String(item._id || item.id || index)} className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-white/10 bg-[#050a13] p-4">
+                  <div>
+                    <div className="font-bold">{Number(item.amount || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} {item.asset}</div>
+                    <div className="mt-1 text-xs text-slate-500">{item.network} · {item.createdAt && !Number.isNaN(new Date(item.createdAt).getTime()) ? new Date(item.createdAt).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" }) : "—"}</div>
+                    {item.txHash && <div className="mt-2 max-w-xl break-all font-mono text-[10px] text-slate-600">TX: {item.txHash}</div>}
+                    {item.adminNote && <div className="mt-2 text-xs text-slate-400">ملاحظة الإدارة: {item.adminNote}</div>}
+                  </div>
+                  <span className={item.status === "approved" ? "rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300" : item.status === "rejected" ? "rounded-full bg-red-400/10 px-3 py-1 text-xs font-bold text-red-300" : "rounded-full bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-200"}>
+                    {item.status === "approved" ? "معتمد — أضيف لرصيد الإيداع" : item.status === "rejected" ? "مرفوض" : "قيد المراجعة"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );

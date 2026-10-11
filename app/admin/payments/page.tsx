@@ -12,6 +12,8 @@ type Payment = {
   minDeposit: number;
   minWithdrawal: number;
   enabled: boolean;
+  depositEnabled: boolean;
+  withdrawalEnabled: boolean;
 };
 
 const EMPTY_PAYMENT: Payment = {
@@ -22,6 +24,8 @@ const EMPTY_PAYMENT: Payment = {
   minDeposit: 0,
   minWithdrawal: 0,
   enabled: false,
+  depositEnabled: true,
+  withdrawalEnabled: true,
 };
 
 export default function PaymentsAdminPage() {
@@ -60,6 +64,8 @@ export default function PaymentsAdminPage() {
             minDeposit: Number(item.minDeposit || 0),
             minWithdrawal: Number(item.minWithdrawal || 0),
             enabled: Boolean(item.enabled),
+            depositEnabled: item.depositEnabled !== false,
+            withdrawalEnabled: item.withdrawalEnabled !== false,
           }))
         : [];
 
@@ -162,6 +168,8 @@ export default function PaymentsAdminPage() {
         minDeposit: Number(payment.minDeposit),
         minWithdrawal: Number(payment.minWithdrawal),
         enabled: Boolean(payment.enabled),
+        depositEnabled: Boolean(payment.depositEnabled),
+        withdrawalEnabled: Boolean(payment.withdrawalEnabled),
       };
 
       const res = await fetch("/api/admin/payment", {
@@ -463,6 +471,23 @@ export default function PaymentsAdminPage() {
                           className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"
                         />
                       </div>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] p-4">
+                        <span>
+                          <span className="block font-bold">السماح بالإيداع</span>
+                          <span className="mt-1 block text-xs text-slate-500">عرض الوسيلة وقبول طلبات الإيداع بها</span>
+                        </span>
+                        <input type="checkbox" checked={payment.depositEnabled} onChange={(e) => updatePayment(index, { depositEnabled: e.target.checked })} className="h-5 w-5 accent-cyan-400" />
+                      </label>
+                      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-violet-400/20 bg-violet-400/[0.04] p-4">
+                        <span>
+                          <span className="block font-bold">السماح بالسحب</span>
+                          <span className="mt-1 block text-xs text-slate-500">عرض الوسيلة وقبول طلبات السحب بها</span>
+                        </span>
+                        <input type="checkbox" checked={payment.withdrawalEnabled} onChange={(e) => updatePayment(index, { withdrawalEnabled: e.target.checked })} className="h-5 w-5 accent-violet-400" />
+                      </label>
                     </div>
 
                     <div className="rounded-xl border border-slate-800 bg-black/10 p-4">

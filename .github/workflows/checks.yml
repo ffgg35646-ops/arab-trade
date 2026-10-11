@@ -65,6 +65,20 @@ jobs:
           if [ "$healthy" != "1" ]; then cat /tmp/arabtrade-next.log; exit 1; fi
 
           node scripts/test-financial-flows.mjs || { cat /tmp/arabtrade-next.log; exit 1; }
+      - name: Lint financial implementation
+        run: >-
+          npx eslint app/api/packages/route.ts app/api/withdrawals/route.ts
+          app/api/admin/withdrawals/route.ts app/api/deposits/route.ts
+          app/api/admin/deposits/route.ts app/api/blockchain/verify-deposit/route.ts
+          app/api/admin/payment/route.ts app/api/payment-options/route.ts
+          app/api/wallet/route.ts app/api/admin/referral/route.ts
+          app/api/referral/route.ts app/dashboard/packages/page.tsx
+          app/dashboard/assets/deposit/page.tsx app/dashboard/assets/withdraw/page.tsx
+          app/admin/packages/page.tsx app/admin/referral/page.tsx
+          app/admin/payments/page.tsx lib/settlement.ts models/PaymentOption.ts
+          models/UserPackage.ts models/WithdrawalRequest.ts models/BlockchainDepositClaim.ts
+          --rule '@typescript-eslint/no-explicit-any: off'
+          --rule '@typescript-eslint/ban-ts-comment: off'
       - name: ESLint check (existing project debt reported separately)
         continue-on-error: true
         run: >-

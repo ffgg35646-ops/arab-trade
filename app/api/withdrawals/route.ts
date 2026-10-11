@@ -380,6 +380,7 @@ export async function POST(request: NextRequest) {
      */
     let lockedWallet = false;
     let lockedUserPackage: any = null;
+    let isFirstPackageWithdrawal = false;
 
     if (source === "package") {
       if (assetCode !== "USDT" || !mongoose.Types.ObjectId.isValid(userPackageId)) {
@@ -389,21 +390,70 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const currentPackage = await UserPackage.findOne({
+        _id: userPackageId,
+        userId: user._id,
+        asset: assetCode,
+        status: { $in: ["active", "cancelled"] },
+      }).lean();
+
+      if (!currentPackage) {
+        return NextResponse.json(
+          { success: false, message: "حساب الباقة غير موجود أو لا يخص هذا المستخدم" },
+          { status: 404 }
+        );
+      }
+
+      let firstStatus = currentPackage.firstWithdrawalStatus;
+      if (!firstStatus) {
+        firstStatus = Number(currentPackage.totalWithdrawn || 0) > 0 ? "completed" : "available";
+        await UserPackage.updateOne(
+          { _id: currentPackage._id, firstWithdrawalStatus: { $exists: false } },
+          { $set: { firstWithdrawalStatus: firstStatus } }
+        );
+      }
+
+      if (firstStatus === "pending") {
+        return NextResponse.json(
+          { success: false, message: "أول طلب سحب من هذه الباقة ما زال قيد المراجعة. انتظر حسمه قبل تقديم طلب آخر." },
+          { status: 409 }
+        );
+      }
+
+      isFirstPackageWithdrawal = firstStatus === "available";
+      if (isFirstPackageWithdrawal && amount > Number(currentPackage.investedAmount || 0)) {
+        return NextResponse.json(
+          { success: false, message: "الحد الأقصى لأول سحب من هذه الباقة هو مبلغ تفعيلها: " + Number(currentPackage.investedAmount || 0) + " " + assetCode + ". بعد حسم أول طلب، يمكنك سحب الرصيد المحقق المتاح دون شرط إحالات." },
+          { status: 400 }
+        );
+      }
+
+      const packageFilter: Record<string, any> = {
+        _id: userPackageId,
+        userId: user._id,
+        asset: assetCode,
+        status: { $in: ["active", "cancelled"] },
+        availableEarnings: { $gte: amount },
+      };
+
+      if (isFirstPackageWithdrawal) {
+        packageFilter.firstWithdrawalStatus = { $in: ["available", null] };
+      } else {
+        packageFilter.firstWithdrawalStatus = "completed";
+      }
+
       lockedUserPackage = await UserPackage.findOneAndUpdate(
+        packageFilter,
         {
-          _id: userPackageId,
-          userId: user._id,
-          asset: assetCode,
-          status: { $in: ["active", "cancelled"] },
-          availableEarnings: { $gte: amount },
+          $inc: { availableEarnings: -amount, lockedEarnings: amount },
+          ...(isFirstPackageWithdrawal ? { $set: { firstWithdrawalStatus: "pending" } } : {}),
         },
-        { $inc: { availableEarnings: -amount, lockedEarnings: amount } },
         { new: true }
       );
 
       if (!lockedUserPackage) {
         return NextResponse.json(
-          { success: false, message: "رصيد السحب المتاح في هذه الباقة غير كافٍ" },
+          { success: false, message: "رصيد السحب المتاح غير كافٍ، أو يوجد طلب أول سحب قيد المراجعة بالفعل." },
           { status: 400 }
         );
       }
@@ -440,6 +490,7 @@ export async function POST(request: NextRequest) {
           address,
           source,
           userPackageId: source === "package" ? userPackageId : null,
+          isFirstPackageWithdrawal,
           status: "pending",
           adminNote: "",
         });
@@ -481,7 +532,10 @@ export async function POST(request: NextRequest) {
       if (source === "package" && lockedUserPackage) {
         await UserPackage.updateOne(
           { _id: lockedUserPackage._id, userId: user._id },
-          { $inc: { availableEarnings: amount, lockedEarnings: -amount } }
+          {
+            $inc: { availableEarnings: amount, lockedEarnings: -amount },
+            ...(isFirstPackageWithdrawal ? { $set: { firstWithdrawalStatus: "available" } } : {}),
+          }
         );
       } else if (lockedWallet) {
         await Wallet.updateOne(

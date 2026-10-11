@@ -82,50 +82,48 @@ export async function POST(request: NextRequest) {
 
       const price = Number(plan.price);
       const asset = String(plan.asset || "USDT").toUpperCase();
-      const depositBalance = await DepositBalance.findOneAndUpdate(
-        { userId: user._id, asset, available: { $gte: price } },
-        { $inc: { available: -price } },
-        { new: true }
-      );
+      const session = await mongoose.startSession();
+      let purchased: any = null;
+      try {
+        await session.withTransaction(async () => {
+          // Check inside the same transaction to protect against concurrent activations.
+          const existing = await UserPackage.findOne({ userId: user._id, status: "active" }).session(session);
+          if (existing) throw new Error("ACTIVE_PACKAGE_EXISTS");
 
-      if (!depositBalance) {
+          const debited = await DepositBalance.findOneAndUpdate(
+            { userId: user._id, asset, available: { $gte: price } },
+            { $inc: { available: -price } },
+            { new: true, session }
+          );
+          if (!debited) throw new Error("INSUFFICIENT_DEPOSIT_BALANCE");
+
+          const created = await UserPackage.create([{
+            userId: user._id, packageId: plan._id, packageName: plan.name,
+            investedAmount: price, asset, durationDays: Number(plan.durationDays),
+            status: "active", availableEarnings: 0, lockedEarnings: 0,
+            totalRealizedEarnings: 0, totalWithdrawn: 0,
+            cancellationRefund: 0, activatedAt: new Date(),
+          }], { session });
+          purchased = created[0];
+          await PackageLedger.create([{
+            userId: user._id, userPackageId: purchased._id,
+            type: "activation", asset, amount: -price,
+            note: "تفعيل باقة " + plan.name + " من رصيد الإيداع",
+          }], { session });
+        });
+      } catch (activationError) {
+        console.error("PACKAGE ACTIVATION:", activationError);
+        const code = activationError instanceof Error ? activationError.message : "";
         return NextResponse.json({
           success: false,
-          message: "رصيد الإيداع غير كافٍ. تحتاج إلى " + price + " " + asset + " في خانة رصيد الإيداع لتفعيل هذه الباقة.",
-        }, { status: 400 });
-      }
-
-      let purchased;
-      try {
-        purchased = await UserPackage.create({
-          userId: user._id,
-          packageId: plan._id,
-          packageName: plan.name,
-          investedAmount: price,
-          asset,
-          durationDays: Number(plan.durationDays),
-          status: "active",
-          availableEarnings: 0,
-          lockedEarnings: 0,
-          totalRealizedEarnings: 0,
-          totalWithdrawn: 0,
-          cancellationRefund: 0,
-          activatedAt: new Date(),
-        });
-        await PackageLedger.create({
-          userId: user._id,
-          userPackageId: purchased._id,
-          type: "activation",
-          asset,
-          amount: -price,
-          note: "تفعيل باقة " + plan.name + " من رصيد الإيداع",
-        });
-      } catch (createError) {
-        if (purchased?._id) {
-          await UserPackage.deleteOne({ _id: purchased._id });
-        }
-        await DepositBalance.updateOne({ _id: depositBalance._id }, { $inc: { available: price } });
-        throw createError;
+          message: code === "ACTIVE_PACKAGE_EXISTS"
+            ? "لديك باقة نشطة بالفعل؛ ألغها قبل تفعيل باقة أخرى."
+            : code === "INSUFFICIENT_DEPOSIT_BALANCE"
+              ? "رصيد الإيداع غير كافٍ. تحتاج إلى " + price + " " + asset + " لتفعيل هذه الباقة."
+              : "لم يتم تفعيل الباقة أو خصم الرصيد لأن المعاملة المالية لم تكتمل.",
+        }, { status: code === "ACTIVE_PACKAGE_EXISTS" ? 409 : code === "INSUFFICIENT_DEPOSIT_BALANCE" ? 400 : 500 });
+      } finally {
+        await session.endSession();
       }
 
       return NextResponse.json({

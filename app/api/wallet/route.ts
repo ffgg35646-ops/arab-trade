@@ -61,8 +61,12 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
 
+    const requestedMode = new URL(request.url).searchParams.get("mode");
+    const mode = String(requestedMode || "live").toLowerCase() === "demo" ? "demo" : "live";
+
     const wallets = await Wallet.find({
       userId: user._id,
+      mode,
       type: {
         $in: ["spot", "funding"],
       },
@@ -217,6 +221,7 @@ export async function GET(request: NextRequest) {
 
     const ledgerEntries = await LedgerEntry.find({
       userId: user._id,
+      mode,
     })
       .sort({ createdAt: -1 })
       .limit(20)

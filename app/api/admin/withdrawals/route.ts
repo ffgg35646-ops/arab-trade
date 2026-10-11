@@ -281,6 +281,8 @@ export async function PATCH(
         title: packageTitle,
         message: packageMessage,
         read: false,
+      }).catch((notificationError) => {
+        console.error("PACKAGE WITHDRAWAL NOTIFICATION:", notificationError);
       });
 
       return NextResponse.json({ success: true, withdrawal });

@@ -244,7 +244,7 @@ export default function WithdrawPage() {
   );
 
   const selectedPackage = packageAccounts.find((item) => item._id === selectedPackageId);
-  const packageFirstStatus = selectedPackage?.firstWithdrawalStatus || (Number(selectedPackage?.totalWithdrawn || 0) > 0 ? "completed" : "available");
+  const packageFirstStatus = selectedPackage?.firstWithdrawalStatus === "pending" ? "pending" : Number(selectedPackage?.totalWithdrawn || 0) > 0 ? "completed" : (selectedPackage?.firstWithdrawalStatus || "available");
   const packageFirstWithdrawalPending = withdrawalSource === "package" && packageFirstStatus === "pending";
   const packageFirstWithdrawal = withdrawalSource === "package" && packageFirstStatus === "available";
   const packageWithdrawalMax = selectedPackage ? (packageFirstWithdrawal ? Math.min(Number(selectedPackage.availableEarnings || 0), Number(selectedPackage.investedAmount || 0)) : Number(selectedPackage.availableEarnings || 0)) : 0;

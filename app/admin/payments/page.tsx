@@ -37,6 +37,7 @@ export default function PaymentsAdminPage() {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
+    await Promise.resolve();
     setLoading(true);
     setError("");
 

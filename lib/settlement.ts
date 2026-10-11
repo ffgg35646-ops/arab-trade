@@ -23,6 +23,7 @@ export async function adjustWallet(
     wallet = await WalletModel.create({
       userId: uid,
       type: "spot",
+      mode: "live",
       balances: []
     });
   }

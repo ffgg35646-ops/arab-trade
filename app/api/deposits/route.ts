@@ -176,6 +176,7 @@ export async function POST(request: NextRequest) {
         asset: assetCode,
         network: networkCode,
         enabled: true,
+        depositEnabled: { $ne: false },
       }).lean();
 
       if (!payment) {

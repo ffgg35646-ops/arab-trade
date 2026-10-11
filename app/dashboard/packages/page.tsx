@@ -22,6 +22,7 @@ export default function UserPackagesPage() {
 
   const load = useCallback(async () => {
     try {
+      await Promise.resolve();
       setLoading(true);
       const res = await fetch("/api/packages", { credentials: "include", cache: "no-store" });
       const json = await res.json();

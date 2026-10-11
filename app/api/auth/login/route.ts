@@ -5,15 +5,13 @@ import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 import { rateLimit } from "@/lib/rate-limit";
 
-const secretText = process.env.AUTH_SECRET;
-
-if (!secretText) {
-  throw new Error("AUTH_SECRET is not configured");
-}
-
-const secret = new TextEncoder().encode(secretText);
-
 export async function POST(request: NextRequest) {
+  const secretText = process.env.AUTH_SECRET;
+  if (!secretText) {
+    return NextResponse.json({ success: false, message: "إعدادات تسجيل الدخول غير مكتملة على الخادم" }, { status: 503 });
+  }
+  const secret = new TextEncoder().encode(secretText);
+
   const clientKey =
     request.headers.get("x-forwarded-for") ||
     request.headers.get("x-real-ip") ||

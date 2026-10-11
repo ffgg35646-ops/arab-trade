@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
-
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongodb";
 import { requireAdminLeader } from "@/lib/admin-auth";
-import { adjustWallet } from "@/lib/settlement";
-
 import DepositRequest from "@/models/DepositRequest";
 import Wallet from "@/models/Wallet";
+import User from "@/models/User";
+import PlatformSettings from "@/models/PlatformSettings";
 import LedgerEntry from "@/models/LedgerEntry";
 import Notification from "@/models/Notification";
 import ReferralCommission from "@/models/ReferralCommission";
@@ -96,281 +94,181 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: NextRequest
-) {
+export async function PATCH(request: NextRequest) {
   try {
     await connectDB();
 
-    const admin =
-      await requireAdminLeader(request);
-
+    const admin = await requireAdminLeader(request);
     if (!admin) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "غير مصرح",
-        },
-        { status: 403 }
-      );
+      return NextResponse.json({ success: false, message: "غير مصرح" }, { status: 403 });
     }
 
-    const body =
-      await request.json().catch(
-        () => ({})
-      );
+    const body = await request.json().catch(() => ({}));
+    const id = String(body.id || "").trim();
+    const status = String(body.status || "").trim();
+    const adminNote = String(body.adminNote || "").trim();
 
-    const id =
-      String(body.id || "").trim();
-
-    const status =
-      String(
-        body.status || ""
-      ).trim();
-
-    const adminNote =
-      String(
-        body.adminNote || ""
-      ).trim();
-
-    if (
-      !id ||
-      !["approved", "rejected"].includes(
-        status
-      )
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "بيانات غير صحيحة",
-        },
-        { status: 400 }
-      );
+    if (!id || !mongoose.Types.ObjectId.isValid(id) || !["approved", "rejected"].includes(status)) {
+      return NextResponse.json({ success: false, message: "بيانات غير صحيحة" }, { status: 400 });
     }
 
-    const deposit =
-      await DepositRequest.findById(
-        id
-      );
-
-    if (!deposit) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "الإيداع غير موجود",
-        },
-        { status: 404 }
-      );
+    const initial = await DepositRequest.findById(id).lean();
+    if (!initial) {
+      return NextResponse.json({ success: false, message: "الإيداع غير موجود" }, { status: 404 });
     }
 
-    if (deposit.creditedAt) {
-      return NextResponse.json(
-        { success: false, message: "تم اعتماد هذا الإيداع وإضافة الرصيد بالفعل. لا يمكن إضافته مرة أخرى." },
-        { status: 409 }
-      );
+    const amount = Number(initial.amount);
+    const asset = String(initial.asset || "").trim().toUpperCase();
+    if (!Number.isFinite(amount) || amount <= 0 || !asset) {
+      return NextResponse.json({ success: false, message: "قيمة الإيداع أو العملة غير صحيحة" }, { status: 400 });
     }
 
-    if (
-      deposit.status !==
-      "pending"
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "تمت معالجة الطلب مسبقًا",
-        },
-        { status: 409 }
-      );
-    }
+    const session = await mongoose.startSession();
+    let processed: any = null;
 
-    const amount =
-      Number(deposit.amount);
-
-    if (
-      !Number.isFinite(amount) ||
-      amount <= 0
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "قيمة الإيداع غير صحيحة",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (status === "approved") {
-      const asset = String(deposit.asset || "").trim().toUpperCase();
-      const credited = await DepositBalance.findOneAndUpdate(
-        { userId: deposit.userId, asset },
-        { $inc: { available: amount }, $setOnInsert: { userId: deposit.userId, asset, locked: 0 } },
-        { new: true, upsert: true, setDefaultsOnInsert: true }
-      );
-
-      // Save the idempotency marker immediately after the separate bucket is credited.
-      deposit.status = "approved";
-      deposit.adminNote = adminNote;
-      deposit.creditedAt = deposit.creditedAt || new Date();
-      await deposit.save();
-
-      await LedgerEntry.create({
-        userId: deposit.userId,
-        asset,
-        type: "deposit",
-        amount,
-        balanceBefore: Number(credited.available || 0) - amount,
-        balanceAfter: Number(credited.available || 0),
-        referenceId: String(deposit._id),
-        note: adminNote || "إيداع خارجي معتمد — أضيف إلى رصيد الإيداع المنفصل",
-      });
-
-      // ============================================
-      // REFERRAL COMMISSION — ONLY AFTER APPROVAL
-      // ============================================
-      const referredUser = await import("@/models/User").then(
-        ({ default: UserModel }) =>
-          UserModel.findById(deposit.userId)
-            .select("referredBy")
-            .lean()
-      );
-
-      if (referredUser?.referredBy) {
-        const settings = await import("@/models/PlatformSettings").then(
-          ({ default: PlatformSettings }) =>
-            PlatformSettings.findOne({ key: "global" }).lean()
+    try {
+      await session.withTransaction(async () => {
+        // Compare-and-set status protects against two admins approving the same request.
+        const current = await DepositRequest.findOneAndUpdate(
+          { _id: id, status: "pending", creditedAt: null },
+          {
+            $set: {
+              status,
+              adminNote,
+              ...(status === "approved" ? { creditedAt: new Date() } : {}),
+            },
+          },
+          { new: true, session, runValidators: true }
         );
 
-        const referralEnabled =
-          settings?.referral?.enabled !== false;
+        if (!current) {
+          throw new Error("DEPOSIT_ALREADY_PROCESSED");
+        }
 
-        const commissionPercent = Number(
-          settings?.referral?.commissionPercent ?? 0
-        );
-
-        if (
-          referralEnabled &&
-          Number.isFinite(commissionPercent) &&
-          commissionPercent > 0
-        ) {
-          const commission = Number(
-            (
-              amount *
-              (commissionPercent / 100)
-            ).toFixed(12)
+        if (status === "approved") {
+          const credited = await DepositBalance.findOneAndUpdate(
+            { userId: current.userId, asset },
+            {
+              $inc: { available: amount },
+              $setOnInsert: { userId: current.userId, asset, locked: 0 },
+            },
+            { new: true, upsert: true, setDefaultsOnInsert: true, session }
           );
 
-          if (commission > 0) {
-            await ReferralCommission.create({
-              referrerId: referredUser.referredBy,
-              referredUserId: deposit.userId,
-              tradeId: null,
-              amount: commission,
-              asset,
-              rate: commissionPercent,
-              status: "available",
-            });
+          await LedgerEntry.create([{
+            userId: current.userId,
+            asset,
+            type: "deposit",
+            amount,
+            balanceBefore: Number(credited.available || 0) - amount,
+            balanceAfter: Number(credited.available || 0),
+            referenceId: String(current._id),
+            note: adminNote || "إيداع خارجي معتمد — أضيف إلى رصيد الإيداع المنفصل",
+          }], { session });
 
-            await adjustWallet(
-              referredUser.referredBy,
-              asset,
-              commission,
-              0,
-              "referral",
-              String(deposit._id),
-              `عمولة إحالة ${commissionPercent}% من إيداع ${deposit.userId}`
-            );
+          // Referral activity and commission are tied to this one approved external deposit.
+          const referredUser = await User.findById(current.userId).select("referredBy").session(session).lean();
+          if (referredUser?.referredBy) {
+            const settings = await PlatformSettings.findOne({ key: "global" }).session(session).lean();
+            const enabled = settings?.referral?.enabled !== false;
+            const commissionPercent = Number(settings?.referral?.commissionPercent ?? 0);
+
+            if (enabled && Number.isFinite(commissionPercent) && commissionPercent > 0 && commissionPercent <= 100) {
+              const commission = Number((amount * commissionPercent / 100).toFixed(12));
+              if (commission > 0) {
+                const referrerId = referredUser.referredBy;
+                await ReferralCommission.create([{
+                  referrerId,
+                  referredUserId: current.userId,
+                  tradeId: null,
+                  amount: commission,
+                  asset,
+                  rate: commissionPercent,
+                  status: "available",
+                }], { session });
+
+                let wallet = await Wallet.findOne({
+                  userId: referrerId,
+                  type: "spot",
+                  mode: "live",
+                }).session(session);
+
+                if (!wallet) {
+                  wallet = new Wallet({
+                    userId: referrerId,
+                    type: "spot",
+                    mode: "live",
+                    balances: [],
+                  });
+                }
+
+                let walletBalance = wallet.balances.find((item: any) => String(item.asset).toUpperCase() === asset);
+                const before = Number(walletBalance?.available || 0);
+                if (!walletBalance) {
+                  wallet.balances.push({ asset, available: commission, locked: 0 });
+                  walletBalance = wallet.balances[wallet.balances.length - 1] as any;
+                } else {
+                  walletBalance.available = Number((before + commission).toFixed(12));
+                }
+                const after = Number(walletBalance?.available || 0);
+                await wallet.save({ session });
+
+                await LedgerEntry.create([{
+                  userId: referrerId,
+                  asset,
+                  type: "referral",
+                  amount: commission,
+                  balanceBefore: before,
+                  balanceAfter: after,
+                  referenceId: String(current._id),
+                  note: `عمولة إحالة ${commissionPercent}% من إيداع ${current.userId}`,
+                }], { session });
+              }
+            }
           }
         }
+
+        processed = current;
+      });
+    } catch (settlementError) {
+      const code = settlementError instanceof Error ? settlementError.message : "";
+      if (code === "DEPOSIT_ALREADY_PROCESSED") {
+        return NextResponse.json({
+          success: false,
+          message: "تمت معالجة طلب الإيداع بالفعل، ولم تتم إضافة الرصيد مرة أخرى.",
+        }, { status: 409 });
       }
+      console.error("ADMIN DEPOSIT SETTLEMENT:", settlementError);
+      return NextResponse.json({
+        success: false,
+        message: "تعذر اعتماد الإيداع أو تحديث الأرصدة؛ لم يتم اعتماد تغييرات جزئية.",
+      }, { status: 500 });
+    } finally {
+      await session.endSession();
     }
 
-    deposit.status =
-      status as
-        | "approved"
-        | "rejected";
-
-    deposit.adminNote = adminNote;
-    if (status === "approved" && !deposit.creditedAt) {
-      deposit.creditedAt = new Date();
-    }
-
-    await deposit.save();
-
+    // Notification is ancillary: a delivery failure must not turn a successful credit into a false API failure.
     await Notification.create({
-      userId:
-        deposit.userId,
+      userId: initial.userId,
       type: "deposit",
-      title:
-        status === "approved"
-          ? "تم اعتماد الإيداع"
-          : "تم رفض الإيداع",
-      message:
-        adminNote ||
-        (status === "approved"
-          ? "تمت إضافة قيمة الإيداع إلى محفظتك"
-          : "تم رفض طلب الإيداع"),
+      title: status === "approved" ? "تم اعتماد الإيداع" : "تم رفض الإيداع",
+      message: adminNote || (status === "approved"
+        ? "تمت إضافة قيمة الإيداع إلى رصيد الإيداع."
+        : "تم رفض طلب الإيداع."),
       read: false,
+    }).catch((notificationError) => {
+      console.error("ADMIN DEPOSIT NOTIFICATION:", notificationError);
     });
-
-    if (
-      deposit.screenshotPath
-    ) {
-      const root =
-        path.resolve(/*turbopackIgnore: true*/
-          process.cwd(),
-          "private",
-          "deposits"
-        );
-
-      const absolute =
-        path.resolve(/*turbopackIgnore: true*/
-          process.cwd(),
-          deposit.screenshotPath
-        );
-
-      if (
-        absolute.startsWith(
-          root + path.sep
-        )
-      ) {
-        await fs.rm(
-          path.dirname(
-            absolute
-          ),
-          {
-            recursive: true,
-            force: true,
-          }
-        ).catch(() => {});
-      }
-
-      deposit.screenshotPath =
-        "";
-
-      await deposit.save();
-    }
 
     return NextResponse.json({
       success: true,
-      deposit,
+      message: status === "approved"
+        ? "تم اعتماد الإيداع وإضافة الرصيد وتسجيل الإحالة إن وجدت."
+        : "تم رفض طلب الإيداع.",
+      deposit: processed,
     });
   } catch (error) {
-    console.error(
-      "ADMIN DEPOSITS PATCH:",
-      error
-    );
-
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "تعذر تحديث الإيداع",
-      },
-      { status: 500 }
-    );
+    console.error("ADMIN DEPOSITS PATCH:", error);
+    return NextResponse.json({ success: false, message: "تعذر تحديث الإيداع" }, { status: 500 });
   }
 }

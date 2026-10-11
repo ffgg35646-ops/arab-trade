@@ -194,6 +194,8 @@ export async function PATCH(request: NextRequest) {
       update.withdrawalEnabled = Boolean(body.withdrawalEnabled);
     }
 
+    await connectDB();
+
     const method = await PaymentOption.findByIdAndUpdate(
       id,
       { $set: update },

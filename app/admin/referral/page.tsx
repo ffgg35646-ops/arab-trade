@@ -53,9 +53,6 @@ export default function ReferralPage() {
 
   const loadSettings = useCallback(async () => {
     try {
-      await Promise.resolve();
-      setLoading(true);
-      setError("");
 
       const response = await fetch("/api/admin/referral", {
         cache: "no-store",

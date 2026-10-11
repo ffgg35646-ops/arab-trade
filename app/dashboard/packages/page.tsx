@@ -22,8 +22,6 @@ export default function UserPackagesPage() {
 
   const load = useCallback(async () => {
     try {
-      await Promise.resolve();
-      setLoading(true);
       const res = await fetch("/api/packages", { credentials: "include", cache: "no-store" });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || "تعذر تحميل الباقات");
@@ -68,7 +66,7 @@ export default function UserPackagesPage() {
         <section className="rounded-3xl border border-white/10 bg-gradient-to-l from-blue-500/[0.14] to-cyan-400/[0.04] p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div><div className="text-[10px] font-bold tracking-[0.2em] text-cyan-300">ARAB TRADE</div><h1 className="mt-3 text-3xl font-black">الباقات</h1><p className="mt-2 text-sm leading-7 text-slate-400">فعّل باقة من رصيد الإيداع الخارجي، وتابع رصيد كل باقة بصورة منفصلة.</p></div>
-            <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm"><RefreshCw size={16} className={loading ? "animate-spin" : ""}/>تحديث</button>
+            <button type="button" onClick={() => { setLoading(true); setError(""); void load(); }} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm"><RefreshCw size={16} className={loading ? "animate-spin" : ""}/>تحديث</button>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-white/10 bg-[#050a13]/70 p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><Wallet size={16}/>رصيد الإيداع الخارجي</div><div className="mt-3 text-3xl font-black">{money(depositUsdt)} <span className="text-sm text-cyan-300">USDT</span></div><p className="mt-2 text-xs text-slate-500">منفصل عن رصيد السحب العام.</p></div>

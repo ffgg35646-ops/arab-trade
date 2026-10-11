@@ -326,6 +326,7 @@ export async function PATCH(
           const wallet = await Wallet.findOne({
             userId: withdrawal.userId,
             type: "spot",
+            mode: "live",
           }).session(session);
           if (!wallet) throw new Error("WALLET_NOT_FOUND");
 

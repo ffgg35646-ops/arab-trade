@@ -102,6 +102,13 @@ export async function POST(
       });
     }
 
+    if (deposit.status !== "pending") {
+      return NextResponse.json(
+        { success: false, message: "تمت معالجة طلب الإيداع بالفعل، ولا يمكن تغييره عبر التحقق التلقائي." },
+        { status: 409 }
+      );
+    }
+
     if (!deposit.txHash) {
       return NextResponse.json(
         {
@@ -260,18 +267,19 @@ export async function POST(
           }).session(session);
 
         if (!current) {
-          throw new Error(
-            "DEPOSIT_NOT_FOUND"
-          );
+          throw new Error("DEPOSIT_NOT_FOUND");
         }
 
         if (current.creditedAt) {
           alreadyProcessedDuringTransaction = true;
           return;
         }
+        if (current.status !== "pending") {
+          throw new Error("DEPOSIT_NOT_PENDING");
+        }
 
         // Same txHash must not credit another deposit
-        const duplicate =
+        const escapedTxHash = String(current.txHash).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\        const duplicate =
           await DepositRequest.findOne({
             _id: {
               $ne: current._id,
@@ -281,6 +289,14 @@ export async function POST(
             creditedAt: {
               $ne: null,
             },
+          })
+            .session(session)
+            .lean();");
+        const duplicate =
+          await DepositRequest.findOne({
+            _id: { $ne: current._id },
+            txHash: { $regex: "^" + escapedTxHash + "$", $options: "i" },
+            creditedAt: { $ne: null },
           })
             .session(session)
             .lean();
@@ -496,8 +512,7 @@ export async function POST(
       },
       {
         status:
-          error?.message ===
-          "DUPLICATE_TXHASH"
+          ["DUPLICATE_TXHASH", "DEPOSIT_NOT_PENDING", "DEPOSIT_ALREADY_PROCESSED"].includes(String(error?.message))
             ? 409
             : 400,
       }

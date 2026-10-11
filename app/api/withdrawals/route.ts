@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
     let networkName = networkCode;
 
     if (payment) {
-      if (!payment.enabled) {
+      if (!payment.enabled || payment.withdrawalEnabled === false) {
         return NextResponse.json(
           {
             success: false,

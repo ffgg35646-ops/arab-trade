@@ -9,7 +9,7 @@ export interface IWithdrawalRequest {
   receiveAmount: number;
   address: string;
   status: "pending" | "approved" | "processing" | "rejected" | "failed" | "completed";
-  source: "wallet" | "package";
+  source?: "wallet" | "package";
   userPackageId?: mongoose.Types.ObjectId | null;
   adminNote: string;
   txHash?: string;

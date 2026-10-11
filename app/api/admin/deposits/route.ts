@@ -165,6 +165,13 @@ export async function PATCH(
       );
     }
 
+    if (deposit.creditedAt) {
+      return NextResponse.json(
+        { success: false, message: "تم اعتماد هذا الإيداع وإضافة الرصيد بالفعل. لا يمكن إضافته مرة أخرى." },
+        { status: 409 }
+      );
+    }
+
     if (
       deposit.status !==
       "pending"
@@ -203,6 +210,12 @@ export async function PATCH(
         { $inc: { available: amount }, $setOnInsert: { userId: deposit.userId, asset, locked: 0 } },
         { new: true, upsert: true, setDefaultsOnInsert: true }
       );
+
+      // Save the idempotency marker immediately after the separate bucket is credited.
+      deposit.status = "approved";
+      deposit.adminNote = adminNote;
+      deposit.creditedAt = deposit.creditedAt || new Date();
+      await deposit.save();
 
       await LedgerEntry.create({
         userId: deposit.userId,

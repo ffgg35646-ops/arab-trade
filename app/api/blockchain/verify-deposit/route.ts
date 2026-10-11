@@ -384,26 +384,11 @@ export async function POST(
           { session }
         );
 
-        current.confirmations =
-          confirmations;
-
-        current.confirmedAt =
-          new Date();
-
-        current.creditedAt =
-          new Date();
-
-        // Keep existing status if the schema does not
-        // define a confirmed enum value.
-        if (
-          typeof current.status ===
-            "string" &&
-          current.status ===
-            "pending"
-        ) {
-          current.adminNote =
-            "تم التحقق من البلوكشين وإضافة الرصيد تلقائيًا";
-        }
+        current.confirmations = confirmations;
+        current.confirmedAt = new Date();
+        current.creditedAt = new Date();
+        current.status = "approved";
+        current.adminNote = "تم التحقق من البلوكشين وإضافة الرصيد إلى رصيد الإيداع الخارجي.";
 
         await current.save({
           session,

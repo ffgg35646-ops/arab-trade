@@ -463,8 +463,8 @@ export async function POST(request: NextRequest) {
           userPackageId: lockedUserPackage._id,
           type: "withdrawal",
           asset: assetCode,
-          amount: -amount,
-          note: "إنشاء طلب سحب من رصيد أرباح الباقة رقم " + String(lockedUserPackage._id),
+          amount: 0,
+          note: "طلب سحب بقيمة " + amount + " " + assetCode + " من رصيد أرباح الباقة. رقم الطلب: " + String(withdrawal._id),
         }).catch((ledgerError) => {
           console.error("PACKAGE WITHDRAWAL LEDGER:", ledgerError);
         });

@@ -24,22 +24,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "اكتب سبب اعتماد العائد المحقق في 5 أحرف على الأقل" }, { status: 400 });
     }
 
-    const account = await UserPackage.findOneAndUpdate(
-      { _id: userPackageId, status: "active" },
-      { $inc: { availableEarnings: amount, totalRealizedEarnings: amount } },
-      { new: true }
-    );
-    if (!account) return NextResponse.json({ success: false, message: "حساب الباقة النشط غير موجود" }, { status: 404 });
+    const session = await mongoose.startSession();
+    let account: any = null;
+    try {
+      await session.withTransaction(async () => {
+        account = await UserPackage.findOneAndUpdate(
+          { _id: userPackageId, status: "active" },
+          { $inc: { availableEarnings: amount, totalRealizedEarnings: amount } },
+          { new: true, session }
+        );
+        if (!account) throw new Error("PACKAGE_NOT_FOUND");
 
-    await PackageLedger.create({
-      userId: account.userId,
-      userPackageId: account._id,
-      type: "realized_earning",
-      asset: account.asset,
-      amount,
-      note,
-      createdBy: admin._id,
-    });
+        await PackageLedger.create([{
+          userId: account.userId,
+          userPackageId: account._id,
+          type: "realized_earning",
+          asset: account.asset,
+          amount,
+          note,
+          createdBy: admin._id,
+        }], { session });
+      });
+    } catch (creditError) {
+      if (creditError instanceof Error && creditError.message === "PACKAGE_NOT_FOUND") {
+        return NextResponse.json({ success: false, message: "حساب الباقة النشط غير موجود" }, { status: 404 });
+      }
+      throw creditError;
+    } finally {
+      await session.endSession();
+    }
 
     return NextResponse.json({
       success: true,

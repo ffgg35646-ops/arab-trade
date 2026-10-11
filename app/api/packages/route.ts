@@ -6,7 +6,8 @@ import DepositBalance from "@/models/DepositBalance";
 import InvestmentPackage from "@/models/InvestmentPackage";
 import UserPackage from "@/models/UserPackage";
 import PackageLedger from "@/models/PackageLedger";
-import { adjustWallet } from "@/lib/settlement";
+import Wallet from "@/models/Wallet";
+import LedgerEntry from "@/models/LedgerEntry";
 
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8) / 1e8;
 
@@ -157,51 +158,93 @@ export async function POST(request: NextRequest) {
       }
 
       const refund = roundAmount(Number(current.investedAmount || 0) * 0.5);
+      const session = await mongoose.startSession();
+      let cancelledPackage: any = null;
+
       try {
-        const cancelled = await UserPackage.findOneAndUpdate(
-          { _id: current._id, userId: user._id, status: "active", lockedEarnings: 0 },
-          { $set: { status: "cancelled", cancelledAt: new Date(), cancellationRefund: refund } },
-          { new: true }
-        );
-
-        if (!cancelled) {
-          return NextResponse.json(
-            { success: false, message: "تم تغيير حالة الباقة بالفعل. حدّث الصفحة قبل المحاولة مرة أخرى." },
-            { status: 409 }
+        await session.withTransaction(async () => {
+          const cancelled = await UserPackage.findOneAndUpdate(
+            { _id: current._id, userId: user._id, status: "active", lockedEarnings: 0 },
+            { $set: { status: "cancelled", cancelledAt: new Date(), cancellationRefund: refund } },
+            { new: true, session }
           );
-        }
 
-        if (refund > 0) {
-          await adjustWallet(
-            user._id,
-            cancelled.asset,
-            refund,
-            0,
-            "adjustment",
-            "package-cancel:" + String(cancelled._id),
-            "استرداد 50% من قيمة باقة " + cancelled.packageName + " الملغاة"
-          );
-        }
+          if (!cancelled) {
+            throw new Error("PACKAGE_ALREADY_CANCELLED");
+          }
 
-        await PackageLedger.create({
-          userId: user._id,
-          userPackageId: cancelled._id,
-          type: "cancellation_refund",
-          asset: cancelled.asset,
-          amount: refund,
-          note: "تم إلغاء الباقة وإضافة نصف قيمة تفعيلها إلى رصيد السحب العام",
+          if (refund > 0) {
+            let wallet = await Wallet.findOne({
+              userId: user._id,
+              type: "spot",
+              mode: "live",
+            }).session(session);
+
+            if (!wallet) {
+              wallet = new Wallet({
+                userId: user._id,
+                type: "spot",
+                mode: "live",
+                balances: [],
+              });
+            }
+
+            const asset = String(cancelled.asset).toUpperCase();
+            let balance = wallet.balances.find((item: any) => String(item.asset).toUpperCase() === asset);
+            const before = Number(balance?.available || 0);
+
+            if (!balance) {
+              wallet.balances.push({ asset, available: refund, locked: 0 });
+              balance = wallet.balances[wallet.balances.length - 1] as any;
+            } else {
+              balance.available = Number((before + refund).toFixed(12));
+            }
+
+            const after = Number(balance.available || 0);
+            await wallet.save({ session });
+
+            await LedgerEntry.create([{
+              userId: user._id,
+              scope: "user",
+              asset,
+              mode: "live",
+              type: "adjustment",
+              amount: refund,
+              balanceBefore: before,
+              balanceAfter: after,
+              referenceId: "package-cancel:" + String(cancelled._id),
+              note: "استرداد 50% من قيمة باقة " + cancelled.packageName + " الملغاة",
+            }], { session });
+          }
+
+          await PackageLedger.create([{
+            userId: user._id,
+            userPackageId: cancelled._id,
+            type: "cancellation_refund",
+            asset: cancelled.asset,
+            amount: refund,
+            note: "تم إلغاء الباقة وإضافة نصف قيمة تفعيلها إلى رصيد السحب العام",
+          }], { session });
+
+          cancelledPackage = cancelled;
         });
       } catch (cancelError) {
         console.error("PACKAGE CANCEL:", cancelError);
+        const conflict = cancelError instanceof Error && cancelError.message === "PACKAGE_ALREADY_CANCELLED";
         return NextResponse.json({
           success: false,
-          message: "تعذر إتمام إلغاء الباقة بصورة مؤكدة. راجع سجل العمليات قبل إعادة المحاولة.",
-        }, { status: 500 });
+          message: conflict
+            ? "تم تغيير حالة الباقة بالفعل. حدّث الصفحة قبل المحاولة مرة أخرى."
+            : "لم يتم إلغاء الباقة أو تغيير الأرصدة لأن المعاملة المالية لم تكتمل. حاول مرة أخرى.",
+        }, { status: conflict ? 409 : 500 });
+      } finally {
+        await session.endSession();
       }
 
       return NextResponse.json({
         success: true,
         message: "تم إلغاء الباقة وإضافة " + refund + " " + current.asset + " إلى رصيد السحب العام. تبقى الأرباح المحققة المتاحة في رصيد هذه الباقة.",
+        userPackage: cancelledPackage,
       });
     }
 

@@ -46,6 +46,8 @@ export async function GET() {
         minDeposit: Number(method.minDeposit || 0),
         minWithdrawal: Number(method.minWithdrawal || 0),
         enabled: Boolean(method.enabled),
+        depositEnabled: method.depositEnabled !== false,
+        withdrawalEnabled: method.withdrawalEnabled !== false,
         source: "payment-option",
       });
     }

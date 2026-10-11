@@ -3,9 +3,8 @@ import { jwtVerify } from "jose";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 
-const secretText = process.env.AUTH_SECRET;
-
 export async function requireAdminLeader(request: NextRequest) {
+  const secretText = process.env.AUTH_SECRET;
   if (!secretText) {
     throw new Error("AUTH_SECRET is not configured");
   }

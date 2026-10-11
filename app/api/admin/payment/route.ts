@@ -57,6 +57,8 @@ export async function POST(request: NextRequest) {
     const minDeposit = Number(body.minDeposit);
     const minWithdrawal = Number(body.minWithdrawal);
     const enabled = body.enabled !== false;
+    const depositEnabled = body.depositEnabled !== false;
+    const withdrawalEnabled = body.withdrawalEnabled !== false;
 
     if (
       !name ||
@@ -96,6 +98,8 @@ export async function POST(request: NextRequest) {
       minDeposit,
       minWithdrawal,
       enabled,
+      depositEnabled,
+      withdrawalEnabled,
     });
 
     return NextResponse.json({
@@ -180,6 +184,14 @@ export async function PATCH(request: NextRequest) {
 
     if (body.enabled !== undefined) {
       update.enabled = Boolean(body.enabled);
+    }
+
+    if (body.depositEnabled !== undefined) {
+      update.depositEnabled = Boolean(body.depositEnabled);
+    }
+
+    if (body.withdrawalEnabled !== undefined) {
+      update.withdrawalEnabled = Boolean(body.withdrawalEnabled);
     }
 
     const method = await PaymentOption.findByIdAndUpdate(

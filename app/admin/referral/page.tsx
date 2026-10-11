@@ -51,12 +51,9 @@ export default function ReferralPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    void loadSettings();
-  }, []);
-
   async function loadSettings() {
     try {
+      await Promise.resolve();
       setLoading(true);
       setError("");
 
@@ -90,6 +87,10 @@ export default function ReferralPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    void loadSettings();
+  }, []);
 
   async function saveSettings() {
     const commissionPercent = Number(settings.commissionPercent);

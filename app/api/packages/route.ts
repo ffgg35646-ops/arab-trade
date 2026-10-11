@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
             type: "adjustment",
             amount: refund,
             balanceBefore: before,
-            balanceAfter: Number(walletBalance.available || 0),
+            balanceAfter: Number(walletBalance?.available || 0),
             referenceId: "package-change:" + String(cancelled._id),
             note: "استرداد 50% من قيمة الباقة السابقة " + cancelled.packageName + " عند تغيير الباقة",
           }], { session });

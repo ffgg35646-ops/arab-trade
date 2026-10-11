@@ -25,7 +25,9 @@ function formatValue(value: unknown) {
 function label(key: string) {
   const labels: Record<string, string> = {
     _id: "المعرف",
-    userId: "معرف المستخدم",
+    userId: "المستخدم",
+    userPackageId: "حساب الباقة",
+    source: "مصدر السحب",
     amount: "المبلغ",
     asset: "الأصل",
     symbol: "الرمز",
@@ -100,27 +102,35 @@ export default function AdminRequestDetail({
     void load();
   }, [endpoint]);
 
-  async function action(actionName: "approve" | "reject") {
+  async function action(actionName: "approve" | "reject" | "complete") {
     let reason = "";
 
     if (actionName === "reject") {
-      reason = window.prompt("اكتب سبب الرفض:") || "";
+      reason = window.prompt("اكتب سبب الرفض أو سبب إرجاع الرصيد:") || "";
       if (!reason.trim()) return;
+    }
+
+    if (actionName === "complete" && !window.confirm("تأكيد تنفيذ السحب؟ سيتم إنهاء الطلب وخصم المبلغ من الرصيد المقفل.")) {
+      return;
     }
 
     setBusy(true);
 
     try {
+      const status =
+        actionName === "approve" ? "approved" :
+        actionName === "reject" ? "rejected" : "completed";
+
       const res = await fetch(backHref.replace("/admin/", "/api/admin/"), {
-        method: "POST",
+        method: "PATCH",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           id: item._id,
-          action: actionName,
-          reason,
+          status,
+          adminNote: reason,
         }),
       });
 
@@ -189,27 +199,43 @@ export default function AdminRequestDetail({
                 ))}
             </div>
 
-            {["pending", "review", "processing"].includes(
-              String(item.status || "").toLowerCase()
-            ) ? (
-              <div className="flex flex-wrap gap-3 rounded-2xl border border-slate-800 bg-[#08111e] p-5">
-                <button
-                  disabled={busy}
-                  onClick={() => void action("approve")}
-                  className="rounded-xl bg-emerald-600 px-6 py-3 font-black disabled:opacity-50"
-                >
-                  اعتماد
-                </button>
+            {(() => {
+              const currentStatus = String(item.status || "").toLowerCase();
+              const pending = ["pending", "review", "processing"].includes(currentStatus);
+              const approvedWithdrawal = kind === "withdrawal" && currentStatus === "approved";
+              if (!pending && !approvedWithdrawal) return null;
+              return (
+                <div className="flex flex-wrap gap-3 rounded-2xl border border-slate-800 bg-[#08111e] p-5">
+                  {pending && (
+                    <button
+                      disabled={busy}
+                      onClick={() => void action("approve")}
+                      className="rounded-xl bg-emerald-600 px-6 py-3 font-black disabled:opacity-50"
+                    >
+                      اعتماد
+                    </button>
+                  )}
 
-                <button
-                  disabled={busy}
-                  onClick={() => void action("reject")}
-                  className="rounded-xl bg-red-600 px-6 py-3 font-black disabled:opacity-50"
-                >
-                  رفض
-                </button>
-              </div>
-            ) : null}
+                  {approvedWithdrawal && (
+                    <button
+                      disabled={busy}
+                      onClick={() => void action("complete")}
+                      className="rounded-xl bg-blue-600 px-6 py-3 font-black disabled:opacity-50"
+                    >
+                      تنفيذ السحب
+                    </button>
+                  )}
+
+                  <button
+                    disabled={busy}
+                    onClick={() => void action("reject")}
+                    className="rounded-xl bg-red-600 px-6 py-3 font-black disabled:opacity-50"
+                  >
+                    {approvedWithdrawal ? "رفض وإرجاع الرصيد" : "رفض"}
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         ) : null}
       </div>

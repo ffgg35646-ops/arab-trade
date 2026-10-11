@@ -28,7 +28,10 @@ export async function GET(
 
     await connectDB();
 
-    const item = await WithdrawalRequest.findById(id).lean();
+    const item = await WithdrawalRequest.findById(id)
+      .populate("userId", "name username email")
+      .populate("userPackageId", "packageName")
+      .lean();
 
     if (!item) {
       return NextResponse.json(

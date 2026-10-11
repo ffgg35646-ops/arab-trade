@@ -3,10 +3,9 @@ import { jwtVerify } from "jose";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 
-const secretText = process.env.AUTH_SECRET;
-
 export async function GET(request: NextRequest) {
   try {
+    const secretText = process.env.AUTH_SECRET;
     if (!secretText) {
       return NextResponse.json(
         { success: false, message: "AUTH_SECRET is not configured" },

@@ -10,6 +10,8 @@ export interface IPaymentOption extends Document {
   minWithdrawal: number;
 
   enabled: boolean;
+  depositEnabled: boolean;
+  withdrawalEnabled: boolean;
 
   createdAt: Date;
   updatedAt: Date;
@@ -64,6 +66,8 @@ const PaymentOptionSchema = new Schema<IPaymentOption>(
       default: true,
       index: true,
     },
+    depositEnabled: { type: Boolean, default: true },
+    withdrawalEnabled: { type: Boolean, default: true },
   },
   {
     timestamps: true,

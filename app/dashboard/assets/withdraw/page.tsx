@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Method = {
   _id: string;
@@ -56,6 +56,7 @@ export default function WithdrawPage() {
 
   const [selectedId, setSelectedId] =
     useState("");
+  const selectedIdRef = useRef("");
 
   const [address, setAddress] =
     useState("");
@@ -78,11 +79,7 @@ export default function WithdrawPage() {
   const [message, setMessage] =
     useState("");
 
-  useEffect(() => {
-    void load();
-  }, []);
-
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const [
         methodsResponse,
@@ -209,7 +206,8 @@ export default function WithdrawPage() {
       );
 
       if (rows.length > 0) {
-        const currentId = rows.some((item) => item._id === selectedId) ? selectedId : rows[0]._id;
+        const currentId = rows.some((item) => item._id === selectedIdRef.current) ? selectedIdRef.current : rows[0]._id;
+        selectedIdRef.current = currentId;
         setSelectedId(currentId);
         const currentMethod = rows.find((item) => item._id === currentId);
         const loadedAddresses: SavedAddress[] = Array.isArray(addressesData.addresses) ? addressesData.addresses : [];
@@ -227,7 +225,11 @@ export default function WithdrawPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    void Promise.resolve().then(() => { void load(); });
+  }, [load]);
 
   const selected = useMemo(
     () =>
@@ -257,6 +259,7 @@ export default function WithdrawPage() {
     : undefined;
 
   function selectMethod(id: string) {
+    selectedIdRef.current = id;
     setSelectedId(id);
     const method = methods.find((item) => item._id === id);
     const knownAddress = method && savedAddresses.find(

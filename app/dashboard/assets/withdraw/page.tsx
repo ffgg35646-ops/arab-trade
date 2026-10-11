@@ -83,9 +83,6 @@ export default function WithdrawPage() {
   }, []);
 
   async function load() {
-    setLoading(true);
-    setError("");
-
     try {
       const [
         methodsResponse,

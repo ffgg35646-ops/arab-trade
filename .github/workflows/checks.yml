@@ -64,7 +64,7 @@ jobs:
           done
           if [ "$healthy" != "1" ]; then cat /tmp/arabtrade-next.log; exit 1; fi
 
-          node scripts/test-financial-flows.mjs
+          node scripts/test-financial-flows.mjs || { cat /tmp/arabtrade-next.log; exit 1; }
       - name: ESLint check (existing project debt reported separately)
         continue-on-error: true
         run: >-

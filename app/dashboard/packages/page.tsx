@@ -33,7 +33,9 @@ export default function UserPackagesPage() {
       setLoading(false);
     }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void Promise.resolve().then(() => { void load(); });
+  }, [load]);
 
   async function action(kind: "activate" | "cancel" | "change", id: string) {
     if (kind === "cancel" && !window.confirm("إلغاء هذه الباقة سيحوّل 50% فقط من قيمة التفعيل إلى رصيد السحب العام. ستبقى الأرباح المحققة المتاحة في سجل الباقة. هل تريد المتابعة؟")) return;

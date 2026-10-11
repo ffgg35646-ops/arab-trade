@@ -36,11 +36,17 @@ export default function UserPackagesPage() {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  async function action(kind: "activate" | "cancel", id: string) {
+  async function action(kind: "activate" | "cancel" | "change", id: string) {
     if (kind === "cancel" && !window.confirm("إلغاء هذه الباقة سيحوّل 50% فقط من قيمة التفعيل إلى رصيد السحب العام. ستبقى الأرباح المحققة المتاحة في سجل الباقة. هل تريد المتابعة؟")) return;
+    if (kind === "change" && (!activePlan || !window.confirm("تغيير الباقة سيضيف 50% من قيمة تفعيل الباقة الحالية إلى رصيد السحب العام، ويخصم سعر الباقة الجديدة من رصيد الإيداع. إذا لم يكف رصيد الإيداع فلن تتغير الباقة أو الأرصدة. هل تريد المتابعة؟"))) return;
     setBusy(id); setError(""); setMessage("");
     try {
-      const res = await fetch("/api/packages", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(kind === "activate" ? { action: kind, packageId: id } : { action: kind, userPackageId: id }) });
+      const body = kind === "cancel"
+        ? { action: kind, userPackageId: id }
+        : kind === "change"
+          ? { action: kind, packageId: id, userPackageId: activePlan?._id }
+          : { action: kind, packageId: id };
+      const res = await fetch("/api/packages", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || "تعذر إتمام العملية");
       setMessage(json.message || "تمت العملية بنجاح");
@@ -72,7 +78,7 @@ export default function UserPackagesPage() {
         {error && <div role="alert" className="mt-5 rounded-xl border border-red-400/20 bg-red-400/[0.07] p-4 text-sm text-red-300">{error}</div>}
         <section className="mt-7"><h2 className="mb-4 text-xl font-black">الباقات المتاحة</h2>
           {loading ? <div className="p-10 text-center text-slate-500"><Loader2 className="mx-auto animate-spin"/></div> : !data?.packages.length ? <div className="rounded-2xl border border-white/10 p-8 text-center text-slate-500">لا توجد باقات مفعلة حاليًا.</div> :
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.packages.map((plan) => <article key={plan._id} className="rounded-2xl border border-white/10 bg-[#07101d] p-5"><div className="flex items-center justify-between"><Package size={22} className="text-cyan-300"/><span className="text-xs text-slate-500">{plan.durationDays} يوم</span></div><h3 className="mt-5 text-xl font-black">{plan.name}</h3><p className="mt-2 min-h-10 text-sm leading-6 text-slate-400">{plan.description || "باقة بمدة وقيمة تفعيل محددتين."}</p><div className="mt-4 text-3xl font-black">{money(plan.price)} <span className="text-sm text-cyan-300">{plan.asset}</span></div><button type="button" onClick={() => void action("activate", plan._id)} disabled={Boolean(busy) || Boolean(activePlan)} className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-black disabled:opacity-50">{busy === plan._id ? "جاري التفعيل..." : activePlan ? "ألغِ الباقة الحالية أولًا" : "تفعيل من رصيد الإيداع"}</button></article>)}</div>}
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.packages.map((plan) => <article key={plan._id} className="rounded-2xl border border-white/10 bg-[#07101d] p-5"><div className="flex items-center justify-between"><Package size={22} className="text-cyan-300"/><span className="text-xs text-slate-500">{plan.durationDays} يوم</span></div><h3 className="mt-5 text-xl font-black">{plan.name}</h3><p className="mt-2 min-h-10 text-sm leading-6 text-slate-400">{plan.description || "باقة بمدة وقيمة تفعيل محددتين."}</p><div className="mt-4 text-3xl font-black">{money(plan.price)} <span className="text-sm text-cyan-300">{plan.asset}</span></div><button type="button" onClick={() => void action(activePlan ? "change" : "activate", plan._id)} disabled={Boolean(busy)} className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-black disabled:opacity-50">{busy === plan._id ? "جاري التنفيذ..." : activePlan ? activePlan.packageName === plan.name ? "تجديد / تفعيل نفس الباقة" : "التغيير إلى هذه الباقة" : "تفعيل من رصيد الإيداع"}</button></article>)}</div>}
         </section>
         <section className="mt-8 rounded-2xl border border-white/10 bg-[#07101d] p-5">
           <h2 className="text-xl font-black">باقاتي وأرصدة السحب</h2><p className="mt-2 text-xs leading-6 text-slate-500">رصيد كل باقة منفصل. من صفحة السحب اختر رصيد الباقة لسحب المبالغ المتاحة.</p>

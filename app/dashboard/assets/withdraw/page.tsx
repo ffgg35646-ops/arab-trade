@@ -527,11 +527,23 @@ export default function WithdrawPage() {
             <div className="mt-2 text-2xl font-black text-amber-200">{Number(depositBalances.find((item) => item.asset === "USDT")?.available || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })}</div>
             <p className="mt-1 text-xs leading-5 text-slate-500">كل الإيداعات الخارجية المعتمدة في رصيد واحد، ويُستخدم لتفعيل الباقات فقط.</p>
           </div>
-          <div className="rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-[#0d2534] to-[#07101d] p-4">
-            <div className="text-xs text-cyan-100/80">إجمالي رصيد السحب الموحد · USDT</div>
+          <button
+            type="button"
+            onClick={() => {
+              setWithdrawalSource("package");
+              const usdtMethod = methods.find((item) => item.asset === "USDT");
+              if (usdtMethod) selectMethod(usdtMethod._id);
+              const account = packageAccounts.find((item) => Number(item.availableEarnings || 0) > 0) || packageAccounts[0];
+              if (account) setSelectedPackageId(account._id);
+              document.getElementById("package-withdrawal-breakdown")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+            aria-label="عرض أرصدة الباقات ورصيد السحب العام"
+            className="rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-[#0d2534] to-[#07101d] p-4 text-right transition hover:border-cyan-200/50 hover:bg-cyan-300/[0.06] focus:outline-none focus:ring-2 focus:ring-cyan-300/50"
+          >
+            <div className="text-xs text-cyan-100/80">إجمالي رصيد السحب · اضغط لعرض التفاصيل · USDT</div>
             <div className="mt-2 text-2xl font-black text-cyan-200">{(Number(balances.find((item) => item.asset === "USDT")?.available || 0) + packageAccounts.reduce((sum, item) => sum + Number(item.availableEarnings || 0), 0)).toLocaleString("en-US", { maximumFractionDigits: 8 })}</div>
-            <p className="mt-1 text-xs leading-5 text-slate-500">يشمل رصيد السحب العام وأرصدة أرباح جميع الباقات. التفاصيل ومصدر السحب بالأسفل.</p>
-          </div>
+            <p className="mt-1 text-xs leading-5 text-slate-500">اضغط لعرض رصيد كل باقة على حدة، ثم رصيد السحب العام أسفلها.</p>
+          </button>
           <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
             <div className="text-xs text-slate-400">طلبات السحب المفتوحة</div>
             <div className="mt-2 text-2xl font-black text-amber-200">{history.filter((item) => ["pending", "approved", "processing"].includes(String(item.status))).length}</div>
@@ -604,7 +616,7 @@ export default function WithdrawPage() {
                 </div>
 
                 {withdrawalSource === "package" && (
-                  <div className="space-y-3">
+                  <div id="package-withdrawal-breakdown" className="space-y-3 scroll-mt-24">
                     <div>
                       <label className="block text-sm font-bold">أرصدة كل حسابات الباقات</label>
                       <p className="mt-1 text-xs leading-6 text-slate-500">اضغط على الباقة التي تريد السحب منها. سيُخصم الطلب من رصيد هذا الحساب فقط.</p>

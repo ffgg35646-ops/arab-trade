@@ -40,6 +40,14 @@ type PackageAccount = {
   investedAmount: number;
   totalWithdrawn: number;
   firstWithdrawalStatus?: "available" | "pending" | "completed";
+  activeReferralCount?: number;
+  activeReferralDepositTotal?: number;
+  firstPackageWithdrawalPercent?: number;
+  referralPackageWithdrawalPercent?: number;
+  referralWithdrawalCap?: number;
+  referralAlreadyWithdrawn?: number;
+  referralRemaining?: number;
+  withdrawalLimit?: number;
 };
 
 export default function WithdrawPage() {
@@ -248,7 +256,7 @@ export default function WithdrawPage() {
   const packageFirstStatus = selectedPackage?.firstWithdrawalStatus === "pending" ? "pending" : Number(selectedPackage?.totalWithdrawn || 0) > 0 ? "completed" : (selectedPackage?.firstWithdrawalStatus || "available");
   const packageFirstWithdrawalPending = withdrawalSource === "package" && packageFirstStatus === "pending";
   const packageFirstWithdrawal = withdrawalSource === "package" && packageFirstStatus === "available";
-  const packageWithdrawalMax = selectedPackage ? (packageFirstWithdrawal ? Math.min(Number(selectedPackage.availableEarnings || 0), Number(selectedPackage.investedAmount || 0)) : Number(selectedPackage.availableEarnings || 0)) : 0;
+  const packageWithdrawalMax = selectedPackage ? Math.max(0, Number(selectedPackage.withdrawalLimit ?? (packageFirstWithdrawal ? Math.min(Number(selectedPackage.availableEarnings || 0), Number(selectedPackage.investedAmount || 0)) : Number(selectedPackage.availableEarnings || 0)))) : 0;
   const selectedBalance =
     withdrawalSource === "package"
       ? Number(selectedPackage?.availableEarnings || 0)
@@ -404,8 +412,12 @@ export default function WithdrawPage() {
         if (packageFirstWithdrawalPending) {
           throw new Error("أول طلب سحب من هذه الباقة ما زال قيد المراجعة.");
         }
-        if (packageFirstWithdrawal && numericAmount > Number(selectedPackage.investedAmount || 0)) {
-          throw new Error(`الحد الأقصى لأول سحب هو مبلغ تفعيل الباقة: ${selectedPackage?.investedAmount || 0} USDT`);
+        if (numericAmount > packageWithdrawalMax) {
+          throw new Error(packageWithdrawalMax > 0
+            ? "المتاح للسحب الآن من هذه الباقة هو " + packageWithdrawalMax + " USDT فقط، حسب قواعد السحب والإحالات النشطة."
+            : packageFirstWithdrawal
+              ? "لا يوجد رصيد محقق متاح لأول سحب من هذه الباقة."
+              : "لا يوجد حد سحب متاح حاليًا. تحتاج إلى إيداعات خارجية معتمدة جديدة من إحالات نشطة.");
         }
         if (numericAmount > selectedPackage.availableEarnings) {
           throw new Error("مبلغ السحب أكبر من الرصيد المتاح في هذه الباقة");
@@ -617,7 +629,10 @@ export default function WithdrawPage() {
                                 </div>
                                 <span className={selectedAccount ? "rounded-full bg-emerald-300/10 px-2 py-1 text-[10px] text-emerald-200" : "rounded-full bg-white/5 px-2 py-1 text-[10px] text-slate-400"}>{selectedAccount ? "محدد" : "اختيار"}</span>
                               </div>
-                              <div className="mt-4 text-2xl font-black text-emerald-200">{Number(item.availableEarnings || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} <span className="text-xs">USDT متاح</span></div>
+                              <div className="mt-4 text-2xl font-black text-emerald-200">{Number(item.availableEarnings || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} <span className="text-xs">USDT رصيد متاح</span></div>
+                              <div className="mt-2 text-sm font-bold text-cyan-200">المتاح للسحب الآن: {Number(item.withdrawalLimit || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</div>
+                              <div className="mt-1 text-xs leading-5 text-slate-500">{item.firstWithdrawalStatus === "pending" ? "أول طلب سحب قيد المراجعة" : (item.firstWithdrawalStatus === "completed" || Number(item.totalWithdrawn || 0) > 0) ? "نسبة السحب اللاحق: " + Number(item.referralPackageWithdrawalPercent ?? 50) + "% من إيداعات الإحالات النشطة المعتمدة" : "السحب الأول دون شرط إحالات، وحده حسب قيمة الباقة ونسبة الإدارة"}</div>
+                              <div className="mt-1 text-xs text-slate-500">الإحالات النشطة: {Number(item.activeReferralCount || 0)} · حد الإحالات: {Number(item.referralWithdrawalCap || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT · المسحوب من حد الإحالات: {Number(item.referralAlreadyWithdrawn || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</div>
                               <div className="mt-2 text-xs text-slate-500">قيد المراجعة: {Number(item.lockedEarnings || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</div>
                             </button>
                           );

@@ -6,8 +6,8 @@ import { ArrowUpFromLine, CheckCircle2, Clock3, Copy, Eye, RefreshCw, Search, Sh
 
 type Status = "pending" | "approved" | "processing" | "rejected" | "failed" | "completed";
 type Source = "wallet" | "package";
-type UserRef = { _id?: string; name?: string; username?: string; email?: string } | string | null;
-type PackageRef = { _id?: string; packageName?: string } | string | null;
+type UserRef = { _id?: string; name?: string; username?: string; email?: string } | string | null | undefined;
+type PackageRef = { _id?: string; packageName?: string } | string | null | undefined;
 type Withdrawal = {
   _id: string;
   userId?: UserRef;

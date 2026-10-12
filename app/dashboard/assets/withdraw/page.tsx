@@ -44,6 +44,7 @@ type PackageAccount = {
 
 export default function WithdrawPage() {
   const [methods, setMethods] = useState<Method[]>([]);
+  const [depositBalances, setDepositBalances] = useState<Balance[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [packageAccounts, setPackageAccounts] = useState<PackageAccount[]>([]);
   const [withdrawalSource, setWithdrawalSource] = useState<"wallet" | "package">("wallet");
@@ -177,6 +178,9 @@ export default function WithdrawPage() {
 
       setMethods(rows);
 
+      setDepositBalances(
+        Array.isArray(walletData.depositBalances) ? walletData.depositBalances : []
+      );
       setBalances(
         walletData.spot?.balances || walletData.wallet?.balances || []
       );
@@ -249,10 +253,6 @@ export default function WithdrawPage() {
     withdrawalSource === "package"
       ? Number(selectedPackage?.availableEarnings || 0)
       : balances.find((balance) => balance.asset === selected?.asset)?.available || 0;
-
-  const unifiedUsdtWithdrawalBalance =
-    Number(balances.find((balance) => balance.asset === "USDT")?.available || 0) +
-    packageAccounts.filter((item) => item.asset === "USDT").reduce((sum, item) => sum + Number(item.availableEarnings || 0), 0);
 
   const savedAddress = selected
     ? savedAddresses.find(
@@ -503,16 +503,21 @@ export default function WithdrawPage() {
           </p>
         </div>
 
-        <section className="mb-6 grid gap-3 sm:grid-cols-3">
+        <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
+            <div className="text-xs text-slate-400">رصيد الإيداع الخارجي · USDT</div>
+            <div className="mt-2 text-2xl font-black text-amber-200">{Number(depositBalances.find((item) => item.asset === "USDT")?.available || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })}</div>
+            <p className="mt-1 text-xs text-slate-500">للتفعيل في الباقات فقط، ولا يُسحب مباشرة.</p>
+          </div>
           <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
             <div className="text-xs text-slate-400">رصيد السحب العام · USDT</div>
             <div className="mt-2 text-2xl font-black text-cyan-200">{Number(balances.find((item) => item.asset === "USDT")?.available || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })}</div>
-            <p className="mt-1 text-xs text-slate-500">منفصل عن رصيد الإيداع الخارجي</p>
+            <p className="mt-1 text-xs text-slate-500">منفصل تمامًا عن رصيد الإيداع.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
-            <div className="text-xs text-slate-400">أرصدة الباقات المتاحة · USDT</div>
+            <div className="text-xs text-slate-400">إجمالي أرصدة الباقات المتاحة · USDT</div>
             <div className="mt-2 text-2xl font-black text-emerald-200">{packageAccounts.reduce((sum, item) => sum + Number(item.availableEarnings || 0), 0).toLocaleString("en-US", { maximumFractionDigits: 8 })}</div>
-            <p className="mt-1 text-xs text-slate-500">مبالغ محققة لكل باقة على حدة</p>
+            <p className="mt-1 text-xs text-slate-500">كل حساب باقة يظهر برصيده المستقل عند اختياره.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
             <div className="text-xs text-slate-400">طلبات مفتوحة</div>
@@ -559,10 +564,9 @@ export default function WithdrawPage() {
               </div>
 
               <div className="space-y-4">
-                <div className="mb-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.06] p-4">
-                  <div className="text-sm font-bold text-emerald-200">إجمالي رصيد السحب الداخلي المتاح (USDT)</div>
-                  <div className="mt-2 text-2xl font-black text-white">{unifiedUsdtWithdrawalBalance.toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</div>
-                  <p className="mt-1 text-xs leading-5 text-slate-400">يشمل المحفظة العامة وأرباح الباقات المتاحة. رصيد الإيداع الخارجي منفصل وغير قابل للسحب مباشرة. عند إنشاء الطلب اختر المصدر الذي يحتوي على المبلغ.</p>
+                <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.025] p-4">
+                  <div className="text-sm font-bold text-white">الأرصدة المالية منفصلة</div>
+                  <p className="mt-1 text-xs leading-6 text-slate-400">رصيد الإيداع يُستخدم لتفعيل الباقات فقط. رصيد السحب العام وأرصدة الباقات مصادر مستقلة، ويجب اختيار المصدر الذي سيتم السحب منه.</p>
                 </div>
                 <div>
                   <label className="mb-3 block text-sm font-bold">تفاصيل مصدر رصيد السحب</label>
@@ -587,22 +591,49 @@ export default function WithdrawPage() {
                 </div>
 
                 {withdrawalSource === "package" && (
-                  <div>
-                    <label className="mb-2 block text-sm font-bold">الباقة التي سيتم السحب منها</label>
-                    <select
-                      value={selectedPackageId}
-                      onChange={(e) => setSelectedPackageId(e.target.value)}
-                      required
-                      className="w-full rounded-xl border border-white/10 bg-[#050a13] px-4 py-3"
-                    >
-                      <option value="">اختر الباقة</option>
-                      {packageAccounts.map((item) => (
-                        <option key={item._id} value={item._id}>
-                          {item.packageName} — متاح {Number(item.availableEarnings || 0).toFixed(2)} USDT
-                        </option>
-                      ))}
-                    </select>
-                    <p className="mt-2 text-xs leading-5 text-slate-500">يتم السحب من رصيد هذه الباقة فقط، ورصيد الإيداع الخارجي لا يُسحب مباشرة.</p>{packageFirstWithdrawalPending ? <p className="mt-2 text-xs font-bold text-amber-300">أول طلب سحب من الباقة قيد المراجعة؛ انتظر حسمه قبل طلب آخر.</p> : packageFirstWithdrawal ? <p className="mt-2 text-xs font-bold text-cyan-300">الحد الأقصى لأول سحب هو مبلغ تفعيل الباقة ({selectedPackage?.investedAmount || 0} USDT). بعد حسم أول طلب، يمكنك سحب الرصيد المحقق المتاح دون شرط إحالات.</p> : <p className="mt-2 text-xs text-slate-500">أول طلب سحب حُسم بالفعل؛ يمكنك سحب رصيد الباقة المحقق والمتاح وفق حدود المنصة.</p>}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-bold">أرصدة كل حسابات الباقات</label>
+                      <p className="mt-1 text-xs leading-6 text-slate-500">اضغط على الباقة التي تريد السحب منها. سيُخصم الطلب من رصيد هذا الحساب فقط.</p>
+                    </div>
+                    {packageAccounts.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-sm text-slate-500">لا توجد حسابات باقات لها رصيد سحب مسجل حتى الآن.</div>
+                    ) : (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {packageAccounts.map((item) => {
+                          const selectedAccount = item._id === selectedPackageId;
+                          return (
+                            <button
+                              key={item._id}
+                              type="button"
+                              aria-pressed={selectedAccount}
+                              onClick={() => { setSelectedPackageId(item._id); setAmount(""); setError(""); setMessage(""); }}
+                              className={selectedAccount ? "rounded-xl border border-emerald-300/50 bg-emerald-300/[0.08] p-4 text-right transition" : "rounded-xl border border-white/10 bg-[#050a13] p-4 text-right transition hover:border-white/20"}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="font-black text-white">{item.packageName}</div>
+                                  <div className="mt-1 text-[11px] text-slate-500">{item.status === "active" ? "الباقة النشطة" : "باقة سابقة"}</div>
+                                </div>
+                                <span className={selectedAccount ? "rounded-full bg-emerald-300/10 px-2 py-1 text-[10px] text-emerald-200" : "rounded-full bg-white/5 px-2 py-1 text-[10px] text-slate-400"}>{selectedAccount ? "محدد" : "اختيار"}</span>
+                              </div>
+                              <div className="mt-4 text-2xl font-black text-emerald-200">{Number(item.availableEarnings || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} <span className="text-xs">USDT متاح</span></div>
+                              <div className="mt-2 text-xs text-slate-500">قيد المراجعة: {Number(item.lockedEarnings || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {selectedPackage && (
+                      <div className="rounded-xl border border-cyan-400/15 bg-cyan-400/[0.04] p-4 text-xs leading-6 text-cyan-100/80">
+                        {packageFirstWithdrawalPending ? "أول طلب سحب من هذه الباقة قيد المراجعة؛ انتظر حسمه قبل طلب آخر." : packageFirstWithdrawal ? `الحد الأقصى لأول سحب هو مبلغ تفعيل الباقة (${selectedPackage.investedAmount || 0} USDT).` : "تم حسم أول طلب سحب من هذه الباقة."}
+                      </div>
+                    )}
+                    <div className="rounded-xl border border-cyan-400/25 bg-cyan-400/[0.06] p-4">
+                      <div className="text-xs text-slate-400">رصيد السحب العام · USDT</div>
+                      <div className="mt-2 text-2xl font-black text-cyan-200">{Number(balances.find((item) => item.asset === "USDT")?.available || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</div>
+                      <p className="mt-1 text-xs leading-5 text-slate-400">هذا الرصيد مستقل عن أرصدة الباقات ورصيد الإيداع. للطلب العام، اختر «رصيد السحب العام» من المصدر أعلاه.</p>
+                    </div>
                   </div>
                 )}
 

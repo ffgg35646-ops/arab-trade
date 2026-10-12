@@ -122,6 +122,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
 
     await connectDB();
+    await accrueDuePackageEarnings({ userId: user._id });
     const body = await request.json();
     const action = String(body.action || "");
     const packageId = String(body.packageId || "").trim();

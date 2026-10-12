@@ -181,10 +181,14 @@ export default function DepositPage() {
         throw new Error("أدخل مبلغًا صحيحًا");
       }
 
-      if (numericAmount < selected.minDeposit) {
-        throw new Error(
-          `الحد الأدنى للإيداع هو ${selected.minDeposit} ${selected.asset}`
-        );
+      const minimumDeposit = Math.max(Number(selected.minDeposit || 0), Number(limits.minDeposit || 0));
+      const configuredMaximums = [Number(selected.maxDeposit || 0), Number(limits.maxDeposit || 0)].filter((value) => value > 0);
+      const maximumDeposit = configuredMaximums.length ? Math.min(...configuredMaximums) : 0;
+      if (numericAmount < minimumDeposit) {
+        throw new Error("الحد الأدنى للإيداع هو " + minimumDeposit + " " + selected.asset);
+      }
+      if (maximumDeposit > 0 && numericAmount > maximumDeposit) {
+        throw new Error("الحد الأقصى للإيداع هو " + maximumDeposit + " " + selected.asset);
       }
 
       const form = new FormData();

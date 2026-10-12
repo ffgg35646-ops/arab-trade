@@ -6,6 +6,7 @@ import DepositBalance from "@/models/DepositBalance";
 import InvestmentPackage from "@/models/InvestmentPackage";
 import UserPackage from "@/models/UserPackage";
 import PackageLedger from "@/models/PackageLedger";
+import { ensureDefaultInvestmentPackages } from "@/lib/ensure-default-investment-packages";
 import Wallet from "@/models/Wallet";
 import LedgerEntry from "@/models/LedgerEntry";
 
@@ -17,6 +18,7 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
 
     await connectDB();
+    await ensureDefaultInvestmentPackages();
     const [packages, depositBalances, userPackages, packageLedger] = await Promise.all([
       InvestmentPackage.find({ enabled: true }).sort({ sortOrder: 1, price: 1 }).lean(),
       DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),

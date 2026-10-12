@@ -6,6 +6,7 @@ import InvestmentPackage from "@/models/InvestmentPackage";
 import UserPackage from "@/models/UserPackage";
 import DepositBalance from "@/models/DepositBalance";
 import PackageLedger from "@/models/PackageLedger";
+import { ensureDefaultInvestmentPackages } from "@/lib/ensure-default-investment-packages";
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,6 +14,7 @@ export async function GET(request: NextRequest) {
     if (!admin) return NextResponse.json({ success: false, message: "غير مصرح" }, { status: 401 });
 
     await connectDB();
+    await ensureDefaultInvestmentPackages();
     const [packages, userPackages, depositBalances, packageLedger] = await Promise.all([
       InvestmentPackage.find({}).sort({ sortOrder: 1, price: 1 }).lean(),
       UserPackage.find({})

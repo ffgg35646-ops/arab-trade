@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
 import Wallet from "@/models/Wallet";
+import DepositBalance from "@/models/DepositBalance";
+import UserPackage from "@/models/UserPackage";
 import LedgerEntry from "@/models/LedgerEntry";
 
 const BINANCE_API = "https://api.binance.com";
@@ -64,7 +66,7 @@ export async function GET(request: NextRequest) {
     const requestedMode = new URL(request.url).searchParams.get("mode");
     const mode = String(requestedMode || "live").toLowerCase() === "demo" ? "demo" : "live";
 
-    const wallets = await Wallet.find({
+    const [wallets, depositBalances, packageAccounts] = await Promise.all([Wallet.find({
       userId: user._id,
       mode,
       type: {
@@ -72,7 +74,12 @@ export async function GET(request: NextRequest) {
       },
     })
       .sort({ type: 1 })
-      .lean();
+      .lean(),
+      DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
+      UserPackage.find({ userId: user._id, status: { $in: ["active", "cancelled"] } })
+        .select("asset availableEarnings lockedEarnings")
+        .lean(),
+    ]);
 
     const spot = wallets.find(
       (wallet: any) => wallet.type === "spot"
@@ -254,8 +261,22 @@ export async function GET(request: NextRequest) {
         0
       );
 
+    const withdrawalMap = new Map<string, { asset: string; available: number; locked: number }>();
+    for (const balance of rawSpotBalances) {
+      withdrawalMap.set(balance.asset, { asset: balance.asset, available: balance.available, locked: balance.locked });
+    }
+    for (const account of packageAccounts as any[]) {
+      const asset = String(account.asset || "USDT").toUpperCase();
+      const current = withdrawalMap.get(asset) || { asset, available: 0, locked: 0 };
+      current.available += Number(account.availableEarnings || 0);
+      current.locked += Number(account.lockedEarnings || 0);
+      withdrawalMap.set(asset, current);
+    }
+
     return NextResponse.json({
       success: true,
+      depositBalances: depositBalances.map((item: any) => ({ asset: String(item.asset || "").toUpperCase(), available: Number(item.available || 0), locked: Number(item.locked || 0) })),
+      withdrawalBalances: Array.from(withdrawalMap.values()).filter((item) => item.available !== 0 || item.locked !== 0),
 
       wallet: {
         type: "spot",

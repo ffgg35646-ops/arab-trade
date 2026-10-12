@@ -7,7 +7,11 @@ export interface IPaymentOption extends Document {
   address: string;
 
   minDeposit: number;
+  maxDeposit: number;
   minWithdrawal: number;
+  maxWithdrawal: number;
+  withdrawalFee: number;
+  warning: string;
 
   enabled: boolean;
   depositEnabled: boolean;
@@ -54,12 +58,16 @@ const PaymentOptionSchema = new Schema<IPaymentOption>(
       default: 0,
     },
 
+    maxDeposit: { type: Number, min: 0, default: 0 },
     minWithdrawal: {
       type: Number,
       required: true,
       min: 0,
       default: 0,
     },
+    maxWithdrawal: { type: Number, min: 0, default: 0 },
+    withdrawalFee: { type: Number, min: 0, default: 0 },
+    warning: { type: String, trim: true, maxlength: 1000, default: "" },
 
     enabled: {
       type: Boolean,

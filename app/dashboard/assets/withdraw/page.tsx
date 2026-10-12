@@ -165,7 +165,9 @@ export default function WithdrawPage() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void Promise.resolve().then(() => { void load(); });
+  }, [load]);
 
   const totalGeneralAvailable = useMemo(
     () => balances.reduce((sum, item) => sum + (String(item.asset).toUpperCase() === "USDT" ? Number(item.available || 0) : 0), 0),

@@ -3,41 +3,45 @@ import PackageCatalogSeed from "@/models/PackageCatalogSeed";
 
 const CATALOG_KEY = "arab-trade-default-packages-v1";
 
-// Initial, editable activation-price templates. No automated earnings are created.
+// Initial lifetime activation-price templates. Daily profit is configurable by administrators.
 const DEFAULT_PACKAGES = [
   {
     name: "Bronze",
-    description: "باقة بداية لمدة 60 يومًا. لا تُضاف أرباح تلقائية؛ تُسجل الإدارة العوائد التي تحققت فعليًا فقط. يمكن تعديل السعر والتفاصيل من لوحة الإدارة.",
+    description: "باقة تفعيل مستمرة دون انتهاء. يحدد الأدمن الربح اليومي من لوحة الإدارة.",
     price: 50,
     asset: "USDT",
-    durationDays: 60,
+    durationDays: 0,
+    dailyProfit: 0,
     enabled: true,
     sortOrder: 1,
   },
   {
     name: "Silver",
-    description: "باقة لمدة 60 يومًا. رصيد التفعيل مستقل عن رصيد السحب، ولا تُضاف أرباح تلقائية. يمكن تعديل السعر والتفاصيل من لوحة الإدارة.",
+    description: "باقة تفعيل مستمرة دون انتهاء. رصيد التفعيل مستقل عن رصيد السحب، والربح اليومي حسب إعداد الإدارة.",
     price: 100,
     asset: "USDT",
-    durationDays: 60,
+    durationDays: 0,
+    dailyProfit: 0,
     enabled: true,
     sortOrder: 2,
   },
   {
     name: "Gold",
-    description: "باقة لمدة 60 يومًا. تُعرض العوائد المحققة المسجلة فعليًا فقط، ويمكن تعديل السعر والتفاصيل من لوحة الإدارة.",
+    description: "باقة تفعيل مستمرة دون انتهاء. يحدد الأدمن الربح اليومي من لوحة الإدارة.",
     price: 250,
     asset: "USDT",
-    durationDays: 60,
+    durationDays: 0,
+    dailyProfit: 0,
     enabled: true,
     sortOrder: 3,
   },
   {
     name: "Platinum",
-    description: "باقة لمدة 60 يومًا. لا يوجد ضمان أو إنشاء تلقائي للأرباح؛ تظل الأرصدة خاضعة لسجل الحركات وقواعد السحب.",
+    description: "باقة تفعيل مستمرة دون انتهاء. الربح اليومي المحدد من الإدارة يظهر في رصيد الباقة وفق قواعد السحب.",
     price: 500,
     asset: "USDT",
-    durationDays: 60,
+    durationDays: 0,
+    dailyProfit: 0,
     enabled: true,
     sortOrder: 4,
   },

@@ -197,9 +197,9 @@ export async function POST(request: NextRequest) {
       network: networkCode,
     }).lean();
 
-    let minAmount = Number(
-      settings.withdrawals.minAmount || 0
-    );
+    let minAmount = source === "wallet"
+      ? Number(settings.withdrawals.minGeneralWithdrawal ?? settings.withdrawals.minAmount ?? 0)
+      : 0;
 
     let maxAmount = Number(
       settings.withdrawals.maxAmount || 0
@@ -424,7 +424,12 @@ export async function POST(request: NextRequest) {
       const packagePlan = await InvestmentPackage.findById(currentPackage.packageId)
         .select("minimumWithdrawal")
         .lean();
-      const packageMinimum = Number(packagePlan?.minimumWithdrawal ?? 0);
+      const configuredMinimums = settings.withdrawals.withdrawalMinByPackage as unknown as Record<string, number> | undefined;
+      const configuredPackageMinimum = configuredMinimums?.[String(currentPackage.packageId)];
+      const packageMinimum = Math.max(
+        Number(configuredPackageMinimum ?? packagePlan?.minimumWithdrawal ?? settings.withdrawals.minAmount ?? 0),
+        Number(minAmount || 0)
+      );
       if (amount < packageMinimum) {
         return NextResponse.json(
           { success: false, message: "الحد الأدنى للسحب من باقة " + currentPackage.packageName + " هو " + packageMinimum + " " + assetCode, minAmount: packageMinimum },

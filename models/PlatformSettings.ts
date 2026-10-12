@@ -20,6 +20,7 @@ export interface IPlatformSettings {
   withdrawals: {
     enabled: boolean;
     minAmount: number;
+    minGeneralWithdrawal: number;
     maxAmount: number;
     dailyLimit: number;
     requireEmailVerification: boolean;
@@ -87,6 +88,7 @@ const PlatformSettingsSchema = new Schema<IPlatformSettings>(
     withdrawals: {
       enabled: { type: Boolean, default: true },
       minAmount: { type: Number, default: 50 },
+      minGeneralWithdrawal: { type: Number, default: 50, min: 0 },
       maxAmount: { type: Number, default: 50000 },
       dailyLimit: { type: Number, default: 100000 },
       requireEmailVerification: { type: Boolean, default: true },

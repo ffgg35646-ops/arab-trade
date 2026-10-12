@@ -25,6 +25,8 @@ export interface IPlatformSettings {
     requireEmailVerification: boolean;
     requireTwoFactor: boolean;
     manualReview: boolean;
+    firstPackageWithdrawalPercent: number;
+    referralPackageWithdrawalPercent: number;
   };
   trading: {
     enabled: boolean;
@@ -90,6 +92,8 @@ const PlatformSettingsSchema = new Schema<IPlatformSettings>(
       requireEmailVerification: { type: Boolean, default: true },
       requireTwoFactor: { type: Boolean, default: false },
       manualReview: { type: Boolean, default: true },
+      firstPackageWithdrawalPercent: { type: Number, default: 100, min: 0, max: 100 },
+      referralPackageWithdrawalPercent: { type: Number, default: 50, min: 0, max: 100 },
     },
 
     trading: {

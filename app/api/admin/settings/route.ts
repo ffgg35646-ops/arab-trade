@@ -66,6 +66,37 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    const currentSettings = await getPlatformSettings();
+    const numericFields: Record<string, string[]> = {
+      deposits: ["minAmount", "maxAmount"],
+      withdrawals: ["minAmount", "maxAmount", "dailyLimit"],
+    };
+    for (const [section, fields] of Object.entries(numericFields)) {
+      const values = body?.[section];
+      if (!values || typeof values !== "object") continue;
+      for (const field of fields) {
+        if (!Object.prototype.hasOwnProperty.call(values, field)) continue;
+        const value = Number(values[field]);
+        if (!Number.isFinite(value) || value < 0 || value > 1000000000000) {
+          return NextResponse.json(
+            { success: false, message: "حدود الإيداع والسحب يجب أن تكون أرقامًا صحيحة لا تقل عن صفر" },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    const nextDepositMin = Number(body?.deposits?.minAmount ?? currentSettings.deposits.minAmount);
+    const nextDepositMax = Number(body?.deposits?.maxAmount ?? currentSettings.deposits.maxAmount);
+    const nextWithdrawalMin = Number(body?.withdrawals?.minAmount ?? currentSettings.withdrawals.minAmount);
+    const nextWithdrawalMax = Number(body?.withdrawals?.maxAmount ?? currentSettings.withdrawals.maxAmount);
+    if (nextDepositMax > 0 && nextDepositMin > nextDepositMax) {
+      return NextResponse.json({ success: false, message: "الحد الأدنى للإيداع لا يمكن أن يتجاوز الحد الأقصى" }, { status: 400 });
+    }
+    if (nextWithdrawalMax > 0 && nextWithdrawalMin > nextWithdrawalMax) {
+      return NextResponse.json({ success: false, message: "الحد الأدنى للسحب لا يمكن أن يتجاوز الحد الأقصى" }, { status: 400 });
+    }
+
     const update: Record<string, unknown> = {};
 
     for (const section of allowedSections) {

@@ -139,7 +139,7 @@ export default function WithdrawPage() {
       const loadedAddresses: SavedAddress[] = Array.isArray(addressesData.addresses) ? addressesData.addresses : [];
       setMethods(methodRows);
       setDepositBalances(Array.isArray(walletData.depositBalances) ? walletData.depositBalances : []);
-      setBalances(walletData.spot?.balances || walletData.wallet?.balances || []);
+      setBalances(Array.isArray(walletData.generalWithdrawalBalances) ? walletData.generalWithdrawalBalances : (walletData.spot?.balances || walletData.wallet?.balances || []));
       setHistory(Array.isArray(historyData.withdrawals) ? historyData.withdrawals : []);
       setSavedAddresses(loadedAddresses);
       setPackageAccounts(packageRows);

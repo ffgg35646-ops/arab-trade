@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     const userPackages = rawUserPackages.map((item: any) => {
       const firstPending = item.firstWithdrawalStatus === "pending";
       const firstCompleted = item.firstWithdrawalStatus === "completed" || Number(item.totalWithdrawn || 0) > 0;
-      const isFirstAvailable = !firstPending && !firstCompleted;
+      const isFirstAvailable = item.status === "active" && !firstPending && !firstCompleted;
       const referralCap = activeReferralDepositTotal * referralPackageWithdrawalPercent / 100;
       const referralAlreadyWithdrawn = referralWithdrawalByPackage.get(String(item._id)) || 0;
       const referralRemaining = Math.max(0, referralCap - referralAlreadyWithdrawn);

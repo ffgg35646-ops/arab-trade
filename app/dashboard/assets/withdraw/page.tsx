@@ -515,24 +515,19 @@ export default function WithdrawPage() {
           </p>
         </div>
 
-        <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
-            <div className="text-xs text-slate-400">رصيد الإيداع الخارجي · USDT</div>
+        <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="rounded-2xl border border-amber-300/20 bg-gradient-to-br from-[#18202b] to-[#07101d] p-4">
+            <div className="text-xs text-amber-100/80">رصيد الإيداع الموحد · USDT</div>
             <div className="mt-2 text-2xl font-black text-amber-200">{Number(depositBalances.find((item) => item.asset === "USDT")?.available || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })}</div>
-            <p className="mt-1 text-xs text-slate-500">للتفعيل في الباقات فقط، ولا يُسحب مباشرة.</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">كل الإيداعات الخارجية المعتمدة في رصيد واحد، ويُستخدم لتفعيل الباقات فقط.</p>
+          </div>
+          <div className="rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-[#0d2534] to-[#07101d] p-4">
+            <div className="text-xs text-cyan-100/80">إجمالي رصيد السحب الموحد · USDT</div>
+            <div className="mt-2 text-2xl font-black text-cyan-200">{(Number(balances.find((item) => item.asset === "USDT")?.available || 0) + packageAccounts.reduce((sum, item) => sum + Number(item.availableEarnings || 0), 0)).toLocaleString("en-US", { maximumFractionDigits: 8 })}</div>
+            <p className="mt-1 text-xs leading-5 text-slate-500">يشمل رصيد السحب العام وأرصدة أرباح جميع الباقات. التفاصيل ومصدر السحب بالأسفل.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
-            <div className="text-xs text-slate-400">رصيد السحب العام · USDT</div>
-            <div className="mt-2 text-2xl font-black text-cyan-200">{Number(balances.find((item) => item.asset === "USDT")?.available || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })}</div>
-            <p className="mt-1 text-xs text-slate-500">منفصل تمامًا عن رصيد الإيداع.</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
-            <div className="text-xs text-slate-400">إجمالي أرصدة الباقات المتاحة · USDT</div>
-            <div className="mt-2 text-2xl font-black text-emerald-200">{packageAccounts.reduce((sum, item) => sum + Number(item.availableEarnings || 0), 0).toLocaleString("en-US", { maximumFractionDigits: 8 })}</div>
-            <p className="mt-1 text-xs text-slate-500">كل حساب باقة يظهر برصيده المستقل عند اختياره.</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
-            <div className="text-xs text-slate-400">طلبات مفتوحة</div>
+            <div className="text-xs text-slate-400">طلبات السحب المفتوحة</div>
             <div className="mt-2 text-2xl font-black text-amber-200">{history.filter((item) => ["pending", "approved", "processing"].includes(String(item.status))).length}</div>
             <p className="mt-1 text-xs text-slate-500">قيد المراجعة أو التنفيذ</p>
           </div>

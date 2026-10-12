@@ -20,7 +20,7 @@ export interface IPlatformSettings {
   withdrawals: {
     enabled: boolean;
     minAmount: number;
-    minGeneralWithdrawal: number;
+    minGeneralWithdrawal?: number;
     withdrawalMinByPackage: Record<string, number>;
     maxAmount: number;
     dailyLimit: number;
@@ -89,7 +89,7 @@ const PlatformSettingsSchema = new Schema<IPlatformSettings>(
     withdrawals: {
       enabled: { type: Boolean, default: true },
       minAmount: { type: Number, default: 50 },
-      minGeneralWithdrawal: { type: Number, default: 50, min: 0 },
+      minGeneralWithdrawal: { type: Number, default: undefined, min: 0 },
       withdrawalMinByPackage: { type: Schema.Types.Mixed, default: {} },
       maxAmount: { type: Number, default: 50000 },
       dailyLimit: { type: Number, default: 100000 },

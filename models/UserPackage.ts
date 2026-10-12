@@ -15,6 +15,7 @@ export interface IUserPackage {
   firstWithdrawalStatus: "available" | "pending" | "completed";
   cancellationRefund: number;
   activatedAt: Date;
+  lastProfitAt?: Date | null;
   cancelledAt?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -27,7 +28,7 @@ const UserPackageSchema = new Schema<IUserPackage>(
     packageName: { type: String, required: true, trim: true },
     investedAmount: { type: Number, required: true, min: 0 },
     asset: { type: String, required: true, uppercase: true, default: "USDT" },
-    durationDays: { type: Number, required: true, min: 1 },
+    durationDays: { type: Number, required: true, default: 0, min: 0, max: 36500 },
     status: { type: String, enum: ["active", "cancelled"], default: "active", index: true },
     availableEarnings: { type: Number, default: 0, min: 0 },
     lockedEarnings: { type: Number, default: 0, min: 0 },
@@ -36,6 +37,7 @@ const UserPackageSchema = new Schema<IUserPackage>(
     firstWithdrawalStatus: { type: String, enum: ["available", "pending", "completed"], default: "available", index: true },
     cancellationRefund: { type: Number, default: 0, min: 0 },
     activatedAt: { type: Date, default: Date.now },
+    lastProfitAt: { type: Date, default: Date.now },
     cancelledAt: { type: Date, default: null },
   },
   { timestamps: true }

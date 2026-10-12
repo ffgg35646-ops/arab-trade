@@ -10,7 +10,11 @@ type Payment = {
   network: string;
   address: string;
   minDeposit: number;
+  maxDeposit: number;
   minWithdrawal: number;
+  maxWithdrawal: number;
+  withdrawalFee: number;
+  warning: string;
   enabled: boolean;
   depositEnabled: boolean;
   withdrawalEnabled: boolean;
@@ -22,7 +26,11 @@ const EMPTY_PAYMENT: Payment = {
   network: "",
   address: "",
   minDeposit: 0,
+  maxDeposit: 0,
   minWithdrawal: 0,
+  maxWithdrawal: 0,
+  withdrawalFee: 0,
+  warning: "",
   enabled: false,
   depositEnabled: true,
   withdrawalEnabled: true,
@@ -60,7 +68,11 @@ export default function PaymentsAdminPage() {
             network: String(item.network || ""),
             address: String(item.address || ""),
             minDeposit: Number(item.minDeposit || 0),
+            maxDeposit: Number(item.maxDeposit || 0),
             minWithdrawal: Number(item.minWithdrawal || 0),
+            maxWithdrawal: Number(item.maxWithdrawal || 0),
+            withdrawalFee: Number(item.withdrawalFee || 0),
+            warning: String(item.warning || ""),
             enabled: Boolean(item.enabled),
             depositEnabled: item.depositEnabled !== false,
             withdrawalEnabled: item.withdrawalEnabled !== false,
@@ -164,7 +176,11 @@ export default function PaymentsAdminPage() {
         network: payment.network.trim(),
         address: payment.address.trim(),
         minDeposit: Number(payment.minDeposit),
+        maxDeposit: Number(payment.maxDeposit),
         minWithdrawal: Number(payment.minWithdrawal),
+        maxWithdrawal: Number(payment.maxWithdrawal),
+        withdrawalFee: Number(payment.withdrawalFee),
+        warning: payment.warning.trim(),
         enabled: Boolean(payment.enabled),
         depositEnabled: Boolean(payment.depositEnabled),
         withdrawalEnabled: Boolean(payment.withdrawalEnabled),
@@ -475,6 +491,21 @@ export default function PaymentsAdminPage() {
                           className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"
                         />
                       </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      <label className="block text-sm font-bold">الحد الأقصى للإيداع (0 = غير محدد)
+                        <input type="number" min="0" step="any" value={payment.maxDeposit} onChange={(e) => updatePayment(index, { maxDeposit: Number(e.target.value) || 0 })} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"/>
+                      </label>
+                      <label className="block text-sm font-bold">الحد الأقصى للسحب (0 = غير محدد)
+                        <input type="number" min="0" step="any" value={payment.maxWithdrawal} onChange={(e) => updatePayment(index, { maxWithdrawal: Number(e.target.value) || 0 })} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"/>
+                      </label>
+                      <label className="block text-sm font-bold">رسوم السحب
+                        <input type="number" min="0" step="any" value={payment.withdrawalFee} onChange={(e) => updatePayment(index, { withdrawalFee: Number(e.target.value) || 0 })} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"/>
+                      </label>
+                      <label className="block text-sm font-bold md:col-span-2 xl:col-span-3">تنبيه يظهر في صفحة السحب
+                        <textarea value={payment.warning} onChange={(e) => updatePayment(index, { warning: e.target.value })} rows={2} maxLength={1000} placeholder="تنبيه اختياري عن وسيلة الدفع أو الشبكة" className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"/>
+                      </label>
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-2">

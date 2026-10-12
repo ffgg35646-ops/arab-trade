@@ -99,6 +99,12 @@ export default function AdminPackagesPage() {
     finally { setCrediting(false); }
   }
 
+  const enabledPlanCount = plans.filter((plan) => plan.enabled).length;
+  const activeAccountCount = accounts.filter((account) => account.status === "active").length;
+  const totalDepositAvailable = depositBalances.filter((item) => item.asset === "USDT").reduce((sum, item) => sum + Number(item.available || 0), 0);
+  const totalPackageAvailable = accounts.filter((account) => account.asset === "USDT").reduce((sum, account) => sum + Number(account.availableEarnings || 0), 0);
+  const totalPackageLocked = accounts.filter((account) => account.asset === "USDT").reduce((sum, account) => sum + Number(account.lockedEarnings || 0), 0);
+
   return <AdminPageFrame title="الباقات">
     <div dir="rtl" className="mx-auto w-full max-w-7xl space-y-6">
       <section className="rounded-3xl border border-white/10 bg-gradient-to-l from-blue-500/[0.13] via-[#08111e] to-cyan-400/[0.03] p-6 md:p-8">
@@ -109,6 +115,13 @@ export default function AdminPackagesPage() {
       </section>
       {message && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.07] p-4 text-sm text-emerald-300"><CheckCircle2 size={17}/>{message}</div>}
       {error && <div role="alert" className="rounded-xl border border-red-400/20 bg-red-400/[0.07] p-4 text-sm text-red-300">{error}</div>}
+
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#08111e] p-4"><div className="text-xs text-slate-400">باقات متاحة للمستخدمين</div><div className="mt-3 text-3xl font-black text-cyan-200">{enabledPlanCount}</div><div className="mt-1 text-xs text-slate-500">من إجمالي {plans.length} باقة</div></div>
+        <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#08111e] p-4"><div className="text-xs text-slate-400">حسابات الباقات النشطة</div><div className="mt-3 text-3xl font-black text-emerald-200">{activeAccountCount}</div><div className="mt-1 text-xs text-slate-500">إجمالي حسابات الباقات: {accounts.length}</div></div>
+        <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#08111e] p-4"><div className="text-xs text-slate-400">رصيد إيداع قابل للتفعيل</div><div className="mt-3 text-2xl font-black text-cyan-200">{money(totalDepositAvailable)} <span className="text-xs">USDT</span></div><div className="mt-1 text-xs text-slate-500">أرصدة خارجية معتمدة فقط</div></div>
+        <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#08111e] p-4"><div className="text-xs text-slate-400">أرصدة الباقات المتاحة / المحجوزة</div><div className="mt-3 text-xl font-black text-emerald-200">{money(totalPackageAvailable)} <span className="text-xs">USDT</span></div><div className="mt-1 text-xs text-slate-500">قيد مراجعة السحب: {money(totalPackageLocked)} USDT</div></div>
+      </section>
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <form onSubmit={savePlan} className="rounded-2xl border border-white/10 bg-[#08111e] p-5 md:p-6">

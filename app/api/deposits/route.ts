@@ -125,15 +125,39 @@ export async function POST(request: NextRequest) {
 
     let depositAddress = "";
     let minDeposit = 0;
+    let maxDeposit = 0;
 
-    const asset = await Asset.findOne({
-      symbol: assetCode,
-      enabled: true,
-      depositEnabled: true,
+    // Validate the same payment method that was displayed in the user's form.
+    // Do not bypass a disabled PaymentOption through a legacy Asset network.
+    const payment = await PaymentOption.findOne({
+      asset: assetCode,
+      network: networkCode,
     }).lean();
 
-    if (asset) {
-      const network = (asset.networks || []).find(
+    if (payment) {
+      if (!payment.enabled || payment.depositEnabled === false) {
+        return NextResponse.json(
+          { success: false, message: "وسيلة الإيداع متوقفة حاليًا" },
+          { status: 400 }
+        );
+      }
+      if (!String(payment.address || "").trim()) {
+        return NextResponse.json(
+          { success: false, message: "عنوان الإيداع غير متوفر لهذه الوسيلة" },
+          { status: 400 }
+        );
+      }
+      depositAddress = payment.address;
+      minDeposit = Number(payment.minDeposit || 0);
+      maxDeposit = Number(payment.maxDeposit || 0);
+    } else {
+      const asset = await Asset.findOne({
+        symbol: assetCode,
+        enabled: true,
+        depositEnabled: true,
+      }).lean();
+
+      const network = asset && (asset.networks || []).find(
         (item: any) =>
           item.code === networkCode &&
           item.enabled &&
@@ -142,69 +166,42 @@ export async function POST(request: NextRequest) {
 
       if (!network) {
         return NextResponse.json(
-          {
-            success: false,
-            message: "الشبكة غير متاحة للإيداع",
-          },
+          { success: false, message: "وسيلة الإيداع أو الشبكة غير متاحة حاليًا" },
           { status: 400 }
         );
       }
 
-      if (!network.depositAddress) {
+      if (!String(network.depositAddress || "").trim()) {
         return NextResponse.json(
-          {
-            success: false,
-            message: "عنوان الإيداع غير متوفر لهذه الشبكة",
-          },
+          { success: false, message: "عنوان الإيداع غير متوفر لهذه الشبكة" },
           { status: 400 }
         );
       }
 
       depositAddress = network.depositAddress;
       minDeposit = Number(network.minDeposit || 0);
-    } else {
-      const payment = await PaymentOption.findOne({
-        asset: assetCode,
-        network: networkCode,
-        enabled: true,
-        depositEnabled: { $ne: false },
-      }).lean();
-
-      if (!payment) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "وسيلة الدفع غير متاحة حاليًا",
-          },
-          { status: 400 }
-        );
-      }
-
-      depositAddress = payment.address;
-      minDeposit = Number(payment.minDeposit || 0);
+      maxDeposit = Number(network.maxDeposit || 0);
     }
 
     minDeposit = Math.max(minDeposit, Number(settings.deposits.minAmount || 0));
+    const configuredDepositMaxima = [
+      Number(settings.deposits.maxAmount || 0),
+      maxDeposit,
+    ].filter((value) => value > 0);
+    const effectiveMaxDeposit = configuredDepositMaxima.length
+      ? Math.min(...configuredDepositMaxima)
+      : 0;
 
     if (amount < minDeposit) {
       return NextResponse.json(
-        {
-          success: false,
-          message: `الحد الأدنى للإيداع هو ${minDeposit}`,
-        },
+        { success: false, message: "الحد الأدنى للإيداع هو " + minDeposit, minDeposit, maxDeposit: effectiveMaxDeposit },
         { status: 400 }
       );
     }
 
-    if (
-      Number(settings.deposits.maxAmount || 0) > 0 &&
-      amount > Number(settings.deposits.maxAmount)
-    ) {
+    if (effectiveMaxDeposit > 0 && amount > effectiveMaxDeposit) {
       return NextResponse.json(
-        {
-          success: false,
-          message: `الحد الأقصى للإيداع هو ${settings.deposits.maxAmount}`,
-        },
+        { success: false, message: "الحد الأقصى للإيداع هو " + effectiveMaxDeposit, minDeposit, maxDeposit: effectiveMaxDeposit },
         { status: 400 }
       );
     }

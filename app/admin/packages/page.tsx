@@ -4,11 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import AdminPageFrame from "@/components/AdminPageFrame";
 import { CheckCircle2, Loader2, Package, Plus, RefreshCw, Save, ShieldAlert, X } from "lucide-react";
 
-type Plan = { _id: string; name: string; description: string; price: number; asset: string; durationDays: number; dailyProfit: number; enabled: boolean; sortOrder: number };
+type Plan = { _id: string; name: string; description: string; price: number; asset: string; durationDays: number; dailyProfit: number; minimumWithdrawal: number; enabled: boolean; sortOrder: number };
 type UserPackage = { _id: string; packageName: string; investedAmount: number; asset: string; status: string; availableEarnings: number; lockedEarnings: number; totalRealizedEarnings: number; totalWithdrawn: number; firstWithdrawalStatus?: "available" | "pending" | "completed"; activatedAt: string; userId?: { _id: string; name?: string; username?: string; email?: string } | null };
 type DepositBalance = { _id: string; asset: string; available: number; locked: number; userId?: { _id: string; name?: string; username?: string; email?: string } | null };
 type LedgerRow = { _id: string; type: string; asset: string; amount: number; note?: string; createdAt: string; userId?: { name?: string; username?: string; email?: string } | null; userPackageId?: { packageName?: string } | null };
-const emptyForm = { name: "", description: "", price: "", durationDays: "0", dailyProfit: "0", sortOrder: "0", enabled: true };
+const emptyForm = { name: "", description: "", price: "", durationDays: "0", dailyProfit: "0", minimumWithdrawal: "50", sortOrder: "0", enabled: true };
 const money = (value: number) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 }).format(Number(value || 0));
 const firstStatus = (account: UserPackage) => account.firstWithdrawalStatus === "pending" ? "pending" : Number(account.totalWithdrawn || 0) > 0 ? "completed" : (account.firstWithdrawalStatus || "available");
 
@@ -48,7 +48,7 @@ export default function AdminPackagesPage() {
 
   function editPlan(plan: Plan) {
     setEditingId(plan._id);
-    setForm({ name: plan.name, description: plan.description || "", price: String(plan.price), durationDays: "0", dailyProfit: String(plan.dailyProfit || 0), sortOrder: String(plan.sortOrder || 0), enabled: plan.enabled });
+    setForm({ name: plan.name, description: plan.description || "", price: String(plan.price), durationDays: "0", dailyProfit: String(plan.dailyProfit || 0), minimumWithdrawal: String(plan.minimumWithdrawal ?? 50), sortOrder: String(plan.sortOrder || 0), enabled: plan.enabled });
     setMessage(""); setError("");
   }
   function resetForm() { setEditingId(""); setForm(emptyForm); }
@@ -56,7 +56,7 @@ export default function AdminPackagesPage() {
   async function savePlan(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setSaving(true); setError(""); setMessage("");
     try {
-      const payload = { ...form, price: Number(form.price), durationDays: 0, dailyProfit: Number(form.dailyProfit), sortOrder: Number(form.sortOrder), ...(editingId ? { id: editingId } : {}) };
+      const payload = { ...form, price: Number(form.price), durationDays: 0, dailyProfit: Number(form.dailyProfit), minimumWithdrawal: Number(form.minimumWithdrawal), sortOrder: Number(form.sortOrder), ...(editingId ? { id: editingId } : {}) };
       const res = await fetch("/api/admin/packages", { method: editingId ? "PATCH" : "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || "تعذر حفظ الباقة");
@@ -132,6 +132,7 @@ export default function AdminPackagesPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div><label className="mb-2 block text-xs font-bold text-slate-400">قيمة التفعيل (USDT)</label><input type="number" required min="1" step="any" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="w-full rounded-xl border border-slate-700 bg-[#050a13] px-4 py-3"/></div>
               <div><label className="mb-2 block text-xs font-bold text-slate-400">الربح اليومي (USDT)</label><input type="number" required min="0" step="any" value={form.dailyProfit} onChange={(e) => setForm({ ...form, dailyProfit: e.target.value })} className="w-full rounded-xl border border-slate-700 bg-[#050a13] px-4 py-3"/><p className="mt-1 text-[11px] text-slate-500">يضاف بعد اكتمال كل 24 ساعة إلى رصيد الباقة نفسها. صفر = لا يوجد ربح آلي.</p></div>
+              <div><label className="mb-2 block text-xs font-bold text-slate-400">الحد الأدنى لسحب هذه الباقة (USDT)</label><input type="number" required min="0" step="any" value={form.minimumWithdrawal} onChange={(e) => setForm({ ...form, minimumWithdrawal: e.target.value })} className="w-full rounded-xl border border-slate-700 bg-[#050a13] px-4 py-3"/><p className="mt-1 text-[11px] text-slate-500">يُطبّق على كل حساب مستخدم تابع لهذه الباقة.</p></div>
               <div><label className="mb-2 block text-xs font-bold text-slate-400">ترتيب العرض</label><input type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} className="w-full rounded-xl border border-slate-700 bg-[#050a13] px-4 py-3"/></div>
               <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#050a13] p-3 text-sm"><input type="checkbox" checked={form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })}/>الباقة متاحة للمستخدمين</label>
             </div>
@@ -140,7 +141,7 @@ export default function AdminPackagesPage() {
         </form>
         <section className="rounded-2xl border border-white/10 bg-[#08111e] p-5 md:p-6">
           <h2 className="mb-4 font-black">الباقات المسجلة</h2>
-          {loading ? <div className="py-10 text-center text-slate-500"><Loader2 className="mx-auto animate-spin"/></div> : plans.length === 0 ? <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">لا توجد باقات. أنشئ أول باقة من النموذج.</div> : <div className="space-y-3">{plans.map((plan) => <div key={plan._id} className="rounded-xl border border-white/10 bg-[#050a13] p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="font-black">{plan.name}</div><div className="mt-1 text-xs text-slate-500">{money(plan.price)} USDT · تفعيل دائم · ربح يومي {money(Number(plan.dailyProfit || 0))} USDT</div><div className="mt-2 max-w-xl text-xs leading-5 text-slate-500">{plan.description}</div></div><span className={plan.enabled ? "rounded-full bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300" : "rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-400"}>{plan.enabled ? "مفعلة" : "متوقفة"}</span></div><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => editPlan(plan)} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold">تعديل</button><button type="button" onClick={() => void togglePlan(plan)} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold">{plan.enabled ? "إيقاف" : "تفعيل"}</button><button type="button" onClick={() => void deletePlan(plan)} className="rounded-lg border border-red-400/15 px-3 py-2 text-xs font-bold text-red-300">حذف / أرشفة</button></div></div>)}</div>}
+          {loading ? <div className="py-10 text-center text-slate-500"><Loader2 className="mx-auto animate-spin"/></div> : plans.length === 0 ? <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">لا توجد باقات. أنشئ أول باقة من النموذج.</div> : <div className="space-y-3">{plans.map((plan) => <div key={plan._id} className="rounded-xl border border-white/10 bg-[#050a13] p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="font-black">{plan.name}</div><div className="mt-1 text-xs text-slate-500">{money(plan.price)} USDT · تفعيل دائم · ربح يومي {money(Number(plan.dailyProfit || 0))} USDT · أقل سحب {money(Number(plan.minimumWithdrawal ?? 50))} USDT</div><div className="mt-2 max-w-xl text-xs leading-5 text-slate-500">{plan.description}</div></div><span className={plan.enabled ? "rounded-full bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300" : "rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-400"}>{plan.enabled ? "مفعلة" : "متوقفة"}</span></div><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => editPlan(plan)} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold">تعديل</button><button type="button" onClick={() => void togglePlan(plan)} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold">{plan.enabled ? "إيقاف" : "تفعيل"}</button><button type="button" onClick={() => void deletePlan(plan)} className="rounded-lg border border-red-400/15 px-3 py-2 text-xs font-bold text-red-300">حذف / أرشفة</button></div></div>)}</div>}
         </section>
       </div>
 

@@ -54,6 +54,18 @@ export async function PATCH(request: NextRequest) {
       "security",
     ];
 
+    for (const field of ["firstPackageWithdrawalPercent", "referralPackageWithdrawalPercent"]) {
+      if (body?.withdrawals && Object.prototype.hasOwnProperty.call(body.withdrawals, field)) {
+        const value = Number(body.withdrawals[field]);
+        if (!Number.isFinite(value) || value < 0 || value > 100) {
+          return NextResponse.json(
+            { success: false, message: "نسب سحب الباقات يجب أن تكون بين 0 و100" },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     const update: Record<string, unknown> = {};
 
     for (const section of allowedSections) {

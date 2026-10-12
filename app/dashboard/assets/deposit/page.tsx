@@ -278,158 +278,111 @@ export default function DepositPage() {
           </div>
         )}
 
-        {loading ? (
-          <div className="mt-5 rounded-2xl border border-slate-800 bg-[#08111e] p-10 text-center text-slate-500">
-            جاري تحميل وسائل الدفع...
+        {loading && (
+          <div className="mt-5 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] p-3 text-sm text-cyan-100">
+            جاري تحميل وسائل الإيداع من إعدادات الإدارة؛ خانات الإيداع ظاهرة ويمكنك إكمالها بمجرد ظهور الوسيلة.
           </div>
-        ) : methods.length === 0 ? (
-          <div className="mt-5 rounded-2xl border border-slate-800 bg-[#08111e] p-10 text-center text-slate-500">
-            لا توجد وسائل إيداع مفعلة حاليًا.
-          </div>
-        ) : (
-          <>
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              {methods.map((method) => {
-                const selectedCard =
-                  method._id === selectedId;
-
-                return (
-                  <button
-                    key={method._id}
-                    type="button"
-                    onClick={() =>
-                      setSelectedId(method._id)
-                    }
-                    className={`rounded-2xl border p-5 text-right transition ${
-                      selectedCard
-                        ? "border-blue-500 bg-blue-950/20"
-                        : "border-slate-800 bg-[#08111e] hover:border-blue-500/50"
-                    }`}
-                  >
-                    <div className="text-lg font-black">
-                      {method.name}
-                    </div>
-
-                    <div className="mt-1 text-xs text-slate-500">
-                      {method.asset} ·{" "}
-                      {method.network}
-                    </div>
-
-                    <div className="mt-3 rounded-lg border border-white/5 bg-black/20 p-3">
-                      <div className="text-[11px] text-slate-500">عنوان الإيداع المعتمد من الإدارة</div>
-                      <div className="mt-1 break-all text-xs leading-5 text-slate-200">
-                        {method.address || "لم يضف الأدمن عنوانًا لهذه الوسيلة بعد"}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 text-sm text-slate-400">
-                      الحد الأدنى للإيداع:
-                    </div>
-
-                    <div className="mt-1 font-black">
-                      {method.minDeposit}{" "}
-                      {method.asset}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {selected && (
-              <form
-                onSubmit={submit}
-                className="mt-5 space-y-5 rounded-2xl border border-slate-800 bg-[#08111e] p-6"
-              >
-                <div className="rounded-xl border border-blue-900/40 bg-blue-950/10 p-5">
-                  <div className="text-lg font-black">
-                    {selected.name}
-                  </div>
-
-                  <div className="mt-1 text-xs text-slate-500">
-                    {selected.asset} ·{" "}
-                    {selected.network}
-                  </div>
-
-                  <div className="mt-4 text-xs font-bold text-cyan-200">
-                    عنوان الإيداع المعتمد من الإدارة — حوّل إليه فقط لهذه الشبكة
-                  </div>
-
-                  <div className="mt-2 break-all rounded-lg bg-black/20 p-3 text-sm">
-                    {selected.address ||
-                      "لم يتم إعداد بيانات التحويل بعد"}
-                  </div>
-
-                  <div className="mt-4 text-xs text-slate-500">
-                    الحد الأدنى للإيداع
-                  </div>
-
-                  <div className="mt-1 font-black">
-                    {selected.minDeposit}{" "}
-                    {selected.asset}
-                  </div>
-                </div>
-
-                <input
-                  value={amount}
-                  onChange={(e) =>
-                    setAmount(e.target.value)
-                  }
-                  type="number"
-                  min="0"
-                  step="any"
-                  required
-                  placeholder="مبلغ الإيداع"
-                  className="w-full rounded-xl border border-slate-700 bg-[#0b1422] p-4 outline-none"
-                />
-
-                <input
-                  value={txHash}
-                  onChange={(e) =>
-                    setTxHash(e.target.value)
-                  }
-                  placeholder="TX Hash إن وجد"
-                  className="w-full rounded-xl border border-slate-700 bg-[#0b1422] p-4 outline-none"
-                />
-
-                <div className="rounded-xl border border-slate-800 p-4">
-                  <label
-                    htmlFor="deposit-screenshot"
-                    className="mb-2 block font-bold"
-                  >
-                    Screenshot للتحويل
-                  </label>
-
-                  <input
-                    id="deposit-screenshot"
-                    type="file"
-                    required
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={(e) =>
-                      setScreenshot(
-                        e.target.files?.[0] || null
-                      )
-                    }
-                    className="block w-full text-sm"
-                  />
-
-                  <p className="mt-2 text-xs text-slate-500">
-                    JPG / PNG / WEBP — الحد الأقصى 4MB
-                  </p>
-                </div>
-
-                <button
-                  disabled={sending}
-                  className="w-full rounded-xl bg-blue-600 px-5 py-4 font-black disabled:opacity-50"
-                >
-                  {sending
-                    ? "جاري إرسال الطلب..."
-                    : "إرسال طلب الإيداع"}
-                </button>
-              </form>
-            )}
-          </>
         )}
 
+        <section className="mt-5 rounded-2xl border border-blue-400/20 bg-[#08111e] p-5 md:p-6">
+          <div className="mb-5">
+            <h2 className="text-xl font-black">إنشاء طلب إيداع</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              أدخل مبلغ التحويل، واختر العملة والشبكة، واستخدم عنوان الإيداع الذي ضبطه الأدمن، ثم أرفق رقم المعاملة وصورة الإثبات.
+            </p>
+          </div>
+
+          <form onSubmit={submit} className="space-y-5">
+            <div>
+              <label htmlFor="deposit-method" className="mb-2 block text-sm font-bold">وسيلة الإيداع / العملة والشبكة</label>
+              <select
+                id="deposit-method"
+                value={selectedId}
+                onChange={(event) => setSelectedId(event.target.value)}
+                className="w-full rounded-xl border border-slate-700 bg-[#0b1422] p-4 outline-none focus:border-blue-400/50"
+              >
+                <option value="">اختر وسيلة الإيداع</option>
+                {methods.map((method) => (
+                  <option key={method._id} value={method._id}>
+                    {method.name} — {method.asset} / {method.network}
+                  </option>
+                ))}
+              </select>
+              {methods.length === 0 && !loading && (
+                <p className="mt-2 rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-3 text-xs leading-5 text-amber-200">
+                  لا توجد وسيلة إيداع مفعلة حاليًا. خانات الإيداع موجودة، لكن إرسال الطلب يتطلب أن يضيف الأدمن وسيلة دفع ويفعّلها ويحدد عنوان التحويل.
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] p-4">
+              <div className="text-xs font-bold text-cyan-200">عنوان الإيداع الذي حدده الأدمن</div>
+              <div className="mt-2 break-all rounded-lg border border-white/5 bg-black/20 p-3 text-sm leading-6 text-white">
+                {selected?.address || "سيظهر عنوان التحويل هنا بعد اختيار وسيلة إيداع مفعلة من الإدارة."}
+              </div>
+              {selected && (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-white/5 bg-black/20 p-3">
+                    <div className="text-xs text-slate-500">العملة والشبكة</div>
+                    <div className="mt-1 font-bold">{selected.asset} · {selected.network}</div>
+                  </div>
+                  <div className="rounded-lg border border-white/5 bg-black/20 p-3">
+                    <div className="text-xs text-slate-500">الحد الأدنى للإيداع حسب الوسيلة</div>
+                    <div className="mt-1 font-black">{Number(selected.minDeposit || 0)} {selected.asset}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="deposit-amount" className="mb-2 block text-sm font-bold">مبلغ الإيداع</label>
+              <input
+                id="deposit-amount"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                type="number"
+                min="0"
+                step="any"
+                required
+                placeholder="اكتب مبلغ التحويل الذي أرسلته"
+                className="w-full rounded-xl border border-slate-700 bg-[#0b1422] p-4 text-lg font-bold outline-none focus:border-blue-400/50"
+              />
+              <p className="mt-2 text-xs leading-5 text-slate-500">سيتم تطبيق الحد الأدنى والأقصى اللذين ضبطهما الأدمن عند إرسال الطلب.</p>
+            </div>
+
+            <div>
+              <label htmlFor="deposit-txhash" className="mb-2 block text-sm font-bold">رقم المعاملة (TX Hash)</label>
+              <input
+                id="deposit-txhash"
+                value={txHash}
+                onChange={(event) => setTxHash(event.target.value)}
+                placeholder="الصق رقم المعاملة من المحفظة (إن توفر)"
+                className="w-full rounded-xl border border-slate-700 bg-[#0b1422] p-4 font-mono text-sm outline-none focus:border-blue-400/50"
+              />
+            </div>
+
+            <div className="rounded-xl border border-slate-800 p-4">
+              <label htmlFor="deposit-screenshot" className="mb-2 block font-bold">صورة إثبات التحويل</label>
+              <input
+                id="deposit-screenshot"
+                type="file"
+                required
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => setScreenshot(event.target.files?.[0] || null)}
+                className="block w-full text-sm"
+              />
+              <p className="mt-2 text-xs text-slate-500">JPG / PNG / WEBP — الحد الأقصى 4MB</p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={sending || loading || !selected}
+              className="w-full rounded-xl bg-blue-600 px-5 py-4 font-black transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {sending ? "جاري إرسال طلب الإيداع..." : "إرسال طلب الإيداع للمراجعة"}
+            </button>
+          </form>
+        </section>
         <section className="mt-6 rounded-2xl border border-cyan-400/20 bg-[#08111e] p-5 md:p-6">
           <h2 className="text-lg font-black">تعليمات الإيداع بالتفصيل</h2>
           <div className="mt-4 space-y-3 text-sm leading-6 text-slate-400">

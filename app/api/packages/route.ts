@@ -13,6 +13,7 @@ import User from "@/models/User";
 import DepositRequest from "@/models/DepositRequest";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
 import PlatformSettings from "@/models/PlatformSettings";
+import { accrueDuePackageEarnings } from "@/lib/accrue-package-earnings";
 
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8) / 1e8;
 
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
     await ensureDefaultInvestmentPackages();
+    await accrueDuePackageEarnings({ userId: user._id });
     const [packages, depositBalances, rawUserPackages, packageLedger, settings, referredUsers] = await Promise.all([
       InvestmentPackage.find({ enabled: true }).sort({ sortOrder: 1, price: 1 }).lean(),
       DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
@@ -89,7 +91,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      packages,
+      packages: packages.map((plan: any) => ({ ...plan, durationDays: 0, dailyProfit: Number(plan.dailyProfit || 0) })),
       depositBalances,
       userPackages,
       packageLedger: packageLedger.map((row: any) => ({
@@ -101,8 +103,8 @@ export async function GET(request: NextRequest) {
         } : null,
       })),
       policy: {
-        dailyReturnsAutomatic: false,
-        earningsNotice: "يضاف إلى رصيد الباقة العائد المحقق فعليًا والمسجل في النظام فقط. لا يتم إنشاء أرباح يومية مضمونة تلقائيًا.",
+        dailyReturnsAutomatic: true,
+        earningsNotice: "يضاف الربح اليومي الذي يحدده الأدمن لكل باقة بعد اكتمال كل 24 ساعة من فترة الاستحقاق، ويظهر في رصيد السحب الخاص بهذه الباقة.",
         singleActivePackageNotice: "يسمح لكل مستخدم بباقة نشطة واحدة فقط.",
         activationSourceNotice: "تفعيل أي باقة يكون من رصيد الإيداع الخارجي فقط، ولا يمكن استخدام رصيد السحب للتفعيل.",
         cancellationNotice: "عند إلغاء باقة نشطة أو التغيير إلى باقة أخرى، يضاف 50% من قيمة تفعيل الباقة السابقة إلى رصيد السحب العام وليس رصيد الإيداع، وتظل الأرباح المحققة المتاحة مسجلة في الباقة.",
@@ -160,7 +162,7 @@ export async function POST(request: NextRequest) {
 
           const created = await UserPackage.create([{
             userId: user._id, packageId: plan._id, packageName: plan.name,
-            investedAmount: price, asset, durationDays: Number(plan.durationDays),
+            investedAmount: price, asset, durationDays: 0, lastProfitAt: new Date(),
             status: "active", availableEarnings: 0, lockedEarnings: 0,
             totalRealizedEarnings: 0, totalWithdrawn: 0,
             cancellationRefund: 0, activatedAt: new Date(),
@@ -278,7 +280,8 @@ export async function POST(request: NextRequest) {
             packageName: plan.name,
             investedAmount: price,
             asset,
-            durationDays: Number(plan.durationDays),
+            durationDays: 0,
+            lastProfitAt: new Date(),
             status: "active",
             availableEarnings: 0,
             lockedEarnings: 0,

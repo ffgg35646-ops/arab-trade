@@ -224,10 +224,11 @@ export async function POST(request: NextRequest) {
         Number(payment.minWithdrawal || 0)
       );
 
-      /*
-       * PaymentOption لا يحتوي حاليًا على maxWithdrawal.
-       * لذلك الحد الأعلى يظل من إعدادات السحب العامة.
-       */
+      const paymentMax = Number((payment as any).maxWithdrawal || 0);
+      if (paymentMax > 0) {
+        maxAmount = maxAmount > 0 ? Math.min(maxAmount, paymentMax) : paymentMax;
+      }
+      fee = Number((payment as any).withdrawalFee || 0);
       networkName = payment.network;
     } else {
       /*

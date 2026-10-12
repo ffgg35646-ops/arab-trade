@@ -147,6 +147,9 @@ export async function PATCH(request: NextRequest) {
     }
     if (body.enabled !== undefined) update.enabled = body.enabled === true;
 
+    // Settle elapsed days using the old rate before the admin changes it.
+    if (body.dailyProfit !== undefined) await accrueDuePackageEarnings();
+
     const previousPlan = await InvestmentPackage.findById(id).select("dailyProfit").lean();
     if (!previousPlan) return NextResponse.json({ success: false, message: "الباقة غير موجودة" }, { status: 404 });
     const profitRateChanged = body.dailyProfit !== undefined &&

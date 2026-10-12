@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import InternalNavbar from "@/components/InternalNavbar";
+import InternalSidebar from "@/components/InternalSidebar";
 
 type Method = {
   _id: string;
@@ -498,10 +500,14 @@ export default function WithdrawPage() {
   }
 
   return (
-    <main
-      dir="rtl"
-      className="min-h-screen bg-[#050a13] px-4 py-8 text-white md:px-8"
-    >
+    <>
+      <InternalNavbar />
+      <div className="mx-auto flex max-w-[1700px]">
+        <InternalSidebar />
+        <main
+          dir="rtl"
+          className="min-w-0 flex-1 min-h-screen bg-[#050a13] px-4 py-8 text-white md:px-8"
+        >
       <div className="mx-auto max-w-6xl">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">
@@ -878,6 +884,8 @@ export default function WithdrawPage() {
           </div>
         )}
       </div>
-    </main>
+        </main>
+      </div>
+    </>
   );
 }

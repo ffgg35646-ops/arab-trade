@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import PaymentOption from "@/models/PaymentOption";
+import { getPlatformSettings } from "@/lib/platform-settings";
 import Asset from "@/models/Asset";
 
 export async function GET() {
   try {
     await connectDB();
+    const platformSettings = await getPlatformSettings();
 
     const paymentOptions = await PaymentOption.find({})
       .sort({ enabled: -1, createdAt: 1 })
@@ -44,7 +46,10 @@ export async function GET() {
         network,
         address: method.address || "",
         minDeposit: Number(method.minDeposit || 0),
+        maxDeposit: Number((method as any).maxDeposit || 0),
         minWithdrawal: Number(method.minWithdrawal || 0),
+        maxWithdrawal: Number((method as any).maxWithdrawal || 0),
+        withdrawalFee: Number((method as any).withdrawalFee || 0),
         enabled: Boolean(method.enabled),
         depositEnabled: method.depositEnabled !== false,
         withdrawalEnabled: method.withdrawalEnabled !== false,
@@ -123,6 +128,14 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       methods,
+      limits: {
+        minDeposit: Number(platformSettings.deposits?.minAmount || 0),
+        maxDeposit: Number(platformSettings.deposits?.maxAmount || 0),
+        minWithdrawal: Number(platformSettings.withdrawals?.minAmount || 0),
+        minGeneralWithdrawal: Number(platformSettings.withdrawals?.minGeneralWithdrawal ?? platformSettings.withdrawals?.minAmount ?? 0),
+        maxWithdrawal: Number(platformSettings.withdrawals?.maxAmount || 0),
+        dailyWithdrawalLimit: Number(platformSettings.withdrawals?.dailyLimit || 0),
+      },
     });
   } catch (error) {
     console.error("PAYMENT OPTIONS GET:", error);

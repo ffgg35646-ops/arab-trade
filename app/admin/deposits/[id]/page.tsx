@@ -143,7 +143,7 @@ export default function DepositDetailPage({
                 ))}
             </div>
 
-            {item.screenshotPath ? (
+            {(item.hasScreenshot || item.screenshotStorage === "mongodb" || item.screenshotPath) ? (
               <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-5">
                 <div className="mb-4 text-lg font-black">
                   Screenshot التحويل

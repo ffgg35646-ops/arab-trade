@@ -120,7 +120,8 @@ export async function ensureDefaultInvestmentPackages() {
     const cleaned = original
       .replace(/باقة(?: بداية)? لمدة\s*\d+\s*يوم(?:ًا|اً|ا)?/gi, "باقة تفعيل مستمرة دون انتهاء")
       .replace(/لمدة\s*\d+\s*يوم(?:ًا|اً|ا)?/gi, "دون تاريخ انتهاء")
-      .replace(/for\s*\d+\s*days?/gi, "with no expiry");
+      .replace(/for\s*\d+\s*days?/gi, "with no expiry")
+      .replace(/لا تُضاف أرباح تلقائية|لا يتم إنشاء أرباح يومية مضمونة تلقائيًا/g, "يُضاف الربح اليومي المحدد من الإدارة");
     if (Number(plan.durationDays || 0) !== 0 || cleaned !== original) {
       await InvestmentPackage.updateOne(
         { _id: plan._id },

@@ -127,10 +127,10 @@ export default function Page() {
       if (!values.every((value) => Number.isFinite(value) && value >= 0)) {
         throw new Error("اكتب حدودًا رقمية صحيحة لا تقل عن صفر");
       }
-      if (financialLimits.minDeposit > financialLimits.maxDeposit) {
+      if (financialLimits.maxDeposit > 0 && financialLimits.minDeposit > financialLimits.maxDeposit) {
         throw new Error("الحد الأدنى للإيداع لا يمكن أن يتجاوز الحد الأقصى");
       }
-      if (financialLimits.minWithdrawal > financialLimits.maxWithdrawal) {
+      if (financialLimits.maxWithdrawal > 0 && financialLimits.minWithdrawal > financialLimits.maxWithdrawal) {
         throw new Error("الحد الأدنى للسحب لا يمكن أن يتجاوز الحد الأقصى");
       }
       const res = await fetch("/api/admin/settings", {

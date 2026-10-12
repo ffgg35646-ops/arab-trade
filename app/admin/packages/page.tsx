@@ -101,9 +101,9 @@ export default function AdminPackagesPage() {
 
   const enabledPlanCount = plans.filter((plan) => plan.enabled).length;
   const activeAccountCount = accounts.filter((account) => account.status === "active").length;
-  const totalDepositAvailable = depositBalances.reduce((sum, item) => sum + Number(item.available || 0), 0);
-  const totalPackageAvailable = accounts.reduce((sum, account) => sum + Number(account.availableEarnings || 0), 0);
-  const totalPackageLocked = accounts.reduce((sum, account) => sum + Number(account.lockedEarnings || 0), 0);
+  const totalDepositAvailable = depositBalances.filter((item) => item.asset === "USDT").reduce((sum, item) => sum + Number(item.available || 0), 0);
+  const totalPackageAvailable = accounts.filter((account) => account.asset === "USDT").reduce((sum, account) => sum + Number(account.availableEarnings || 0), 0);
+  const totalPackageLocked = accounts.filter((account) => account.asset === "USDT").reduce((sum, account) => sum + Number(account.lockedEarnings || 0), 0);
 
   return <AdminPageFrame title="الباقات">
     <div dir="rtl" className="mx-auto w-full max-w-7xl space-y-6">

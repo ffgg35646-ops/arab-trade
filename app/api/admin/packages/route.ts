@@ -7,6 +7,7 @@ import UserPackage from "@/models/UserPackage";
 import DepositBalance from "@/models/DepositBalance";
 import PackageLedger from "@/models/PackageLedger";
 import { ensureDefaultInvestmentPackages } from "@/lib/ensure-default-investment-packages";
+import { accrueDuePackageEarnings } from "@/lib/accrue-package-earnings";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +16,7 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
     await ensureDefaultInvestmentPackages();
+    await accrueDuePackageEarnings();
     const [packages, userPackages, depositBalances, packageLedger] = await Promise.all([
       InvestmentPackage.find({}).sort({ sortOrder: 1, price: 1 }).lean(),
       UserPackage.find({})
@@ -89,18 +91,19 @@ export async function POST(request: NextRequest) {
     const name = String(body.name || "").trim();
     const description = String(body.description || "").trim();
     const price = Number(body.price);
-    const durationDays = Number(body.durationDays);
+    const durationDays = 0;
+    const dailyProfit = Number(body.dailyProfit ?? 0);
     const sortOrder = Number(body.sortOrder || 0);
     const enabled = body.enabled !== false;
 
     if (!name || !Number.isFinite(price) || price < 1 ||
-        !Number.isInteger(durationDays) || durationDays < 1 || durationDays > 3650 ||
+        !Number.isFinite(dailyProfit) || dailyProfit < 0 || dailyProfit > 1000000000 ||
         !Number.isFinite(sortOrder)) {
       return NextResponse.json({ success: false, message: "تحقق من الاسم والسعر والمدة والترتيب" }, { status: 400 });
     }
 
     const item = await InvestmentPackage.create({
-      name, description, price, asset: "USDT", durationDays, sortOrder, enabled,
+      name, description, price, asset: "USDT", durationDays, dailyProfit, sortOrder, enabled,
     });
 
     return NextResponse.json({ success: true, package: item }, { status: 201 });
@@ -130,10 +133,12 @@ export async function PATCH(request: NextRequest) {
       if (!Number.isFinite(value) || value < 1) return NextResponse.json({ success: false, message: "سعر الباقة غير صالح" }, { status: 400 });
       update.price = value;
     }
-    if (body.durationDays !== undefined) {
-      const value = Number(body.durationDays);
-      if (!Number.isInteger(value) || value < 1 || value > 3650) return NextResponse.json({ success: false, message: "مدة الباقة غير صالحة" }, { status: 400 });
-      update.durationDays = value;
+    // All packages are lifetime packages; legacy duration values are ignored.
+    update.durationDays = 0;
+    if (body.dailyProfit !== undefined) {
+      const value = Number(body.dailyProfit);
+      if (!Number.isFinite(value) || value < 0 || value > 1000000000) return NextResponse.json({ success: false, message: "الربح اليومي غير صالح" }, { status: 400 });
+      update.dailyProfit = value;
     }
     if (body.sortOrder !== undefined) {
       const value = Number(body.sortOrder);
@@ -144,6 +149,10 @@ export async function PATCH(request: NextRequest) {
 
     const item = await InvestmentPackage.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true });
     if (!item) return NextResponse.json({ success: false, message: "الباقة غير موجودة" }, { status: 404 });
+    if (body.dailyProfit !== undefined) {
+      // A changed rate takes effect from now and does not re-price elapsed days.
+      await UserPackage.updateMany({ packageId: id, status: "active" }, { $set: { lastProfitAt: new Date() } });
+    }
     return NextResponse.json({ success: true, package: item });
   } catch (error) {
     console.error("ADMIN PACKAGES PATCH:", error);

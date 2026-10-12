@@ -250,6 +250,10 @@ export default function WithdrawPage() {
       ? Number(selectedPackage?.availableEarnings || 0)
       : balances.find((balance) => balance.asset === selected?.asset)?.available || 0;
 
+  const unifiedUsdtWithdrawalBalance =
+    Number(balances.find((balance) => balance.asset === "USDT")?.available || 0) +
+    packageAccounts.filter((item) => item.asset === "USDT").reduce((sum, item) => sum + Number(item.availableEarnings || 0), 0);
+
   const savedAddress = selected
     ? savedAddresses.find(
         (item) =>
@@ -555,8 +559,13 @@ export default function WithdrawPage() {
               </div>
 
               <div className="space-y-4">
+                <div className="mb-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.06] p-4">
+                  <div className="text-sm font-bold text-emerald-200">إجمالي رصيد السحب الداخلي المتاح (USDT)</div>
+                  <div className="mt-2 text-2xl font-black text-white">{unifiedUsdtWithdrawalBalance.toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</div>
+                  <p className="mt-1 text-xs leading-5 text-slate-400">يشمل المحفظة العامة وأرباح الباقات المتاحة. رصيد الإيداع الخارجي منفصل وغير قابل للسحب مباشرة. عند إنشاء الطلب اختر المصدر الذي يحتوي على المبلغ.</p>
+                </div>
                 <div>
-                  <label className="mb-3 block text-sm font-bold">اختر مصدر رصيد السحب</label>
+                  <label className="mb-3 block text-sm font-bold">تفاصيل مصدر رصيد السحب</label>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <button type="button" onClick={() => setWithdrawalSource("wallet")} className={withdrawalSource === "wallet" ? "rounded-2xl border border-cyan-300/40 bg-cyan-300/[0.09] p-4 text-right transition" : "rounded-2xl border border-white/10 bg-[#050a13] p-4 text-right transition hover:border-white/20"}>
                       <div className="flex items-center justify-between gap-2"><span className="font-black text-white">رصيد السحب العام</span><span className="text-[10px] text-cyan-200">{withdrawalSource === "wallet" ? "محدد" : "اختيار"}</span></div>

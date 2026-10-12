@@ -8,7 +8,9 @@ import DepositRequest from "@/models/DepositRequest";
 
 function imageResponse(buffer: Buffer, contentType: string) {
   const allowed = new Set(["image/jpeg", "image/png", "image/webp"]);
-  return new NextResponse(buffer, {
+  const body = new ArrayBuffer(buffer.byteLength);
+  new Uint8Array(body).set(buffer);
+  return new NextResponse(body, {
     status: 200,
     headers: {
       "Content-Type": allowed.has(contentType) ? contentType : "image/jpeg",

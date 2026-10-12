@@ -66,6 +66,19 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    const packageMinima = body?.withdrawals?.withdrawalMinByPackage;
+    if (packageMinima !== undefined) {
+      if (!packageMinima || typeof packageMinima !== "object" || Array.isArray(packageMinima)) {
+        return NextResponse.json({ success: false, message: "حدود السحب لكل باقة يجب أن تكون قائمة صحيحة" }, { status: 400 });
+      }
+      for (const [packageId, rawValue] of Object.entries(packageMinima)) {
+        const value = Number(rawValue);
+        if (!packageId || !Number.isFinite(value) || value < 0 || value > 1000000000000) {
+          return NextResponse.json({ success: false, message: "الحد الأدنى للسحب لإحدى الباقات غير صالح" }, { status: 400 });
+        }
+      }
+    }
+
     const currentSettings = await getPlatformSettings();
     const numericFields: Record<string, string[]> = {
       deposits: ["minAmount", "maxAmount"],

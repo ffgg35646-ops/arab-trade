@@ -15,6 +15,10 @@ import PackageLedger from "@/models/PackageLedger";
 import User from "@/models/User";
 import DepositRequest from "@/models/DepositRequest";
 
+function normalizeAsset(value: unknown) {
+  return String(value || "").trim().toUpperCase();
+}
+
 export async function GET(request: NextRequest) {
   const clientKey =
     request.headers.get("x-forwarded-for") ||

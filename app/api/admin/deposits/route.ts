@@ -64,6 +64,7 @@ export async function GET(
       await DepositRequest.find(
         filter
       )
+        .select("-screenshotData")
         .sort({
           createdAt: -1,
         })

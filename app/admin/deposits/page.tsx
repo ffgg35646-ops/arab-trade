@@ -1,255 +1,272 @@
- "use client";
+"use client";
 
 import AdminPageFrame from "@/components/AdminPageFrame";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CheckCircle2, Clock3, FileImage, RefreshCw, Search, X, XCircle } from "lucide-react";
 
-function rowsFrom(data: any): any[] {
-  if (Array.isArray(data)) return data;
+type UserRef = {
+  _id?: string;
+  name?: string;
+  username?: string;
+  email?: string;
+} | string | null;
 
-  for (const key of [
-    "deposits",
-    "withdrawals",
-    "requests",
-    "items",
-    "data",
-  ]) {
-    if (Array.isArray(data?.[key])) return data[key];
-  }
+type Deposit = {
+  _id: string;
+  userId?: UserRef;
+  asset: string;
+  network: string;
+  amount: number;
+  txHash?: string;
+  address?: string;
+  status: "pending" | "approved" | "rejected";
+  adminNote?: string;
+  screenshotPath?: string;
+  screenshotStorage?: "mongodb" | "filesystem";
+  hasScreenshot?: boolean;
+  creditedAt?: string | null;
+  confirmations?: number;
+  createdAt?: string;
+};
 
-  return [];
+const money = (amount: unknown, asset = "") =>
+  Number(amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 }) + (asset ? " " + asset : "");
+
+function date(value?: string | null) {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleString("ar-EG", { timeZone: "Africa/Cairo" });
 }
 
-function date(v: unknown) {
-  if (!v) return "—";
-  const d = new Date(String(v));
-  return Number.isNaN(d.getTime()) ? String(v) : d.toLocaleString("en-US");
+function userValue(user: UserRef | undefined, key: "name" | "username" | "email") {
+  if (user && typeof user === "object") return user[key] || "";
+  return "";
 }
 
-export default function Page() {
-  const [data, setData] = useState<any[]>([]);
+function statusStyle(status: string) {
+  if (status === "approved") return "border-emerald-400/20 bg-emerald-400/10 text-emerald-200";
+  if (status === "rejected") return "border-red-400/20 bg-red-400/10 text-red-200";
+  return "border-amber-400/20 bg-amber-400/10 text-amber-200";
+}
+function statusLabel(status: string) {
+  if (status === "approved") return "معتمد — أضيف الرصيد";
+  if (status === "rejected") return "مرفوض";
+  return "قيد المراجعة";
+}
+
+export default function AdminDepositsPage() {
+  const [rows, setRows] = useState<Deposit[]>([]);
+  const [selected, setSelected] = useState<Deposit | null>(null);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
-  const [sort, setSort] = useState("newest");
+  const [statusFilter, setStatusFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
+  const [sort, setSort] = useState<"newest" | "oldest">("newest");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
+    setRefreshing(true);
     setError("");
-
     try {
-      const res = await fetch("/api/admin/deposits", {
-        credentials: "include",
-        cache: "no-store",
-      });
-
-      const json = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(
-          json?.message || json?.error || "تعذر تحميل البيانات"
-        );
-      }
-
-      setData(rowsFrom(json));
+      const response = await fetch("/api/admin/deposits?limit=500", { credentials: "include", cache: "no-store" });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok || !json.success) throw new Error(json.message || json.error || "تعذر تحميل طلبات الإيداع");
+      setRows(Array.isArray(json.deposits) ? json.deposits : []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "حدث خطأ");
+      setError(e instanceof Error ? e.message : "تعذر تحميل طلبات الإيداع");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    void load();
+    void Promise.resolve().then(() => { void load(); });
   }, [load]);
+
+  const stats = useMemo(() => ({
+    total: rows.length,
+    pending: rows.filter((row) => row.status === "pending").length,
+    approved: rows.filter((row) => row.status === "approved").length,
+    rejected: rows.filter((row) => row.status === "rejected").length,
+    pendingAmount: rows.filter((row) => row.status === "pending").reduce((sum, row) => sum + Number(row.amount || 0), 0),
+  }), [rows]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-
-    return [...data]
-      .filter((item) => {
-        if (status === "all") return true;
-        return String(item.status || "").toLowerCase() === status;
-      })
-      .filter((item) => {
+    return [...rows]
+      .filter((row) => statusFilter === "all" || row.status === statusFilter)
+      .filter((row) => {
         if (!q) return true;
-        return JSON.stringify(item).toLowerCase().includes(q);
+        const user = [userValue(row.userId, "name"), userValue(row.userId, "username"), userValue(row.userId, "email")].join(" ");
+        return [user, row._id, row.asset, row.network, row.txHash, row.address, row.adminNote].some((value) => String(value || "").toLowerCase().includes(q));
       })
       .sort((a, b) => {
-        const aa = new Date(String(a.createdAt || a.updatedAt || 0)).getTime();
-        const bb = new Date(String(b.createdAt || b.updatedAt || 0)).getTime();
+        const aa = new Date(a.createdAt || 0).getTime();
+        const bb = new Date(b.createdAt || 0).getTime();
         return sort === "newest" ? bb - aa : aa - bb;
       });
-  }, [data, search, status, sort]);
+  }, [rows, search, statusFilter, sort]);
 
-  const statuses = useMemo(() => {
-    const set = new Set<string>();
-    for (const item of data) {
-      if (item.status) set.add(String(item.status));
-    }
-    return [...set];
-  }, [data]);
-
-  const columns = useMemo(() => {
-    const set = new Set<string>();
-
-    for (const item of filtered.slice(0, 100)) {
-      if (item && typeof item === "object") {
-        Object.keys(item).forEach((key) => set.add(key));
-      }
-    }
-
-    return [...set]
-      .filter((key) => !["__v"].includes(key))
-      .slice(0, 12);
-  }, [filtered]);
-
-  function label(key: string) {
-    const map: Record<string, string> = {
-      _id: "المعرف",
-      id: "المعرف",
-      userId: "المستخدم",
-      amount: "المبلغ",
-      asset: "الأصل",
-      symbol: "الرمز",
-      network: "الشبكة",
-      status: "الحالة",
-      txHash: "TX Hash",
-      address: "العنوان",
-      fee: "الرسوم",
-      createdAt: "تاريخ الإنشاء",
-      updatedAt: "التحديث",
-    };
-
-    return map[key] || key;
+  function openReview(row: Deposit) {
+    setSelected(row);
+    setNote(row.adminNote || "");
+    setError("");
+    setMessage("");
   }
 
-  function val(v: unknown) {
-    if (v === null || v === undefined || v === "") return "—";
-    if (typeof v === "object") {
-      try {
-        return JSON.stringify(v);
-      } catch {
-        return String(v);
-      }
+  async function review(nextStatus: "approved" | "rejected") {
+    if (!selected || busy) return;
+    if (nextStatus === "rejected" && !note.trim()) {
+      setError("اكتب سبب الرفض حتى يظهر للمستخدم في سجل الإيداع.");
+      return;
     }
-    return String(v);
+    const question = nextStatus === "approved"
+      ? "تأكيد اعتماد الإيداع وإضافة المبلغ إلى رصيد الإيداع؟"
+      : "تأكيد رفض الإيداع؟ لن تتم إضافة أي رصيد.";
+    if (!window.confirm(question)) return;
+
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/admin/deposits", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selected._id, status: nextStatus, adminNote: note.trim() }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok || !json.success) throw new Error(json.message || "تعذرت معالجة الإيداع");
+      setSelected(null);
+      setNote("");
+      setMessage(json.message || (nextStatus === "approved" ? "تم اعتماد الإيداع." : "تم رفض الإيداع."));
+      await load(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "تعذرت معالجة الإيداع");
+    } finally {
+      setBusy(false);
+    }
   }
+
+  const selectedHasScreenshot = Boolean(selected?.hasScreenshot || selected?.screenshotStorage === "mongodb" || selected?.screenshotPath);
 
   return (
-    <AdminPageFrame title="الإيداعات">
-      <div dir="rtl" className="space-y-5">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="بحث..."
-            className="rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 text-sm outline-none"
-          />
-
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 text-sm outline-none"
-          >
-            <option value="all">كل الحالات</option>
-            {statuses.map((s) => (
-              <option key={s} value={s.toLowerCase()}>{"{"}s{"}"}</option>
-            ))}
-          </select>
-
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-            className="rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 text-sm outline-none"
-          >
-            <option value="newest">الأحدث أولًا</option>
-            <option value="oldest">الأقدم أولًا</option>
-          </select>
-
-          <button
-            onClick={() => void load()}
-            className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold"
-          >
-            تحديث
+    <AdminPageFrame title="مراجعة الإيداعات">
+      <div dir="rtl" className="space-y-5 text-white">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-black">طلبات الإيداع ومراجعة إثبات الدفع</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-400">راجع مبلغ التحويل والشبكة وTX Hash وصورة الإثبات قبل اعتماد الرصيد أو رفض الطلب مع توضيح السبب.</p>
+          </div>
+          <button type="button" onClick={() => void load(true)} disabled={refreshing} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-bold text-slate-200 disabled:opacity-50">
+            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} /> تحديث الطلبات
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-3 text-sm text-slate-400">
-          <span>إجمالي السجلات: <b className="text-white">{data.length}</b></span>
-          <span>المعروض: <b className="text-white">{filtered.length}</b></span>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-amber-400/20 bg-[#08111e] p-4"><div className="flex items-center gap-2 text-xs text-slate-400"><Clock3 size={16} className="text-amber-200" />قيد المراجعة</div><div className="mt-3 text-3xl font-black text-amber-200">{stats.pending}</div><p className="mt-1 text-xs text-slate-500">مجموع القيم المعلقة: {money(stats.pendingAmount)}</p></div>
+          <div className="rounded-2xl border border-emerald-400/20 bg-[#08111e] p-4"><div className="text-xs text-slate-400">إيداعات معتمدة</div><div className="mt-3 text-3xl font-black text-emerald-200">{stats.approved}</div><p className="mt-1 text-xs text-slate-500">تُضاف إلى رصيد الإيداع مرة واحدة</p></div>
+          <div className="rounded-2xl border border-red-400/20 bg-[#08111e] p-4"><div className="text-xs text-slate-400">إيداعات مرفوضة</div><div className="mt-3 text-3xl font-black text-red-200">{stats.rejected}</div><p className="mt-1 text-xs text-slate-500">يُحفظ سبب الرفض في سجل المستخدم</p></div>
+          <div className="rounded-2xl border border-white/10 bg-[#08111e] p-4"><div className="text-xs text-slate-400">إجمالي الطلبات المحمّلة</div><div className="mt-3 text-3xl font-black">{stats.total}</div><p className="mt-1 text-xs text-slate-500">الأحدث حتى حد 500 طلب</p></div>
         </div>
 
-        {error ? (
-          <div className="rounded-xl border border-red-900/60 bg-red-950/30 p-4 text-sm text-red-300">
-            {error}
-          </div>
-        ) : null}
+        {error && <div role="alert" className="rounded-xl border border-red-500/20 bg-red-500/[0.06] p-4 text-sm text-red-200">{error}</div>}
+        {message && <div role="status" className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] p-4 text-sm text-emerald-200">{message}</div>}
 
-        <div className="overflow-hidden rounded-2xl border border-slate-800 bg-[#08111e]">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_190px_180px]">
+          <div className="relative">
+            <Search size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="بحث بالاسم أو البريد أو TX Hash أو رقم الطلب" className="w-full rounded-xl border border-slate-700 bg-[#08111e] py-3 pr-10 pl-4 text-sm outline-none focus:border-cyan-300/30" />
+          </div>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)} className="rounded-xl border border-slate-700 bg-[#08111e] px-4 py-3 text-sm outline-none">
+            <option value="pending">قيد المراجعة</option><option value="approved">معتمد</option><option value="rejected">مرفوض</option><option value="all">كل الحالات</option>
+          </select>
+          <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="rounded-xl border border-slate-700 bg-[#08111e] px-4 py-3 text-sm outline-none">
+            <option value="newest">الأحدث أولًا</option><option value="oldest">الأقدم أولًا</option>
+          </select>
+        </div>
+
+        <section className="overflow-hidden rounded-2xl border border-slate-800 bg-[#08111e]">
           {loading ? (
-            <div className="p-12 text-center text-slate-500">
-              جاري تحميل البيانات...
-            </div>
+            <div className="p-12 text-center text-slate-500">جاري تحميل طلبات الإيداع...</div>
           ) : filtered.length === 0 ? (
-            <div className="p-12 text-center text-slate-500">
-              لا توجد سجلات مطابقة.
-            </div>
+            <div className="p-12 text-center text-slate-500">{search ? "لا توجد نتائج مطابقة للبحث." : "لا توجد طلبات ضمن الحالة المختارة."}</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-right text-sm">
-                <thead className="border-b border-slate-800 bg-[#0c1726]">
-                  <tr>
-                    {columns.map((column) => (
-                      <th key={column} className="whitespace-nowrap px-4 py-4 font-bold">
-                        {label(column)}
-                      </th>
-                    ))}
-                    <th className="px-4 py-4 font-bold">الإجراء</th>
-                  </tr>
+              <table className="w-full min-w-[900px] text-right text-sm">
+                <thead className="border-b border-white/10 bg-white/[0.025] text-xs text-slate-500">
+                  <tr><th className="px-4 py-4">المستخدم</th><th className="px-4 py-4">المبلغ</th><th className="px-4 py-4">العملة / الشبكة</th><th className="px-4 py-4">TX Hash</th><th className="px-4 py-4">تاريخ الطلب</th><th className="px-4 py-4">الحالة</th><th className="px-4 py-4">الإجراء</th></tr>
                 </thead>
-
                 <tbody>
-                  {filtered.map((item, index) => (
-                    <tr
-                      key={String(item._id || item.id || index)}
-                      className="border-b border-slate-800/70 last:border-0"
-                    >
-                      {columns.map((column) => (
-                        <td
-                          key={column}
-                          className="max-w-[340px] whitespace-nowrap px-4 py-4 text-slate-200"
-                        >
-
-                          {column === "createdAt" || column === "updatedAt"
-                            ? date(item[column])
-                            : val(item[column])}
-                        </td>
-                      ))}
-                      <td className="px-4 py-4">
-                        <Link
-                          href={`/admin/deposits/${item._id || item.id}`}
-                          className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold"
-                        >
-                          تفاصيل الطلب
-                        </Link>
-                      </td>
-                      <td className="px-4 py-4">
-                        <Link
-                          href={`/admin/deposits/${item._id || item.id}`}
-                          className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold"
-                        >
-                          فتح الطلب
-                        </Link>
-                      </td>
+                  {filtered.map((row) => (
+                    <tr key={row._id} className="border-b border-white/[0.05] last:border-0 hover:bg-white/[0.02]">
+                      <td className="px-4 py-4"><div className="font-bold">{userValue(row.userId, "name") || userValue(row.userId, "username") || "مستخدم"}</div><div className="mt-1 text-xs text-slate-500">{userValue(row.userId, "email") || "—"}</div><div className="mt-1 max-w-[180px] truncate text-[10px] text-slate-600">{row._id}</div></td>
+                      <td className="px-4 py-4 font-black">{money(row.amount, row.asset)}</td>
+                      <td className="px-4 py-4"><div>{row.asset}</div><div className="mt-1 text-xs text-slate-500">{row.network}</div></td>
+                      <td className="max-w-[190px] px-4 py-4"><div className="truncate font-mono text-xs text-cyan-100">{row.txHash || "—"}</div></td>
+                      <td className="px-4 py-4 text-xs text-slate-400">{date(row.createdAt)}</td>
+                      <td className="px-4 py-4"><span className={"inline-flex rounded-full border px-3 py-1 text-xs font-bold " + statusStyle(row.status)}>{statusLabel(row.status)}</span></td>
+                      <td className="px-4 py-4"><button type="button" onClick={() => openReview(row)} className="inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-2 text-xs font-black text-[#03111c] hover:bg-cyan-200"><FileImage size={15} /> مراجعة الإثبات</button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-        </div>
+        </section>
+
+        {selected && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="مراجعة إثبات الإيداع">
+            <div className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-white/10 bg-[#07101d] p-5 shadow-2xl md:p-7">
+              <div className="mb-5 flex items-start justify-between gap-3">
+                <div><div className="text-xs font-bold tracking-widest text-cyan-300">DEPOSIT REVIEW</div><h2 className="mt-2 text-2xl font-black">مراجعة طلب الإيداع</h2><p className="mt-1 break-all text-xs text-slate-500">رقم الطلب: {selected._id}</p></div>
+                <button type="button" onClick={() => { setSelected(null); setError(""); }} className="rounded-xl border border-white/10 p-2 text-slate-400 hover:bg-white/5" aria-label="إغلاق"><X size={19} /></button>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4"><div className="text-xs text-slate-500">صاحب الطلب</div><div className="mt-2 font-black">{userValue(selected.userId, "name") || userValue(selected.userId, "username") || "مستخدم"}</div><div className="mt-1 break-all text-sm text-slate-400">{userValue(selected.userId, "email") || "—"}</div></div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4"><div className="text-xs text-slate-500">المبلغ المطلوب</div><div className="mt-2 text-2xl font-black text-cyan-200">{money(selected.amount, selected.asset)}</div><div className="mt-1 text-xs text-slate-500">الشبكة: {selected.network}</div></div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4"><div className="text-xs text-slate-500">حالة الطلب</div><div className="mt-2"><span className={"inline-flex rounded-full border px-3 py-1 text-xs font-bold " + statusStyle(selected.status)}>{statusLabel(selected.status)}</span></div><div className="mt-2 text-xs text-slate-500">{date(selected.createdAt)}</div></div>
+              </div>
+
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4"><div className="text-xs text-slate-500">عنوان الإيداع الذي استقبل التحويل</div><div className="mt-2 break-all font-mono text-sm">{selected.address || "—"}</div></div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4"><div className="text-xs text-slate-500">TX Hash</div><div className="mt-2 break-all font-mono text-sm text-cyan-100">{selected.txHash || "لم يضف المستخدم رقم معاملة."}</div>{selected.confirmations !== undefined && <div className="mt-2 text-xs text-slate-500">التأكيدات: {selected.confirmations}</div>}</div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.025] p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h3 className="font-black">صورة إثبات الدفع</h3><span className="text-xs text-slate-500">لا تعتمد الطلب قبل التحقق من التفاصيل</span></div>
+                {selectedHasScreenshot ? (
+                  <a href={"/api/admin/deposits/file?id=" + encodeURIComponent(selected._id)} target="_blank" rel="noreferrer" className="block">
+                    <img src={"/api/admin/deposits/file?id=" + encodeURIComponent(selected._id)} alt="إثبات الدفع" className="max-h-[460px] w-full rounded-xl border border-white/10 bg-black object-contain" />
+                  </a>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">لا توجد صورة إثبات محفوظة لهذا الطلب. راجع TX Hash إن وجد قبل اتخاذ القرار.</div>
+                )}
+              </div>
+
+              {selected.status === "pending" ? (
+                <div className="mt-4">
+                  <label className="mb-2 block text-sm font-bold text-slate-300">ملاحظة الإدارة (سبب الرفض مطلوب عند الرفض)</label>
+                  <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} maxLength={1000} placeholder="اكتب ملاحظة للمستخدم أو سبب رفض الإيداع..." className="w-full rounded-xl border border-white/10 bg-[#030b12] p-4 text-sm outline-none focus:border-cyan-300/30" />
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <button type="button" onClick={() => void review("approved")} disabled={busy} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 font-black text-[#03111c] disabled:opacity-50"><CheckCircle2 size={17} />{busy ? "جاري المعالجة..." : "اعتماد الإيداع وإضافة الرصيد"}</button>
+                    <button type="button" onClick={() => void review("rejected")} disabled={busy} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-3 font-black text-white disabled:opacity-50"><XCircle size={17} />رفض الإيداع</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.025] p-4 text-sm text-slate-400">تمت معالجة هذا الطلب بالفعل: <b>{statusLabel(selected.status)}</b>{selected.adminNote && <p className="mt-2">ملاحظة الإدارة: {selected.adminNote}</p>}</div>
+              )}
+              {error && <div role="alert" className="mt-4 rounded-xl border border-red-500/20 bg-red-500/[0.06] p-4 text-sm text-red-200">{error}</div>}
+              <div className="mt-4 flex justify-end"><button type="button" onClick={() => setSelected(null)} className="rounded-xl border border-white/10 px-5 py-3 text-sm font-bold text-slate-300 hover:bg-white/5">إغلاق المراجعة</button></div>
+            </div>
+          </div>
+        )}
       </div>
     </AdminPageFrame>
   );

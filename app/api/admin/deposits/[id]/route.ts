@@ -28,7 +28,7 @@ export async function GET(
 
     await connectDB();
 
-    const item = await DepositRequest.findById(id).lean();
+    const item = await DepositRequest.findById(id).select("-screenshotData").lean();
 
     if (!item) {
       return NextResponse.json(

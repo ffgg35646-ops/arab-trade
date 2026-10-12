@@ -413,7 +413,7 @@ export default function DepositPage() {
                   />
 
                   <p className="mt-2 text-xs text-slate-500">
-                    JPG / PNG / WEBP — الحد الأقصى 8MB
+                    JPG / PNG / WEBP — الحد الأقصى 4MB
                   </p>
                 </div>
 
@@ -429,6 +429,20 @@ export default function DepositPage() {
             )}
           </>
         )}
+
+        <section className="mt-6 rounded-2xl border border-cyan-400/20 bg-[#08111e] p-5 md:p-6">
+          <h2 className="text-lg font-black">تعليمات الإيداع بالتفصيل</h2>
+          <div className="mt-4 space-y-3 text-sm leading-6 text-slate-400">
+            <p><span className="ml-2 font-black text-cyan-200">1.</span>اختر وسيلة الدفع والعملة والشبكة المفعّلة من الإدارة.</p>
+            <p><span className="ml-2 font-black text-cyan-200">2.</span>حوّل إلى عنوان الإيداع الظاهر للوسيلة والشبكة المختارتين فقط، وتأكد من الشبكة قبل الإرسال.</p>
+            <p><span className="ml-2 font-black text-cyan-200">3.</span>اكتب المبلغ الفعلي الذي أرسلته، وأضف TX Hash إن كان متاحًا. لا تستخدم رقم معاملة لإيداع آخر.</p>
+            <p><span className="ml-2 font-black text-cyan-200">4.</span>ارفع صورة واضحة لإثبات التحويل بصيغة JPG أو PNG أو WEBP، بحد أقصى 4MB.</p>
+            <p><span className="ml-2 font-black text-cyan-200">5.</span>سيظهر الطلب في سجل الإيداعات بحالة «قيد المراجعة». لا يُضاف الرصيد إلا بعد اعتماد الإدارة أو إكمال التحقق الآلي المدعوم للمعاملة.</p>
+          </div>
+          <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] p-4 text-sm leading-6 text-amber-100">
+            رصيد الإيداع منفصل عن رصيد السحب العام، ويُستخدم حسب قواعد المنصة للتفعيل. لا ترسل أموالًا إلى عنوان غير ظاهر في وسيلة الدفع المعتمدة.
+          </div>
+        </section>
 
         <section className="mt-7 rounded-2xl border border-slate-800 bg-[#08111e] p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">

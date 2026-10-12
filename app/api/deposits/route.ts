@@ -1,8 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
-import { randomUUID } from "crypto";
-
 import { connectDB } from "@/lib/mongodb";
 import DepositRequest from "@/models/DepositRequest";
 import DepositBalance from "@/models/DepositBalance";
@@ -18,13 +14,7 @@ const ALLOWED_TYPES = new Set([
   "image/webp",
 ]);
 
-const MAX_FILE_SIZE = 8 * 1024 * 1024;
-
-function extension(type: string) {
-  if (type === "image/png") return ".png";
-  if (type === "image/webp") return ".webp";
-  return ".jpg";
-}
+const MAX_FILE_SIZE = 4 * 1024 * 1024;
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,6 +31,7 @@ export async function GET(request: NextRequest) {
 
     const [deposits, depositBalances] = await Promise.all([
       DepositRequest.find({ userId: user._id })
+        .select("-screenshotData")
         .sort({ createdAt: -1 })
         .limit(100)
         .lean(),
@@ -127,7 +118,7 @@ export async function POST(request: NextRequest) {
 
     if (screenshot.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { success: false, message: "حجم الصورة يجب ألا يتجاوز 8MB" },
+        { success: false, message: "حجم الصورة يجب ألا يتجاوز 4MB" },
         { status: 400 }
       );
     }
@@ -218,25 +209,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const folder = path.join(
-      process.cwd(),
-      "private",
-      "deposits",
-      String(user._id),
-      randomUUID()
-    );
-
-    await fs.mkdir(folder, { recursive: true });
-
-    const filename = `screenshot${extension(screenshot.type)}`;
-    const absolutePath = path.join(folder, filename);
-
-    await fs.writeFile(
-      absolutePath,
-      Buffer.from(await screenshot.arrayBuffer())
-    );
-
-    const screenshotPath = path.relative(process.cwd(), absolutePath);
+    const screenshotData = Buffer.from(await screenshot.arrayBuffer());
 
     const deposit = await DepositRequest.create({
       userId: user._id,
@@ -246,7 +219,10 @@ export async function POST(request: NextRequest) {
       txHash,
       address: depositAddress,
       status: "pending",
-      screenshotPath,
+      screenshotData,
+      screenshotContentType: screenshot.type,
+      screenshotStorage: "mongodb",
+      hasScreenshot: true,
     });
 
     await Notification.create({

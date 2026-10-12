@@ -7,12 +7,16 @@ export interface IDepositRequest {
   amount: number;
   txHash: string;
   confirmations?: number;
-  confirmedAt?: Date;
   creditedAt?: Date;
+  confirmedAt?: Date;
   address: string;
   status: "pending" | "approved" | "rejected";
   adminNote: string;
   screenshotPath?: string;
+  screenshotData?: Buffer;
+  screenshotContentType?: string;
+  screenshotStorage?: "mongodb" | "filesystem";
+  hasScreenshot?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -24,9 +28,9 @@ const DepositRequestSchema = new Schema<IDepositRequest>(
     network: { type: String, required: true },
     amount: { type: Number, required: true, min: 0 },
     txHash: { type: String, default: "" },
-  confirmations: { type: Number, default: 0, min: 0 },
-  creditedAt: { type: Date, default: null },
-  confirmedAt: { type: Date, default: null },
+    confirmations: { type: Number, default: 0, min: 0 },
+    creditedAt: { type: Date, default: null },
+    confirmedAt: { type: Date, default: null },
     address: { type: String, default: "" },
     status: {
       type: String,
@@ -35,11 +39,12 @@ const DepositRequestSchema = new Schema<IDepositRequest>(
       index: true,
     },
     adminNote: { type: String, default: "" },
-
-    screenshotPath: {
-      type: String,
-      default: "",
-    },
+    // Keep the legacy path for older records while new proofs use durable MongoDB storage.
+    screenshotPath: { type: String, default: "" },
+    screenshotData: { type: Buffer, select: false },
+    screenshotContentType: { type: String, default: "" },
+    screenshotStorage: { type: String, enum: ["mongodb", "filesystem"], default: "filesystem" },
+    hasScreenshot: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

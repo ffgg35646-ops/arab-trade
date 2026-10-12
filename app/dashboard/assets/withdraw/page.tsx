@@ -29,6 +29,7 @@ type SavedAddress = {
   asset: string;
   network: string;
   address: string;
+  source: "wallet" | "package";
 };
 
 type PackageAccount = {
@@ -194,7 +195,7 @@ export default function WithdrawPage() {
       ))
     : 0;
   const savedAddress = selectedMethod
-    ? savedAddresses.find((item) => item.asset === selectedMethod.asset && item.network === selectedMethod.network)
+    ? savedAddresses.find((item) => item.asset === selectedMethod.asset && item.network === selectedMethod.network && item.source === selectedSource)
     : undefined;
   const totalGeneralAvailable = balances.reduce((sum, item) => sum + (item.asset === "USDT" ? Number(item.available || 0) : 0), 0);
   const totalPackageAvailable = packageAccounts.reduce((sum, item) => sum + Number(item.availableEarnings || 0), 0);
@@ -210,7 +211,7 @@ export default function WithdrawPage() {
     setError("");
     setMessage("");
     const method = methods.find((item) => item._id === id);
-    const addressRow = method && savedAddresses.find((item) => item.asset === method.asset && item.network === method.network);
+    const addressRow = method && savedAddresses.find((item) => item.asset === method.asset && item.network === method.network && item.source === selectedSource);
     setAddress(addressRow?.address || "");
   }
 
@@ -222,7 +223,7 @@ export default function WithdrawPage() {
     const method = methods.find((item) => source !== "package" || item.asset === "USDT");
     if (method) {
       setSelectedMethodId(method._id);
-      const knownAddress = savedAddresses.find((item) => item.asset === method.asset && item.network === method.network);
+      const knownAddress = savedAddresses.find((item) => item.asset === method.asset && item.network === method.network && item.source === source);
       setAddress(knownAddress?.address || "");
     }
   }
@@ -249,6 +250,7 @@ export default function WithdrawPage() {
           asset: selectedMethod.asset,
           network: selectedMethod.network,
           address: cleanAddress,
+          source: selectedSource,
         }),
       });
       const data = await response.json().catch(() => ({}));

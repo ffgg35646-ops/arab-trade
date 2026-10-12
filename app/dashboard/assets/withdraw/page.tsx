@@ -504,15 +504,16 @@ export default function WithdrawPage() {
 
                           <div>
                             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                              <label className="block text-sm font-bold">عنوان محفظة السحب</label>
+                              <label className="block text-sm font-bold">{selectedSource === "package" ? "عنوان استلام سحب أرباح الباقة" : "عنوان استلام السحب العام"}</label>
                               <span className="text-xs text-slate-500">{savedAddress ? "يوجد عنوان محفوظ لهذه الشبكة" : "لا يوجد عنوان محفوظ لهذه الشبكة"}</span>
                             </div>
-                            <textarea value={address} onChange={(event) => setAddress(event.target.value)} rows={3} required placeholder="أدخل عنوان محفظة الاستلام" className="w-full resize-y rounded-xl border border-white/10 bg-[#050a13] px-4 py-3 outline-none focus:border-cyan-400/50" />
+                            <p className="mb-2 text-xs leading-5 text-slate-500">اكتب عنوان محفظتك أنت لاستلام المبلغ. عنوان الإيداع الذي يحدده الأدمن مخصص لاستقبال الإيداعات ولا تستخدمه كعنوان استلام للسحب.</p>
+                            <textarea value={address} onChange={(event) => setAddress(event.target.value)} rows={3} required placeholder="أدخل عنوان محفظتك لاستلام السحب" className="w-full resize-y rounded-xl border border-white/10 bg-[#050a13] px-4 py-3 outline-none focus:border-cyan-400/50" />
                             <button type="button" onClick={() => void saveAddress()} disabled={savingAddress || !address.trim()} className="mt-3 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.06] px-4 py-2 text-sm font-bold text-cyan-200 disabled:opacity-40">{savingAddress ? "جاري حفظ العنوان..." : savedAddress ? "تحديث العنوان المحفوظ" : "حفظ العنوان للمرة القادمة"}</button>
                           </div>
 
                           <div>
-                            <label className="mb-2 block text-sm font-bold">مبلغ السحب</label>
+                            <label className="mb-2 block text-sm font-bold">{selectedSource === "package" ? "مبلغ السحب من الباقة المحددة" : "مبلغ السحب العام"}</label>
                             <input type="number" min={Number(selectedMethod.minWithdrawal || 0)} max={selectedSource === "package" ? selectedPackageMax : (selectedMethod.maxWithdrawal && selectedMethod.maxWithdrawal > 0 ? selectedMethod.maxWithdrawal : undefined)} step="any" value={amount} onChange={(event) => setAmount(event.target.value)} disabled={firstStatusPending} required placeholder="اكتب المبلغ" className="w-full rounded-xl border border-white/10 bg-[#050a13] px-4 py-3 outline-none focus:border-cyan-400/50 disabled:opacity-50" />
                             {selectedSource === "package" && <p className="mt-2 text-xs text-slate-500">أقصى مبلغ يمكنك طلبه الآن من هذه الباقة: {money(selectedPackageMax)} USDT.</p>}
                           </div>

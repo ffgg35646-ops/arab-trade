@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import InternalNavbar from "@/components/InternalNavbar";
+import InternalSidebar from "@/components/InternalSidebar";
 
 type DepositBalance = { asset: string; available: number; locked: number };
 type DepositRecord = { _id?: string; id?: string; asset: string; network: string; amount: number; status: string; txHash?: string; adminNote?: string; createdAt?: string };
@@ -226,8 +228,12 @@ export default function DepositPage() {
   }
 
   return (
-    <main
-      dir="rtl"
+    <>
+      <InternalNavbar />
+      <div className="mx-auto flex max-w-[1700px]">
+        <InternalSidebar />
+        <main
+          dir="rtl"
       className="min-h-screen bg-[#050a13] p-4 text-white sm:p-6"
     >
       <div className="mx-auto max-w-4xl">
@@ -450,6 +456,8 @@ export default function DepositPage() {
           )}
         </section>
       </div>
-    </main>
+        </main>
+      </div>
+    </>
   );
 }

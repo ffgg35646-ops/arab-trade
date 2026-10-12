@@ -14,6 +14,7 @@ import UserPackage from "@/models/UserPackage";
 import PackageLedger from "@/models/PackageLedger";
 import User from "@/models/User";
 import DepositRequest from "@/models/DepositRequest";
+import { accrueDuePackageEarnings } from "@/lib/accrue-package-earnings";
 
 function normalizeAsset(value: unknown) {
   return String(value || "").trim().toUpperCase();
@@ -127,6 +128,7 @@ export async function POST(request: NextRequest) {
     }
 
     await connectDB();
+    await accrueDuePackageEarnings({ userId: user._id });
 
     const settings = await getPlatformSettings();
 

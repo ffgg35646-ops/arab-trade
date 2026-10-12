@@ -14,6 +14,7 @@ type FinancialLimits = {
   minDeposit: number;
   maxDeposit: number;
   minWithdrawal: number;
+  minGeneralWithdrawal: number;
   maxWithdrawal: number;
   dailyWithdrawalLimit: number;
 };
@@ -32,7 +33,7 @@ export default function Page() {
   const [loadingWithdrawalRules, setLoadingWithdrawalRules] = useState(true);
   const [savingWithdrawalRules, setSavingWithdrawalRules] = useState(false);
   const [savingSupport, setSavingSupport] = useState(false);
-  const [financialLimits, setFinancialLimits] = useState<FinancialLimits>({ minDeposit: 10, maxDeposit: 100000, minWithdrawal: 50, maxWithdrawal: 50000, dailyWithdrawalLimit: 100000 });
+  const [financialLimits, setFinancialLimits] = useState<FinancialLimits>({ minDeposit: 10, maxDeposit: 100000, minWithdrawal: 50, minGeneralWithdrawal: 50, maxWithdrawal: 50000, dailyWithdrawalLimit: 100000 });
   const [savingFinancialLimits, setSavingFinancialLimits] = useState(false);
 
   async function loadSupport() {
@@ -79,6 +80,7 @@ export default function Page() {
         minDeposit: Number(json.settings?.deposits?.minAmount ?? 10),
         maxDeposit: Number(json.settings?.deposits?.maxAmount ?? 100000),
         minWithdrawal: Number(json.settings?.withdrawals?.minAmount ?? 50),
+        minGeneralWithdrawal: Number(json.settings?.withdrawals?.minGeneralWithdrawal ?? json.settings?.withdrawals?.minAmount ?? 50),
         maxWithdrawal: Number(json.settings?.withdrawals?.maxAmount ?? 50000),
         dailyWithdrawalLimit: Number(json.settings?.withdrawals?.dailyLimit ?? 100000),
       });
@@ -133,12 +135,15 @@ export default function Page() {
       if (financialLimits.maxWithdrawal > 0 && financialLimits.minWithdrawal > financialLimits.maxWithdrawal) {
         throw new Error("الحد الأدنى للسحب لا يمكن أن يتجاوز الحد الأقصى");
       }
+      if (financialLimits.maxWithdrawal > 0 && financialLimits.minGeneralWithdrawal > financialLimits.maxWithdrawal) {
+        throw new Error("الحد الأدنى للسحب العام لا يمكن أن يتجاوز الحد الأقصى للسحب");
+      }
       const res = await fetch("/api/admin/settings", {
         method: "PATCH", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           deposits: { minAmount: financialLimits.minDeposit, maxAmount: financialLimits.maxDeposit },
-          withdrawals: { minAmount: financialLimits.minWithdrawal, maxAmount: financialLimits.maxWithdrawal, dailyLimit: financialLimits.dailyWithdrawalLimit },
+          withdrawals: { minAmount: financialLimits.minWithdrawal, minGeneralWithdrawal: financialLimits.minGeneralWithdrawal, maxAmount: financialLimits.maxWithdrawal, dailyLimit: financialLimits.dailyWithdrawalLimit },
         }),
       });
       const json = await res.json();
@@ -147,6 +152,7 @@ export default function Page() {
         minDeposit: Number(json.settings?.deposits?.minAmount ?? financialLimits.minDeposit),
         maxDeposit: Number(json.settings?.deposits?.maxAmount ?? financialLimits.maxDeposit),
         minWithdrawal: Number(json.settings?.withdrawals?.minAmount ?? financialLimits.minWithdrawal),
+        minGeneralWithdrawal: Number(json.settings?.withdrawals?.minGeneralWithdrawal ?? financialLimits.minGeneralWithdrawal),
         maxWithdrawal: Number(json.settings?.withdrawals?.maxAmount ?? financialLimits.maxWithdrawal),
         dailyWithdrawalLimit: Number(json.settings?.withdrawals?.dailyLimit ?? financialLimits.dailyWithdrawalLimit),
       });
@@ -219,6 +225,7 @@ export default function Page() {
                 ["minDeposit", "الحد الأدنى للإيداع"],
                 ["maxDeposit", "الحد الأقصى للإيداع"],
                 ["minWithdrawal", "الحد الأدنى للسحب"],
+                ["minGeneralWithdrawal", "الحد الأدنى للسحب العام"],
                 ["maxWithdrawal", "الحد الأقصى للسحب"],
                 ["dailyWithdrawalLimit", "الحد اليومي الإجمالي للسحب"],
               ] as const).map(([key, label]) => (

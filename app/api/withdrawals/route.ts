@@ -11,6 +11,7 @@ import { getCurrentUser } from "@/lib/current-user";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import { rateLimit } from "@/lib/rate-limit";
 import UserPackage from "@/models/UserPackage";
+import InvestmentPackage from "@/models/InvestmentPackage";
 import PackageLedger from "@/models/PackageLedger";
 import User from "@/models/User";
 import DepositRequest from "@/models/DepositRequest";
@@ -286,6 +287,13 @@ export async function POST(request: NextRequest) {
       networkName = network.name || network.code;
     }
 
+    if (source === "wallet") {
+      minAmount = Math.max(
+        minAmount,
+        Number(settings.withdrawals.minGeneralWithdrawal ?? settings.withdrawals.minAmount ?? 0)
+      );
+    }
+
     if (
       amount < minAmount ||
       (maxAmount > 0 && amount > maxAmount)
@@ -409,6 +417,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { success: false, message: "حساب الباقة غير موجود أو لا يخص هذا المستخدم" },
           { status: 404 }
+        );
+      }
+
+      const packagePlan = await InvestmentPackage.findById(currentPackage.packageId)
+        .select("minimumWithdrawal")
+        .lean();
+      const packageMinimum = Number(packagePlan?.minimumWithdrawal ?? 0);
+      if (amount < packageMinimum) {
+        return NextResponse.json(
+          { success: false, message: "الحد الأدنى للسحب من باقة " + currentPackage.packageName + " هو " + packageMinimum + " " + assetCode, minAmount: packageMinimum },
+          { status: 400 }
         );
       }
 

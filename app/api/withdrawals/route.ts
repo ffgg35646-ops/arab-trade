@@ -421,22 +421,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const packagePlan = await InvestmentPackage.findById(currentPackage.packageId)
-        .select("minimumWithdrawal")
-        .lean();
-      const configuredMinimums = settings.withdrawals.withdrawalMinByPackage as unknown as Record<string, number> | undefined;
-      const configuredPackageMinimum = configuredMinimums?.[String(currentPackage.packageId)];
-      const packageMinimum = Math.max(
-        Number(configuredPackageMinimum ?? packagePlan?.minimumWithdrawal ?? settings.withdrawals.minAmount ?? 0),
-        Number(minAmount || 0)
-      );
-      if (amount < packageMinimum) {
-        return NextResponse.json(
-          { success: false, message: "الحد الأدنى للسحب من باقة " + currentPackage.packageName + " هو " + packageMinimum + " " + assetCode, minAmount: packageMinimum },
-          { status: 400 }
-        );
-      }
-
       let firstStatus = currentPackage.firstWithdrawalStatus;
       if (firstStatus !== "pending" && Number(currentPackage.totalWithdrawn || 0) > 0) {
         firstStatus = "completed";
@@ -460,6 +444,23 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
+
+      const packagePlan = await InvestmentPackage.findById(currentPackage.packageId)
+        .select("minimumWithdrawal")
+        .lean();
+      const configuredMinimums = settings.withdrawals.withdrawalMinByPackage as unknown as Record<string, number> | undefined;
+      const configuredPackageMinimum = configuredMinimums?.[String(currentPackage.packageId)];
+      const packageMinimum = Math.max(
+        Number(configuredPackageMinimum ?? packagePlan?.minimumWithdrawal ?? settings.withdrawals.minAmount ?? 0),
+        Number(minAmount || 0)
+      );
+      if (amount < packageMinimum) {
+        return NextResponse.json(
+          { success: false, message: "الحد الأدنى للسحب من باقة " + currentPackage.packageName + " هو " + packageMinimum + " " + assetCode, minAmount: packageMinimum },
+          { status: 400 }
+        );
+      }
+
 
       // Only the currently active package receives the special first-withdrawal cap.
       // Inactive/cancelled package balances require referral-backed cap like later withdrawals.

@@ -11,6 +11,8 @@ type Method = {
   asset: string;
   network: string;
   minWithdrawal: number;
+  maxWithdrawal?: number;
+  withdrawalFee?: number;
   enabled: boolean;
   withdrawalEnabled?: boolean;
   maxWithdrawal?: number;
@@ -39,6 +41,7 @@ type PackageAccount = {
   referralAlreadyWithdrawn?: number;
   referralRemaining?: number;
   withdrawalLimit?: number;
+  minimumWithdrawal?: number;
 };
 type Withdrawal = {
   _id: string;
@@ -54,6 +57,7 @@ type Withdrawal = {
   adminNote?: string;
   createdAt: string;
 };
+type PaymentLimits = { minDeposit: number; maxDeposit: number; minWithdrawal: number; minGeneralWithdrawal: number; maxWithdrawal: number; dailyWithdrawalLimit: number };
 type WithdrawalForm = { methodId: string; amount: string; address: string };
 
 const emptyForm: WithdrawalForm = { methodId: "", amount: "", address: "" };
@@ -76,6 +80,7 @@ function packageMaximum(item: PackageAccount) {
 
 export default function WithdrawPage() {
   const [methods, setMethods] = useState<Method[]>([]);
+  const [limits, setLimits] = useState<PaymentLimits>({ minDeposit: 0, maxDeposit: 0, minWithdrawal: 0, minGeneralWithdrawal: 0, maxWithdrawal: 0, dailyWithdrawalLimit: 0 });
   const [depositBalances, setDepositBalances] = useState<Balance[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [packageAccounts, setPackageAccounts] = useState<PackageAccount[]>([]);
@@ -107,6 +112,16 @@ export default function WithdrawPage() {
         })
       );
 
+      if (methodsData.limits) {
+        setLimits({
+          minDeposit: Number(methodsData.limits.minDeposit || 0),
+          maxDeposit: Number(methodsData.limits.maxDeposit || 0),
+          minWithdrawal: Number(methodsData.limits.minWithdrawal || 0),
+          minGeneralWithdrawal: Number(methodsData.limits.minGeneralWithdrawal || 0),
+          maxWithdrawal: Number(methodsData.limits.maxWithdrawal || 0),
+          dailyWithdrawalLimit: Number(methodsData.limits.dailyWithdrawalLimit || 0),
+        });
+      }
       const methodRows: Method[] = Array.isArray(methodsData.methods)
         ? methodsData.methods.filter((item: Method) => item.enabled !== false && item.withdrawalEnabled !== false)
         : [];
@@ -283,8 +298,11 @@ export default function WithdrawPage() {
       }
     }
 
-    const minimum = Number(selectedMethod.minWithdrawal || 0);
-    const maximum = Number(selectedMethod.maxWithdrawal || 0);
+    const minimum = source === "package"
+      ? Math.max(Number(selectedMethod.minWithdrawal || 0), Number(limits.minWithdrawal || 0), Number(packageAccount?.minimumWithdrawal || 0))
+      : Math.max(Number(selectedMethod.minWithdrawal || 0), Number(limits.minWithdrawal || 0), Number(limits.minGeneralWithdrawal || 0));
+    const configuredMaximums = [Number(selectedMethod.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
+    const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : 0;
     if (numericAmount < minimum) {
       setError("الحد الأدنى للسحب هو " + money(minimum) + " " + selectedMethod.asset);
       return;
@@ -360,6 +378,11 @@ export default function WithdrawPage() {
     const available = source === "package"
       ? Number(packageAccount?.availableEarnings || 0)
       : Number(balances.find((item) => item.asset === selected?.asset)?.available || 0);
+    const minimum = source === "package"
+      ? Math.max(Number(selected?.minWithdrawal || 0), Number(limits.minWithdrawal || 0), Number(packageAccount?.minimumWithdrawal || 0))
+      : Math.max(Number(selected?.minWithdrawal || 0), Number(limits.minWithdrawal || 0), Number(limits.minGeneralWithdrawal || 0));
+    const configuredMaximums = [Number(selected?.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
+    const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : undefined;
     const packageMax = packageAccount ? packageMaximum(packageAccount) : 0;
     const packagePending = packageAccount?.firstWithdrawalStatus === "pending";
     const savedAddress = selected && savedAddresses.some((item) =>
@@ -385,7 +408,7 @@ export default function WithdrawPage() {
           </div>
           <div className="rounded-xl border border-white/10 bg-white/[0.025] p-4">
             <div className="text-xs text-slate-500">الحد الأدنى للسحب</div>
-            <div className="mt-2 text-xl font-black">{selected ? money(Number(selected.minWithdrawal || 0)) : "—"} <span className="text-xs">{selected?.asset || ""}</span></div>
+            <div className="mt-2 text-xl font-black">{selected ? money(minimum) : "—"} <span className="text-xs">{selected?.asset || ""}</span></div>
           </div>
         </div>
 
@@ -403,9 +426,9 @@ export default function WithdrawPage() {
 
         <div>
           <label className="mb-2 block text-sm font-bold">{source === "package" ? "مبلغ السحب من باقة " + (packageAccount?.packageName || "") : "مبلغ السحب العام"}</label>
-          <input type="number" min={selected ? Number(selected.minWithdrawal || 0) : 0} max={source === "package" ? packageMax : (selected?.maxWithdrawal && selected.maxWithdrawal > 0 ? selected.maxWithdrawal : undefined)} step="any" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", event.target.value)} disabled={Boolean(packagePending)} required placeholder="اكتب مبلغ السحب" className="w-full rounded-xl border border-white/10 bg-[#050a13] px-4 py-3 outline-none focus:border-cyan-400/50 disabled:opacity-50" />
-          {source === "package" && <p className="mt-2 text-xs leading-5 text-slate-500">الحد الأقصى المتاح من هذه الباقة: {money(packageMax)} USDT. الطلب من هذه الخانة لا يخصم من الباقات الأخرى أو الرصيد العام.</p>}
-          {source === "wallet" && selected && <p className="mt-2 text-xs text-slate-500">الرصيد المتاح لهذه العملة: {money(available)} {selected.asset}.</p>}
+          <input type="number" min={minimum} max={source === "package" ? Math.min(packageMax, maximum || packageMax) : maximum} step="any" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", event.target.value)} disabled={Boolean(packagePending)} required placeholder="اكتب مبلغ السحب" className="w-full rounded-xl border border-white/10 bg-[#050a13] px-4 py-3 outline-none focus:border-cyan-400/50 disabled:opacity-50" />
+          {source === "package" && <p className="mt-2 text-xs leading-5 text-slate-500">الحد الأدنى الذي حدده الأدمن لهذه الباقة: {money(Number(packageAccount?.minimumWithdrawal || 0))} USDT. والحد الأقصى المتاح الآن: {money(Math.min(packageMax, maximum || packageMax))} USDT. الطلب من هذه الخانة لا يخصم من الباقات الأخرى أو الرصيد العام.</p>}
+          {source === "wallet" && selected && <p className="mt-2 text-xs text-slate-500">الحد الأدنى للسحب العام حسب إعدادات الأدمن: {money(Number(limits.minGeneralWithdrawal || limits.minWithdrawal || 0))} {selected.asset}. الرصيد المتاح: {money(available)} {selected.asset}.</p>}
         </div>
 
         <div className="rounded-xl border border-white/10 bg-white/[0.025] p-4 text-sm">

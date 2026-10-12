@@ -7,6 +7,8 @@ import InternalSidebar from "@/components/InternalSidebar";
 type DepositBalance = { asset: string; available: number; locked: number };
 type DepositRecord = { _id?: string; id?: string; asset: string; network: string; amount: number; status: string; txHash?: string; adminNote?: string; createdAt?: string };
 
+type PaymentLimits = { minDeposit: number; maxDeposit: number; minWithdrawal: number; minGeneralWithdrawal: number; maxWithdrawal: number; dailyWithdrawalLimit: number };
+
 type Method = {
   _id: string;
   name: string;
@@ -14,6 +16,7 @@ type Method = {
   network: string;
   address: string;
   minDeposit: number;
+  maxDeposit?: number;
   minWithdrawal: number;
   enabled: boolean;
   depositEnabled?: boolean;
@@ -23,6 +26,7 @@ type Method = {
 
 export default function DepositPage() {
   const [methods, setMethods] = useState<Method[]>([]);
+  const [limits, setLimits] = useState<PaymentLimits>({ minDeposit: 0, maxDeposit: 0, minWithdrawal: 0, minGeneralWithdrawal: 0, maxWithdrawal: 0, dailyWithdrawalLimit: 0 });
   const [depositBalances, setDepositBalances] = useState<DepositBalance[]>([]);
   const [deposits, setDeposits] = useState<DepositRecord[]>([]);
   const [selectedId, setSelectedId] = useState("");
@@ -53,6 +57,16 @@ export default function DepositPage() {
       ]);
 
       const json = await res.json();
+      if (json.limits) {
+        setLimits({
+          minDeposit: Number(json.limits.minDeposit || 0),
+          maxDeposit: Number(json.limits.maxDeposit || 0),
+          minWithdrawal: Number(json.limits.minWithdrawal || 0),
+          minGeneralWithdrawal: Number(json.limits.minGeneralWithdrawal || 0),
+          maxWithdrawal: Number(json.limits.maxWithdrawal || 0),
+          dailyWithdrawalLimit: Number(json.limits.dailyWithdrawalLimit || 0),
+        });
+      }
       const balanceJson = await balanceRes.json().catch(() => ({}));
       setDepositBalances(
         Array.isArray(balanceJson.depositBalances) ? balanceJson.depositBalances : []
@@ -328,7 +342,7 @@ export default function DepositPage() {
                   </div>
                   <div className="rounded-lg border border-white/5 bg-black/20 p-3">
                     <div className="text-xs text-slate-500">الحد الأدنى للإيداع حسب الوسيلة</div>
-                    <div className="mt-1 font-black">{Number(selected.minDeposit || 0)} {selected.asset}</div>
+                    <div className="mt-1 font-black">{Math.max(Number(selected.minDeposit || 0), Number(limits.minDeposit || 0))} {selected.asset}</div>
                   </div>
                 </div>
               )}
@@ -347,7 +361,7 @@ export default function DepositPage() {
                 placeholder="اكتب مبلغ التحويل الذي أرسلته"
                 className="w-full rounded-xl border border-slate-700 bg-[#0b1422] p-4 text-lg font-bold outline-none focus:border-blue-400/50"
               />
-              <p className="mt-2 text-xs leading-5 text-slate-500">سيتم تطبيق الحد الأدنى والأقصى اللذين ضبطهما الأدمن عند إرسال الطلب.</p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">الحد المسموح لهذه الوسيلة: {Math.max(Number(selected?.minDeposit || 0), Number(limits.minDeposit || 0))} إلى {(() => { const values = [Number(selected?.maxDeposit || 0), Number(limits.maxDeposit || 0)].filter((value) => value > 0); return values.length ? Math.min(...values).toLocaleString("en-US") : "غير محدد"; })()} {selected?.asset || ""}. هذه الحدود يتحكم فيها الأدمن.</p>
             </div>
 
             <div>

@@ -323,40 +323,52 @@ export async function PATCH(
         if (!updatedRequest) throw new Error("WITHDRAWAL_STATUS_CHANGED");
 
         if (nextStatus === "rejected" || nextStatus === "completed") {
-          const wallet = await Wallet.findOne({
-            userId: withdrawal.userId,
-            type: "spot",
-            mode: "live",
-          }).session(session);
-          if (!wallet) throw new Error("WALLET_NOT_FOUND");
-
           const asset = normalizeAsset(withdrawal.asset);
-          const balance = wallet.balances.find((item: any) => normalizeAsset(item.asset) === asset);
           const amount = Number(withdrawal.amount);
-          if (!balance || !Number.isFinite(amount) || amount <= 0 || Number(balance.locked || 0) + 1e-12 < amount) {
-            throw new Error("WALLET_BALANCE_INVALID");
-          }
+          if (!Number.isFinite(amount) || amount <= 0) throw new Error("WALLET_BALANCE_INVALID");
 
-          const availableBefore = Number(balance.available || 0);
-          balance.locked = Number(balance.locked || 0) - amount;
-          if (nextStatus === "rejected") {
-            balance.available = availableBefore + amount;
-          }
-          const availableAfter = Number(balance.available || 0);
-          await wallet.save({ session });
+          const allocations = Array.isArray(withdrawal.walletAllocations) && withdrawal.walletAllocations.length
+            ? withdrawal.walletAllocations
+            : [{ walletType: withdrawal.walletType || "spot", amount }];
+          const totalAllocated = allocations.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0);
+          if (Math.abs(totalAllocated - amount) > 1e-7) throw new Error("WALLET_BALANCE_INVALID");
 
-          await LedgerEntry.create([{
-            userId: withdrawal.userId,
-            asset,
-            type: "withdrawal",
-            amount: nextStatus === "rejected" ? amount : -amount,
-            balanceBefore: availableBefore,
-            balanceAfter: availableAfter,
-            referenceId: String(withdrawal._id),
-            note: adminNote || (nextStatus === "rejected"
-              ? "تم رفض طلب السحب وإرجاع المبلغ"
-              : "تم تنفيذ السحب"),
-          }], { session });
+          for (const allocation of allocations as any[]) {
+            const allocatedAmount = Number(allocation.amount);
+            const walletType = allocation.walletType === "funding" ? "funding" : "spot";
+            if (!Number.isFinite(allocatedAmount) || allocatedAmount <= 0) throw new Error("WALLET_BALANCE_INVALID");
+
+            const wallet = await Wallet.findOne({
+              userId: withdrawal.userId,
+              type: walletType,
+              mode: "live",
+            }).session(session);
+            if (!wallet) throw new Error("WALLET_NOT_FOUND");
+
+            const balance = wallet.balances.find((item: any) => normalizeAsset(item.asset) === asset);
+            if (!balance || Number(balance.locked || 0) + 1e-12 < allocatedAmount) {
+              throw new Error("WALLET_BALANCE_INVALID");
+            }
+
+            const availableBefore = Number(balance.available || 0);
+            balance.locked = Number(balance.locked || 0) - allocatedAmount;
+            if (nextStatus === "rejected") balance.available = availableBefore + allocatedAmount;
+            const availableAfter = Number(balance.available || 0);
+            await wallet.save({ session });
+
+            await LedgerEntry.create([{
+              userId: withdrawal.userId,
+              asset,
+              type: "withdrawal",
+              amount: nextStatus === "rejected" ? allocatedAmount : -allocatedAmount,
+              balanceBefore: availableBefore,
+              balanceAfter: availableAfter,
+              referenceId: String(withdrawal._id),
+              note: adminNote || (nextStatus === "rejected"
+                ? "تم رفض طلب السحب وإرجاع المبلغ إلى " + (walletType === "funding" ? "محفظة التمويل" : "المحفظة العامة")
+                : "تم تنفيذ السحب من " + (walletType === "funding" ? "محفظة التمويل" : "المحفظة العامة")),
+            }], { session });
+          }
         }
         settledWithdrawal = updatedRequest;
       });

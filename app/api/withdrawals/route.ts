@@ -380,7 +380,7 @@ export async function POST(request: NextRequest) {
      * قفل الرصيد من المحفظة العامة أو رصيد أرباح الباقة.
      * رصيد الإيداع الخارجي منفصل ولا يسمح بسحبه مباشرة.
      */
-    let lockedWallet = false;
+    let lockedWalletAllocations: Array<{ walletType: "spot" | "funding"; amount: number }> = [];
     let lockedUserPackage: any = null;
     let isFirstPackageWithdrawal = false;
 
@@ -526,24 +526,52 @@ export async function POST(request: NextRequest) {
         );
       }
     } else {
-      const wallet = await Wallet.findOneAndUpdate(
-        {
+      // Lock from spot first, then funding; internally earned money in either
+      // wallet is withdrawable. The deposit balance is a separate model and is never queried here.
+      let remaining = amount;
+      for (const walletType of ["spot", "funding"] as const) {
+        if (remaining <= 1e-8) break;
+        const currentWallet = await Wallet.findOne({
           userId: user._id,
-          type: "spot",
+          type: walletType,
           mode: "live",
-          balances: { $elemMatch: { asset: assetCode, available: { $gte: amount } } },
-        },
-        { $inc: { "balances.$.available": -amount, "balances.$.locked": amount } },
-        { new: true }
-      );
+        }).select("balances").lean();
+        const currentBalance = (currentWallet?.balances || []).find(
+          (item: any) => normalizeAsset(item.asset) === assetCode
+        );
+        const available = Number(currentBalance?.available || 0);
+        const allocationAmount = Math.min(remaining, available);
+        if (allocationAmount <= 1e-8) continue;
 
-      if (!wallet) {
+        const lockedWallet = await Wallet.findOneAndUpdate(
+          {
+            userId: user._id,
+            type: walletType,
+            mode: "live",
+            balances: { $elemMatch: { asset: assetCode, available: { $gte: allocationAmount } } },
+          },
+          { $inc: { "balances.$.available": -allocationAmount, "balances.$.locked": allocationAmount } },
+          { new: true }
+        );
+        if (!lockedWallet) continue;
+
+        lockedWalletAllocations.push({ walletType, amount: allocationAmount });
+        remaining = Number(Math.max(0, remaining - allocationAmount).toFixed(8));
+      }
+
+      if (remaining > 1e-8) {
+        for (const allocation of lockedWalletAllocations) {
+          await Wallet.updateOne(
+            { userId: user._id, type: allocation.walletType, mode: "live", "balances.asset": assetCode },
+            { $inc: { "balances.$.available": allocation.amount, "balances.$.locked": -allocation.amount } }
+          );
+        }
+        lockedWalletAllocations = [];
         return NextResponse.json(
-          { success: false, message: "الرصيد المتاح غير كافٍ" },
+          { success: false, message: "رصيد السحب العام غير كافٍ. يشمل الرصيد المتاح أرباح المنصة والمكافآت والإحالات، ولا يشمل الإيداعات الخارجية المخصصة لتفعيل الباقات." },
           { status: 400 }
         );
       }
-      lockedWallet = true;
     }
 
     try {
@@ -557,6 +585,8 @@ export async function POST(request: NextRequest) {
           receiveAmount,
           address,
           source,
+          walletType: lockedWalletAllocations[0]?.walletType || "spot",
+          walletAllocations: source === "wallet" ? lockedWalletAllocations : [],
           userPackageId: source === "package" ? userPackageId : null,
           isFirstPackageWithdrawal,
           status: "pending",
@@ -607,11 +637,13 @@ export async function POST(request: NextRequest) {
             ...(isFirstPackageWithdrawal ? { $set: { firstWithdrawalStatus: "available" } } : {}),
           }
         );
-      } else if (lockedWallet) {
-        await Wallet.updateOne(
-          { userId: user._id, type: "spot", mode: "live", "balances.asset": assetCode },
-          { $inc: { "balances.$.available": amount, "balances.$.locked": -amount } }
-        );
+      } else if (lockedWalletAllocations.length) {
+        for (const allocation of lockedWalletAllocations) {
+          await Wallet.updateOne(
+            { userId: user._id, type: allocation.walletType, mode: "live", "balances.asset": assetCode },
+            { $inc: { "balances.$.available": allocation.amount, "balances.$.locked": -allocation.amount } }
+          );
+        }
       }
 
       throw error;

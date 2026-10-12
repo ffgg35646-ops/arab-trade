@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
-import { ArrowDownToLine, CheckCircle2, Clock3, RefreshCw, ShieldCheck, Wallet, XCircle } from "lucide-react";
+import { ArrowDownToLine, Clock3, RefreshCw, ShieldCheck, Wallet } from "lucide-react";
 
 type Method = {
   _id: string;
@@ -68,11 +68,6 @@ type Withdrawal = {
   createdAt: string;
 };
 
-type Settings = {
-  minAmount?: number;
-  maxAmount?: number;
-  dailyLimit?: number;
-};
 
 const money = (value: number) =>
   Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 });
@@ -111,7 +106,6 @@ export default function WithdrawPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [settings, setSettings] = useState<Settings>({});
 
   const load = useCallback(async () => {
     try {
@@ -149,12 +143,6 @@ export default function WithdrawPage() {
       setHistory(Array.isArray(historyData.withdrawals) ? historyData.withdrawals : []);
       setSavedAddresses(loadedAddresses);
       setPackageAccounts(packageRows);
-      setSettings({
-        minAmount: Number(packageData.policy?.minWithdrawal ?? 0),
-        maxAmount: Number(packageData.policy?.maxWithdrawal ?? 0),
-        dailyLimit: Number(packageData.policy?.dailyLimit ?? 0),
-      });
-
       setSelectedPackageId((current) =>
         current && packageRows.some((item) => item._id === current)
           ? current

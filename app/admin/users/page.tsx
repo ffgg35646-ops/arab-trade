@@ -171,6 +171,8 @@ export default function UsersPage() {
                     <th className="px-4 py-4">الصلاحية</th>
                     <th className="px-4 py-4">الحالة</th>
                     <th className="px-4 py-4">التوثيق</th>
+                    <th className="px-4 py-4">رصيد الإيداع الخارجي</th>
+                    <th className="px-4 py-4">رصيد السحب الداخلي</th>
                     <th className="px-4 py-4">تاريخ التسجيل</th>
                     <th className="px-4 py-4">الإجراءات</th>
                   </tr>
@@ -217,6 +219,14 @@ export default function UsersPage() {
 
                       <td className="px-4 py-4 text-slate-300">
                         {user.isVerified ? "موثق" : "غير موثق"}
+                      </td>
+
+                      <td className="px-4 py-4 text-sky-200">
+                        {Array.isArray(user.depositBalances) && user.depositBalances.length ? user.depositBalances.map((b: any) => <div key={b.asset} className="whitespace-nowrap">{Number(b.available || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} {b.asset}</div>) : "—"}
+                      </td>
+
+                      <td className="px-4 py-4 text-emerald-200">
+                        {Array.isArray(user.withdrawalBalances) && user.withdrawalBalances.length ? user.withdrawalBalances.map((b: any) => <div key={b.asset} className="whitespace-nowrap">{Number(b.available || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} {b.asset}</div>) : "—"}
                       </td>
 
                       <td className="px-4 py-4 text-slate-400">

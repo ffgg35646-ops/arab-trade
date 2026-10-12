@@ -151,6 +151,21 @@ export async function PATCH(request: NextRequest) {
 
     const update: Record<string, unknown> = {};
 
+    if (body.minDeposit !== undefined && body.maxDeposit !== undefined) {
+      const minimum = Number(body.minDeposit);
+      const maximum = Number(body.maxDeposit);
+      if (!Number.isFinite(minimum) || minimum < 0 || !Number.isFinite(maximum) || maximum < 0 || (maximum > 0 && minimum > maximum)) {
+        return NextResponse.json({ success: false, message: "الحد الأدنى للإيداع لا يمكن أن يتجاوز الحد الأقصى" }, { status: 400 });
+      }
+    }
+    if (body.minWithdrawal !== undefined && body.maxWithdrawal !== undefined) {
+      const minimum = Number(body.minWithdrawal);
+      const maximum = Number(body.maxWithdrawal);
+      if (!Number.isFinite(minimum) || minimum < 0 || !Number.isFinite(maximum) || maximum < 0 || (maximum > 0 && minimum > maximum)) {
+        return NextResponse.json({ success: false, message: "الحد الأدنى للسحب لا يمكن أن يتجاوز الحد الأقصى" }, { status: 400 });
+      }
+    }
+
     if (body.name !== undefined) {
       update.name = String(body.name).trim();
     }

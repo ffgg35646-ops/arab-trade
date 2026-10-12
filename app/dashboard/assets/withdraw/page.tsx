@@ -499,6 +499,24 @@ export default function WithdrawPage() {
           </p>
         </div>
 
+        <section className="mb-6 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
+            <div className="text-xs text-slate-400">رصيد السحب العام · USDT</div>
+            <div className="mt-2 text-2xl font-black text-cyan-200">{Number(balances.find((item) => item.asset === "USDT")?.available || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })}</div>
+            <p className="mt-1 text-xs text-slate-500">منفصل عن رصيد الإيداع الخارجي</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
+            <div className="text-xs text-slate-400">أرصدة الباقات المتاحة · USDT</div>
+            <div className="mt-2 text-2xl font-black text-emerald-200">{packageAccounts.reduce((sum, item) => sum + Number(item.availableEarnings || 0), 0).toLocaleString("en-US", { maximumFractionDigits: 8 })}</div>
+            <p className="mt-1 text-xs text-slate-500">مبالغ محققة لكل باقة على حدة</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
+            <div className="text-xs text-slate-400">طلبات مفتوحة</div>
+            <div className="mt-2 text-2xl font-black text-amber-200">{history.filter((item) => ["pending", "approved", "processing"].includes(String(item.status))).length}</div>
+            <p className="mt-1 text-xs text-slate-500">قيد المراجعة أو التنفيذ</p>
+          </div>
+        </section>
+
         {error && (
           <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-red-300">
             {error}
@@ -538,24 +556,25 @@ export default function WithdrawPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="mb-2 block text-sm font-bold">مصدر رصيد السحب</label>
-                  <select
-                    value={withdrawalSource}
-                    onChange={(e) => {
-                      const next = e.target.value === "package" ? "package" : "wallet";
-                      setWithdrawalSource(next);
-                      if (next === "package") {
-                        const usdtMethod = methods.find((item) => item.asset === "USDT");
-                        if (usdtMethod) selectMethod(usdtMethod._id);
-                        const account = packageAccounts.find((item) => Number(item.availableEarnings || 0) > 0);
-                        if (account) setSelectedPackageId(account._id);
-                      }
-                    }}
-                    className="w-full rounded-xl border border-white/10 bg-[#050a13] px-4 py-3"
-                  >
-                    <option value="wallet">رصيد السحب العام</option>
-                    <option value="package">رصيد أرباح باقة محددة</option>
-                  </select>
+                  <label className="mb-3 block text-sm font-bold">اختر مصدر رصيد السحب</label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <button type="button" onClick={() => setWithdrawalSource("wallet")} className={withdrawalSource === "wallet" ? "rounded-2xl border border-cyan-300/40 bg-cyan-300/[0.09] p-4 text-right transition" : "rounded-2xl border border-white/10 bg-[#050a13] p-4 text-right transition hover:border-white/20"}>
+                      <div className="flex items-center justify-between gap-2"><span className="font-black text-white">رصيد السحب العام</span><span className="text-[10px] text-cyan-200">{withdrawalSource === "wallet" ? "محدد" : "اختيار"}</span></div>
+                      <div className="mt-3 text-xl font-black text-cyan-200">{Number(balances.find((item) => item.asset === (selected?.asset || "USDT"))?.available || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} <span className="text-xs">{selected?.asset || "USDT"}</span></div>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">السحب من رصيد المحفظة العام فقط، وليس من رصيد الإيداع.</p>
+                    </button>
+                    <button type="button" onClick={() => {
+                      setWithdrawalSource("package");
+                      const usdtMethod = methods.find((item) => item.asset === "USDT");
+                      if (usdtMethod) selectMethod(usdtMethod._id);
+                      const account = packageAccounts.find((item) => Number(item.availableEarnings || 0) > 0);
+                      if (account) setSelectedPackageId(account._id);
+                    }} className={withdrawalSource === "package" ? "rounded-2xl border border-emerald-300/40 bg-emerald-300/[0.08] p-4 text-right transition" : "rounded-2xl border border-white/10 bg-[#050a13] p-4 text-right transition hover:border-white/20"}>
+                      <div className="flex items-center justify-between gap-2"><span className="font-black text-white">رصيد أرباح الباقات</span><span className="text-[10px] text-emerald-200">{withdrawalSource === "package" ? "محدد" : "اختيار"}</span></div>
+                      <div className="mt-3 text-xl font-black text-emerald-200">{packageAccounts.reduce((sum, item) => sum + Number(item.availableEarnings || 0), 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} <span className="text-xs">USDT</span></div>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">كل باقة لها رصيد مستقل؛ رصيد الإيداع الخارجي غير قابل للسحب المباشر.</p>
+                    </button>
+                  </div>
                 </div>
 
                 {withdrawalSource === "package" && (
@@ -796,9 +815,11 @@ export default function WithdrawPage() {
                         </div>
                       </div>
 
-                      <div className="text-sm">
-                        {item.status}
-                      </div>
+                      <div className={"inline-flex rounded-full border px-3 py-1 text-xs font-bold " + (item.status === "completed" ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : item.status === "rejected" ? "border-red-400/20 bg-red-400/10 text-red-200" : item.status === "approved" || item.status === "processing" ? "border-blue-400/20 bg-blue-400/10 text-blue-200" : "border-amber-400/20 bg-amber-400/10 text-amber-200")}>
+                          {item.status === "pending" ? "قيد المراجعة" : item.status === "approved" ? "تمت الموافقة" : item.status === "processing" ? "قيد التنفيذ" : item.status === "completed" ? "مكتمل" : item.status === "rejected" ? "مرفوض" : item.status === "failed" ? "فشل التنفيذ" : item.status}
+                        </div>
+                        <div className="mt-2 text-xs text-slate-500">{item.source === "package" ? "سحب من رصيد باقة" : "سحب عام"} · {new Date(item.createdAt).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</div>
+                        {item.fee !== undefined && <div className="mt-1 text-xs text-slate-500">الرسوم: {Number(item.fee || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} · الصافي: {Number(item.receiveAmount || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} {item.asset}</div>}
                     </div>
                   </div>
                 ))}

@@ -42,8 +42,12 @@ export async function GET(request: NextRequest) {
     const packageMinimumRows = await InvestmentPackage.find({})
       .select("_id minimumWithdrawal")
       .lean();
+    const configuredMinimums = settings?.withdrawals?.withdrawalMinByPackage as unknown as Record<string, number> | undefined;
     const minimumWithdrawalByPlan = new Map(
-      (packageMinimumRows as any[]).map((plan) => [String(plan._id), Number(plan.minimumWithdrawal ?? 50)])
+      (packageMinimumRows as any[]).map((plan) => [
+        String(plan._id),
+        Number(configuredMinimums?.[String(plan._id)] ?? plan.minimumWithdrawal ?? settings?.withdrawals?.minAmount ?? 0),
+      ])
     );
 
     const [activeReferralDeposits, referralWithdrawalRows] = await Promise.all([

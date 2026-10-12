@@ -55,7 +55,11 @@ export async function POST(request: NextRequest) {
     const network = String(body.network || "").trim();
     const address = String(body.address || "").trim();
     const minDeposit = Number(body.minDeposit);
+    const maxDeposit = Number(body.maxDeposit ?? 0);
     const minWithdrawal = Number(body.minWithdrawal);
+    const maxWithdrawal = Number(body.maxWithdrawal ?? 0);
+    const withdrawalFee = Number(body.withdrawalFee ?? 0);
+    const warning = String(body.warning || "").trim();
     const enabled = body.enabled !== false;
     const depositEnabled = body.depositEnabled !== false;
     const withdrawalEnabled = body.withdrawalEnabled !== false;
@@ -67,8 +71,11 @@ export async function POST(request: NextRequest) {
       !address ||
       !Number.isFinite(minDeposit) ||
       minDeposit < 0 ||
+      !Number.isFinite(maxDeposit) || maxDeposit < 0 || (maxDeposit > 0 && minDeposit > maxDeposit) ||
       !Number.isFinite(minWithdrawal) ||
-      minWithdrawal < 0
+      minWithdrawal < 0 ||
+      !Number.isFinite(maxWithdrawal) || maxWithdrawal < 0 || (maxWithdrawal > 0 && minWithdrawal > maxWithdrawal) ||
+      !Number.isFinite(withdrawalFee) || withdrawalFee < 0
     ) {
       return NextResponse.json(
         { success: false, message: "بيانات وسيلة الدفع غير مكتملة" },
@@ -96,7 +103,11 @@ export async function POST(request: NextRequest) {
       network,
       address,
       minDeposit,
+      maxDeposit,
       minWithdrawal,
+      maxWithdrawal,
+      withdrawalFee,
+      warning,
       enabled,
       depositEnabled,
       withdrawalEnabled,
@@ -181,6 +192,16 @@ export async function PATCH(request: NextRequest) {
 
       update.minWithdrawal = value;
     }
+
+    for (const field of ["maxDeposit", "maxWithdrawal", "withdrawalFee"] as const) {
+      if (body[field] === undefined) continue;
+      const value = Number(body[field]);
+      if (!Number.isFinite(value) || value < 0) {
+        return NextResponse.json({ success: false, message: "الحد أو الرسوم غير صالحة" }, { status: 400 });
+      }
+      update[field] = value;
+    }
+    if (body.warning !== undefined) update.warning = String(body.warning || "").trim().slice(0, 1000);
 
     if (body.enabled !== undefined) {
       update.enabled = Boolean(body.enabled);

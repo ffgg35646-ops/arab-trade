@@ -163,7 +163,7 @@ export default function WithdrawPage() {
   }, [selectedSource]);
 
   useEffect(() => {
-    void load();
+    void Promise.resolve().then(() => { void load(); });
   }, [load]);
 
   const selectedMethod = useMemo(

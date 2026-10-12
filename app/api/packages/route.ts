@@ -39,6 +39,13 @@ export async function GET(request: NextRequest) {
     ]);
 
     const referredIds = referredUsers.map((item: any) => item._id);
+    const packageMinimumRows = await InvestmentPackage.find({})
+      .select("_id minimumWithdrawal")
+      .lean();
+    const minimumWithdrawalByPlan = new Map(
+      (packageMinimumRows as any[]).map((plan) => [String(plan._id), Number(plan.minimumWithdrawal ?? 50)])
+    );
+
     const [activeReferralDeposits, referralWithdrawalRows] = await Promise.all([
       referredIds.length
         ? DepositRequest.aggregate([
@@ -78,6 +85,7 @@ export async function GET(request: NextRequest) {
         : Math.min(Number(item.availableEarnings || 0), referralRemaining);
       return {
         ...item,
+        minimumWithdrawal: minimumWithdrawalByPlan.get(String(item.packageId)) ?? Number(settings?.withdrawals?.minAmount ?? 0),
         activeReferralCount,
         activeReferralDepositTotal,
         firstPackageWithdrawalPercent,

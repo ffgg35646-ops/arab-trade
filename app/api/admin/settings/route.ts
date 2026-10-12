@@ -69,7 +69,7 @@ export async function PATCH(request: NextRequest) {
     const currentSettings = await getPlatformSettings();
     const numericFields: Record<string, string[]> = {
       deposits: ["minAmount", "maxAmount"],
-      withdrawals: ["minAmount", "maxAmount", "dailyLimit"],
+      withdrawals: ["minAmount", "minGeneralWithdrawal", "maxAmount", "dailyLimit"],
     };
     for (const [section, fields] of Object.entries(numericFields)) {
       const values = body?.[section];
@@ -95,6 +95,11 @@ export async function PATCH(request: NextRequest) {
     }
     if (nextWithdrawalMax > 0 && nextWithdrawalMin > nextWithdrawalMax) {
       return NextResponse.json({ success: false, message: "الحد الأدنى للسحب لا يمكن أن يتجاوز الحد الأقصى" }, { status: 400 });
+    }
+
+    const nextGeneralWithdrawalMin = Number(body?.withdrawals?.minGeneralWithdrawal ?? currentSettings.withdrawals.minGeneralWithdrawal ?? nextWithdrawalMin);
+    if (nextWithdrawalMax > 0 && nextGeneralWithdrawalMin > nextWithdrawalMax) {
+      return NextResponse.json({ success: false, message: "الحد الأدنى للسحب العام لا يمكن أن يتجاوز الحد الأقصى للسحب" }, { status: 400 });
     }
 
     const update: Record<string, unknown> = {};

@@ -1,5 +1,6 @@
 import InvestmentPackage from "@/models/InvestmentPackage";
 import PackageCatalogSeed from "@/models/PackageCatalogSeed";
+import UserPackage from "@/models/UserPackage";
 
 const CATALOG_KEY = "arab-trade-default-packages-v1";
 
@@ -105,4 +106,26 @@ export async function ensureDefaultInvestmentPackages() {
     });
   }
   await localSeedPromise;
+
+  // The platform packages are lifetime accounts. Normalize legacy catalog and
+  // user-package duration values so old "60 day" records cannot imply expiry.
+  const [plans, legacyAccounts] = await Promise.all([
+    InvestmentPackage.find({}).select("_id durationDays description").lean(),
+    UserPackage.updateMany({ durationDays: { $ne: 0 } }, { $set: { durationDays: 0 } }),
+  ]);
+  void legacyAccounts;
+
+  for (const plan of plans as any[]) {
+    const original = String(plan.description || "");
+    const cleaned = original
+      .replace(/باقة(?: بداية)? لمدة\s*\d+\s*يوم(?:ًا|اً|ا)?/gi, "باقة تفعيل مستمرة دون انتهاء")
+      .replace(/لمدة\s*\d+\s*يوم(?:ًا|اً|ا)?/gi, "دون تاريخ انتهاء")
+      .replace(/for\s*\d+\s*days?/gi, "with no expiry");
+    if (Number(plan.durationDays || 0) !== 0 || cleaned !== original) {
+      await InvestmentPackage.updateOne(
+        { _id: plan._id },
+        { $set: { durationDays: 0, description: cleaned } }
+      );
+    }
+  }
 }

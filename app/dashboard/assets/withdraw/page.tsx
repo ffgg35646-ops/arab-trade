@@ -15,8 +15,6 @@ type Method = {
   withdrawalFee?: number;
   enabled: boolean;
   withdrawalEnabled?: boolean;
-  maxWithdrawal?: number;
-  withdrawalFee?: number;
   warning?: string;
 };
 type Balance = { asset: string; available: number; locked: number };

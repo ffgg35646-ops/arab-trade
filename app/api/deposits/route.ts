@@ -206,8 +206,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (
-      Number.isFinite(settings.deposits.maxAmount) &&
-      amount > settings.deposits.maxAmount
+      Number(settings.deposits.maxAmount || 0) > 0 &&
+      amount > Number(settings.deposits.maxAmount)
     ) {
       return NextResponse.json(
         {

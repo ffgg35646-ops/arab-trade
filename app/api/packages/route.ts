@@ -46,7 +46,9 @@ export async function GET(request: NextRequest) {
       policy: {
         dailyReturnsAutomatic: false,
         earningsNotice: "يضاف إلى رصيد الباقة العائد المحقق فعليًا والمسجل في النظام فقط. لا يتم إنشاء أرباح يومية مضمونة تلقائيًا.",
-        cancellationNotice: "عند إلغاء باقة نشطة، يضاف 50% من قيمة تفعيلها إلى رصيد السحب العام، وتظل الأرباح المحققة المتاحة مسجلة في الباقة.",
+        singleActivePackageNotice: "يسمح لكل مستخدم بباقة نشطة واحدة فقط.",
+        activationSourceNotice: "تفعيل أي باقة يكون من رصيد الإيداع الخارجي فقط، ولا يمكن استخدام رصيد السحب للتفعيل.",
+        cancellationNotice: "عند إلغاء باقة نشطة أو التغيير إلى باقة أخرى، يضاف 50% من قيمة تفعيل الباقة السابقة إلى رصيد السحب العام وليس رصيد الإيداع، وتظل الأرباح المحققة المتاحة مسجلة في الباقة.",
       },
     });
   } catch (error) {
@@ -158,6 +160,16 @@ export async function POST(request: NextRequest) {
 
       try {
         await session.withTransaction(async () => {
+          // Enforce the one-active-package rule inside the transaction as well,
+          // including protection against concurrent package changes.
+          const activePackages = await UserPackage.find({ userId: user._id, status: "active" })
+            .select("_id")
+            .session(session)
+            .lean();
+          if (activePackages.length !== 1 || String(activePackages[0]?._id) !== String(current._id)) {
+            throw new Error("MULTIPLE_ACTIVE_PACKAGES");
+          }
+
           const stillEnabled = await InvestmentPackage.findOne({ _id: plan._id, enabled: true }).session(session);
           if (!stillEnabled) throw new Error("TARGET_PACKAGE_DISABLED");
 
@@ -242,6 +254,12 @@ export async function POST(request: NextRequest) {
         });
       } catch (changeError) {
         const code = changeError instanceof Error ? changeError.message : "";
+        if (code === "MULTIPLE_ACTIVE_PACKAGES") {
+          return NextResponse.json({
+            success: false,
+            message: "يجب أن تكون لديك باقة نشطة واحدة فقط قبل التغيير. ألغِ أي باقات نشطة زائدة أولًا؛ لن يتغير أي رصيد تلقائيًا.",
+          }, { status: 409 });
+        }
         if (code === "INSUFFICIENT_DEPOSIT_BALANCE" || code === "CURRENT_PACKAGE_CHANGED" || code === "TARGET_PACKAGE_DISABLED") {
           const status = code === "INSUFFICIENT_DEPOSIT_BALANCE" ? 400 : 409;
           const message = code === "INSUFFICIENT_DEPOSIT_BALANCE"

@@ -79,6 +79,10 @@ export default function UserPackagesPage() {
             <div className="rounded-2xl border border-white/10 bg-[#050a13]/70 p-5"><div className="text-xs text-slate-400">الباقة النشطة</div><div className="mt-3 text-xl font-black">{activePlan?.packageName || "لا توجد باقة نشطة"}</div><p className="mt-2 text-xs text-slate-500">{activePlan ? "قيمة التفعيل " + money(activePlan.investedAmount) + " " + activePlan.asset : "اختر باقة متاحة."}</p></div>
           </div>
         </section>
+        <section role="note" className="mt-4 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-4 text-sm leading-7 text-amber-100">
+          <div className="font-black">تنبيه مهم: لك باقة نشطة واحدة فقط للتفعيل.</div>
+          <p className="mt-1">عند التغيير إلى باقة أخرى، يتم إنهاء الباقة الحالية وإرجاع 50% من قيمة تفعيلها إلى <strong>رصيد السحب العام</strong> وليس رصيد الإيداع. سعر الباقة الجديدة يُخصم كاملًا من <strong>رصيد الإيداع الخارجي فقط</strong>، ولا يمكن استخدام رصيد السحب لتفعيل أي باقة.</p>
+        </section>
         <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
             <div className="flex items-center gap-2 text-xs text-slate-400"><Package size={16} className="text-cyan-300" />الباقات النشطة</div>
@@ -109,7 +113,7 @@ export default function UserPackagesPage() {
                 <div className="flex items-center gap-2"><CheckCircle2 size={14} className="text-cyan-300" />التفعيل من رصيد الإيداع الخارجي</div>
                 <div className="flex items-center gap-2"><ShieldCheck size={14} className="text-cyan-300" />رصيد الباقة منفصل عن السحب العام</div>
                 <div className="flex items-center gap-2"><Wallet size={14} className="text-cyan-300" />سجل مستقل للعوائد والسحوبات</div>
-              </div><div className="mt-4 text-3xl font-black">{money(plan.price)} <span className="text-sm text-cyan-300">{plan.asset}</span></div><button type="button" onClick={() => void action(activePlan ? "change" : "activate", plan._id)} disabled={Boolean(busy)} className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-black disabled:opacity-50">{busy === plan._id ? "جاري التنفيذ..." : activePlan ? activePlan.packageName === plan.name ? "تجديد / تفعيل نفس الباقة" : "التغيير إلى هذه الباقة" : "تفعيل من رصيد الإيداع"}</button></article>)}</div>}
+              </div><div className="mt-4 text-3xl font-black">{money(plan.price)} <span className="text-sm text-cyan-300">{plan.asset}</span></div><button type="button" onClick={() => void action(activePlan ? "change" : "activate", plan._id)} disabled={Boolean(busy)} className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-black disabled:opacity-50">{busy === plan._id ? "جاري التنفيذ..." : activePlan ? activePlan.packageName === plan.name ? "إعادة تفعيل هذه الباقة" : "التغيير إلى هذه الباقة" : "تفعيل من رصيد الإيداع"}</button></article>)}</div>}
         </section>
         <section className="mt-8 rounded-2xl border border-white/10 bg-[#07101d] p-5">
           <h2 className="text-xl font-black">باقاتي وأرصدة السحب</h2><p className="mt-2 text-xs leading-6 text-slate-500">رصيد كل باقة منفصل. من صفحة السحب اختر رصيد الباقة لسحب المبالغ المتاحة.</p>

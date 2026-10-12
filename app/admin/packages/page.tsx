@@ -8,7 +8,7 @@ type Plan = { _id: string; name: string; description: string; price: number; ass
 type UserPackage = { _id: string; packageName: string; investedAmount: number; asset: string; status: string; availableEarnings: number; lockedEarnings: number; totalRealizedEarnings: number; totalWithdrawn: number; firstWithdrawalStatus?: "available" | "pending" | "completed"; activatedAt: string; userId?: { _id: string; name?: string; username?: string; email?: string } | null };
 type DepositBalance = { _id: string; asset: string; available: number; locked: number; userId?: { _id: string; name?: string; username?: string; email?: string } | null };
 type LedgerRow = { _id: string; type: string; asset: string; amount: number; note?: string; createdAt: string; userId?: { name?: string; username?: string; email?: string } | null; userPackageId?: { packageName?: string } | null };
-const emptyForm = { name: "", description: "", price: "", durationDays: "30", sortOrder: "0", enabled: true };
+const emptyForm = { name: "", description: "", price: "", durationDays: "60", sortOrder: "0", enabled: true };
 const money = (value: number) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 }).format(Number(value || 0));
 const firstStatus = (account: UserPackage) => account.firstWithdrawalStatus === "pending" ? "pending" : Number(account.totalWithdrawn || 0) > 0 ? "completed" : (account.firstWithdrawalStatus || "available");
 

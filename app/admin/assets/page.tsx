@@ -251,7 +251,7 @@ export default function AssetsAdminPage() {
         )
       );
 
-      alert("تم حفظ تغييرات العملة");
+      alert("تم حفظ إعدادات العملة والشبكات");
     } catch (error) {
       alert(
         error instanceof Error
@@ -623,21 +623,8 @@ export default function AssetsAdminPage() {
                                 type="button"
                                 disabled={saving === asset._id}
                                 onClick={() => {
-                                  const networks =
-                                    (asset.networks || []).map((item) =>
-                                      item._id === net._id ||
-                                      (!item._id &&
-                                        !net._id &&
-                                        item.code === net.code)
-                                        ? {
-                                            ...item,
-                                            enabled: !item.enabled,
-                                          }
-                                        : item
-                                    );
-
-                                  void updateAsset(asset._id, {
-                                    networks,
+                                  updateLocalNetwork(asset._id, net._id, net.code, {
+                                    enabled: !net.enabled,
                                   });
                                 }}
                                 className={`rounded-full px-3 py-1.5 text-[10px] font-bold ${
@@ -648,6 +635,38 @@ export default function AssetsAdminPage() {
                               >
                                 {asset.enabled && net.enabled ? "مفعل" : "متوقف"}
                               </button>
+                            </div>
+
+                            <div className="mt-4 grid gap-3 md:grid-cols-2">
+                              <label className="block text-xs font-bold text-slate-400">عنوان الإيداع
+                                <input value={net.depositAddress || ""} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { depositAddress: e.target.value })} placeholder="عنوان التحويل الذي يراه المستخدم" className="mt-2 w-full rounded-lg border border-slate-700 bg-[#07101d] px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/40"/>
+                              </label>
+                              <label className="block text-xs font-bold text-slate-400">الحد الأدنى للإيداع
+                                <input type="number" min="0" step="any" value={Number(net.minDeposit || 0)} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { minDeposit: Number(e.target.value) })} className="mt-2 w-full rounded-lg border border-slate-700 bg-[#07101d] px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/40"/>
+                              </label>
+                              <label className="block text-xs font-bold text-slate-400">الحد الأقصى للإيداع (0 = غير محدد)
+                                <input type="number" min="0" step="any" value={Number(net.maxDeposit || 0)} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { maxDeposit: Number(e.target.value) })} className="mt-2 w-full rounded-lg border border-slate-700 bg-[#07101d] px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/40"/>
+                              </label>
+                              <label className="block text-xs font-bold text-slate-400">الحد الأدنى للسحب
+                                <input type="number" min="0" step="any" value={Number(net.minWithdrawal || 0)} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { minWithdrawal: Number(e.target.value) })} className="mt-2 w-full rounded-lg border border-slate-700 bg-[#07101d] px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/40"/>
+                              </label>
+                              <label className="block text-xs font-bold text-slate-400">الحد الأقصى للسحب (0 = غير محدد)
+                                <input type="number" min="0" step="any" value={Number(net.maxWithdrawal || 0)} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { maxWithdrawal: Number(e.target.value) })} className="mt-2 w-full rounded-lg border border-slate-700 bg-[#07101d] px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/40"/>
+                              </label>
+                              <label className="block text-xs font-bold text-slate-400">رسوم السحب
+                                <input type="number" min="0" step="any" value={Number(net.withdrawalFee || 0)} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { withdrawalFee: Number(e.target.value) })} className="mt-2 w-full rounded-lg border border-slate-700 bg-[#07101d] px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/40"/>
+                              </label>
+                              <label className="block text-xs font-bold text-slate-400">تنبيه يظهر للمستخدم
+                                <textarea value={net.warning || ""} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { warning: e.target.value })} rows={2} placeholder="تنبيه اختياري عن الشبكة أو السحب" className="mt-2 w-full rounded-lg border border-slate-700 bg-[#07101d] px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/40"/>
+                              </label>
+                            </div>
+
+                            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex flex-wrap gap-4 text-xs">
+                                <label className="flex items-center gap-2 text-slate-300"><input type="checkbox" checked={net.depositEnabled !== false} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { depositEnabled: e.target.checked })}/>السحب/الإيداع: السماح بالإيداع</label>
+                                <label className="flex items-center gap-2 text-slate-300"><input type="checkbox" checked={net.withdrawalEnabled !== false} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { withdrawalEnabled: e.target.checked })}/>السماح بالسحب</label>
+                              </div>
+                              <button type="button" disabled={saving === asset._id} onClick={() => void saveAssetChanges(asset)} className="rounded-lg bg-cyan-600 px-4 py-2 text-xs font-black text-slate-950 disabled:opacity-50">{saving === asset._id ? "جاري الحفظ..." : "حفظ إعدادات الشبكة"}</button>
                             </div>
                           </div>
                         ))}

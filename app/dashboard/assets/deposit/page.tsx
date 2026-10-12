@@ -315,6 +315,13 @@ export default function DepositPage() {
                       {method.network}
                     </div>
 
+                    <div className="mt-3 rounded-lg border border-white/5 bg-black/20 p-3">
+                      <div className="text-[11px] text-slate-500">عنوان الإيداع المعتمد من الإدارة</div>
+                      <div className="mt-1 break-all text-xs leading-5 text-slate-200">
+                        {method.address || "لم يضف الأدمن عنوانًا لهذه الوسيلة بعد"}
+                      </div>
+                    </div>
+
                     <div className="mt-4 text-sm text-slate-400">
                       الحد الأدنى للإيداع:
                     </div>
@@ -343,8 +350,8 @@ export default function DepositPage() {
                     {selected.network}
                   </div>
 
-                  <div className="mt-4 text-xs text-slate-500">
-                    بيانات التحويل
+                  <div className="mt-4 text-xs font-bold text-cyan-200">
+                    عنوان الإيداع المعتمد من الإدارة — حوّل إليه فقط لهذه الشبكة
                   </div>
 
                   <div className="mt-2 break-all rounded-lg bg-black/20 p-3 text-sm">

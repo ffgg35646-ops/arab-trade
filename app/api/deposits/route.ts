@@ -193,6 +193,8 @@ export async function POST(request: NextRequest) {
       minDeposit = Number(payment.minDeposit || 0);
     }
 
+    minDeposit = Math.max(minDeposit, Number(settings.deposits.minAmount || 0));
+
     if (amount < minDeposit) {
       return NextResponse.json(
         {

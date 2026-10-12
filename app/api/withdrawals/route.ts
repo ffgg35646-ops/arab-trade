@@ -12,6 +12,8 @@ import { getPlatformSettings } from "@/lib/platform-settings";
 import { rateLimit } from "@/lib/rate-limit";
 import UserPackage from "@/models/UserPackage";
 import PackageLedger from "@/models/PackageLedger";
+import User from "@/models/User";
+import DepositRequest from "@/models/DepositRequest";
 
 export async function GET(request: NextRequest) {
   const clientKey =
@@ -429,9 +431,67 @@ export async function POST(request: NextRequest) {
       }
 
       isFirstPackageWithdrawal = firstStatus === "available";
+
+      const firstWithdrawalPercent = Math.max(0, Math.min(100, Number(settings.withdrawals.firstPackageWithdrawalPercent ?? 100)));
+      const referralWithdrawalPercent = Math.max(0, Math.min(100, Number(settings.withdrawals.referralPackageWithdrawalPercent ?? 50)));
+      const firstWithdrawalCap = Number(currentPackage.investedAmount || 0) * firstWithdrawalPercent / 100;
+
+      if (isFirstPackageWithdrawal && amount > firstWithdrawalCap) {
+        return NextResponse.json(
+          { success: false, message: "الحد الأقصى لأول سحب من هذه الباقة هو " + firstWithdrawalCap + " " + assetCode + " (النسبة المضبوطة: " + firstWithdrawalPercent + "% من قيمة تفعيل الباقة)." },
+          { status: 400 }
+        );
+      }
+
+      if (!isFirstPackageWithdrawal) {
+        const referredUsers = await User.find({ referredBy: user._id }).select("_id").lean();
+        const referredIds = referredUsers.map((item: any) => item._id);
+        const approvedReferralDeposits = referredIds.length
+          ? await DepositRequest.aggregate([
+              { $match: { userId: { $in: referredIds }, status: "approved", asset: assetCode } },
+              { $group: { _id: "$userId", total: { $sum: "$amount" } } },
+            ])
+          : [];
+        const referralDepositTotal = approvedReferralDeposits.reduce(
+          (sum: number, row: any) => sum + Number(row.total || 0), 0
+        );
+        const referralWithdrawalCap = referralDepositTotal * referralWithdrawalPercent / 100;
+        const previousReferralWithdrawals = await WithdrawalRequest.aggregate([
+          {
+            $match: {
+              userId: user._id,
+              source: "package",
+              userPackageId: currentPackage._id,
+              isFirstPackageWithdrawal: { $ne: true },
+              status: { $in: ["pending", "approved", "processing", "completed"] },
+            },
+          },
+          { $group: { _id: null, total: { $sum: "$amount" } } },
+        ]);
+        const alreadyWithdrawnAgainstReferrals = Number(previousReferralWithdrawals[0]?.total || 0);
+        const referralRemaining = Math.max(0, referralWithdrawalCap - alreadyWithdrawnAgainstReferrals);
+        if (amount > referralRemaining) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: referralRemaining > 0
+                ? "المتاح للسحب الآن من هذه الباقة حسب الإحالات النشطة هو " + referralRemaining + " " + assetCode + " فقط. نسبة الاستحقاق " + referralWithdrawalPercent + "% من إيداعات الإحالات النشطة المعتمدة، وتم خصم السحوبات السابقة."
+                : "لا يوجد حد سحب إضافي متاح من هذه الباقة حاليًا. تحتاج إلى إيداعات خارجية معتمدة جديدة من إحالات نشطة لزيادة الحد.",
+              activeReferrals: approvedReferralDeposits.length,
+              referralDepositTotal,
+              referralWithdrawalPercent,
+              referralWithdrawalCap,
+              alreadyWithdrawnAgainstReferrals,
+              referralRemaining,
+            },
+            { status: 400 }
+          );
+        }
+      }
+
       if (isFirstPackageWithdrawal && amount > Number(currentPackage.investedAmount || 0)) {
         return NextResponse.json(
-          { success: false, message: "الحد الأقصى لأول سحب من هذه الباقة هو مبلغ تفعيلها: " + Number(currentPackage.investedAmount || 0) + " " + assetCode + ". بعد حسم أول طلب، يمكنك سحب الرصيد المحقق المتاح دون شرط إحالات." },
+          { success: false, message: "الحد الأقصى لأول سحب من هذه الباقة هو " + firstWithdrawalCap + " " + assetCode + ". السحوبات التالية تعتمد على نسبة إيداعات الإحالات النشطة المضبوطة من الإدارة." },
           { status: 400 }
         );
       }

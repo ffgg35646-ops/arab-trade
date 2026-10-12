@@ -178,6 +178,7 @@ export default function WithdrawPage() {
     ? Number(selectedPackage?.availableEarnings || 0)
     : selectedGeneralBalance;
   const isFirstWithdrawal = !!selectedPackage &&
+    selectedPackage.status === "active" &&
     selectedPackage.firstWithdrawalStatus !== "pending" &&
     selectedPackage.firstWithdrawalStatus !== "completed" &&
     Number(selectedPackage.totalWithdrawn || 0) <= 0;
@@ -445,7 +446,7 @@ export default function WithdrawPage() {
                           <div className="grid gap-3 md:grid-cols-2">
                             {packageAccounts.map((item) => {
                               const chosen = item._id === selectedPackageId;
-                              const firstStatus = item.firstWithdrawalStatus === "pending" ? "أول طلب سحب قيد المراجعة" : (item.firstWithdrawalStatus === "completed" || Number(item.totalWithdrawn || 0) > 0) ? "تم حسم أول سحب" : "أول سحب متاح حسب النسبة المحددة";
+                              const firstStatus = item.status === "cancelled" ? "باقة غير نشطة: السحب يشترط حد إحالات نشطة متبقيًا" : item.firstWithdrawalStatus === "pending" ? "أول طلب سحب قيد المراجعة" : (item.firstWithdrawalStatus === "completed" || Number(item.totalWithdrawn || 0) > 0) ? "تم حسم أول سحب" : "أول سحب متاح حسب النسبة المحددة";
                               return (
                                 <button key={item._id} type="button" aria-pressed={chosen} onClick={() => { setSelectedPackageId(item._id); setAmount(""); setError(""); setMessage(""); }} className={chosen ? "rounded-2xl border border-emerald-300/50 bg-emerald-300/[0.07] p-4 text-right transition" : "rounded-2xl border border-white/10 bg-[#050a13] p-4 text-right transition hover:border-white/20"}>
                                   <div className="flex items-start justify-between gap-3">
@@ -471,7 +472,9 @@ export default function WithdrawPage() {
                               ? "أول طلب سحب من هذه الباقة قيد المراجعة. لا يمكن تقديم طلب آخر حتى تتم معالجته."
                               : isFirstWithdrawal
                                 ? "حد أول سحب: " + money(Number(selectedPackage.investedAmount || 0) * Number(selectedPackage.firstPackageWithdrawalPercent ?? 100) / 100) + " USDT، مع الالتزام بالرصيد المحقق المتاح."
-                                : "السحوبات التالية تعتمد على " + Number(selectedPackage.referralPackageWithdrawalPercent ?? 50) + "% من إيداعات الإحالات المعتمدة بعد خصم السحوبات السابقة."}
+                                : selectedPackage.status === "cancelled"
+                                  ? "هذه الباقة غير نشطة للسحب الآن. يلزم وجود إحالات نشطة لديها إيداعات معتمدة وحد سحب متبقٍ؛ تُخصم السحوبات السابقة من هذا الحد."
+                                  : "السحوبات التالية تعتمد على " + Number(selectedPackage.referralPackageWithdrawalPercent ?? 50) + "% من إيداعات الإحالات المعتمدة بعد خصم السحوبات السابقة."}
                           </div>
                         )}
                       </div>

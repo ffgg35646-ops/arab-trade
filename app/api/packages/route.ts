@@ -9,6 +9,10 @@ import PackageLedger from "@/models/PackageLedger";
 import { ensureDefaultInvestmentPackages } from "@/lib/ensure-default-investment-packages";
 import Wallet from "@/models/Wallet";
 import LedgerEntry from "@/models/LedgerEntry";
+import User from "@/models/User";
+import DepositRequest from "@/models/DepositRequest";
+import WithdrawalRequest from "@/models/WithdrawalRequest";
+import PlatformSettings from "@/models/PlatformSettings";
 
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8) / 1e8;
 
@@ -19,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
     await ensureDefaultInvestmentPackages();
-    const [packages, depositBalances, userPackages, packageLedger] = await Promise.all([
+    const [packages, depositBalances, rawUserPackages, packageLedger, settings, referredUsers] = await Promise.all([
       InvestmentPackage.find({ enabled: true }).sort({ sortOrder: 1, price: 1 }).lean(),
       DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
       UserPackage.find({ userId: user._id }).sort({ createdAt: -1 }).limit(100).lean(),
@@ -28,7 +32,60 @@ export async function GET(request: NextRequest) {
         .sort({ createdAt: -1 })
         .limit(200)
         .lean(),
+      PlatformSettings.findOne({ key: "global" }).lean(),
+      User.find({ referredBy: user._id }).select("_id").lean(),
     ]);
+
+    const referredIds = referredUsers.map((item: any) => item._id);
+    const [activeReferralDeposits, referralWithdrawalRows] = await Promise.all([
+      referredIds.length
+        ? DepositRequest.aggregate([
+            { $match: { userId: { $in: referredIds }, status: "approved", asset: "USDT" } },
+            { $group: { _id: "$userId", total: { $sum: "$amount" } } },
+          ])
+        : Promise.resolve([]),
+      WithdrawalRequest.find({
+        userId: user._id,
+        source: "package",
+        isFirstPackageWithdrawal: { $ne: true },
+        status: { $in: ["pending", "approved", "processing", "completed"] },
+      }).select("userPackageId amount").lean(),
+    ]);
+
+    const activeReferralCount = activeReferralDeposits.length;
+    const activeReferralDepositTotal = activeReferralDeposits.reduce(
+      (sum: number, row: any) => sum + Number(row.total || 0), 0
+    );
+    const firstPackageWithdrawalPercent = Math.max(0, Math.min(100, Number(settings?.withdrawals?.firstPackageWithdrawalPercent ?? 100)));
+    const referralPackageWithdrawalPercent = Math.max(0, Math.min(100, Number(settings?.withdrawals?.referralPackageWithdrawalPercent ?? 50)));
+    const referralWithdrawalByPackage = new Map<string, number>();
+    for (const row of referralWithdrawalRows as any[]) {
+      const key = String(row.userPackageId || "");
+      referralWithdrawalByPackage.set(key, (referralWithdrawalByPackage.get(key) || 0) + Number(row.amount || 0));
+    }
+    const userPackages = rawUserPackages.map((item: any) => {
+      const firstPending = item.firstWithdrawalStatus === "pending";
+      const firstCompleted = item.firstWithdrawalStatus === "completed" || Number(item.totalWithdrawn || 0) > 0;
+      const isFirstAvailable = !firstPending && !firstCompleted;
+      const referralCap = activeReferralDepositTotal * referralPackageWithdrawalPercent / 100;
+      const referralAlreadyWithdrawn = referralWithdrawalByPackage.get(String(item._id)) || 0;
+      const referralRemaining = Math.max(0, referralCap - referralAlreadyWithdrawn);
+      const firstCap = Number(item.investedAmount || 0) * firstPackageWithdrawalPercent / 100;
+      const withdrawalLimit = firstPending ? 0 : isFirstAvailable
+        ? Math.min(Number(item.availableEarnings || 0), firstCap)
+        : Math.min(Number(item.availableEarnings || 0), referralRemaining);
+      return {
+        ...item,
+        activeReferralCount,
+        activeReferralDepositTotal,
+        firstPackageWithdrawalPercent,
+        referralPackageWithdrawalPercent,
+        referralWithdrawalCap: referralCap,
+        referralAlreadyWithdrawn,
+        referralRemaining,
+        withdrawalLimit,
+      };
+    });
 
     return NextResponse.json({
       success: true,

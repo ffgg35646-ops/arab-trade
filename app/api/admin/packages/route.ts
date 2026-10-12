@@ -93,17 +93,19 @@ export async function POST(request: NextRequest) {
     const price = Number(body.price);
     const durationDays = 0;
     const dailyProfit = Number(body.dailyProfit ?? 0);
+    const minimumWithdrawal = Number(body.minimumWithdrawal ?? 50);
     const sortOrder = Number(body.sortOrder || 0);
     const enabled = body.enabled !== false;
 
     if (!name || !Number.isFinite(price) || price < 1 ||
         !Number.isFinite(dailyProfit) || dailyProfit < 0 || dailyProfit > 1000000000 ||
+        !Number.isFinite(minimumWithdrawal) || minimumWithdrawal < 0 ||
         !Number.isFinite(sortOrder)) {
       return NextResponse.json({ success: false, message: "تحقق من الاسم والسعر والمدة والترتيب" }, { status: 400 });
     }
 
     const item = await InvestmentPackage.create({
-      name, description, price, asset: "USDT", durationDays, dailyProfit, sortOrder, enabled,
+      name, description, price, asset: "USDT", durationDays, dailyProfit, minimumWithdrawal, sortOrder, enabled,
     });
 
     return NextResponse.json({ success: true, package: item }, { status: 201 });
@@ -144,6 +146,11 @@ export async function PATCH(request: NextRequest) {
       const value = Number(body.sortOrder);
       if (!Number.isFinite(value)) return NextResponse.json({ success: false, message: "ترتيب الباقة غير صالح" }, { status: 400 });
       update.sortOrder = value;
+    }
+    if (body.minimumWithdrawal !== undefined) {
+      const value = Number(body.minimumWithdrawal);
+      if (!Number.isFinite(value) || value < 0) return NextResponse.json({ success: false, message: "الحد الأدنى لسحب هذه الباقة غير صالح" }, { status: 400 });
+      update.minimumWithdrawal = value;
     }
     if (body.enabled !== undefined) update.enabled = body.enabled === true;
 

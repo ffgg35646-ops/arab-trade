@@ -297,8 +297,8 @@ export default function WithdrawPage() {
     }
 
     const minimum = source === "package"
-      ? Math.max(Number(selectedMethod.minWithdrawal || 0), Number(limits.minWithdrawal || 0), Number(packageAccount?.minimumWithdrawal || 0))
-      : Math.max(Number(selectedMethod.minWithdrawal || 0), Number(limits.minWithdrawal || 0), Number(limits.minGeneralWithdrawal || 0));
+      ? Math.max(Number(selectedMethod.minWithdrawal || 0), Number(packageAccount?.minimumWithdrawal || 0))
+      : Math.max(Number(selectedMethod.minWithdrawal || 0), Number(limits.minGeneralWithdrawal ?? limits.minWithdrawal ?? 0));
     const configuredMaximums = [Number(selectedMethod.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : 0;
     if (numericAmount < minimum) {
@@ -377,8 +377,8 @@ export default function WithdrawPage() {
       ? Number(packageAccount?.availableEarnings || 0)
       : Number(balances.find((item) => item.asset === selected?.asset)?.available || 0);
     const minimum = source === "package"
-      ? Math.max(Number(selected?.minWithdrawal || 0), Number(limits.minWithdrawal || 0), Number(packageAccount?.minimumWithdrawal || 0))
-      : Math.max(Number(selected?.minWithdrawal || 0), Number(limits.minWithdrawal || 0), Number(limits.minGeneralWithdrawal || 0));
+      ? Math.max(Number(selected?.minWithdrawal || 0), Number(packageAccount?.minimumWithdrawal || 0))
+      : Math.max(Number(selected?.minWithdrawal || 0), Number(limits.minGeneralWithdrawal ?? limits.minWithdrawal ?? 0));
     const configuredMaximums = [Number(selected?.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : undefined;
     const packageMax = packageAccount ? packageMaximum(packageAccount) : 0;

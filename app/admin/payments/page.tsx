@@ -430,6 +430,9 @@ export default function PaymentsAdminPage() {
                         placeholder="عنوان محفظة الإيداع أو رقم الحساب أو بيانات التحويل"
                         className="w-full resize-none rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"
                       />
+                      <p className="mt-2 text-xs leading-5 text-slate-500">
+                        يظهر هذا العنوان في صفحة الإيداع للمستخدمين لهذه العملة والشبكة. عنوان استلام المستخدم عند السحب يكتبه المستخدم في صفحة السحب ولا يُستبدل بعنوان الإيداع.
+                      </p>
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">

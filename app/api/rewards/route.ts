@@ -177,12 +177,14 @@ export async function POST(request: NextRequest) {
       let wallet = await Wallet.findOne({
         userId: user._id,
         type: "funding",
+        mode: "live",
       }).session(session);
 
       if (!wallet) {
         wallet = new Wallet({
           userId: user._id,
           type: "funding",
+          mode: "live",
           balances: [],
         });
       }

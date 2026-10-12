@@ -434,7 +434,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      isFirstPackageWithdrawal = firstStatus === "available";
+      // Only the currently active package receives the special first-withdrawal cap.
+      // Inactive/cancelled package balances require referral-backed cap like later withdrawals.
+      isFirstPackageWithdrawal = currentPackage.status === "active" && firstStatus === "available";
 
       const firstWithdrawalPercent = Math.max(0, Math.min(100, Number(settings.withdrawals.firstPackageWithdrawalPercent ?? 100)));
       const referralWithdrawalPercent = Math.max(0, Math.min(100, Number(settings.withdrawals.referralPackageWithdrawalPercent ?? 50)));
@@ -480,7 +482,9 @@ export async function POST(request: NextRequest) {
               success: false,
               message: referralRemaining > 0
                 ? "المتاح للسحب الآن من هذه الباقة حسب الإحالات النشطة هو " + referralRemaining + " " + assetCode + " فقط. نسبة الاستحقاق " + referralWithdrawalPercent + "% من إيداعات الإحالات النشطة المعتمدة، وتم خصم السحوبات السابقة."
-                : "لا يوجد حد سحب إضافي متاح من هذه الباقة حاليًا. تحتاج إلى إيداعات خارجية معتمدة جديدة من إحالات نشطة لزيادة الحد.",
+                : currentPackage.status === "cancelled"
+                  ? "هذه الباقة غير نشطة للسحب الآن. عليك بجلب إحالات نشطة لديها إيداعات خارجية معتمدة."
+                  : "لا يوجد حد سحب إضافي متاح من هذه الباقة حاليًا. تحتاج إلى إيداعات خارجية معتمدة جديدة من إحالات نشطة لزيادة الحد.",
               activeReferrals: approvedReferralDeposits.length,
               referralDepositTotal,
               referralWithdrawalPercent,
@@ -509,6 +513,9 @@ export async function POST(request: NextRequest) {
       };
 
       if (isFirstPackageWithdrawal) {
+        packageFilter.firstWithdrawalStatus = { $in: ["available", null] };
+      } else if (currentPackage.status === "cancelled" && firstStatus === "available") {
+        // Keep the unused-first marker for audit, but treat this inactive account as referral-gated.
         packageFilter.firstWithdrawalStatus = { $in: ["available", null] };
       } else {
         packageFilter.firstWithdrawalStatus = "completed";

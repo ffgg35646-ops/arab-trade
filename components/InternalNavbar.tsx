@@ -77,6 +77,9 @@ export default function InternalNavbar() {
     setUnreadNotifications,
   ] = useState(0);
 
+  const [depositUsdtBalance, setDepositUsdtBalance] = useState(0);
+  const [withdrawUsdtBalance, setWithdrawUsdtBalance] = useState(0);
+
   const ref =
     useRef<HTMLDivElement>(null);
 
@@ -122,6 +125,43 @@ export default function InternalNavbar() {
         5000
       );
 
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBalances() {
+      try {
+        const response = await fetch("/api/wallet", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!data?.success || cancelled) return;
+
+        const depositBalances = Array.isArray(data.depositBalances) ? data.depositBalances : [];
+        const withdrawalBalances = Array.isArray(data.withdrawalBalances) ? data.withdrawalBalances : [];
+        const depositUsdt = depositBalances
+          .filter((item: { asset?: string }) => String(item.asset || "").toUpperCase() === "USDT")
+          .reduce((sum: number, item: { available?: number }) => sum + Number(item.available || 0), 0);
+        const withdrawalUsdt = withdrawalBalances
+          .filter((item: { asset?: string }) => String(item.asset || "").toUpperCase() === "USDT")
+          .reduce((sum: number, item: { available?: number }) => sum + Number(item.available || 0), 0);
+
+        setDepositUsdtBalance(depositUsdt);
+        setWithdrawUsdtBalance(withdrawalUsdt);
+      } catch {
+        // احتفظ بآخر أرصدة ناجحة بدل تصفيرها عند انقطاع الشبكة
+      }
+    }
+
+    void loadBalances();
+    const timer = window.setInterval(() => void loadBalances(), 5000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -360,6 +400,17 @@ export default function InternalNavbar() {
             <Search size={18} />
           </Link>
 
+          <div className="hidden items-center gap-2 2xl:flex">
+            <Link href="/dashboard/assets/deposit" className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2 transition hover:bg-amber-300/[0.1]" title="رصيد الإيداع الموحد">
+              <span className="block text-[10px] text-amber-200/80">رصيد الإيداع</span>
+              <span className="block text-xs font-black text-amber-100">{depositUsdtBalance.toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</span>
+            </Link>
+            <Link href="/dashboard/assets/withdraw" className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-2 transition hover:bg-cyan-300/[0.1]" title="إجمالي رصيد السحب العام وأرصدة الباقات">
+              <span className="block text-[10px] text-cyan-200/80">رصيد السحب</span>
+              <span className="block text-xs font-black text-cyan-100">{withdrawUsdtBalance.toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</span>
+            </Link>
+          </div>
+
           <Link
             href="/dashboard/notifications"
             onClick={() =>
@@ -519,6 +570,17 @@ export default function InternalNavbar() {
                 </div>
               )
             )}
+
+            <div className="grid grid-cols-2 gap-2">
+              <Link href="/dashboard/assets/deposit" onClick={() => setMobile(false)} className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-3">
+                <span className="block text-[10px] text-amber-200/80">رصيد الإيداع</span>
+                <span className="mt-1 block text-xs font-black text-amber-100">{depositUsdtBalance.toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</span>
+              </Link>
+              <Link href="/dashboard/assets/withdraw" onClick={() => setMobile(false)} className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-3">
+                <span className="block text-[10px] text-cyan-200/80">رصيد السحب</span>
+                <span className="mt-1 block text-xs font-black text-cyan-100">{withdrawUsdtBalance.toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</span>
+              </Link>
+            </div>
 
             <Link
               href="/dashboard/notifications"

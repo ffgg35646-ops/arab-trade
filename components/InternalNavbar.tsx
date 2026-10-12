@@ -400,12 +400,12 @@ export default function InternalNavbar() {
             <Search size={18} />
           </Link>
 
-          <div className="hidden items-center gap-2 2xl:flex">
-            <Link href="/dashboard/assets/deposit" className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-2 transition hover:bg-amber-300/[0.1]" title="رصيد الإيداع الموحد">
+          <div className="hidden items-center gap-1 md:flex xl:gap-2">
+            <Link href="/dashboard/assets/deposit" className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-2 py-2 transition hover:bg-amber-300/[0.1] xl:px-3" title="رصيد الإيداع الموحد">
               <span className="block text-[10px] text-amber-200/80">رصيد الإيداع</span>
               <span className="block text-xs font-black text-amber-100">{depositUsdtBalance.toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</span>
             </Link>
-            <Link href="/dashboard/assets/withdraw" className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-2 transition hover:bg-cyan-300/[0.1]" title="إجمالي رصيد السحب العام وأرصدة الباقات">
+            <Link href="/dashboard/assets/withdraw" className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] px-2 py-2 transition hover:bg-cyan-300/[0.1] xl:px-3" title="إجمالي رصيد السحب العام وأرصدة الباقات">
               <span className="block text-[10px] text-cyan-200/80">رصيد السحب</span>
               <span className="block text-xs font-black text-cyan-100">{withdrawUsdtBalance.toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</span>
             </Link>

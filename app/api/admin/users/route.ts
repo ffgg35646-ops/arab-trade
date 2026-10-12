@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { requireAdminLeader } from "@/lib/admin-auth";
 import User from "@/models/User";
+import DepositBalance from "@/models/DepositBalance";
+import Wallet from "@/models/Wallet";
+import UserPackage from "@/models/UserPackage";
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,12 +63,58 @@ export async function GET(request: NextRequest) {
       .limit(500)
       .lean();
 
+    const userIds = users.map((user: any) => user._id);
+    const [depositRows, walletRows, packageRows] = await Promise.all([
+      DepositBalance.find({ userId: { $in: userIds } }).lean(),
+      Wallet.find({ userId: { $in: userIds }, type: "spot", mode: "live" }).lean(),
+      UserPackage.find({ userId: { $in: userIds }, status: { $in: ["active", "cancelled"] } })
+        .select("userId asset availableEarnings lockedEarnings").lean(),
+    ]);
+
+    const depositByUser = new Map<string, any[]>();
+    for (const row of depositRows as any[]) {
+      const key = String(row.userId);
+      depositByUser.set(key, [...(depositByUser.get(key) || []), {
+        asset: String(row.asset || "").toUpperCase(), available: Number(row.available || 0), locked: Number(row.locked || 0),
+      }]);
+    }
+
+    const withdrawalByUser = new Map<string, Map<string, { asset: string; available: number; locked: number }>>();
+    for (const wallet of walletRows as any[]) {
+      const key = String(wallet.userId);
+      const balances = withdrawalByUser.get(key) || new Map();
+      for (const row of wallet.balances || []) {
+        const asset = String(row.asset || "").toUpperCase();
+        const current = balances.get(asset) || { asset, available: 0, locked: 0 };
+        current.available += Number(row.available || 0);
+        current.locked += Number(row.locked || 0);
+        balances.set(asset, current);
+      }
+      withdrawalByUser.set(key, balances);
+    }
+    for (const row of packageRows as any[]) {
+      const key = String(row.userId);
+      const asset = String(row.asset || "USDT").toUpperCase();
+      const balances = withdrawalByUser.get(key) || new Map();
+      const current = balances.get(asset) || { asset, available: 0, locked: 0 };
+      current.available += Number(row.availableEarnings || 0);
+      current.locked += Number(row.lockedEarnings || 0);
+      balances.set(asset, current);
+      withdrawalByUser.set(key, balances);
+    }
+
     return NextResponse.json({
       success: true,
-      users: users.map((user: any) => ({
-        ...user,
-        _id: user._id ? String(user._id) : undefined,
-      })),
+      users: users.map((user: any) => {
+        const id = String(user._id);
+        return {
+          ...user,
+          _id: id,
+          depositBalances: depositByUser.get(id) || [],
+          withdrawalBalances: Array.from(withdrawalByUser.get(id)?.values() || [])
+            .filter((row) => row.available !== 0 || row.locked !== 0),
+        };
+      }),
     });
   } catch (error) {
     console.error("ADMIN USERS GET ERROR:", error);

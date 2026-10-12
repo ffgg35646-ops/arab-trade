@@ -10,6 +10,7 @@ export interface IWithdrawalRequest {
   address: string;
   status: "pending" | "approved" | "processing" | "rejected" | "failed" | "completed";
   source?: "wallet" | "package";
+  walletType?: "spot" | "funding";
   userPackageId?: mongoose.Types.ObjectId | null;
   isFirstPackageWithdrawal?: boolean;
   adminNote: string;
@@ -31,6 +32,7 @@ const WithdrawalRequestSchema = new Schema<IWithdrawalRequest>(
     receiveAmount: { type: Number, required: true, min: 0 },
     address: { type: String, required: true },
     source: { type: String, enum: ["wallet", "package"], default: "wallet", index: true },
+    walletType: { type: String, enum: ["spot", "funding"], default: "spot", index: true },
     userPackageId: { type: Schema.Types.ObjectId, ref: "UserPackage", default: null, index: true },
     isFirstPackageWithdrawal: { type: Boolean, default: false, index: true },
     status: {

@@ -261,9 +261,20 @@ export async function GET(request: NextRequest) {
         0
       );
 
+    // General withdrawal balance includes funds earned inside the platform,
+    // regardless of whether they currently sit in spot or funding.
+    const generalWithdrawalMap = new Map<string, { asset: string; available: number; locked: number }>();
+    for (const balance of [...rawSpotBalances, ...rawFundingBalances]) {
+      const current = generalWithdrawalMap.get(balance.asset) || { asset: balance.asset, available: 0, locked: 0 };
+      current.available += Number(balance.available || 0);
+      current.locked += Number(balance.locked || 0);
+      generalWithdrawalMap.set(balance.asset, current);
+    }
+
+    // Unified display balance = general internal funds + independently held package earnings.
     const withdrawalMap = new Map<string, { asset: string; available: number; locked: number }>();
-    for (const balance of rawSpotBalances) {
-      withdrawalMap.set(balance.asset, { asset: balance.asset, available: balance.available, locked: balance.locked });
+    for (const [asset, balance] of generalWithdrawalMap) {
+      withdrawalMap.set(asset, { ...balance });
     }
     for (const account of packageAccounts as any[]) {
       const asset = String(account.asset || "USDT").toUpperCase();
@@ -276,6 +287,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       depositBalances: depositBalances.map((item: any) => ({ asset: String(item.asset || "").toUpperCase(), available: Number(item.available || 0), locked: Number(item.locked || 0) })),
+      generalWithdrawalBalances: Array.from(generalWithdrawalMap.values()).filter((item) => item.available !== 0 || item.locked !== 0),
       withdrawalBalances: Array.from(withdrawalMap.values()).filter((item) => item.available !== 0 || item.locked !== 0),
 
       wallet: {

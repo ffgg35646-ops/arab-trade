@@ -23,13 +23,24 @@ export default function UserPackagesPage() {
 
   const load = useCallback(async () => {
     try {
-      // Read the canonical deposit balance from the same API that validates
-      // and debits package activations. Avoid racing two balance-reconciliation
-      // requests (/api/packages and /api/wallet) during the same page load.
-      const res = await fetch("/api/packages", { credentials: "include", cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.message || "تعذر تحميل الباقات");
-      setData(json as Data);
+      // Use the same wallet endpoint as InternalNavbar for the displayed deposit balance.
+      // Keep package/account data from /api/packages; do not merge balances or credit funds client-side.
+      const [packagesRes, walletRes] = await Promise.all([
+        fetch("/api/packages", { credentials: "include", cache: "no-store" }),
+        fetch("/api/wallet", { credentials: "include", cache: "no-store" }),
+      ]);
+      const [packagesJson, walletJson] = await Promise.all([
+        packagesRes.json(),
+        walletRes.json(),
+      ]);
+      if (!packagesRes.ok || !packagesJson.success) {
+        throw new Error(packagesJson.message || "تعذر تحميل الباقات");
+      }
+      const nextData = packagesJson as Data;
+      if (walletRes.ok && walletJson?.success && Array.isArray(walletJson.depositBalances)) {
+        nextData.depositBalances = walletJson.depositBalances;
+      }
+      setData(nextData);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذر تحميل الباقات");

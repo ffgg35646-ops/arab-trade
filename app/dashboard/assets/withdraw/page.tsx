@@ -416,55 +416,47 @@ export default function WithdrawPage() {
     const isSubmitting = submittingKey === key;
     const isSaving = savingAddressKey === key;
     return (
-      <form onSubmit={(event) => void submitWithdrawal(event, source, packageAccount, packageId)} className="space-y-3">
-        <div>
-          <label className="mb-1 block text-xs font-bold">وسيلة السحب / العملة والشبكة</label>
+      <form onSubmit={(event) => void submitWithdrawal(event, source, packageAccount, packageId)} className={source === "wallet" ? "grid gap-2 md:grid-cols-2" : "space-y-2"}>
+        <div className="min-w-0">
+          <label className="mb-1 block text-[11px] font-bold">وسيلة السحب</label>
           <select value={form.methodId} onChange={(event) => changeMethod(source, packageId, event.target.value)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-3 py-2 text-sm outline-none focus:border-cyan-400/50">
-            <option value="">اختر وسيلة السحب</option>
+            <option value="">اختر الوسيلة</option>
             {renderMethodOptions(source === "package")}
           </select>
-          {methods.length === 0 && <p className="mt-2 text-xs text-amber-200">الأدمن لم يفعّل أي وسيلة سحب بعد؛ الخانات موجودة لكن لن يتم إرسال الطلب حتى تفعيل وسيلة.</p>}
+          {methods.length === 0 && <p className="mt-2 text-xs text-amber-200">لا توجد وسيلة سحب مفعّلة حاليًا.</p>}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-lg border border-white/10 bg-white/[0.025] p-2.5">
-            <div className="text-[11px] text-slate-500">الرصيد المتاح</div>
-            <div className="mt-1 text-base font-black text-cyan-100">{money(available)} <span className="text-[10px]">{selected?.asset || "USDT"}</span></div>
-          </div>
-          <div className="rounded-lg border border-white/10 bg-white/[0.025] p-2.5">
-            <div className="text-[11px] text-slate-500">الحد الأدنى للسحب</div>
-            <div className="mt-1 text-base font-black">{selected ? money(minimum) : money(minimum)} <span className="text-[10px]">{selected?.asset || "USDT"}</span></div>
-          </div>
+        <div className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.025] px-3 py-2 text-xs">
+          <div><span className="text-slate-500">المتاح</span><div className="mt-0.5 font-black text-cyan-100">{money(available)} {selected?.asset || "USDT"}</div></div>
+          <div className="text-left"><span className="text-slate-500">الحد الأدنى</span><div className="mt-0.5 font-black">{money(minimum)} {selected?.asset || "USDT"}</div></div>
         </div>
 
-        <div>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <label className="block text-xs font-bold">عنوان محفظتك لاستلام السحب</label>
-            <span className="text-xs text-slate-500">{savedAddress ? "يوجد عنوان محفوظ لهذه الشبكة" : "أدخل عنوان الاستلام الخاص بك"}</span>
+        <div className={source === "wallet" ? "min-w-0 md:col-span-2" : "min-w-0"}>
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <label className="block text-[11px] font-bold">عنوان الاستلام</label>
+            <span className="text-[10px] text-slate-500">{savedAddress ? "عنوان محفوظ" : ""}</span>
           </div>
-          <p className="mb-1 text-[11px] text-slate-500">عنوان الاستلام الخاص بك.</p>
           <textarea value={form.address} onChange={(event) => updateForm(source, packageId, "address", event.target.value)} rows={2} required placeholder="عنوان محفظة الاستلام" className="w-full resize-y rounded-lg border border-white/10 bg-[#050a13] px-3 py-2 text-sm outline-none focus:border-cyan-400/50" />
-          <button type="button" onClick={() => void saveAddress(source, packageId)} disabled={isSaving || !form.address.trim() || !selected} className="mt-1.5 rounded-lg border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-1.5 text-[11px] font-bold text-cyan-200 disabled:opacity-40">
-            {isSaving ? "جاري حفظ العنوان..." : savedAddress ? "تحديث العنوان المحفوظ" : "حفظ العنوان للمرة القادمة"}
+          <button type="button" onClick={() => void saveAddress(source, packageId)} disabled={isSaving || !form.address.trim() || !selected} className="mt-1 rounded-lg border border-cyan-400/20 bg-cyan-400/[0.06] px-2.5 py-1 text-[10px] font-bold text-cyan-200 disabled:opacity-40">
+            {isSaving ? "جارٍ الحفظ…" : savedAddress ? "تحديث العنوان" : "حفظ العنوان"}
           </button>
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-bold">{source === "package" ? "مبلغ السحب — " + (packageAccount?.packageName || packagePlan?.name || "الباقة") : "مبلغ السحب العام"}</label>
-          <input type="number" min={minimum} max={source === "package" ? Math.min(packageMax, maximum || packageMax) : maximum} step="any" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", event.target.value)} disabled={Boolean(packagePending || (source === "package" && (!packageAccount || packageMax <= 0)))} required placeholder="مبلغ السحب" className="w-full rounded-lg border border-white/10 bg-[#050a13] px-3 py-2 text-sm outline-none focus:border-cyan-400/50 disabled:opacity-50" />
-          {source === "package" && <p className="mt-1 text-[10px] leading-4 text-slate-500">حد الأدنى الإدارة: {money(Number(packageAccount?.minimumWithdrawal ?? packagePlan?.minimumWithdrawal ?? 100))} USDT · متاح: {money(Math.min(packageMax, maximum || packageMax))} USDT.</p>}
-          {source === "wallet" && selected && <p className="mt-1 text-[10px] text-slate-500">الحد الأدنى للإدارة: {money(Number(limits.minGeneralWithdrawal || limits.minWithdrawal || 0))} {selected.asset}.</p>}
+          <label className="mb-1 block text-[11px] font-bold">مبلغ السحب</label>
+          <input type="number" min={minimum} max={source === "package" ? Math.min(packageMax, maximum || packageMax) : maximum} step="any" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", event.target.value)} disabled={Boolean(packagePending || (source === "package" && (!packageAccount || packageMax <= 0)))} required placeholder="المبلغ" className="w-full rounded-lg border border-white/10 bg-[#050a13] px-3 py-2 text-sm outline-none focus:border-cyan-400/50 disabled:opacity-50" />
+          {source === "package" && <p className="mt-1 text-[10px] leading-4 text-slate-500">أقصى مبلغ: {money(Math.min(packageMax, maximum || packageMax))} USDT</p>}
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-white/[0.025] p-2.5 text-xs">
-          <div className="flex justify-between py-1"><span className="text-slate-500">الرسوم</span><span>{money(Number(selected?.withdrawalFee || 0))} {selected?.asset || ""}</span></div>
-          <div className="flex justify-between py-1"><span className="text-slate-500">الصافي المتوقع</span><span className="font-black text-emerald-200">{money(Math.max(0, Number(form.amount || 0) - Number(selected?.withdrawalFee || 0)))} {selected?.asset || ""}</span></div>
+        <div className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.025] px-3 py-2 text-[11px]">
+          <span className="text-slate-500">الرسوم: <b className="text-slate-200">{money(Number(selected?.withdrawalFee || 0))} {selected?.asset || ""}</b></span>
+          <span className="text-slate-500">الصافي: <b className="text-emerald-200">{money(Math.max(0, Number(form.amount || 0) - Number(selected?.withdrawalFee || 0)))} {selected?.asset || ""}</b></span>
         </div>
         {selected?.warning && <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-2 text-xs text-amber-200">{selected.warning}</div>}
         {packagePending && <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-2 text-[11px] text-amber-200">طلب السحب الأول قيد المراجعة.</div>}
 
-        <button type="submit" disabled={isSubmitting || !selected || (source === "package" && (!packageAccount || packagePending || packageMax <= 0))} className="w-full rounded-lg bg-cyan-300 px-3 py-2.5 text-sm font-black text-[#03111c] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40">
-          {isSubmitting ? "جاري إرسال الطلب..." : source === "package" ? "إرسال طلب سحب من هذه الباقة" : "إرسال طلب السحب العام"}
+        <button type="submit" disabled={isSubmitting || !selected || (source === "package" && (!packageAccount || packagePending || packageMax <= 0))} className={"w-full rounded-lg bg-cyan-300 px-3 py-2 text-xs font-black text-[#03111c] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40 " + (source === "wallet" ? "md:col-span-2" : "")}>
+          {isSubmitting ? "جارٍ الإرسال…" : "تأكيد السحب"}
         </button>
       </form>
     );
@@ -501,18 +493,15 @@ export default function WithdrawPage() {
               <div className="rounded-2xl border border-white/10 bg-[#07101d] p-12 text-center text-slate-400">جاري تحميل الأرصدة وبيانات السحب...</div>
             ) : (
               <>
-                <section className="rounded-2xl border border-cyan-400/20 bg-[#07101d] p-3 md:p-4">
-                  <div className="mb-3 flex items-center gap-2"><Wallet size={19} className="text-cyan-300" /><div><h2 className="text-base font-black">السحب العام</h2><p className="mt-0.5 text-xs text-slate-400">رصيد المحفظة العامة فقط: {money(totalGeneralAvailable)} USDT</p></div></div>
+                <section className="rounded-xl border border-cyan-400/20 bg-[#07101d] p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2"><h2 className="flex items-center gap-2 text-sm font-black"><Wallet size={16} className="text-cyan-300" />السحب العام</h2><span className="text-xs font-bold text-cyan-200">{money(totalGeneralAvailable)} USDT</span></div>
                   {renderWithdrawalFields("wallet")}
                 </section>
 
-                <section className="mt-5 rounded-2xl border border-emerald-400/20 bg-[#07101d] p-3 md:p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-base font-black">السحب من الباقات</h2>
-                      <p className="mt-1 text-xs text-slate-500">الباقات والحد الأدنى مرتبطان مباشرة بإعدادات الأدمن.</p>
-                    </div>
-                    <span className="rounded-full border border-emerald-300/20 px-2.5 py-1 text-[11px] text-emerald-200">{packagePlans.length} باقات</span>
+                <section className="mt-3 rounded-xl border border-emerald-400/20 bg-[#07101d] p-3">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-black">السحب من الباقات</h2>
+                    <span className="rounded-full border border-emerald-300/20 px-2 py-1 text-[10px] text-emerald-200">{packagePlans.length} باقات</span>
                   </div>
                   {packagePlans.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-xs text-slate-500">لا توجد باقات متاحة حاليًا.</div>
@@ -524,7 +513,7 @@ export default function WithdrawPage() {
                         const availableForPlan = item ? packageMaximum(item) : 0;
                         return (
                           <article key={plan._id} className="min-w-0 rounded-xl border border-white/10 bg-[#050a13] p-3">
-                            <div className="mb-3 flex items-start justify-between gap-2">
+                            <div className="mb-2 flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <h3 className="break-words text-sm font-black">{plan.name}</h3>
                                 <span className={item ? "mt-1 inline-flex rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] text-emerald-200" : "mt-1 inline-flex rounded-full bg-slate-700/50 px-2 py-0.5 text-[10px] text-slate-300"}>
@@ -536,19 +525,18 @@ export default function WithdrawPage() {
                                 <div className="text-sm font-black text-emerald-200">{money(availableForPlan)} USDT</div>
                               </div>
                             </div>
-                            <div className="mb-3 grid grid-cols-2 gap-2">
-                              <div className="rounded-lg border border-white/5 bg-white/[0.025] p-2">
-                                <div className="text-[10px] text-slate-500">الحد الأدنى</div>
-                                <div className="mt-1 text-xs font-bold">{money(Number(item?.minimumWithdrawal ?? plan.minimumWithdrawal ?? 100))} USDT</div>
-                              </div>
-                              <div className="rounded-lg border border-white/5 bg-white/[0.025] p-2">
-                                <div className="text-[10px] text-slate-500">قيد المراجعة</div>
-                                <div className="mt-1 text-xs font-bold">{money(Number(item?.lockedEarnings || 0))} USDT</div>
-                              </div>
+                            <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
+                              <span className="text-slate-500">الحد الأدنى: <b className="text-slate-200">{money(Number(item?.minimumWithdrawal ?? plan.minimumWithdrawal ?? 100))} USDT</b></span>
+                              <span className="text-slate-500">محجوز: <b className="text-slate-200">{money(Number(item?.lockedEarnings || 0))} USDT</b></span>
                             </div>
-                            {!item && <p className="mb-3 text-[11px] leading-4 text-slate-500">فعّل الباقة من صفحة «الباقات» لبدء السحب منها.</p>}
-                            {item?.firstWithdrawalStatus === "pending" && <p className="mb-3 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب الأول قيد المراجعة.</p>}
-                            {renderWithdrawalFields("package", item, plan)}
+                            {!item ? (
+                              <p className="rounded-lg bg-white/[0.025] px-2 py-2 text-[10px] text-slate-500">فعّل الباقة أولًا لتتاح عمليات السحب.</p>
+                            ) : (
+                              <>
+                                {item.firstWithdrawalStatus === "pending" && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب الأول قيد المراجعة.</p>}
+                                {renderWithdrawalFields("package", item, plan)}
+                              </>
+                            )}
                           </article>
                         );
                       })}
@@ -556,9 +544,7 @@ export default function WithdrawPage() {
                   )}
                 </section>
 
-                <div className="mt-3 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 text-[11px] text-slate-500">
-                  السحب العام منفصل عن أرصدة الباقات، والحد الأدنى لكل باقة يحدده الأدمن. الطلبات تخضع للمراجعة.
-                </div>
+                <div className="mt-2 text-[10px] text-slate-600">السحب العام منفصل عن أرباح الباقات؛ كل طلب يخضع للمراجعة.</div>
 
                 <section className="mt-8 rounded-3xl border border-purple-400/20 bg-[#07131f]/80 p-5 md:p-7">
                   <div className="mb-5 flex items-center justify-between gap-3"><div><h2 className="text-xl font-black">طلبات السحب العام</h2><p className="mt-1 text-xs text-slate-500">سجل منفصل لطلبات السحب من المحفظة العامة.</p></div><span className="rounded-full border border-purple-300/20 px-3 py-1 text-xs text-purple-200">{generalHistory.length} طلب</span></div>

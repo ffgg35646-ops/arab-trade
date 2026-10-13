@@ -18,7 +18,7 @@ export async function GET() {
       .lean();
 
     const methods: any[] = [];
-    const existing = new Set<string>();
+    const existing = new Map<string, any>();
 
     /*
      * PaymentOption هو المصدر الأساسي لوسائل الدفع
@@ -34,16 +34,14 @@ export async function GET() {
       if (!asset || !network) continue;
 
       const key = `${asset}:${network}`;
-
+      const kind = String((method as any).kind || "both");
       if (existing.has(key)) continue;
-
-      existing.add(key);
-
-      methods.push({
+      const row = {
         _id: String(method._id),
         name: method.name,
         asset,
         network,
+        kind,
         address: method.address || "",
         minDeposit: Number(method.minDeposit || 0),
         maxDeposit: Number((method as any).maxDeposit || 0),
@@ -52,10 +50,12 @@ export async function GET() {
         withdrawalFee: Number((method as any).withdrawalFee || 0),
         warning: String((method as any).warning || ""),
         enabled: Boolean(method.enabled),
-        depositEnabled: method.depositEnabled !== false,
-        withdrawalEnabled: method.withdrawalEnabled !== false,
+        depositEnabled: kind !== "withdrawal" && method.depositEnabled !== false,
+        withdrawalEnabled: kind !== "deposit" && method.withdrawalEnabled !== false,
         source: "payment-option",
-      });
+      };
+      existing.set(key, row);
+      methods.push(row);
     }
 
     /*

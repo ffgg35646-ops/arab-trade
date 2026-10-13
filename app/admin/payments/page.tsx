@@ -4,6 +4,8 @@ import AdminPageFrame from "@/components/AdminPageFrame";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+type PackagePlan = { _id: string; name: string; price: number; minimumWithdrawal?: number; enabled?: boolean };
+
 type Payment = {
   _id?: string;
   name: string;
@@ -36,11 +38,15 @@ export default function PaymentsAdminPage() {
   const [newMinimum, setNewMinimum] = useState("0");
   const [newAddress, setNewAddress] = useState("");
   const [savingNew, setSavingNew] = useState(false);
+  const [packagePlans, setPackagePlans] = useState<PackagePlan[]>([]);
+  const [packageWithdrawalMinimums, setPackageWithdrawalMinimums] = useState<Record<string, number>>({});
+  const [savingPackageMinimums, setSavingPackageMinimums] = useState(false);
+  const [loadingPackages, setLoadingPackages] = useState(true);
 
   const load = useCallback(async () => {
 
     try {
-      const [res, settingsRes] = await Promise.all([
+      const [res, settingsRes, packagesRes] = await Promise.all([
         fetch("/api/admin/payment", {
           credentials: "include",
           cache: "no-store",
@@ -49,9 +55,14 @@ export default function PaymentsAdminPage() {
           credentials: "include",
           cache: "no-store",
         }),
+        fetch("/api/admin/packages", {
+          credentials: "include",
+          cache: "no-store",
+        }),
       ]);
 
       const settingsJson = await settingsRes.json().catch(() => ({}));
+      const packagesJson = await packagesRes.json().catch(() => ({}));
       if (settingsRes.ok && settingsJson.success) {
         setGlobalDepositsEnabled(settingsJson.settings?.deposits?.enabled !== false);
       }
@@ -84,6 +95,28 @@ export default function PaymentsAdminPage() {
         : [];
 
       setPayments(rows);
+
+      if (!packagesRes.ok || !packagesJson.success || !Array.isArray(packagesJson.packages)) {
+        throw new Error(packagesJson.message || "تعذر تحميل الباقات لإعداد السحب منها");
+      }
+      const plans: PackagePlan[] = packagesJson.packages.map((item: PackagePlan) => ({
+        _id: String(item._id),
+        name: String(item.name || "باقة"),
+        price: Number(item.price || 0),
+        minimumWithdrawal: Number(item.minimumWithdrawal ?? settingsJson.settings?.withdrawals?.minAmount ?? 0),
+        enabled: item.enabled !== false,
+      }));
+      const rawConfigured = settingsJson.settings?.withdrawals?.withdrawalMinByPackage;
+      const configured: Record<string, number> = rawConfigured && typeof rawConfigured === "object"
+        ? (rawConfigured instanceof Map ? Object.fromEntries(rawConfigured.entries()) : rawConfigured as Record<string, number>)
+        : {};
+      const minima: Record<string, number> = {};
+      for (const plan of plans) {
+        minima[plan._id] = Number(configured[plan._id] ?? plan.minimumWithdrawal ?? settingsJson.settings?.withdrawals?.minAmount ?? 0);
+      }
+      setPackagePlans(plans);
+      setPackageWithdrawalMinimums(minima);
+      setError("");
     } catch (err) {
       setError(
         err instanceof Error
@@ -92,6 +125,7 @@ export default function PaymentsAdminPage() {
       );
     } finally {
       setLoading(false);
+      setLoadingPackages(false);
     }
   }, []);
 
@@ -283,6 +317,36 @@ export default function PaymentsAdminPage() {
   }
 
 
+  async function savePackageWithdrawalMinimums() {
+    const entries = Object.entries(packageWithdrawalMinimums);
+    if (!entries.every(([id, value]) => Boolean(id) && Number.isFinite(Number(value)) && Number(value) >= 0)) {
+      setError("تأكد من أن الحد الأدنى للسحب لكل باقة رقم صحيح لا يقل عن صفر");
+      return;
+    }
+    setSavingPackageMinimums(true);
+    setMessage("");
+    setError("");
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ withdrawals: { withdrawalMinByPackage: packageWithdrawalMinimums } }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) throw new Error(json.message || "تعذر حفظ حدود السحب لكل باقة");
+      const saved = json.settings?.withdrawals?.withdrawalMinByPackage;
+      if (saved && typeof saved === "object") {
+        setPackageWithdrawalMinimums(saved instanceof Map ? Object.fromEntries(saved.entries()) : saved);
+      }
+      setMessage("تم حفظ الحد الأدنى للسحب لكل باقة. سيظهر الحد للمستخدم عند السحب من أرباح الباقة.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تعذر حفظ حدود السحب لكل باقة");
+    } finally {
+      setSavingPackageMinimums(false);
+    }
+  }
+
   async function toggleGlobalDeposits() {
     if (savingGlobalDeposits) return;
     const nextValue = !globalDepositsEnabled;
@@ -379,8 +443,11 @@ export default function PaymentsAdminPage() {
               + إضافة وسيلة إيداع
             </button>
             <button type="button" onClick={() => addPayment("withdrawal")} className="rounded-xl bg-violet-600 px-5 py-3 font-black transition hover:bg-violet-500">
-              + إضافة وسيلة سحب
+              + إضافة وسيلة سحب عام
             </button>
+            <a href="#package-withdrawal-settings" className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-3 font-black text-emerald-200 transition hover:bg-emerald-400/15">
+              + إعداد سحب الباقات
+            </a>
           </div>
         </div>
 
@@ -429,6 +496,39 @@ export default function PaymentsAdminPage() {
             </div>
           </section>
         ) : null}
+
+        <section id="package-withdrawal-settings" className="scroll-mt-6 rounded-2xl border border-emerald-400/20 bg-[#08111e] p-5 md:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-black">سحب أرباح الباقات — الحد الأدنى لكل باقة</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">كل الباقات الموجودة في صفحة «إدارة الباقات» تظهر هنا تلقائيًا، بما فيها الباقات الأربع الحالية وأي باقة جديدة مثل «باقة 400». حدّث الحد الأدنى ثم احفظه ليُطبّق على سحب أرباح تلك الباقة عند المستخدم. وسيلة الشبكة/عنوان الاستلام تظل من وسائل السحب العامة.</p>
+            </div>
+            <button type="button" onClick={() => { setLoading(true); setLoadingPackages(true); void load(); }} disabled={loading} className="shrink-0 rounded-lg border border-slate-700 px-3 py-2 text-sm font-bold disabled:opacity-50">تحديث الباقات</button>
+          </div>
+
+          {loadingPackages ? (
+            <p className="py-6 text-center text-sm text-slate-500">جاري تحميل الباقات...</p>
+          ) : packagePlans.length === 0 ? (
+            <p className="mt-4 rounded-xl border border-dashed border-slate-700 p-6 text-sm leading-6 text-slate-400">لم تصل أي باقات من قاعدة البيانات. تأكد من نجاح تحميل صفحة إدارة الباقات، ثم اضغط «تحديث الباقات».</p>
+          ) : (
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {packagePlans.map((plan) => (
+                <label key={plan._id} className="block rounded-xl border border-white/10 bg-white/[0.025] p-4">
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="font-black">{plan.name}</span>
+                    <span className={plan.enabled ? "rounded-full bg-emerald-400/10 px-2 py-1 text-[11px] text-emerald-200" : "rounded-full bg-slate-700 px-2 py-1 text-[11px] text-slate-300"}>{plan.enabled ? "مفعلة" : "متوقفة"}</span>
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500">قيمة الباقة: {Number(plan.price || 0).toLocaleString("en-US")} USDT</span>
+                  <span className="mt-4 block text-sm font-bold">الحد الأدنى للسحب من هذه الباقة (USDT)</span>
+                  <input type="number" min="0" step="any" value={packageWithdrawalMinimums[plan._id] ?? Number(plan.minimumWithdrawal || 0)} onChange={(event) => setPackageWithdrawalMinimums((current) => ({ ...current, [plan._id]: Number(event.target.value) }))} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 text-white outline-none focus:border-emerald-400"/>
+                </label>
+              ))}
+            </div>
+          )}
+          <button type="button" disabled={loadingPackages || savingPackageMinimums || packagePlans.length === 0} onClick={() => void savePackageWithdrawalMinimums()} className="mt-5 w-full rounded-xl bg-emerald-500 px-5 py-3 font-black text-slate-950 disabled:opacity-50">
+            {savingPackageMinimums ? "جاري حفظ حدود سحب الباقات..." : "حفظ الحد الأدنى لكل باقة"}
+          </button>
+        </section>
 
         {message ? (
           <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-300">

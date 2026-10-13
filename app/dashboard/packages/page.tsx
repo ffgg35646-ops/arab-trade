@@ -85,34 +85,7 @@ export default function UserPackagesPage() {
               <button type="button" onClick={() => void action(activePlan ? "change" : "activate", plan._id)} disabled={Boolean(busy)} className="mt-4 w-full rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold disabled:opacity-50">{busy === plan._id ? "جاري التنفيذ..." : activePlan ? activePlan.packageName === plan.name ? "إعادة التفعيل" : "التغيير إلى هذه الباقة" : "تفعيل الباقة"}</button>
             </article>)}</div>}
         </section>
-        <section className="mt-8 rounded-2xl border border-white/10 bg-[#07101d] p-5">
-          <h2 className="text-xl font-black">باقاتي وأرصدة السحب</h2><p className="mt-2 text-xs leading-6 text-slate-500">رصيد كل باقة منفصل. من صفحة السحب اختر رصيد الباقة لسحب المبالغ المتاحة.</p>
-          {loading ? <div className="py-8 text-center text-slate-500">جاري تحميل السجل...</div> : !data?.userPackages.length ? <div className="mt-4 p-8 text-center text-sm text-slate-500">لم تفعل أي باقة بعد.</div> : <div className="mt-4 space-y-3">{data.userPackages.map((item) => <div key={item._id} className="rounded-xl border border-white/10 bg-[#050a13] p-4"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="font-black">{item.packageName} <span className="text-xs text-slate-500">{item.status === "active" ? "نشطة" : "ملغاة"}</span></div><div className="mt-2 text-xs text-slate-500">التفعيل: {new Date(item.activatedAt).toLocaleDateString("ar-EG")} · قيمة التفعيل: {money(item.investedAmount)} {item.asset}</div></div>{item.status === "active" && <button type="button" onClick={() => void action("cancel", item._id)} disabled={Boolean(busy)} className="rounded-lg border border-red-400/20 px-3 py-2 text-xs text-red-300">{busy === item._id ? "جاري الإلغاء..." : "إلغاء الباقة (استرداد 50%)"}</button>}</div><div className="mt-3 rounded-lg border border-cyan-400/15 bg-cyan-400/[0.04] p-3 text-xs leading-6 text-cyan-100/80">{firstStatus(item) === "available" ? `الحد الأقصى لأول سحب من الباقة: ${money(item.investedAmount)} ${item.asset}.` : firstStatus(item) === "pending" ? "أول طلب سحب من هذه الباقة قيد المراجعة." : "تم حسم أول سحب؛ السحب اللاحق متاح من رصيد الباقة المحقق والمتاح وفق حدود المنصة."}</div><div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">{[["رصيد السحب المتاح", item.availableEarnings], ["سحب قيد المراجعة", item.lockedEarnings], ["العوائد المحققة", item.totalRealizedEarnings], ["إجمالي السحب", item.totalWithdrawn]].map(([label, amount]) => <div key={String(label)} className="rounded-lg border border-white/5 bg-white/[0.025] p-3"><div className="text-[11px] text-slate-500">{label}</div><div className="mt-1 font-black">{money(Number(amount))} {item.asset}</div></div>)}</div></div>)}</div>}
-        </section>
-        <section className="mt-7 rounded-2xl border border-white/10 bg-[#07101d] p-5">
-          <h2 className="text-lg font-black">سجل حركات الباقات</h2>
-          <p className="mt-1 text-xs text-slate-500">كل تفعيل واسترداد وعائد محقق وطلب سحب مسجل على حدة.</p>
-          {!data?.packageLedger?.length ? (
-            <div className="mt-4 rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">لا توجد حركات باقات مسجلة.</div>
-          ) : (
-            <div className="mt-4 space-y-2">
-              {data.packageLedger.map((row) => (
-                <div key={row._id} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-white/5 bg-[#050a13] p-4">
-                  <div className="min-w-0">
-                    <div className="font-bold">{row.userPackageId?.packageName || "الباقة"}</div>
-                    <div className="mt-1 text-xs text-slate-500">{row.note || row.type}</div>
-                    <div className="mt-1 text-[10px] text-slate-600">{new Date(row.createdAt).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</div>
-                  </div>
-                  <div className={Number(row.amount) < 0 ? "font-black text-red-300" : "font-black text-emerald-300"}>
-                    {Number(row.amount) > 0 ? "+" : ""}{money(row.amount)} {row.asset}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
 
-        <section className="mt-6 rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-4 text-xs leading-6 text-amber-100/80">{data?.policy?.earningsNotice || "تُسجل العوائد المحققة فعليًا فقط، ولا تُنشأ أرباح يومية مضمونة تلقائيًا."} {data?.policy?.cancellationNotice}</section>
       </main>
     </div>
   </>;

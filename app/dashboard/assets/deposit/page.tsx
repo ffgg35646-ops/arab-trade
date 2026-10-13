@@ -399,7 +399,7 @@ export default function DepositPage() {
               <span className="flex items-center gap-3">
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-cyan-200/15 bg-cyan-200/[0.08] text-cyan-100"><UploadCloud size={22}/></span>
                 <span className="min-w-0 flex-1">
-                  <span className="block font-black text-white">صورة التحويل (Screenshot)</span>
+                  <span className="block font-black text-white">صورة التحويل (Screenshot) <span className="text-xs font-normal text-amber-200">مطلوبة</span></span>
                   <span className="mt-1 block text-xs leading-5 text-slate-500">اضغط لاختيار صورة واضحة · JPG أو PNG أو WEBP · حتى 4MB</span>
                 </span>
                 <ImagePlus size={20} className="shrink-0 text-cyan-200"/>
@@ -407,7 +407,6 @@ export default function DepositPage() {
               <input
                 id="deposit-screenshot"
                 type="file"
-                required
                 accept="image/jpeg,image/png,image/webp"
                 onChange={(event) => {
                   const file = event.target.files?.[0] || null;

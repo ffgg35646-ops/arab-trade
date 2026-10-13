@@ -49,73 +49,75 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-
-    const name = String(body.name || "").trim();
+    const kind = body.kind === "withdrawal" ? "withdrawal" : "deposit";
+    const name = String(body.name || body.asset || "").trim();
     const asset = String(body.asset || "").trim().toUpperCase();
     const network = String(body.network || "").trim();
     const address = String(body.address || "").trim();
-    const minDeposit = Number(body.minDeposit);
-    const maxDeposit = Number(body.maxDeposit ?? 0);
-    const minWithdrawal = Number(body.minWithdrawal);
-    const maxWithdrawal = Number(body.maxWithdrawal ?? 0);
-    const withdrawalFee = Number(body.withdrawalFee ?? 0);
-    const warning = String(body.warning || "").trim();
-    const enabled = body.enabled !== false;
-    const depositEnabled = body.depositEnabled !== false;
-    const withdrawalEnabled = body.withdrawalEnabled !== false;
+    const minDeposit = Number(body.minDeposit ?? 0);
+    const minWithdrawal = Number(body.minWithdrawal ?? 0);
 
     if (
-      !name ||
-      !asset ||
-      !network ||
-      !address ||
-      !Number.isFinite(minDeposit) ||
-      minDeposit < 0 ||
-      !Number.isFinite(maxDeposit) || maxDeposit < 0 || (maxDeposit > 0 && minDeposit > maxDeposit) ||
-      !Number.isFinite(minWithdrawal) ||
-      minWithdrawal < 0 ||
-      !Number.isFinite(maxWithdrawal) || maxWithdrawal < 0 || (maxWithdrawal > 0 && minWithdrawal > maxWithdrawal) ||
-      !Number.isFinite(withdrawalFee) || withdrawalFee < 0
+      !name || !asset || !network ||
+      (kind === "deposit" && !address) ||
+      !Number.isFinite(kind === "deposit" ? minDeposit : minWithdrawal) ||
+      (kind === "deposit" ? minDeposit : minWithdrawal) < 0
     ) {
       return NextResponse.json(
-        { success: false, message: "بيانات وسيلة الدفع غير مكتملة" },
+        { success: false, message: "أكمل بيانات العملة والشبكة والحد الأدنى" },
         { status: 400 }
       );
     }
 
     await connectDB();
 
-    const exists = await PaymentOption.findOne({
-      asset,
-      network,
-    });
-
-    if (exists) {
-      return NextResponse.json(
-        { success: false, message: "هذه العملة والشبكة موجودتان بالفعل" },
-        { status: 409 }
-      );
+    // Keep the existing unique asset/network key and merge the selected
+    // operation into an existing record instead of creating a conflicting row.
+    const existing = await PaymentOption.findOne({ asset, network });
+    if (existing) {
+      const update: Record<string, unknown> = {
+        name,
+        enabled: true,
+      };
+      if (kind === "deposit") {
+        update.address = address;
+        update.minDeposit = minDeposit;
+        update.depositEnabled = true;
+      } else {
+        update.minWithdrawal = minWithdrawal;
+        update.withdrawalEnabled = true;
+      }
+      const method = await PaymentOption.findByIdAndUpdate(
+        existing._id,
+        { $set: update },
+        { new: true, runValidators: true }
+      ).lean();
+      return NextResponse.json({
+        success: true,
+        message: kind === "deposit" ? "تمت إضافة/تحديث وسيلة الإيداع" : "تمت إضافة/تحديث وسيلة السحب",
+        method,
+      });
     }
 
     const method = await PaymentOption.create({
       name,
       asset,
       network,
-      address,
-      minDeposit,
-      maxDeposit,
-      minWithdrawal,
-      maxWithdrawal,
-      withdrawalFee,
-      warning,
-      enabled,
-      depositEnabled,
-      withdrawalEnabled,
+      address: kind === "deposit" ? address : "",
+      minDeposit: kind === "deposit" ? minDeposit : 0,
+      maxDeposit: 0,
+      minWithdrawal: kind === "withdrawal" ? minWithdrawal : 0,
+      maxWithdrawal: 0,
+      withdrawalFee: 0,
+      warning: "",
+      enabled: true,
+      depositEnabled: kind === "deposit",
+      withdrawalEnabled: kind === "withdrawal",
     });
 
     return NextResponse.json({
       success: true,
-      message: "تمت إضافة وسيلة الدفع",
+      message: kind === "deposit" ? "تمت إضافة وسيلة الإيداع" : "تمت إضافة وسيلة السحب",
       method,
     });
   } catch (error) {

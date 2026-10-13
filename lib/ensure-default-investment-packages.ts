@@ -12,7 +12,7 @@ const DEFAULT_PACKAGES = [
     price: 50,
     asset: "USDT",
     durationDays: 0,
-    dailyProfit: 0,
+    dailyProfit: 2,
     enabled: true,
     sortOrder: 1,
   },
@@ -22,7 +22,7 @@ const DEFAULT_PACKAGES = [
     price: 100,
     asset: "USDT",
     durationDays: 0,
-    dailyProfit: 0,
+    dailyProfit: 4,
     enabled: true,
     sortOrder: 2,
   },
@@ -32,7 +32,7 @@ const DEFAULT_PACKAGES = [
     price: 250,
     asset: "USDT",
     durationDays: 0,
-    dailyProfit: 0,
+    dailyProfit: 10,
     enabled: true,
     sortOrder: 3,
   },
@@ -42,7 +42,7 @@ const DEFAULT_PACKAGES = [
     price: 500,
     asset: "USDT",
     durationDays: 0,
-    dailyProfit: 0,
+    dailyProfit: 20,
     enabled: true,
     sortOrder: 4,
   },
@@ -110,7 +110,7 @@ export async function ensureDefaultInvestmentPackages() {
   // The platform packages are lifetime accounts. Normalize legacy catalog and
   // user-package duration values so old "60 day" records cannot imply expiry.
   const [plans, legacyAccounts] = await Promise.all([
-    InvestmentPackage.find({}).select("_id durationDays description").lean(),
+    InvestmentPackage.find({}).select("_id name price dailyProfit durationDays description").lean(),
     UserPackage.updateMany({ durationDays: { $ne: 0 } }, { $set: { durationDays: 0 } }),
   ]);
   void legacyAccounts;

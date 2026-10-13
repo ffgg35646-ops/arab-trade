@@ -57,6 +57,8 @@ function statusLabel(status: string) {
 export default function AdminDepositsPage() {
   const [rows, setRows] = useState<Deposit[]>([]);
   const [selected, setSelected] = useState<Deposit | null>(null);
+  const [proofExpanded, setProofExpanded] = useState(false);
+  const [proofLoadError, setProofLoadError] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
@@ -114,6 +116,8 @@ export default function AdminDepositsPage() {
 
   function openReview(row: Deposit) {
     setSelected(row);
+    setProofExpanded(false);
+    setProofLoadError(false);
     setNote(row.adminNote || "");
     setError("");
     setMessage("");
@@ -221,50 +225,60 @@ export default function AdminDepositsPage() {
         </section>
 
         {selected && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="مراجعة إثبات الإيداع">
-            <div className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-white/10 bg-[#07101d] p-5 shadow-2xl md:p-7">
-              <div className="mb-5 flex items-start justify-between gap-3">
-                <div><div className="text-xs font-bold tracking-widest text-cyan-300">DEPOSIT REVIEW</div><h2 className="mt-2 text-2xl font-black">مراجعة طلب الإيداع</h2><p className="mt-1 break-all text-xs text-slate-500">رقم الطلب: {selected._id}</p></div>
-                <button type="button" onClick={() => { setSelected(null); setError(""); }} className="rounded-xl border border-white/10 p-2 text-slate-400 hover:bg-white/5" aria-label="إغلاق"><X size={19} /></button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="مراجعة إثبات الإيداع">
+            <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-white/10 bg-[#07101d] p-3 shadow-2xl sm:p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div><div className="text-[10px] font-bold tracking-widest text-cyan-300">DEPOSIT REVIEW</div><h2 className="mt-1 text-lg font-black">مراجعة طلب الإيداع</h2><p className="mt-1 max-w-[min(78vw,680px)] break-all text-[10px] text-slate-500">رقم الطلب: {selected._id}</p></div>
+                <button type="button" onClick={() => { setSelected(null); setError(""); }} className="rounded-lg border border-white/10 p-1.5 text-slate-400 hover:bg-white/5" aria-label="إغلاق"><X size={19} /></button>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4"><div className="text-xs text-slate-500">صاحب الطلب</div><div className="mt-2 font-black">{userValue(selected.userId, "name") || userValue(selected.userId, "username") || "مستخدم"}</div><div className="mt-1 break-all text-sm text-slate-400">{userValue(selected.userId, "email") || "—"}</div></div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4"><div className="text-xs text-slate-500">المبلغ المطلوب</div><div className="mt-2 text-2xl font-black text-cyan-200">{money(selected.amount, selected.asset)}</div><div className="mt-1 text-xs text-slate-500">الشبكة: {selected.network}</div></div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4"><div className="text-xs text-slate-500">حالة الطلب</div><div className="mt-2"><span className={"inline-flex rounded-full border px-3 py-1 text-xs font-bold " + statusStyle(selected.status)}>{statusLabel(selected.status)}</span></div><div className="mt-2 text-xs text-slate-500">{date(selected.createdAt)}</div></div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div className="rounded-xl border border-white/10 bg-white/[0.025] p-2.5"><div className="text-xs text-slate-500">صاحب الطلب</div><div className="mt-1 text-sm font-bold">{userValue(selected.userId, "name") || userValue(selected.userId, "username") || "مستخدم"}</div><div className="mt-1 break-all text-[11px] text-slate-400">{userValue(selected.userId, "email") || "—"}</div></div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.025] p-2.5"><div className="text-xs text-slate-500">المبلغ المطلوب</div><div className="mt-1 text-lg font-black text-cyan-200">{money(selected.amount, selected.asset)}</div><div className="mt-1 text-xs text-slate-500">الشبكة: {selected.network}</div></div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.025] p-2.5"><div className="text-xs text-slate-500">حالة الطلب</div><div className="mt-2"><span className={"inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold " + statusStyle(selected.status)}>{statusLabel(selected.status)}</span></div><div className="mt-2 text-xs text-slate-500">{date(selected.createdAt)}</div></div>
               </div>
 
-              <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4"><div className="text-xs text-slate-500">عنوان الإيداع الذي استقبل التحويل</div><div className="mt-2 break-all font-mono text-sm">{selected.address || "—"}</div></div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4"><div className="text-xs text-slate-500">TX Hash</div><div className="mt-2 break-all font-mono text-sm text-cyan-100">{selected.txHash || "لم يضف المستخدم رقم معاملة."}</div>{selected.confirmations !== undefined && <div className="mt-2 text-xs text-slate-500">التأكيدات: {selected.confirmations}</div>}</div>
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                <div className="rounded-xl border border-white/10 bg-white/[0.025] p-2.5"><div className="text-xs text-slate-500">عنوان الإيداع الذي استقبل التحويل</div><div className="mt-1 break-all font-mono text-xs">{selected.address || "—"}</div></div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.025] p-2.5"><div className="text-xs text-slate-500">TX Hash</div><div className="mt-1 break-all font-mono text-xs text-cyan-100">{selected.txHash || "لم يضف المستخدم رقم معاملة."}</div>{selected.confirmations !== undefined && <div className="mt-1 text-[10px] text-slate-500">التأكيدات: {selected.confirmations}</div>}</div>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.025] p-4">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h3 className="font-black">صورة إثبات الدفع</h3><span className="text-xs text-slate-500">لا تعتمد الطلب قبل التحقق من التفاصيل</span></div>
+              <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.025] p-2.5">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-bold">صورة إثبات الدفع</h3><span className="text-[10px] text-slate-500">اضغط على الصورة لتكبيرها</span></div>
                 {selectedHasScreenshot ? (
-                  <a href={"/api/admin/deposits/file?id=" + encodeURIComponent(selected._id)} target="_blank" rel="noreferrer" className="block">
-                    <img src={"/api/admin/deposits/file?id=" + encodeURIComponent(selected._id)} alt="إثبات الدفع" className="max-h-[460px] w-full rounded-xl border border-white/10 bg-black object-contain" />
-                  </a>
+                  proofLoadError ? (
+                    <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.04] p-4 text-center text-xs text-amber-200">تعذر تحميل صورة الإثبات من الخادم. تحقق من التخزين ثم أعد المحاولة.</div>
+                  ) : (
+                  <button type="button" onClick={() => setProofExpanded(true) className="block w-full cursor-zoom-in rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-300/60" aria-label="تكبير صورة إثبات الدفع">
+                    <img src={"/api/admin/deposits/file?id=" + encodeURIComponent(selected._id)} alt="إثبات الدفع" onError={() => setProofLoadError(true)} className="mx-auto max-h-[300px] w-full rounded-lg border border-white/10 bg-black object-contain" />
+                  </button>
+                  )
                 ) : (
-                  <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">لا توجد صورة إثبات محفوظة لهذا الطلب. راجع TX Hash إن وجد قبل اتخاذ القرار.</div>
+                  <div className="rounded-xl border border-dashed border-white/10 p-4 text-center text-xs text-slate-500">لا توجد صورة إثبات محفوظة لهذا الطلب. راجع TX Hash قبل اتخاذ القرار.</div>
                 )}
               </div>
 
               {selected.status === "pending" ? (
-                <div className="mt-4">
-                  <label className="mb-2 block text-sm font-bold text-slate-300">ملاحظة الإدارة (سبب الرفض مطلوب عند الرفض)</label>
-                  <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} maxLength={1000} placeholder="اكتب ملاحظة للمستخدم أو سبب رفض الإيداع..." className="w-full rounded-xl border border-white/10 bg-[#030b12] p-4 text-sm outline-none focus:border-cyan-300/30" />
-                  <div className="mt-3 flex flex-wrap gap-3">
-                    <button type="button" onClick={() => void review("approved")} disabled={busy} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 font-black text-[#03111c] disabled:opacity-50"><CheckCircle2 size={17} />{busy ? "جاري المعالجة..." : "اعتماد الإيداع وإضافة الرصيد"}</button>
-                    <button type="button" onClick={() => void review("rejected")} disabled={busy} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-3 font-black text-white disabled:opacity-50"><XCircle size={17} />رفض الإيداع</button>
+                <div className="mt-3">
+                  <label className="mb-1.5 block text-xs font-bold text-slate-300">ملاحظة الإدارة (سبب الرفض مطلوب عند الرفض)</label>
+                  <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={2} maxLength={1000} placeholder="اكتب ملاحظة أو سبب الرفض..." className="w-full rounded-lg border border-white/10 bg-[#030b12] p-2.5 text-xs outline-none focus:border-cyan-300/30" />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => void review("approved")} disabled={busy} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-400 px-3 py-2 text-sm font-black text-[#03111c] disabled:opacity-50"><CheckCircle2 size={17} />{busy ? "جاري المعالجة..." : "اعتماد الإيداع وإضافة الرصيد"}</button>
+                    <button type="button" onClick={() => void review("rejected")} disabled={busy} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-500 px-3 py-2 text-sm font-black text-white disabled:opacity-50"><XCircle size={17} />رفض الإيداع</button>
                   </div>
                 </div>
               ) : (
-                <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.025] p-4 text-sm text-slate-400">تمت معالجة هذا الطلب بالفعل: <b>{statusLabel(selected.status)}</b>{selected.adminNote && <p className="mt-2">ملاحظة الإدارة: {selected.adminNote}</p>}</div>
+                <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.025] p-3 text-xs text-slate-400">تمت معالجة هذا الطلب بالفعل: <b>{statusLabel(selected.status)}</b>{selected.adminNote && <p className="mt-2">ملاحظة الإدارة: {selected.adminNote}</p>}</div>
               )}
-              {error && <div role="alert" className="mt-4 rounded-xl border border-red-500/20 bg-red-500/[0.06] p-4 text-sm text-red-200">{error}</div>}
-              <div className="mt-4 flex justify-end"><button type="button" onClick={() => setSelected(null)} className="rounded-xl border border-white/10 px-5 py-3 text-sm font-bold text-slate-300 hover:bg-white/5">إغلاق المراجعة</button></div>
+              {error && <div role="alert" className="mt-3 rounded-lg border border-red-500/20 bg-red-500/[0.06] p-2.5 text-xs text-red-200">{error}</div>}
+              <div className="mt-3 flex justify-end"><button type="button" onClick={() => { setSelected(null); setProofExpanded(false); }} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold text-slate-300 hover:bg-white/5">إغلاق المراجعة</button></div>
             </div>
+            {proofExpanded && selectedHasScreenshot && !proofLoadError && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-3" role="dialog" aria-modal="true" aria-label="تكبير صورة إثبات الدفع" onClick={() => setProofExpanded(false)}>
+                <button type="button" onClick={() => setProofExpanded(false)} className="absolute right-4 top-4 rounded-lg border border-white/20 bg-black/60 p-2 text-white" aria-label="إغلاق الصورة"><X size={20} /></button>
+                <img src={"/api/admin/deposits/file?id=" + encodeURIComponent(selected._id)} alt="إثبات الدفع مكبر" onClick={(event) => event.stopPropagation()} onError={() => { setProofLoadError(true); setProofExpanded(false); }} className="max-h-[90vh] max-w-full rounded-lg object-contain" />
+              </div>
+            )}
           </div>
         )}
       </div>

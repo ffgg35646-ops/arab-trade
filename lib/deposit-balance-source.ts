@@ -151,9 +151,9 @@ export async function creditDepositBalance(
 export async function separateLegacyDepositsFromSpotWallet(
   userId: mongoose.Types.ObjectId,
 ): Promise<void> {
-  // v2 intentionally bypasses v1 markers so any leftover legacy amount in funding can be reconciled once.
-  // The v1 negative LedgerEntry remains in the ledger and reduces depositExposure by the amount already moved.
-  const marker = "legacy-deposit-separation:v2:" + String(userId);
+  // v3 replays all legacy deposit credits, including credits from before the old cutover date.
+  // Previous v1/v2 negative marker entries remain in the ledger and reduce exposure by amounts already separated.
+  const marker = "legacy-deposit-separation:v3:" + String(userId);
   const session = await mongoose.startSession();
 
   try {

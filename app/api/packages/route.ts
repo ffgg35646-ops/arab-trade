@@ -414,7 +414,7 @@ export async function POST(request: NextRequest) {
               userId: user._id,
               userPackageId: cancelled._id,
               type: "cancellation_refund",
-              asset: oldAsset,
+              asset: cancelled.asset || USDT_ASSET,
               amount: refund,
               note: "تغيير الباقة: إضافة 50% من قيمة تفعيل " + cancelled.packageName + " إلى رصيد سحب هذه الباقة",
             },

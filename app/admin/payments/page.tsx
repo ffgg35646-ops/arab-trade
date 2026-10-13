@@ -604,8 +604,7 @@ export default function PaymentsAdminPage() {
                           className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"
                         />
                       </div>
-
-                      
+                    </div>
 
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                       <label className="block text-sm font-bold">الحد الأقصى للإيداع (0 = غير محدد)

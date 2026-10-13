@@ -5,7 +5,7 @@ import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
 import { Activity, CheckCircle2, Clock3, Loader2, Package, RefreshCw, ShieldCheck, Wallet } from "lucide-react";
 
-type Plan = { _id: string; name: string; description?: string; price: number; asset: string; durationDays: number; dailyProfit?: number };
+type Plan = { _id: string; name: string; description?: string; price: number; asset: string; durationDays: number; dailyProfit?: number; minimumWithdrawal?: number };
 type DepositBalance = { asset: string; available: number; locked: number };
 type UserPlan = { _id: string; packageName: string; investedAmount: number; asset: string; durationDays: number; status: string; availableEarnings: number; lockedEarnings: number; totalRealizedEarnings: number; totalWithdrawn: number; firstWithdrawalStatus?: "available" | "pending" | "completed"; activatedAt: string; };
 type LedgerRow = { _id: string; type: string; asset: string; amount: number; note?: string; createdAt: string; userPackageId?: { packageName?: string } | null };
@@ -126,7 +126,7 @@ export default function UserPackagesPage() {
                 <div className="flex items-center gap-2"><CheckCircle2 size={14} className="text-cyan-300" />التفعيل من رصيد USDT الموحد</div>
                 <div className="flex items-center gap-2"><ShieldCheck size={14} className="text-cyan-300" />رصيد الباقة منفصل عن السحب العام</div>
                 <div className="flex items-center gap-2"><Wallet size={14} className="text-cyan-300" />سجل مستقل للعوائد والسحوبات</div>
-              </div><div className="mt-4 text-3xl font-black">{money(plan.price)} <span className="text-sm text-cyan-300">{plan.asset}</span></div><div className="mt-2 text-xs text-emerald-200">الربح اليومي المحدد من الإدارة: {money(Number(plan.dailyProfit || 0))} {plan.asset}</div><button type="button" onClick={() => void action(activePlan ? "change" : "activate", plan._id)} disabled={Boolean(busy)} className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-black disabled:opacity-50">{busy === plan._id ? "جاري التنفيذ..." : activePlan ? activePlan.packageName === plan.name ? "إعادة تفعيل هذه الباقة" : "التغيير إلى هذه الباقة" : "تفعيل من رصيد USDT"}</button></article>)}</div>}
+              </div><div className="mt-4 text-3xl font-black">{money(plan.price)} <span className="text-sm text-cyan-300">{plan.asset}</span></div><div className="mt-2 text-xs text-emerald-200">الربح اليومي المحدد من الإدارة: {money(Number(plan.dailyProfit || 0))} {plan.asset}</div><div className="mt-1 text-xs text-cyan-200">الحد الأدنى للسحب: {money(Number(plan.minimumWithdrawal ?? 100))} USDT</div><button type="button" onClick={() => void action(activePlan ? "change" : "activate", plan._id)} disabled={Boolean(busy)} className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-black disabled:opacity-50">{busy === plan._id ? "جاري التنفيذ..." : activePlan ? activePlan.packageName === plan.name ? "إعادة تفعيل هذه الباقة" : "التغيير إلى هذه الباقة" : "تفعيل من رصيد USDT"}</button></article>)}</div>}
         </section>
         <section className="mt-8 rounded-2xl border border-white/10 bg-[#07101d] p-5">
           <h2 className="text-xl font-black">باقاتي وأرصدة السحب</h2><p className="mt-2 text-xs leading-6 text-slate-500">رصيد كل باقة منفصل. من صفحة السحب اختر رصيد الباقة لسحب المبالغ المتاحة.</p>

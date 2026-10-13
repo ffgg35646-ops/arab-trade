@@ -45,7 +45,7 @@ export default function UserPackagesPage() {
 
   async function action(kind: "activate" | "cancel" | "change" | "collect", id: string) {
     if (kind === "cancel" && !window.confirm("إلغاء هذه الباقة سيحوّل 50% فقط من قيمة التفعيل إلى رصيد USDT المتاح في المحفظة الفورية. ستبقى الأرباح المحققة المتاحة في سجل الباقة. هل تريد المتابعة؟")) return;
-    if (kind === "change" && (!activePlan || !window.confirm("تغيير الباقة سيضيف 50% من قيمة تفعيل الباقة الحالية إلى رصيد USDT في المحفظة الفورية، ويخصم سعر الباقة الجديدة من رصيد USDT نفسه. إذا لم يكفِ الرصيد فلن تتغير الباقة أو الأرصدة. هل تريد المتابعة؟"))) return;
+    if (kind === "change" && (!activePlan || !window.confirm("تغيير الباقة سيضيف 50% من قيمة تفعيل الباقة الحالية إلى رصيد السحب الخاص بهذه الباقة، مع الاحتفاظ بأرباحها المجمعة فيها. وسيُخصم سعر الباقة الجديدة من رصيد الإيداع. إذا لم يكفِ رصيد الإيداع فلن تتغير الباقة أو الأرصدة. هل تريد المتابعة؟"))) return;
     setBusy(id); setError(""); setMessage("");
     try {
       const body = kind === "collect"

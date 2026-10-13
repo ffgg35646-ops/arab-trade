@@ -314,7 +314,7 @@ export async function POST(
         const credited = await creditSpotUsdtBalance(
           current.userId,
           expectedAmount,
-          session,
+          session!,
         );
 
         await LedgerEntry.create(
@@ -337,7 +337,7 @@ export async function POST(
         current.confirmedAt = new Date();
         current.creditedAt = new Date();
         current.status = "approved";
-        current.adminNote = "تم التحقق من البلوكشين وإضافة الرصيد إلى رصيد الإيداع الخارجي.";
+        current.adminNote = "تم التحقق من البلوكشين وإضافة الرصيد إلى محفظة USDT الموحدة.";
 
         await current.save({
           session,

@@ -234,7 +234,7 @@ export async function POST(request: NextRequest) {
         maxAmount = maxAmount > 0 ? Math.min(maxAmount, paymentMax) : paymentMax;
       }
       fee = Number((payment as any).withdrawalFee || 0);
-      networkName = payment.network;
+      networkName = normalizePaymentNetwork(payment.network) || networkCode;
     } else {
       /*
        * لو مفيش PaymentOption، ندعم Asset Network
@@ -290,7 +290,7 @@ export async function POST(request: NextRequest) {
       }
 
       fee = Number(network.withdrawalFee || 0);
-      networkName = network.name || network.code;
+      networkName = normalizePaymentNetwork(network.code) || networkCode;
     }
 
     if (source === "wallet") {

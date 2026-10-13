@@ -3,7 +3,7 @@ import mongoose, { Model, Schema } from "mongoose";
 export interface IPackageLedger {
   userId: mongoose.Types.ObjectId;
   userPackageId: mongoose.Types.ObjectId;
-  type: "activation" | "realized_earning" | "daily_earning" | "cancellation_refund" | "withdrawal" | "withdrawal_reversal";
+  type: "activation" | "realized_earning" | "daily_earning" | "reward" | "cancellation_refund" | "withdrawal" | "withdrawal_reversal";
   asset: string;
   amount: number;
   note: string;
@@ -17,7 +17,7 @@ const PackageLedgerSchema = new Schema<IPackageLedger>(
     userPackageId: { type: Schema.Types.ObjectId, ref: "UserPackage", required: true, index: true },
     type: {
       type: String,
-      enum: ["activation", "realized_earning", "daily_earning", "cancellation_refund", "withdrawal", "withdrawal_reversal"],
+      enum: ["activation", "realized_earning", "daily_earning", "reward", "cancellation_refund", "withdrawal", "withdrawal_reversal"],
       required: true,
       index: true,
     },

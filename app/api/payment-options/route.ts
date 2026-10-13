@@ -35,7 +35,7 @@ export async function GET() {
 
       const key = `${asset}:${network}`;
       const kind = String((method as any).kind || "both");
-      if (existing.has(key)) continue;
+      if (existing.has(`${key}:deposit`) && existing.has(`${key}:withdrawal`)) continue;
       const row = {
         _id: String(method._id),
         name: method.name,
@@ -54,7 +54,8 @@ export async function GET() {
         withdrawalEnabled: kind !== "deposit" && method.withdrawalEnabled !== false,
         source: "payment-option",
       };
-      existing.add(key); // mark the configured asset/network pair
+      if (row.depositEnabled) existing.add(`${key}:deposit`);
+      if (row.withdrawalEnabled) existing.add(`${key}:withdrawal`);
       methods.push(row);
     }
 

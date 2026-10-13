@@ -5,7 +5,7 @@ import { requireAdminLeader } from "@/lib/admin-auth";
 import InvestmentPackage from "@/models/InvestmentPackage";
 import PlatformSettings from "@/models/PlatformSettings";
 import UserPackage from "@/models/UserPackage";
-import Wallet from "@/models/Wallet";
+import DepositBalance from "@/models/DepositBalance";
 import PackageLedger from "@/models/PackageLedger";
 import { ensureDefaultInvestmentPackages } from "@/lib/ensure-default-investment-packages";
 
@@ -16,16 +16,18 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
     await ensureDefaultInvestmentPackages();
-    const [rawPackages, userPackages, spotWallets, packageLedger, savedSettings] = await Promise.all([
+    const [rawPackages, userPackages, depositBalances, packageLedger, savedSettings] = await Promise.all([
       InvestmentPackage.find({}).sort({ sortOrder: 1, price: 1 }).lean(),
       UserPackage.find({})
         .populate("userId", "name username email")
         .sort({ createdAt: -1 })
         .limit(500)
         .lean(),
-      Wallet.find({ type: "spot", mode: "live" })
+      DepositBalance.find({
+        $or: [{ available: { $gt: 0 } }, { locked: { $gt: 0 } }],
+      })
         .populate("userId", "name username email")
-        .sort({ updatedAt: -1 })
+        .sort({ asset: 1, available: -1 })
         .limit(1000)
         .lean(),
       PackageLedger.find({})
@@ -55,24 +57,16 @@ export async function GET(request: NextRequest) {
           email: row.userId.email,
         } : null,
       })),
-      depositBalances: spotWallets.flatMap((wallet: any) => {
-        const balances = (wallet.balances || []).filter(
-          (item: any) => String(item.asset || "").trim().toUpperCase() === "USDT" &&
-            (Number(item.available || 0) > 0 || Number(item.locked || 0) > 0),
-        );
-        return balances.map((item: any, index: number) => ({
-          _id: String(wallet._id) + ":USDT:" + index,
-          asset: "USDT",
-          available: Number(item.available || 0),
-          locked: Number(item.locked || 0),
-          userId: wallet.userId ? {
-            _id: String(wallet.userId._id),
-            name: wallet.userId.name,
-            username: wallet.userId.username,
-            email: wallet.userId.email,
-          } : null,
-        }));
-      }),
+      depositBalances: depositBalances.map((row: any) => ({
+        ...row,
+        _id: String(row._id),
+        userId: row.userId ? {
+          _id: String(row.userId._id),
+          name: row.userId.name,
+          username: row.userId.username,
+          email: row.userId.email,
+        } : null,
+      })),
       packageLedger: packageLedger.map((row: any) => ({
         ...row,
         _id: String(row._id),

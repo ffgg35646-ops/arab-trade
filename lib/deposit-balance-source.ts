@@ -153,7 +153,9 @@ export async function creditDepositBalance(
 export async function separateLegacyDepositsFromSpotWallet(
   userId: mongoose.Types.ObjectId,
 ): Promise<void> {
-  const marker = "legacy-deposit-separation:" + String(userId);
+  // v2 intentionally bypasses v1 markers so any leftover legacy amount in funding can be reconciled once.
+  // The v1 negative LedgerEntry remains in the ledger and reduces depositExposure by the amount already moved.
+  const marker = "legacy-deposit-separation:v2:" + String(userId);
   const session = await mongoose.startSession();
 
   try {

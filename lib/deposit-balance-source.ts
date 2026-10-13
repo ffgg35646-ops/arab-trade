@@ -191,6 +191,10 @@ export async function separateLegacyDepositsFromSpotWallet(
       for (const entry of entries as any[]) {
         const amount = Number(entry.amount || 0);
         const referenceId = String(entry.referenceId || "");
+        const isSeparateDepositCredit = referenceId.startsWith("external-deposit-balance:");
+        const isSeparateDepositSpend = referenceId.startsWith("separate-deposit-spend:");
+        if (isSeparateDepositCredit || isSeparateDepositSpend) continue;
+
         const isLegacyMigrationCredit = referenceId.startsWith("legacy-deposit-migration:");
         const isPostCutoverDeposit = String(entry.type || "") === "deposit" &&
           new Date(entry.createdAt).getTime() >= LEGACY_UNIFIED_DEPOSIT_CUTOVER_AT;

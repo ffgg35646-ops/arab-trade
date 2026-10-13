@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     const savedMinimums = (savedSettings as any)?.withdrawals?.withdrawalMinByPackage || {};
     const packages = (rawPackages as any[]).map((plan) => ({
       ...plan,
-      minimumWithdrawal: Number(savedMinimums[String(plan._id)] ?? plan.minimumWithdrawal ?? 50),
+      minimumWithdrawal: Number(savedMinimums[String(plan._id)] ?? plan.minimumWithdrawal ?? 100),
     }));
 
     return NextResponse.json({
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     const price = Number(body.price);
     const durationDays = 0;
     const dailyProfit = Number(body.dailyProfit ?? 0);
-    const minimumWithdrawal = Number(body.minimumWithdrawal ?? 50);
+    const minimumWithdrawal = Number(body.minimumWithdrawal ?? 100);
     const sortOrder = Number(body.sortOrder || 0);
     const enabled = body.enabled !== false;
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/current-user";
 import { connectDB } from "@/lib/mongodb";
+import { migrateLegacyDepositBalancesToSpotWallet } from "@/lib/unified-usdt-wallet";
 import GridBot from "@/models/GridBot";
 import {
   startGridBot,
@@ -76,6 +77,7 @@ export async function PATCH(
   }
 
   await connectDB();
+  await migrateLegacyDepositBalancesToSpotWallet(user._id);
 
   const { id } = await context.params;
 

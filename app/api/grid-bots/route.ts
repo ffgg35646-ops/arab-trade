@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/current-user";
 import { connectDB } from "@/lib/mongodb";
+import { migrateLegacyDepositBalancesToSpotWallet } from "@/lib/unified-usdt-wallet";
 import GridBot from "@/models/GridBot";
 import {
   createGridBot,
@@ -68,6 +69,7 @@ export async function POST(
   }
 
   await connectDB();
+  await migrateLegacyDepositBalancesToSpotWallet(user._id);
 
   try {
     const body = await request.json();

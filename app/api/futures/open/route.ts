@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/current-user";
 import { connectDB } from "@/lib/mongodb";
+import { migrateLegacyDepositBalancesToSpotWallet } from "@/lib/unified-usdt-wallet";
 import FuturesPosition from "@/models/FuturesPosition";
 
 export async function POST(request: NextRequest) {
@@ -9,6 +10,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
 
     await connectDB();
+    await migrateLegacyDepositBalancesToSpotWallet(user._id);
     const body = await request.json();
 
     const symbol = String(body.symbol || "").toUpperCase();

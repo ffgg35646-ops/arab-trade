@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireVerifiedIdentity } from "@/lib/require-kyc";
 import { getCurrentUser } from "@/lib/current-user";
 import { connectDB } from "@/lib/mongodb";
+import { migrateLegacyDepositBalancesToSpotWallet } from "@/lib/unified-usdt-wallet";
 
 import MarginLoan from "@/models/MarginLoan";
 import MarginPosition from "@/models/MarginPosition";
@@ -40,6 +41,7 @@ export async function POST(
     }
 
     await connectDB();
+    await migrateLegacyDepositBalancesToSpotWallet(user._id);
 
     /*
      * الاقتراض المستقل ممنوع.

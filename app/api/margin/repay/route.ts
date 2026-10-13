@@ -3,6 +3,7 @@ import { requireVerifiedIdentity } from "@/lib/require-kyc";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/current-user";
 import { connectDB } from "@/lib/mongodb";
+import { migrateLegacyDepositBalancesToSpotWallet } from "@/lib/unified-usdt-wallet";
 import Wallet from "@/models/Wallet";
 import MarginLoan from "@/models/MarginLoan";
 
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     await connectDB();
+    await migrateLegacyDepositBalancesToSpotWallet(user._id);
 
     const body = await request.json();
     const loanId = String(body.loanId || "");

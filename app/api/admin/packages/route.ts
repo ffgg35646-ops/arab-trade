@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongodb";
 import { requireAdminLeader } from "@/lib/admin-auth";
 import InvestmentPackage from "@/models/InvestmentPackage";
+import PlatformSettings from "@/models/PlatformSettings";
 import UserPackage from "@/models/UserPackage";
 import DepositBalance from "@/models/DepositBalance";
 import PackageLedger from "@/models/PackageLedger";
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
     await connectDB();
     await ensureDefaultInvestmentPackages();
     await accrueDuePackageEarnings();
-    const [packages, userPackages, depositBalances, packageLedger] = await Promise.all([
+    const [rawPackages, userPackages, depositBalances, packageLedger, savedSettings] = await Promise.all([
       InvestmentPackage.find({}).sort({ sortOrder: 1, price: 1 }).lean(),
       UserPackage.find({})
         .populate("userId", "name username email")
@@ -35,7 +36,13 @@ export async function GET(request: NextRequest) {
         .sort({ createdAt: -1 })
         .limit(500)
         .lean(),
+      PlatformSettings.findOne({ key: "global" }).select("withdrawals.withdrawalMinByPackage").lean(),
     ]);
+    const savedMinimums = (savedSettings as any)?.withdrawals?.withdrawalMinByPackage || {};
+    const packages = (rawPackages as any[]).map((plan) => ({
+      ...plan,
+      minimumWithdrawal: Number(savedMinimums[String(plan._id)] ?? plan.minimumWithdrawal ?? 50),
+    }));
 
     return NextResponse.json({
       success: true,
@@ -107,6 +114,11 @@ export async function POST(request: NextRequest) {
     const item = await InvestmentPackage.create({
       name, description, price, asset: "USDT", durationDays, dailyProfit, minimumWithdrawal, sortOrder, enabled,
     });
+    await PlatformSettings.updateOne(
+      { key: "global" },
+      { $set: { key: "global", [`withdrawals.withdrawalMinByPackage.${String(item._id)}`]: minimumWithdrawal } },
+      { upsert: true }
+    );
 
     return NextResponse.json({ success: true, package: item }, { status: 201 });
   } catch (error) {
@@ -164,6 +176,13 @@ export async function PATCH(request: NextRequest) {
 
     const item = await InvestmentPackage.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true });
     if (!item) return NextResponse.json({ success: false, message: "الباقة غير موجودة" }, { status: 404 });
+    if (update.minimumWithdrawal !== undefined) {
+      await PlatformSettings.updateOne(
+        { key: "global" },
+        { $set: { key: "global", [`withdrawals.withdrawalMinByPackage.${id}`]: Number(update.minimumWithdrawal) } },
+        { upsert: true }
+      );
+    }
     if (profitRateChanged) {
       // Apply the new rate only to future 24-hour windows; preserve elapsed profit.
       await UserPackage.updateMany({ packageId: id, status: "active" }, { $set: { lastProfitAt: new Date() } });

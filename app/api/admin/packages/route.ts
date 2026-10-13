@@ -8,7 +8,6 @@ import UserPackage from "@/models/UserPackage";
 import Wallet from "@/models/Wallet";
 import PackageLedger from "@/models/PackageLedger";
 import { ensureDefaultInvestmentPackages } from "@/lib/ensure-default-investment-packages";
-import { accrueDuePackageEarnings } from "@/lib/accrue-package-earnings";
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,7 +16,6 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
     await ensureDefaultInvestmentPackages();
-    await accrueDuePackageEarnings();
     const [rawPackages, userPackages, spotWallets, packageLedger, savedSettings] = await Promise.all([
       InvestmentPackage.find({}).sort({ sortOrder: 1, price: 1 }).lean(),
       UserPackage.find({})
@@ -174,8 +172,7 @@ export async function PATCH(request: NextRequest) {
     }
     if (body.enabled !== undefined) update.enabled = body.enabled === true;
 
-    // Settle elapsed days using the old rate before the admin changes it.
-    if (body.dailyProfit !== undefined) await accrueDuePackageEarnings();
+    // Package earnings are credited only when the user collects within the 30-minute window.
 
     const previousPlan = await InvestmentPackage.findById(id).select("dailyProfit").lean();
     if (!previousPlan) return NextResponse.json({ success: false, message: "الباقة غير موجودة" }, { status: 404 });

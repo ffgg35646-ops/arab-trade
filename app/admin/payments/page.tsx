@@ -285,36 +285,6 @@ export default function PaymentsAdminPage() {
   }
 
 
-  async function savePackageWithdrawalMinimums() {
-    const entries = Object.entries(packageWithdrawalMinimums);
-    if (!entries.every(([id, value]) => Boolean(id) && Number.isFinite(Number(value)) && Number(value) >= 0)) {
-      setError("تأكد من أن الحد الأدنى للسحب لكل باقة رقم صحيح لا يقل عن صفر");
-      return;
-    }
-    setSavingPackageMinimums(true);
-    setMessage("");
-    setError("");
-    try {
-      const res = await fetch("/api/admin/settings", {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ withdrawals: { withdrawalMinByPackage: packageWithdrawalMinimums } }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.success) throw new Error(json.message || "تعذر حفظ حدود السحب لكل باقة");
-      const saved = json.settings?.withdrawals?.withdrawalMinByPackage;
-      if (saved && typeof saved === "object") {
-        setPackageWithdrawalMinimums(saved instanceof Map ? Object.fromEntries(saved.entries()) : saved);
-      }
-      setMessage("تم حفظ الحد الأدنى للسحب لكل باقة. سيظهر الحد للمستخدم عند السحب من أرباح الباقة.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "تعذر حفظ حدود السحب لكل باقة");
-    } finally {
-      setSavingPackageMinimums(false);
-    }
-  }
-
   async function toggleGlobalDeposits() {
     if (savingGlobalDeposits) return;
     const nextValue = !globalDepositsEnabled;

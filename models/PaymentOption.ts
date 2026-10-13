@@ -4,6 +4,7 @@ export interface IPaymentOption extends Document {
   name: string;
   asset: string;
   network: string;
+  kind: "both" | "deposit" | "withdrawal";
   address: string;
 
   minDeposit: number;
@@ -42,6 +43,13 @@ const PaymentOptionSchema = new Schema<IPaymentOption>(
       type: String,
       required: true,
       trim: true,
+      index: true,
+    },
+
+    kind: {
+      type: String,
+      enum: ["both", "deposit", "withdrawal"],
+      default: "both",
       index: true,
     },
 

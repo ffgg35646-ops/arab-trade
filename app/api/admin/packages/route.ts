@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     const description = String(body.description || "").trim();
     const price = Number(body.price);
     const durationDays = 0;
-    const dailyProfit = Number(body.dailyProfit ?? 0);
+    const dailyProfit = Number(body.dailyProfit ?? (Number(body.price) / 25));
     const minimumWithdrawal = Number(body.minimumWithdrawal ?? 100);
     const sortOrder = Number(body.sortOrder || 0);
     const enabled = body.enabled !== false;

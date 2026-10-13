@@ -192,7 +192,7 @@ export async function PATCH(request: NextRequest) {
             amount,
             balanceBefore: credited.availableBefore,
             balanceAfter: credited.availableAfter,
-            referenceId: String(current._id),
+            referenceId: "external-deposit-balance:" + String(current._id),
             note: adminNote || "إيداع USDT معتمد — أضيف إلى رصيد الإيداع المنفصل، ولا يُضاف إلى رصيد السحب العام.",
           }], { session });
 

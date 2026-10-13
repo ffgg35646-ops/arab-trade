@@ -192,9 +192,14 @@ export default function AdminWithdrawalsPage() {
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">مراجعة طلبات السحب العام وطلبات سحب أرباح الباقات، ومتابعة الموافقة والتنفيذ والرفض من شاشة واحدة.</p>
               </div>
             </div>
-            <button type="button" onClick={() => void load(true)} disabled={refreshing} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-cyan-300/30 disabled:opacity-50">
-              <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} /> تحديث البيانات
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <a href="/admin/payments#package-withdrawal-settings" className="inline-flex items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-3 text-sm font-bold text-emerald-100 transition hover:bg-emerald-300/15">
+                إعداد سحب أرباح الباقات
+              </a>
+              <button type="button" onClick={() => void load(true)} disabled={refreshing} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-cyan-300/30 disabled:opacity-50">
+                <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} /> تحديث البيانات
+              </button>
+            </div>
           </div>
           <div className="relative mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-2xl border border-white/10 bg-[#030b12]/65 p-4"><div className="flex items-center gap-2 text-xs text-slate-400"><Clock3 size={16} className="text-amber-300" />قيد المراجعة</div><div className="mt-3 text-3xl font-black text-amber-200">{stats.pending}</div><p className="mt-1 text-xs text-slate-500">عام: {stats.walletPending} · باقات: {stats.packagePending}</p></div>

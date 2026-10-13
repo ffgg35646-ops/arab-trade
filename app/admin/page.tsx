@@ -71,21 +71,8 @@ export default function AdminDashboard() {
   return (
     <AdminGuard>
       <AdminShell title="لوحة التحكم">
-        {loading ? (
-          <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-12 text-center text-slate-400">
-            جاري تحميل بيانات لوحة التحكم...
-          </div>
-        ) : error ? (
-          <div className="rounded-2xl border border-red-900/60 bg-red-950/30 p-5 text-red-300">
-            {error}
-            <button
-              onClick={() => void load()}
-              className="mr-3 rounded-lg bg-red-900/50 px-3 py-2 text-xs font-bold"
-            >
-              إعادة المحاولة
-            </button>
-          </div>
-        ) : data ? (
+        {data ? (
+          <div className="space-y-6">
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -203,7 +190,36 @@ export default function AdminDashboard() {
               </section>
             </div>
           </div>
-        ) : null}
+        ) : error ? (
+          <div className="rounded-2xl border border-red-900/60 bg-red-950/30 p-5 text-red-300">
+            {error}
+            <button
+              onClick={() => void load()}
+              className="mr-3 rounded-lg bg-red-900/50 px-3 py-2 text-xs font-bold"
+            >
+              إعادة المحاولة
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-5" aria-hidden="true">
+            <div className="h-8 w-48 animate-pulse rounded-lg bg-white/[0.04]" />
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              {Array.from({ length: 5 }, (_, i) => (
+                <div key={i} className="h-28 rounded-2xl border border-slate-800 bg-[#08111e]" />
+              ))}
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }, (_, i) => (
+                <div key={i} className="h-24 rounded-2xl border border-slate-800 bg-[#08111e]" />
+              ))}
+            </div>
+            <div className="grid gap-6 xl:grid-cols-3">
+              {Array.from({ length: 3 }, (_, i) => (
+                <div key={i} className="h-64 rounded-2xl border border-slate-800 bg-[#08111e]" />
+              ))}
+            </div>
+          </div>
+        )}
       </AdminShell>
     </AdminGuard>
   );

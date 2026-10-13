@@ -136,13 +136,13 @@ export default function AdminShell({
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#050a13] text-white">
-      <aside className="fixed right-0 top-0 z-40 hidden h-screen w-[280px] overflow-y-auto border-l border-slate-800 bg-[#07101d] lg:block">
-        <div className="border-b border-slate-800 p-5">
+      <aside className="fixed right-0 top-0 z-40 hidden h-screen w-[248px] overflow-y-auto border-l border-slate-800 bg-[#07101d] lg:block">
+        <div className="border-b border-slate-800 p-4">
           <div className="text-xl font-black">ArabTrade</div>
           <div className="mt-1 text-xs text-slate-500">لوحة الإدارة</div>
         </div>
 
-        <nav className="space-y-5 p-4">
+        <nav className="space-y-4 p-3">
           {groups.map((group) => (
             <div key={group.title}>
               <div className="mb-2 px-3 text-[11px] font-bold text-slate-500">
@@ -160,7 +160,7 @@ export default function AdminShell({
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`block rounded-xl px-3 py-3 text-sm font-bold transition ${
+                      className={`block rounded-lg px-3 py-2.5 text-sm font-bold transition ${
                         active
                           ? "bg-blue-600/20 text-blue-300"
                           : "text-slate-300 hover:bg-white/[0.04] hover:text-white"
@@ -177,15 +177,15 @@ export default function AdminShell({
           <button
             onClick={logout}
             disabled={busy}
-            className="w-full rounded-xl border border-red-900/60 bg-red-950/20 px-3 py-3 text-sm font-bold text-red-300 hover:bg-red-950/40 disabled:opacity-50"
+            className="w-full rounded-lg border border-red-900/60 bg-red-950/20 px-3 py-2.5 text-sm font-bold text-red-300 hover:bg-red-950/40 disabled:opacity-50"
           >
             {busy ? "جاري تسجيل الخروج..." : "تسجيل الخروج"}
           </button>
         </nav>
       </aside>
 
-      <main className="lg:mr-[280px]">
-        <div className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#050a13]/95 px-4 py-3 backdrop-blur sm:px-6">
+      <main className="lg:mr-[248px]">
+        <div className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#050a13]/95 px-3 py-2.5 backdrop-blur sm:px-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
               {pathname !== "/admin" ? (
@@ -208,7 +208,7 @@ export default function AdminShell({
             <div className="relative shrink-0">
               <button
                 onClick={() => setNotificationOpen((v) => !v)}
-                className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-slate-700 bg-[#0b1422] text-lg hover:bg-[#101c2d]"
+                className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-slate-700 bg-[#0b1422] text-lg hover:bg-[#101c2d]"
                 aria-label="إشعارات الطلبات"
               >
                 🔔
@@ -221,8 +221,8 @@ export default function AdminShell({
               </button>
 
               {notificationOpen ? (
-                <div className="absolute left-0 top-14 w-[300px] overflow-hidden rounded-2xl border border-slate-700 bg-[#08111e] shadow-2xl">
-                  <div className="border-b border-slate-800 px-4 py-4">
+                <div className="absolute left-0 top-12 w-[280px] overflow-hidden rounded-xl border border-slate-700 bg-[#08111e] shadow-2xl">
+                  <div className="border-b border-slate-800 px-3 py-3">
                     <div className="font-black">طلبات جديدة</div>
                     <div className="mt-1 text-xs text-slate-500">
                       العدد يتغير تلقائيًا حسب الطلبات المعلقة
@@ -234,7 +234,7 @@ export default function AdminShell({
                       <Link
                         key={item.href}
                         href={item.href}
-                        className="flex items-center justify-between rounded-xl px-3 py-3 hover:bg-white/[0.04]"
+                        className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-white/[0.04]"
                       >
                         <span className="font-bold text-slate-200">
                           {item.title}
@@ -256,7 +256,7 @@ export default function AdminShell({
           </div>
         </div>
 
-        <div className="p-4 sm:p-6">{children}</div>
+        <div className="p-3 sm:p-4">{children}</div>
       </main>
     </div>
   );

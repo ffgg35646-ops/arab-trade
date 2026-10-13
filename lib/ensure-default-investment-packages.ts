@@ -117,7 +117,7 @@ export async function ensureDefaultInvestmentPackages() {
 
   // One-time migration: initialize legacy zero-profit plans using the original
   // package defaults, without overriding values the administrator later edits.
-  const profitMigrationKey = "arab-trade-package-daily-profit-defaults-v1";
+  const profitMigrationKey = "arab-trade-package-daily-profit-defaults-v2";
   if (!(await PackageCatalogSeed.exists({ key: profitMigrationKey }))) {
     const defaultsByPrice: Record<number, number> = { 50: 2, 100: 4, 250: 10, 500: 20 };
     for (const plan of plans as any[]) {

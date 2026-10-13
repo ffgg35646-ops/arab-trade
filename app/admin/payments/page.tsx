@@ -184,11 +184,6 @@ export default function PaymentsAdminPage() {
 
     if (!payment) return;
 
-    if (!payment.name.trim()) {
-      setError("اسم وسيلة الإيداع مطلوب");
-      return;
-    }
-
     if (!payment.asset.trim()) {
       setError("رمز العملة مطلوب");
       return;
@@ -463,48 +458,15 @@ export default function PaymentsAdminPage() {
                   }
                   className="rounded-2xl border border-slate-800 bg-[#08111e] p-6"
                 >
-                  <div className="mb-6 flex items-start justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-black">
-                        {payment.name || "وسيلة دفع جديدة"}
-                      </h2>
-
-                      <div className="mt-1 text-xs text-slate-500">
-                        {payment.asset || "بدون عملة"}{" "}
-                        {payment.network
-                          ? `• ${payment.network}`
-                          : ""}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updatePayment(index, {
-                          enabled: !payment.enabled,
-                        })
-                      }
-                      className={`rounded-full px-4 py-2 text-xs font-black ${
-                        payment.enabled
-                          ? "bg-emerald-500/15 text-emerald-300"
-                          : "bg-red-500/15 text-red-300"
-                      }`}
-                    >
-                      {payment.enabled
-                        ? "مفعلة"
-                        : "متوقفة"}
-                    </button>
+                  <div className="mb-6">
+                    <h2 className="text-xl font-black">
+                      {payment.asset || "USDT"} {payment.network ? `• ${payment.network}` : ""}
+                    </h2>
                   </div>
 
                   <details className="group">
                     <summary className="cursor-pointer rounded-xl border border-slate-700 bg-[#0b1422] p-4 font-bold">تعديل تفاصيل وسيلة الإيداع</summary>
                     <div className="space-y-4 pt-4">
-                      <div>
-                        <label className="mb-2 block text-sm font-bold">اسم وسيلة الإيداع</label>
-                        <input value={payment.name} onChange={(e) => updatePayment(index, { name: e.target.value })} placeholder="مثال: USDT TRC20" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
-                        
-                      </div>
-
                       <div className="grid gap-4 md:grid-cols-2">
                         <div>
                           <label className="mb-2 block text-sm font-bold">العملة / الرمز</label>
@@ -526,34 +488,12 @@ export default function PaymentsAdminPage() {
                         <input value={payment.address} onChange={(e) => updatePayment(index, { address: e.target.value })} placeholder="عنوان محفظة الإيداع أو بيانات التحويل" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
                       </div>
 
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div>
-                          <label className="mb-2 block text-sm font-bold">الحد الأدنى للإيداع</label>
-                          <input value={payment.minDeposit} onChange={(e) => updatePayment(index, { minDeposit: Number(e.target.value) || 0 })} type="number" min="0" step="any" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-sm font-bold">الحد الأقصى للإيداع</label>
-                          <input value={payment.maxDeposit} onChange={(e) => updatePayment(index, { maxDeposit: Number(e.target.value) || 0 })} type="number" min="0" step="any" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
-                        </div>
-                        
-                      </div>
-
                       <div>
-                        <label className="mb-2 block text-sm font-bold">تنبيه للمستخدم</label>
-                        <textarea value={payment.warning} onChange={(e) => updatePayment(index, { warning: e.target.value })} rows={2} placeholder="تعليمات أو تنبيه اختياري" className="w-full resize-y rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
+                        <label className="mb-2 block text-sm font-bold">الحد الأدنى للإيداع</label>
+                        <input value={payment.minDeposit} onChange={(e) => updatePayment(index, { minDeposit: Number(e.target.value) || 0 })} type="number" min="0" step="any" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
                       </div>
 
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-black/10 p-3">
-                          <span className="text-sm font-bold">تفعيل الوسيلة</span>
-                          <input type="checkbox" checked={payment.enabled} onChange={(e) => updatePayment(index, { enabled: e.target.checked })} className="h-5 w-5 accent-violet-400" />
-                        </label>
-                        <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-black/10 p-3">
-                          <span className="text-sm font-bold">السماح بالإيداع</span>
-                          <input type="checkbox" checked={payment.depositEnabled} onChange={(e) => updatePayment(index, { depositEnabled: e.target.checked })} className="h-5 w-5 accent-violet-400" />
-                        </label>
-                        
-                      </div>
+
                     </div>
                   </details>
 

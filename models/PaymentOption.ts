@@ -47,8 +47,8 @@ const PaymentOptionSchema = new Schema<IPaymentOption>(
 
     address: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
     },
 
     minDeposit: {

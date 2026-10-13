@@ -5,6 +5,8 @@ import { connectDB } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
 import Reward from "@/models/Reward";
 import Wallet from "@/models/Wallet";
+import UserPackage from "@/models/UserPackage";
+import PackageLedger from "@/models/PackageLedger";
 import PlatformSettings from "@/models/PlatformSettings";
 import LedgerEntry from "@/models/LedgerEntry";
 
@@ -174,48 +176,96 @@ export async function POST(request: NextRequest) {
         throw new Error("INVALID_REWARD");
       }
 
-      let wallet = await Wallet.findOne({
+      // Route each reward to the currently active package's withdrawal balance.
+      // If there is no active package for this asset, use the general withdrawal wallet.
+      const activePackage = await UserPackage.findOne({
         userId: user._id,
-        type: "funding",
-        mode: "live",
-      }).session(session);
+        status: "active",
+        asset,
+      })
+        .sort({ activatedAt: -1, createdAt: -1 })
+        .session(session);
 
-      if (!wallet) {
-        wallet = new Wallet({
+      let before = 0;
+      let balanceAfter = 0;
+      let destinationNote = "";
+
+      if (activePackage) {
+        before = Number(activePackage.availableEarnings || 0);
+
+        const updatedPackage = await UserPackage.findOneAndUpdate(
+          {
+            _id: activePackage._id,
+            userId: user._id,
+            status: "active",
+          },
+          {
+            $inc: {
+              availableEarnings: amount,
+              totalRealizedEarnings: amount,
+            },
+          },
+          { new: true, session }
+        );
+
+        if (!updatedPackage) {
+          throw new Error("REWARD_PACKAGE_UPDATE_FAILED");
+        }
+
+        balanceAfter = Number(updatedPackage.availableEarnings || 0);
+        destinationNote = "رصيد سحب الباقة المفعّلة: " + activePackage.packageName;
+
+        await PackageLedger.create(
+          [
+            {
+              userId: user._id,
+              userPackageId: activePackage._id,
+              type: "reward",
+              asset,
+              amount,
+              note: "مكافأة صندوق: " + reward.title,
+            },
+          ],
+          { session }
+        );
+      } else {
+        let wallet = await Wallet.findOne({
           userId: user._id,
           type: "funding",
           mode: "live",
-          balances: [],
-        });
+        }).session(session);
+
+        if (!wallet) {
+          wallet = new Wallet({
+            userId: user._id,
+            type: "funding",
+            mode: "live",
+            balances: [],
+          });
+        }
+
+        let balance = wallet.balances.find(
+          (item: any) => String(item.asset || "").toUpperCase() === asset
+        );
+
+        if (!balance) {
+          wallet.balances.push({
+            asset,
+            available: amount,
+            locked: 0,
+          });
+
+          balance = wallet.balances[wallet.balances.length - 1] as any;
+          before = 0;
+        } else {
+          before = Number(balance.available || 0);
+          balance.available = before + amount;
+        }
+
+        balanceAfter = Number(balance?.available ?? amount);
+        await wallet.save({ session });
+        destinationNote = "رصيد السحب العام";
       }
-
-      let balance = wallet.balances.find(
-        (item: any) => item.asset === asset
-      );
-
-      let before = 0;
-
-      if (!balance) {
-        wallet.balances.push({
-          asset,
-          available: amount,
-          locked: 0,
-        });
-
-        before = 0;
-        balance = wallet.balances[
-          wallet.balances.length - 1
-        ] as any;
-      } else {
-        before = Number(balance.available || 0);
-        balance.available = before + amount;
-      }
-
-      const balanceAfter = Number(
-        balance?.available ?? amount
-      );
-
-      await wallet.save({ session });
 
       await LedgerEntry.create(
         [
@@ -227,7 +277,7 @@ export async function POST(request: NextRequest) {
             balanceBefore: before,
             balanceAfter,
             referenceId: String(reward._id),
-            note: reward.title,
+            note: String(reward.title || "مكافأة") + " — " + destinationNote,
           },
         ],
         { session }

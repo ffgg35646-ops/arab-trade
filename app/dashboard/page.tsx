@@ -231,31 +231,24 @@ export default function DashboardPage() {
                 </div>
 
                 <div>
-                  {loadingUser ? (
-                    <div className="text-sm text-slate-500">
-                      جاري تحميل بيانات الحساب...
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="text-xl font-bold">
-                          {user?.name || "حسابي"}
-                        </h1>
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="text-xl font-bold">
+                        {user?.name || "حسابي"}
+                      </h1>
 
+                      {user ? (
                         <div className="flex flex-wrap items-center gap-2">
                           <span
                             className={`rounded-full border px-2.5 py-1 text-xs ${
-                              user?.isVerified
+                              user.isVerified
                                 ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
                                 : "border-red-400/20 bg-red-400/10 text-red-300"
                             }`}
                           >
-                            {user?.isVerified
-                              ? "الحساب موثق"
-                              : "الحساب غير موثق"}
+                            {user.isVerified ? "الحساب موثق" : "الحساب غير موثق"}
                           </span>
-
-                          {!user?.isVerified && (
+                          {!user.isVerified && (
                             <Link
                               href="/dashboard/account/verification"
                               className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-bold text-slate-950 transition hover:bg-cyan-400"
@@ -264,15 +257,15 @@ export default function DashboardPage() {
                             </Link>
                           )}
                         </div>
-                      </div>
+                      ) : null}
+                    </div>
 
-                      <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-600">
-                        <span>اسم المستخدم: @{user?.username || "—"}</span>
-                        <span>UID: {user?.id || "—"}</span>
-                        <span>{user?.email || "—"}</span>
-                      </div>
-                    </>
-                  )}
+                    <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-600">
+                      <span>اسم المستخدم: @{user?.username || "—"}</span>
+                      <span>UID: {user?.id || "—"}</span>
+                      <span>{user?.email || "—"}</span>
+                    </div>
+                  </>
                 </div>
               </div>
 

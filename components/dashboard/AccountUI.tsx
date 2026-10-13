@@ -34,11 +34,11 @@ export function Frame({
   return (
     <main dir="rtl" className="min-h-[calc(100vh-4rem)] bg-[#050a13] text-white">
       <div className="border-b border-white/10 bg-[#07101d]">
-        <div className="mx-auto max-w-[1700px] px-4 py-6 md:px-6 lg:px-8">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10">
-                <Icon size={22} className="text-cyan-300" />
+        <div className="mx-auto max-w-[1700px] px-4 py-4 md:px-6 lg:px-8">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10">
+                <Icon size={19} className="text-cyan-300" />
               </div>
 
               <div>
@@ -49,7 +49,7 @@ export function Frame({
                   </span>
                 </div>
 
-                <p className="mt-1 max-w-3xl text-xs leading-6 text-slate-500">
+                <p className="mt-1 max-w-3xl text-[11px] leading-5 text-slate-500">
                   {description}
                 </p>
               </div>

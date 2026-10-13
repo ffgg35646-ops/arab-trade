@@ -506,7 +506,9 @@ export default function PaymentsAdminPage() {
                     </button>
                   </div>
 
-                  <div className="space-y-4">
+                  <details className="group">
+                    <summary className="cursor-pointer rounded-xl border border-slate-700 bg-[#0b1422] p-4 font-bold">تعديل تفاصيل وسيلة الدفع الحالية</summary>
+                    <div className="space-y-4 pt-4">
                     <div>
                       <label className="mb-2 block text-sm font-bold">
                         اسم وسيلة الدفع
@@ -690,7 +692,8 @@ export default function PaymentsAdminPage() {
                         </button>
                       </div>
                     </div>
-                  </div>
+                    </div>
+                  </details>
 
                   <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                     <button

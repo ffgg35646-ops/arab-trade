@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import PlatformSettings from "@/models/PlatformSettings";
+import InvestmentPackage from "@/models/InvestmentPackage";
+import mongoose from "mongoose";
 import { requireAdminLeader } from "@/lib/admin-auth";
 
 export async function GET(request: NextRequest) {
@@ -137,6 +139,18 @@ export async function PATCH(request: NextRequest) {
       { $set: update },
       { upsert: true }
     );
+
+    // Keep the package document and the legacy settings map synchronized:
+    // both the admin package editor and all withdrawal flows then read the same minimum.
+    if (packageMinima !== undefined) {
+      const writes = Object.entries(packageMinima)
+        .filter(([packageId]) => mongoose.Types.ObjectId.isValid(packageId))
+        .map(([packageId, rawValue]) => InvestmentPackage.updateOne(
+          { _id: packageId },
+          { $set: { minimumWithdrawal: Number(rawValue) } }
+        ));
+      await Promise.all(writes);
+    }
 
     const settings = await getPlatformSettings();
 

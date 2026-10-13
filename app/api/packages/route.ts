@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
         earningsNotice: "يصبح الربح اليومي متاحًا للجمع بعد اكتمال 24 ساعة، وتستمر فرصة الجمع 30 دقيقة فقط. إذا انتهت المهلة دون جمع، يسقط ربح الدورة وتبدأ دورة جديدة؛ والباقة نفسها مستمرة دون مدة انتهاء.",
         singleActivePackageNotice: "يسمح لكل مستخدم بباقة نشطة واحدة فقط.",
         activationSourceNotice: "تفعيل الباقات يتم من رصيد USDT الموحد في المحفظة الفورية، وهو نفس الرصيد المستخدم للتداول والتحويل.",
-        cancellationNotice: "عند إلغاء باقة نشطة أو التغيير إلى باقة أخرى، يضاف 50% من قيمة تفعيل الباقة السابقة إلى رصيد السحب العام وليس رصيد الإيداع، وتظل الأرباح المحققة المتاحة مسجلة في الباقة.",
+        cancellationNotice: "عند إلغاء باقة نشطة أو التغيير إلى باقة أخرى، يضاف 50% من قيمة تفعيل الباقة السابقة إلى رصيد السحب الخاص بالباقة نفسها، وتظل الأرباح المجمعة مسجلة فيها. سعر الباقة الجديدة يُخصم من رصيد الإيداع.",
       },
     });
   } catch (error) {
@@ -271,7 +271,7 @@ export async function POST(request: NextRequest) {
       if (activePackage) {
         return NextResponse.json({
           success: false,
-          message: "لديك باقة نشطة بالفعل. ألغِها أولًا؛ سيُحوّل نصف قيمة تفعيلها إلى رصيد السحب العام.",
+          message: "لديك باقة نشطة بالفعل. استخدم «التغيير إلى هذه الباقة» لنقل 50% من قيمة تفعيلها إلى رصيد سحب الباقة الحالية.",
         }, { status: 409 });
       }
 
@@ -373,7 +373,7 @@ export async function POST(request: NextRequest) {
 
           const cancelled = await UserPackage.findOneAndUpdate(
             { _id: current._id, userId: user._id, status: "active", lockedEarnings: 0 },
-            { $set: { status: "cancelled", cancelledAt: new Date(), cancellationRefund: refund } },
+            { $set: { status: "cancelled", cancelledAt: new Date(), cancellationRefund: refund }, $inc: { availableEarnings: refund } },
             { new: true, session }
           );
           if (!cancelled) throw new Error("CURRENT_PACKAGE_CHANGED");
@@ -388,34 +388,6 @@ export async function POST(request: NextRequest) {
             balanceBefore: debit.availableBefore, balanceAfter: debit.availableAfter,
             referenceId: "package-change-debit:" + String(cancelled._id) + ":" + String(plan._id) + ":" + String(Date.now()),
             note: "خصم تفعيل الباقة الجديدة " + plan.name + " من رصيد USDT الموحد.",
-          }], { session });
-
-          let wallet = await Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).session(session);
-          if (!wallet) {
-            wallet = new Wallet({ userId: user._id, type: "spot", mode: "live", balances: [] });
-          }
-          const oldAsset = USDT_ASSET;
-          let walletBalance = wallet.balances.find((item: any) => String(item.asset).toUpperCase() === oldAsset);
-          const before = Number(walletBalance?.available || 0);
-          if (!walletBalance) {
-            wallet.balances.push({ asset: oldAsset, available: refund, locked: 0 });
-            walletBalance = wallet.balances[wallet.balances.length - 1] as any;
-          } else {
-            walletBalance.available = Number((before + refund).toFixed(12));
-          }
-          await wallet.save({ session });
-
-          await LedgerEntry.create([{
-            userId: user._id,
-            scope: "user",
-            asset: oldAsset,
-            mode: "live",
-            type: "adjustment",
-            amount: refund,
-            balanceBefore: before,
-            balanceAfter: Number(walletBalance?.available || 0),
-            referenceId: "package-change:" + String(cancelled._id),
-            note: "استرداد 50% من قيمة الباقة السابقة " + cancelled.packageName + " عند تغيير الباقة",
           }], { session });
 
           const created = await UserPackage.create([{
@@ -444,7 +416,7 @@ export async function POST(request: NextRequest) {
               type: "cancellation_refund",
               asset: oldAsset,
               amount: refund,
-              note: "تغيير الباقة: استرداد 50% من قيمة " + cancelled.packageName + " إلى رصيد السحب العام",
+              note: "تغيير الباقة: إضافة 50% من قيمة تفعيل " + cancelled.packageName + " إلى رصيد سحب هذه الباقة",
             },
             {
               userId: user._id,
@@ -481,7 +453,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "تم تغيير الباقة بنجاح. خُصمت قيمة الباقة الجديدة من رصيد USDT الموحد، وأضيف 50% من قيمة الباقة السابقة إلى رصيد USDT العام.",
+        message: "تم تغيير الباقة بنجاح. أُضيف 50% من قيمة تفعيل الباقة السابقة إلى رصيد سحبها الخاص، وخُصمت قيمة الباقة الجديدة من رصيد الإيداع.",
         userPackage: changedPackage,
         cancellationRefund: refund,
       });

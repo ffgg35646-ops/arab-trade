@@ -39,9 +39,12 @@ export default function UserPackagesPage() {
   }, [load]);
 
   useEffect(() => {
-    setClockNow(Date.now());
+    const initialTimer = window.setTimeout(() => setClockNow(Date.now()), 0);
     const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
   }, []);
 
   async function action(kind: "activate" | "cancel" | "change" | "collect", id: string) {

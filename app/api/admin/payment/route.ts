@@ -75,9 +75,12 @@ export async function POST(request: NextRequest) {
     // operation into an existing record instead of creating a conflicting row.
     const existing = await PaymentOption.findOne({ asset, network });
     if (existing) {
+      const oldKind = String((existing as any).kind || "both");
+      const mergedKind = oldKind === "both" || oldKind === kind ? oldKind : "both";
       const update: Record<string, unknown> = {
         name,
         enabled: true,
+        kind: mergedKind,
       };
       if (kind === "deposit") {
         update.address = address;
@@ -103,6 +106,7 @@ export async function POST(request: NextRequest) {
       name,
       asset,
       network,
+      kind,
       address: kind === "deposit" ? address : "",
       minDeposit: kind === "deposit" ? minDeposit : 0,
       maxDeposit: 0,

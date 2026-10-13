@@ -4,7 +4,8 @@ import { getCurrentUser } from "@/lib/current-user";
 import { connectDB } from "@/lib/mongodb";
 import DepositRequest from "@/models/DepositRequest";
 import Asset from "@/models/Asset";
-import { creditSpotUsdtBalance, normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
+import { normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
+import { creditDepositBalance, separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
 import LedgerEntry from "@/models/LedgerEntry";
 import Wallet from "@/models/Wallet";
 import User from "@/models/User";
@@ -252,6 +253,10 @@ export async function POST(
       });
     }
 
+    // Move any remaining balance from the temporary merged-account implementation
+    // back into the separate deposit balance before processing this deposit.
+    await separateLegacyDepositsFromSpotWallet(user._id);
+
     // -----------------------------------------------------
     // Atomic credit
     // -----------------------------------------------------
@@ -311,8 +316,9 @@ export async function POST(
           throw claimError;
         }
 
-        const credited = await creditSpotUsdtBalance(
+        const credited = await creditDepositBalance(
           current.userId,
+          USDT_ASSET,
           expectedAmount,
           session!,
         );
@@ -328,7 +334,7 @@ export async function POST(
             balanceBefore: credited.availableBefore,
             balanceAfter: credited.availableAfter,
             referenceId: `DEPOSIT:${current._id}`,
-            note: "تم تأكيد إيداع USDT وإضافته إلى رصيد USDT الموحد المتاح للتداول وتفعيل الباقات والتحويل.",
+            note: "تم تأكيد إيداع USDT وإضافته إلى رصيد الإيداع المنفصل عن رصيد السحب العام.",
           }],
           { session },
         );
@@ -337,7 +343,7 @@ export async function POST(
         current.confirmedAt = new Date();
         current.creditedAt = new Date();
         current.status = "approved";
-        current.adminNote = "تم التحقق من البلوكشين وإضافة الرصيد إلى محفظة USDT الموحدة.";
+        current.adminNote = "تم التحقق من البلوكشين وإضافة الرصيد إلى رصيد الإيداع المنفصل.";
 
         await current.save({
           session,

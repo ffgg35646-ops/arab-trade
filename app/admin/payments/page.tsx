@@ -550,10 +550,27 @@ export default function PaymentsAdminPage() {
                       </div>
                     </div>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-bold">
-                        عنوان الإيداع / بيانات التحويل التي ستظهر للمستخدم
-                      </label>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="mb-2 block text-sm font-bold">
+                          عنوان الإيداع / بيانات التحويل التي ستظهر للمستخدم
+                        </label>
+                        <textarea
+                          value={payment.address}
+                          onChange={(e) =>
+                            updatePayment(index, { address: e.target.value })
+                          }
+                          rows={1}
+                          placeholder="عنوان محفظة الإيداع أو بيانات التحويل"
+                          className="mt-2 w-full resize-none rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="mb-2 block text-sm font-bold">
+                          الحد الأدنى للإيداع
 
                       <textarea
                         value={payment.address}
@@ -593,54 +610,7 @@ export default function PaymentsAdminPage() {
                       </div>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <label className="block text-sm font-bold">الحد الأقصى للإيداع (0 = غير محدد)
-                        <input type="number" min="0" step="any" value={payment.maxDeposit} onChange={(e) => updatePayment(index, { maxDeposit: Number(e.target.value) || 0 })} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"/>
-                      </label>
-                    </div>
 
-                    <div className="grid gap-3 md:grid-cols-1">
-                      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] p-4">
-                        <span>
-                          <span className="block font-bold">السماح بالإيداع</span>
-                          <span className="mt-1 block text-xs text-slate-500">عرض الوسيلة وقبول طلبات الإيداع بها</span>
-                        </span>
-                        <input type="checkbox" checked={payment.depositEnabled} onChange={(e) => updatePayment(index, { depositEnabled: e.target.checked })} className="h-5 w-5 accent-cyan-400" />
-                      </label>
-                    </div>
-
-                    <div className="rounded-xl border border-slate-800 bg-black/10 p-4">
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <div className="font-bold">
-                            حالة الوسيلة
-                          </div>
-
-                          <div className="mt-1 text-xs text-slate-500">
-                            عند إيقافها لن تكون متاحة كوسيلة دفع
-                            للمستخدم.
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updatePayment(index, {
-                              enabled: !payment.enabled,
-                            })
-                          }
-                          className={`rounded-xl px-4 py-2 text-sm font-black ${
-                            payment.enabled
-                              ? "bg-emerald-500/15 text-emerald-300"
-                              : "bg-red-500/15 text-red-300"
-                          }`}
-                        >
-                          {payment.enabled
-                            ? "مفعلة"
-                            : "متوقفة"}
-                        </button>
-                      </div>
-                    </div>
                     </div>
                   </details>
 

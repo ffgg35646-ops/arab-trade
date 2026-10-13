@@ -83,6 +83,8 @@ export async function GET() {
 
         const key = `${assetCode}:${networkCode}`;
 
+        if (existing.has(key + ':deposit') || existing.has(key + ':withdrawal')) continue;
+
                 const depositEnabled =
           asset.depositEnabled === true &&
           network.depositEnabled === true;

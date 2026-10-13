@@ -85,14 +85,14 @@ async function prepare() {
   });
 
   await db.collection("paymentoptions").insertOne({
-    name: "CI Test Network", asset: "USDT", network: "TEST",
+    name: "CI Test Network", asset: "USDT", network: "TRC20",
     address: "test-deposit-address", minDeposit: 1, minWithdrawal: 1,
     enabled: true, depositEnabled: true, withdrawalEnabled: true,
     createdAt, updatedAt: createdAt,
   });
 
   await db.collection("depositrequests").insertOne({
-    userId, asset: "USDT", network: "TEST", amount: 1000,
+    userId, asset: "USDT", network: "TRC20", amount: 1000,
     txHash: "ci-unique-transaction-hash", confirmations: 0,
     creditedAt: null, confirmedAt: null, address: "test-deposit-address",
     status: "pending", adminNote: "", screenshotPath: "",
@@ -185,7 +185,7 @@ const referrer = await db.collection("users").findOne({ email: "ci-referrer@arab
 const user = await db.collection("users").findOne({ email: "ci-user@arabtrade.invalid" });
 assert.ok(admin && referrer && user, "run test preparation first");
 const deposit = await db.collection("depositrequests").findOne({ txHash: "ci-unique-transaction-hash" });
-const payment = await db.collection("paymentoptions").findOne({ asset: "USDT", network: "TEST" });
+const payment = await db.collection("paymentoptions").findOne({ asset: "USDT", network: "TRC20" });
 assert.ok(deposit && payment, "CI deposit/payment fixtures must exist");
 
 ok(await api("/api/admin/deposits", {
@@ -193,9 +193,9 @@ ok(await api("/api/admin/deposits", {
   body: { id: String(deposit._id), status: "approved", adminNote: "CI external deposit" },
 }), "admin approves external deposit");
 
-let depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
-closeTo(depositBalance && depositBalance.available, 1000, "external principal is in deposit balance");
-closeTo(depositBalance && depositBalance.locked, 0, "external deposit locked bucket");
+let spotWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+closeTo(spotWallet && spotWallet.balances.find((x) => x.asset === "USDT").available, 1050, "approved deposit joins existing spot USDT balance");
+closeTo(spotWallet && spotWallet.balances.find((x) => x.asset === "USDT").locked, 0, "approved deposit is not locked");
 const referrerWallet = await db.collection("wallets").findOne({ userId: referrer._id, type: "spot", mode: "live" });
 closeTo(referrerWallet && referrerWallet.balances.find((x) => x.asset === "USDT").available, 100, "referral commission is in general withdrawal wallet");
 const referralCommission = await db.collection("referralcommissions").findOne({ referrerId: referrer._id, referredUserId: user._id });
@@ -206,15 +206,15 @@ const duplicateApproval = await api("/api/admin/deposits", {
   body: { id: String(deposit._id), status: "approved", adminNote: "duplicate attempt" },
 });
 statusIs(duplicateApproval, 409, "duplicate deposit approval blocked");
-depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
-closeTo(depositBalance && depositBalance.available, 1000, "duplicate approval did not double credit");
+spotWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+closeTo(spotWallet && spotWallet.balances.find((x) => x.asset === "USDT").available, 1050, "duplicate approval did not double credit");
 
 statusIs(await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TEST", address: "user-test-address", amount: 1000, source: "wallet" },
-}), 400, "external deposit balance is not directly withdrawable");
-depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
-closeTo(depositBalance.available, 1000, "failed direct withdrawal leaves external deposit balance untouched");
+}), 400, "unsupported network is rejected before any USDT debit");
+spotWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+closeTo(spotWallet.balances.find((x) => x.asset === "USDT").available, 1050, "unsupported network leaves shared USDT unchanged");
 
 const userReferral = await api("/api/referral", { as: "referrer" });
 ok(userReferral, "user referral API");
@@ -243,13 +243,13 @@ assert.ok(plan100 && plan200, "admin-created packages need IDs");
 
 const packagePage = await api("/api/packages");
 ok(packagePage, "user packages API");
-closeTo(packagePage.data.depositBalances.find((x) => x.asset === "USDT").available, 1000, "package page shows external deposit balance");
+closeTo(packagePage.data.depositBalances.find((x) => x.asset === "USDT").available, 1050, "package page shows shared spot USDT balance");
 
 const activated = await api("/api/packages", { method: "POST", body: { action: "activate", packageId: String(plan100._id) } });
-ok(activated, "user activates package from deposit balance", 201);
+ok(activated, "user activates package from shared USDT balance", 201);
 const package100 = activated.data.userPackage;
-depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
-closeTo(depositBalance.available, 900, "package activation debits deposit balance");
+spotWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+closeTo(spotWallet.balances.find((x) => x.asset === "USDT").available, 950, "package activation debits shared spot USDT");
 
 ok(await api("/api/admin/packages/credit", {
   as: "admin", method: "POST",
@@ -260,7 +260,7 @@ closeTo(package100Doc.availableEarnings, 600, "realized earnings stay in package
 
 const tooLargeFirst = await api("/api/withdrawals", {
   method: "POST",
-  body: { asset: "USDT", network: "TEST", address: "user-test-address", amount: 101, source: "package", userPackageId: String(package100._id) },
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 101, source: "package", userPackageId: String(package100._id) },
 });
 statusIs(tooLargeFirst, 400, "first package withdrawal cannot exceed activation price");
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
@@ -268,7 +268,7 @@ closeTo(package100Doc.availableEarnings, 600, "rejected over-limit first withdra
 
 const firstWithdrawal = await api("/api/withdrawals", {
   method: "POST",
-  body: { asset: "USDT", network: "TEST", address: "user-test-address", amount: 100, source: "package", userPackageId: String(package100._id) },
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 100, source: "package", userPackageId: String(package100._id) },
 });
 ok(firstWithdrawal, "first package withdrawal in activation limit", 201);
 const rejectedPackageWithdrawalId = String(firstWithdrawal.data.withdrawal._id);
@@ -287,7 +287,7 @@ closeTo(stillActivePackage.cancellationRefund, 0, "blocked cancellation does not
 
 statusIs(await api("/api/withdrawals", {
   method: "POST",
-  body: { asset: "USDT", network: "TEST", address: "user-test-address", amount: 10, source: "package", userPackageId: String(package100._id) },
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 10, source: "package", userPackageId: String(package100._id) },
 }), 409, "another package withdrawal is blocked until the first is resolved");
 
 ok(await api("/api/admin/withdrawals", {
@@ -301,7 +301,7 @@ assert.equal(package100Doc.firstWithdrawalStatus, "available", "rejected first p
 
 const retryFirstWithdrawal = await api("/api/withdrawals", {
   method: "POST",
-  body: { asset: "USDT", network: "TEST", address: "user-test-address", amount: 100, source: "package", userPackageId: String(package100._id) },
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 100, source: "package", userPackageId: String(package100._id) },
 });
 ok(retryFirstWithdrawal, "first package withdrawal can be retried after rejection", 201);
 const packageWithdrawalId = String(retryFirstWithdrawal.data.withdrawal._id);
@@ -312,7 +312,7 @@ assert.equal(package100Doc.firstWithdrawalStatus, "pending", "retried first pack
 
 statusIs(await api("/api/withdrawals", {
   method: "POST",
-  body: { asset: "USDT", network: "TEST", address: "user-test-address", amount: 10, source: "package", userPackageId: String(package100._id) },
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 10, source: "package", userPackageId: String(package100._id) },
 }), 409, "second package withdrawal blocked while first request is pending");
 
 ok(await api("/api/admin/withdrawals", {
@@ -331,19 +331,19 @@ assert.equal(package100Doc.firstWithdrawalStatus, "completed", "first package wi
 
 const generalWithdrawal = await api("/api/withdrawals", {
   method: "POST",
-  body: { asset: "USDT", network: "TEST", address: "general-test-address", amount: 10, source: "wallet" },
+  body: { asset: "USDT", network: "TRC20", address: "general-test-address", amount: 10, source: "wallet" },
 });
 ok(generalWithdrawal, "user requests general-wallet withdrawal", 201);
 const generalWithdrawalId = String(generalWithdrawal.data.withdrawal._id);
 let userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 40, "general withdrawal reduces available balance");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 940, "general withdrawal reduces shared USDT balance");
 closeTo(userWallet.balances.find((x) => x.asset === "USDT").locked, 10, "general withdrawal locks request amount");
 ok(await api("/api/admin/withdrawals", {
   as: "admin", method: "PATCH",
   body: { id: generalWithdrawalId, status: "rejected", adminNote: "CI balance restoration" },
 }), "admin rejects general-wallet withdrawal");
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 50, "rejected withdrawal restores available balance");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 950, "rejected withdrawal restores shared USDT balance");
 closeTo(userWallet.balances.find((x) => x.asset === "USDT").locked, 0, "rejected withdrawal releases locked balance");
 
 const changed = await api("/api/packages", {
@@ -356,37 +356,31 @@ assert.ok(package200 && package200._id, "new package account created");
 const oldPackage = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
 assert.equal(oldPackage.status, "cancelled", "old package is cancelled");
 closeTo(oldPackage.cancellationRefund, 50, "changing package refunds half old activation");
-depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
-closeTo(depositBalance.available, 700, "package change debits new package price");
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 100, "package change refunds to general withdrawal wallet");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 800, "package change debits new plan and returns old-plan refund to shared wallet");
 
-await db.collection("depositbalances").updateOne({ userId: user._id, asset: "USDT" }, { $set: { available: 99 } });
+await db.collection("wallets").updateOne({ userId: user._id, type: "spot", mode: "live", "balances.asset": "USDT" }, { $set: { "balances.$.available": 99 } });
 statusIs(await api("/api/packages", {
   method: "POST",
   body: { action: "change", packageId: String(plan100._id), userPackageId: String(package200._id) },
-}), 400, "package change is rejected when the new package price exceeds deposit balance");
+}), 400, "package change is rejected when the new price exceeds shared USDT balance");
 const activeAfterFailedChange = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package200._id)) });
 assert.equal(activeAfterFailedChange.status, "active", "failed package change rolls back old package cancellation");
 closeTo(activeAfterFailedChange.cancellationRefund, 0, "failed package change does not credit cancellation refund");
-depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
-closeTo(depositBalance.available, 99, "failed package change keeps deposit balance unchanged after insufficient-funds setup");
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 100, "failed package change does not credit general wallet");
-await db.collection("depositbalances").updateOne({ userId: user._id, asset: "USDT" }, { $set: { available: 700 } });
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 99, "failed package change rolls back the shared wallet");
+await db.collection("wallets").updateOne({ userId: user._id, type: "spot", mode: "live", "balances.asset": "USDT" }, { $set: { "balances.$.available": 700 } });
 
 ok(await api("/api/packages", { method: "POST", body: { action: "cancel", userPackageId: String(package200._id) } }), "user cancels package");
 const cancelledPackage = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package200._id)) });
 closeTo(cancelledPackage.cancellationRefund, 100, "cancel package refunds half its activation price");
-depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
-closeTo(depositBalance.available, 700, "cancellation does not alter deposit bucket");
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 200, "cancellation refund enters general withdrawal wallet");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 800, "cancellation refund enters shared USDT wallet");
 
 const renewed = await api("/api/packages", { method: "POST", body: { action: "activate", packageId: String(plan200._id) } });
-ok(renewed, "renew package from deposit balance", 201);
-depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
-closeTo(depositBalance.available, 500, "package renewal debits deposit bucket");
+ok(renewed, "renew package from shared USDT wallet", 201);
+userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 600, "package renewal debits shared USDT wallet");
 
 ok(await api("/api/deposits"), "user deposit page API");
 ok(await api("/api/withdrawals"), "user withdrawal history API");
@@ -394,7 +388,7 @@ ok(await api("/api/packages"), "user package page API after changes");
 const adminPackages = await api("/api/admin/packages", { as: "admin" });
 ok(adminPackages, "admin packages and balances API");
 assert.ok(adminPackages.data.userPackages.length >= 3, "admin sees package accounts");
-assert.ok(adminPackages.data.depositBalances.some((x) => String(x.userId && (x.userId._id || x.userId)) === String(user._id)), "admin sees deposit bucket");
+assert.ok(adminPackages.data.depositBalances.some((x) => String(x.userId && (x.userId._id || x.userId)) === String(user._id)), "admin sees unified USDT wallet balance");
 const adminWithdrawals = await api("/api/admin/withdrawals", { as: "admin" });
 ok(adminWithdrawals, "admin withdrawal review API");
 assert.ok(adminWithdrawals.data.withdrawals.length >= 2, "admin sees package and general withdrawal requests");
@@ -405,19 +399,19 @@ ok(await api("/api/admin/payment", {
 }), "admin saves deposit and withdrawal switches");
 const options = await api("/api/payment-options");
 ok(options, "public payment options API");
-const testOption = options.data.methods.find((x) => x.asset === "USDT" && x.network === "TEST");
+const testOption = options.data.methods.find((x) => x.asset === "USDT" && x.network === "TRC20");
 assert.equal(testOption.depositEnabled, false, "deposit switch appears in API");
 assert.equal(testOption.withdrawalEnabled, false, "withdrawal switch appears in API");
 
 const disabledWithdrawal = await api("/api/withdrawals", {
   method: "POST",
-  body: { asset: "USDT", network: "TEST", address: "test-address", amount: 10, source: "wallet" },
+  body: { asset: "USDT", network: "TRC20", address: "test-address", amount: 10, source: "wallet" },
 });
 statusIs(disabledWithdrawal, 400, "backend rejects withdrawal when admin disabled that channel");
 
 const form = new FormData();
 form.append("asset", "USDT");
-form.append("network", "TEST");
+form.append("network", "TRC20");
 form.append("amount", "10");
 form.append("txHash", "");
 form.append("screenshot", new Blob(["test-proof"], { type: "image/png" }), "proof.png");

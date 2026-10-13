@@ -373,7 +373,9 @@ const oldPackage = await db.collection("userpackages").findOne({ _id: new mongoo
 assert.equal(oldPackage.status, "cancelled", "old package is cancelled");
 closeTo(oldPackage.cancellationRefund, 50, "changing package refunds half old activation");
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 100, "package change refunds half the old plan into general withdrawal balance");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 50, "package change does not mix deposit or package refund into the general wallet");
+const oldPackageAfterChange = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
+closeTo(oldPackageAfterChange.availableEarnings, 550, "package change refund stays inside the old package withdrawal balance");
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(depositBalance && depositBalance.available, 700, "package change debits the new plan from deposit balance");
 
@@ -394,7 +396,7 @@ ok(await api("/api/packages", { method: "POST", body: { action: "cancel", userPa
 const cancelledPackage = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package200._id)) });
 closeTo(cancelledPackage.cancellationRefund, 100, "cancel package refunds half its activation price");
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 200, "cancellation refund enters general withdrawal wallet");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 150, "package cancellation refund enters general withdrawal wallet");
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(depositBalance && depositBalance.available, 700, "cancellation does not change external deposit balance");
 

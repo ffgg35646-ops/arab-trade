@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/current-user";
 
 import InvestmentPackage from "@/models/InvestmentPackage";
 import UserPackage from "@/models/UserPackage";
+import DepositBalance from "@/models/DepositBalance";
 import PackageLedger from "@/models/PackageLedger";
 import { ensureDefaultInvestmentPackages } from "@/lib/ensure-default-investment-packages";
 import Wallet from "@/models/Wallet";
@@ -14,7 +15,8 @@ import DepositRequest from "@/models/DepositRequest";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
 import PlatformSettings from "@/models/PlatformSettings";
 import { normalizeMissedPackageCollectionWindows } from "@/lib/package-collection-window";
-import { debitSpotUsdtBalance, migrateLegacyDepositBalancesToSpotWallet, USDT_ASSET } from "@/lib/unified-usdt-wallet";
+import { USDT_ASSET } from "@/lib/unified-usdt-wallet";
+import { debitDepositBalance, normalizeDepositBalanceRows, separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
 
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8) / 1e8;
 
@@ -24,7 +26,7 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
 
     await connectDB();
-    await migrateLegacyDepositBalancesToSpotWallet(user._id);
+    await separateLegacyDepositsFromSpotWallet(user._id);
     await Promise.all([
       UserPackage.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
       PackageLedger.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
@@ -32,10 +34,10 @@ export async function GET(request: NextRequest) {
     ]);
     await ensureDefaultInvestmentPackages();
     await normalizeMissedPackageCollectionWindows({ userId: user._id });
-    const [packages, allPlansForProfit, spotWallet, rawUserPackages, packageLedger, settings, referredUsers] = await Promise.all([
+    const [packages, allPlansForProfit, rawDepositBalances, rawUserPackages, packageLedger, settings, referredUsers] = await Promise.all([
       InvestmentPackage.find({ enabled: true }).sort({ sortOrder: 1, price: 1 }).lean(),
       InvestmentPackage.find({}).select("_id dailyProfit").lean(),
-      Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).lean(),
+      DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
       UserPackage.find({ userId: user._id }).sort({ createdAt: -1 }).limit(100).lean(),
       PackageLedger.find({ userId: user._id })
         .populate("userPackageId", "packageName")
@@ -45,13 +47,7 @@ export async function GET(request: NextRequest) {
       PlatformSettings.findOne({ key: "global" }).lean(),
       User.find({ referredBy: user._id }).select("_id").lean(),
     ]);
-
-    const spotUsdtRows = (spotWallet?.balances || []).filter((item: any) => String(item.asset || "").trim().toUpperCase() === USDT_ASSET);
-    const depositBalances = [{
-      asset: USDT_ASSET,
-      available: spotUsdtRows.reduce((sum: number, item: any) => sum + Number(item.available || 0), 0),
-      locked: spotUsdtRows.reduce((sum: number, item: any) => sum + Number(item.locked || 0), 0),
-    }];
+    const depositBalances = normalizeDepositBalanceRows(rawDepositBalances as any[]);
     const referredIds = referredUsers.map((item: any) => item._id);
     const packageMinimumRows = await InvestmentPackage.find({})
       .select("_id minimumWithdrawal")
@@ -146,7 +142,7 @@ export async function GET(request: NextRequest) {
         collectionWindowMinutes: 30,
         earningsNotice: "يصبح الربح اليومي متاحًا للجمع بعد اكتمال 24 ساعة، وتستمر فرصة الجمع 30 دقيقة فقط. إذا انتهت المهلة دون جمع، يسقط ربح الدورة وتبدأ دورة جديدة؛ والباقة نفسها مستمرة دون مدة انتهاء.",
         singleActivePackageNotice: "يسمح لكل مستخدم بباقة نشطة واحدة فقط.",
-        activationSourceNotice: "تفعيل الباقات يتم من رصيد USDT الموحد في المحفظة الفورية، وهو نفس الرصيد المستخدم للتداول والتحويل.",
+        activationSourceNotice: "تفعيل الباقات يتم من رصيد الإيداع المنفصل بعملة USDT، ولا يُضاف إلى رصيد السحب العام.",
         cancellationNotice: "عند التغيير إلى باقة أخرى، يضاف 50% من قيمة تفعيل الباقة السابقة إلى رصيد السحب الخاص بالباقة نفسها، وتظل الأرباح المجمعة مسجلة فيها. سعر الباقة الجديدة يُخصم من رصيد الإيداع.",
       },
     });
@@ -162,7 +158,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
 
     await connectDB();
-    await migrateLegacyDepositBalancesToSpotWallet(user._id);
+    await separateLegacyDepositsFromSpotWallet(user._id);
     await Promise.all([
       UserPackage.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
       PackageLedger.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
@@ -286,16 +282,16 @@ export async function POST(request: NextRequest) {
           const existing = await UserPackage.findOne({ userId: user._id, status: "active" }).session(session);
           if (existing) throw new Error("ACTIVE_PACKAGE_EXISTS");
 
-          const debit = await debitSpotUsdtBalance(user._id, price, session);
+          const debit = await debitDepositBalance(user._id, asset, price, session);
           availableDepositBefore = debit.availableBefore;
           if (!debit.ok) throw new Error("INSUFFICIENT_DEPOSIT_BALANCE");
 
           await LedgerEntry.create([{
             userId: user._id, scope: "user", asset: USDT_ASSET, mode: "live",
             type: "adjustment", amount: -price,
-            balanceBefore: debit.availableBefore, balanceAfter: debit.availableAfter,
+            balanceBefore: debit.availableBefore, balanceAfter: roundAmount(debit.availableBefore - price),
             referenceId: "package-activation:" + String(plan._id) + ":" + String(user._id) + ":" + String(Date.now()),
-            note: "خصم تفعيل باقة " + plan.name + " من رصيد USDT الموحد.",
+            note: "خصم تفعيل باقة " + plan.name + " من رصيد الإيداع المنفصل.",
           }], { session });
 
           const created = await UserPackage.create([{
@@ -329,7 +325,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "تم تفعيل الباقة من رصيد USDT الموحد.",
+        message: "تم تفعيل الباقة من رصيد الإيداع المنفصل.",
         userPackage: purchased,
       }, { status: 201 });
     }
@@ -378,16 +374,16 @@ export async function POST(request: NextRequest) {
           );
           if (!cancelled) throw new Error("CURRENT_PACKAGE_CHANGED");
 
-          const debit = await debitSpotUsdtBalance(user._id, price, session);
+          const debit = await debitDepositBalance(user._id, asset, price, session);
           availableDepositBefore = debit.availableBefore;
           if (!debit.ok) throw new Error("INSUFFICIENT_DEPOSIT_BALANCE");
 
           await LedgerEntry.create([{
             userId: user._id, scope: "user", asset: USDT_ASSET, mode: "live",
             type: "adjustment", amount: -price,
-            balanceBefore: debit.availableBefore, balanceAfter: debit.availableAfter,
+            balanceBefore: debit.availableBefore, balanceAfter: roundAmount(debit.availableBefore - price),
             referenceId: "package-change-debit:" + String(cancelled._id) + ":" + String(plan._id) + ":" + String(Date.now()),
-            note: "خصم تفعيل الباقة الجديدة " + plan.name + " من رصيد USDT الموحد.",
+            note: "خصم تفعيل الباقة الجديدة " + plan.name + " من رصيد الإيداع المنفصل.",
           }], { session });
 
           const created = await UserPackage.create([{

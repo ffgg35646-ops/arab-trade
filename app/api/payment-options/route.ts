@@ -83,9 +83,7 @@ export async function GET() {
 
         const key = `${assetCode}:${networkCode}`;
 
-        if (existing.has(key)) continue;
-
-        const depositEnabled =
+                const depositEnabled =
           asset.depositEnabled === true &&
           network.depositEnabled === true;
 

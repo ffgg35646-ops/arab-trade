@@ -96,6 +96,8 @@ export async function GET() {
         if (!depositEnabled && !withdrawalEnabled) continue;
 
         existing.add(key);
+        if (depositEnabled) existing.add(key + ':deposit');
+        if (withdrawalEnabled) existing.add(key + ':withdrawal');
 
         methods.push({
           _id: `${asset._id}:${networkCode}`,

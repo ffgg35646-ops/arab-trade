@@ -212,14 +212,6 @@ export default function PaymentsAdminPage() {
       return;
     }
 
-    if (
-      !Number.isFinite(Number(payment.minWithdrawal)) ||
-      Number(payment.minWithdrawal) < 0
-    ) {
-      setError("الحد الأدنى للسحب غير صالح");
-      return;
-    }
-
     const savingKey =
       payment._id || `${payment.asset}-${payment.network}`;
 
@@ -238,13 +230,8 @@ export default function PaymentsAdminPage() {
         address: payment.address.trim(),
         minDeposit: Number(payment.minDeposit),
         maxDeposit: Number(payment.maxDeposit),
-        minWithdrawal: Number(payment.minWithdrawal),
-        maxWithdrawal: Number(payment.maxWithdrawal),
-        withdrawalFee: Number(payment.withdrawalFee),
-        warning: payment.warning.trim(),
         enabled: Boolean(payment.enabled),
         depositEnabled: Boolean(payment.depositEnabled),
-        withdrawalEnabled: Boolean(payment.withdrawalEnabled),
       };
 
       const res = await fetch("/api/admin/payment", {
@@ -606,29 +593,19 @@ export default function PaymentsAdminPage() {
                       </div>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid gap-4 md:grid-cols-2">
                       <label className="block text-sm font-bold">الحد الأقصى للإيداع (0 = غير محدد)
                         <input type="number" min="0" step="any" value={payment.maxDeposit} onChange={(e) => updatePayment(index, { maxDeposit: Number(e.target.value) || 0 })} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"/>
                       </label>
-                      <label className="block text-sm font-bold md:col-span-2 xl:col-span-3">تنبيه يظهر في صفحة السحب
-                        <textarea value={payment.warning} onChange={(e) => updatePayment(index, { warning: e.target.value })} rows={2} maxLength={1000} placeholder="تنبيه اختياري عن وسيلة الدفع أو الشبكة" className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"/>
-                      </label>
                     </div>
 
-                    <div className="grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-3 md:grid-cols-1">
                       <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] p-4">
                         <span>
                           <span className="block font-bold">السماح بالإيداع</span>
                           <span className="mt-1 block text-xs text-slate-500">عرض الوسيلة وقبول طلبات الإيداع بها</span>
                         </span>
                         <input type="checkbox" checked={payment.depositEnabled} onChange={(e) => updatePayment(index, { depositEnabled: e.target.checked })} className="h-5 w-5 accent-cyan-400" />
-                      </label>
-                      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-violet-400/20 bg-violet-400/[0.04] p-4">
-                        <span>
-                          <span className="block font-bold">السماح بالسحب</span>
-                          <span className="mt-1 block text-xs text-slate-500">عرض الوسيلة وقبول طلبات السحب بها</span>
-                        </span>
-                        <input type="checkbox" checked={payment.withdrawalEnabled} onChange={(e) => updatePayment(index, { withdrawalEnabled: e.target.checked })} className="h-5 w-5 accent-violet-400" />
                       </label>
                     </div>
 

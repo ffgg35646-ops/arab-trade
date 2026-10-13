@@ -136,6 +136,11 @@ export async function POST(request: NextRequest) {
     const payment = await PaymentOption.findOne({
       asset: assetCode,
       network: networkCode,
+      $or: [
+        { kind: "deposit" },
+        { kind: "both" },
+        { kind: { $exists: false } },
+      ],
     }).lean();
 
     if (payment) {

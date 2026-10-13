@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
         earningsNotice: "يصبح الربح اليومي متاحًا للجمع بعد اكتمال 24 ساعة، وتستمر فرصة الجمع 30 دقيقة فقط. إذا انتهت المهلة دون جمع، يسقط ربح الدورة وتبدأ دورة جديدة؛ والباقة نفسها مستمرة دون مدة انتهاء.",
         singleActivePackageNotice: "يسمح لكل مستخدم بباقة نشطة واحدة فقط.",
         activationSourceNotice: "تفعيل الباقات يتم من رصيد الإيداع المنفصل بعملة USDT، ولا يُضاف إلى رصيد السحب العام.",
-        cancellationNotice: "عند التغيير إلى باقة أخرى، يضاف 50% من قيمة تفعيل الباقة السابقة إلى رصيد السحب الخاص بالباقة نفسها، وتظل الأرباح المجمعة مسجلة فيها. سعر الباقة الجديدة يُخصم من رصيد الإيداع.",
+        cancellationNotice: "عند التغيير إلى باقة أخرى، يضاف 50% من قيمة تفعيل الباقة السابقة إلى رصيد السحب العام. تظل الأرباح المجمعة في سجل الباقة السابقة، ويُخصم سعر الباقة الجديدة من رصيد الإيداع.",
       },
     });
   } catch (error) {
@@ -286,6 +286,51 @@ export async function POST(request: NextRequest) {
           availableDepositBefore = debit.availableBefore;
           if (!debit.ok) throw new Error("INSUFFICIENT_DEPOSIT_BALANCE");
 
+          // Refund half of the previous package's activation price to the general withdrawal wallet.
+          // Do not add this refund to package earnings: cancelled packages may be subject to referral caps.
+          if (refund > 0) {
+            let wallet = await Wallet.findOne({
+              userId: user._id,
+              type: "spot",
+              mode: "live",
+            }).session(session);
+
+            if (!wallet) {
+              wallet = new Wallet({
+                userId: user._id,
+                type: "spot",
+                mode: "live",
+                balances: [],
+              });
+            }
+
+            let balance = wallet.balances.find((item: any) => String(item.asset).toUpperCase() === asset);
+            const before = Number(balance?.available || 0);
+
+            if (!balance) {
+              wallet.balances.push({ asset, available: refund, locked: 0 });
+              balance = wallet.balances[wallet.balances.length - 1] as any;
+            } else {
+              balance.available = Number((before + refund).toFixed(12));
+            }
+
+            const after = Number(balance?.available || 0);
+            await wallet.save({ session });
+
+            await LedgerEntry.create([{
+              userId: user._id,
+              scope: "user",
+              asset,
+              mode: "live",
+              type: "adjustment",
+              amount: refund,
+              balanceBefore: before,
+              balanceAfter: after,
+              referenceId: "package-change-refund:" + String(cancelled._id),
+              note: "استرداد 50% من قيمة تفعيل باقة " + cancelled.packageName + " إلى رصيد السحب العام عند تغيير الباقة.",
+            }], { session });
+          }
+
           await LedgerEntry.create([{
             userId: user._id, scope: "user", asset: USDT_ASSET, mode: "live",
             type: "adjustment", amount: -price,
@@ -369,7 +414,7 @@ export async function POST(request: NextRequest) {
 
           const cancelled = await UserPackage.findOneAndUpdate(
             { _id: current._id, userId: user._id, status: "active", lockedEarnings: 0 },
-            { $set: { status: "cancelled", cancelledAt: new Date(), cancellationRefund: refund }, $inc: { availableEarnings: refund } },
+            { $set: { status: "cancelled", cancelledAt: new Date(), cancellationRefund: refund } },
             { new: true, session }
           );
           if (!cancelled) throw new Error("CURRENT_PACKAGE_CHANGED");
@@ -412,7 +457,7 @@ export async function POST(request: NextRequest) {
               type: "cancellation_refund",
               asset: cancelled.asset || USDT_ASSET,
               amount: refund,
-              note: "تغيير الباقة: إضافة 50% من قيمة تفعيل " + cancelled.packageName + " إلى رصيد سحب هذه الباقة",
+              note: "تغيير الباقة: استرداد 50% من قيمة تفعيل " + cancelled.packageName + " إلى رصيد السحب العام.",
             },
             {
               userId: user._id,

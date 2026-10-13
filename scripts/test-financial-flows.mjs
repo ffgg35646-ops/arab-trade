@@ -446,8 +446,9 @@ const disabledDeposit = await api("/api/deposits", { method: "POST", body: form 
 statusIs(disabledDeposit, 400, "backend rejects deposit when admin disabled that channel");
 
 // Simulate an account partially repaired by legacy v1 (20 moved already,
-// another 70 remains across spot and funding). V2 must finish only the remainder.
-const legacyDepositAt = new Date(Date.now() + 5000);
+// another 70 remains across spot and funding). The original deposit predates
+// the former cutover check; v3 must still recognize it and move only the remainder.
+const legacyDepositAt = new Date("2026-09-01T12:00:00.000Z");
 const oldRepairAt = new Date(legacyDepositAt.getTime() + 1000);
 const legacyWithdrawalId = new mongoose.Types.ObjectId();
 await db.collection("depositbalances").updateOne(
@@ -494,13 +495,13 @@ await db.collection("withdrawalrequests").deleteOne({ _id: legacyWithdrawalId })
 legacyWalletApi = await api("/api/wallet");
 ok(legacyWalletApi, "wallet API after legacy withdrawal is resolved");
 legacyDepositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
-closeTo(legacyDepositBalance.available, 590, "v2 repair moves only the legacy deposit remainder");
+closeTo(legacyDepositBalance.available, 590, "v3 repair recognizes old deposits and moves only the legacy remainder");
 closeTo((legacyWalletApi.data.generalWithdrawalBalances || []).reduce((sum, item) => sum + (item.asset === "USDT" ? item.available : 0), 0), 0, "legacy deposit is removed from spot and funding withdrawal balances");
 closeTo((await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" })).balances.find((x) => x.asset === "USDT").available, 0, "legacy deposit portion is removed from spot");
 closeTo((await db.collection("wallets").findOne({ userId: user._id, type: "funding", mode: "live" })).balances.find((x) => x.asset === "USDT").available, 0, "legacy deposit portion is removed from funding");
 await api("/api/wallet");
 legacyDepositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
-closeTo(legacyDepositBalance.available, 590, "v2 repair is idempotent and does not double credit");
+closeTo(legacyDepositBalance.available, 590, "v3 repair is idempotent and does not double credit");
 
 console.log("PASS: external deposit, idempotency, active referral, referral commission, package activation, first-withdrawal cap, admin settlement, balance rollback, package switch, cancellation, renewal, and admin/user APIs");
 await mongoose.disconnect();

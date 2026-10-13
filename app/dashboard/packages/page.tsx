@@ -57,7 +57,9 @@ export default function UserPackagesPage() {
     } finally { setBusy(""); }
   }
 
-  const depositUsdt = data?.depositBalances.find((x) => x.asset === "USDT")?.available || 0;
+  const depositUsdt = data?.depositBalances
+    .filter((x) => String(x.asset || "").trim().toUpperCase() === "USDT")
+    .reduce((sum, x) => sum + Number(x.available || 0), 0) || 0;
   const activePlan = data?.userPackages.find((x) => x.status === "active");
   const activePackageCount = data?.userPackages.filter((x) => x.status === "active").length || 0;
   const availablePackageTotal = data?.userPackages.reduce((sum, x) => sum + Number(x.availableEarnings || 0), 0) || 0;
@@ -75,7 +77,18 @@ export default function UserPackagesPage() {
             <button type="button" onClick={() => { setLoading(true); setError(""); void load(); }} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm"><RefreshCw size={16} className={loading ? "animate-spin" : ""}/>تحديث</button>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-[#050a13]/70 p-5"><div className="flex items-center gap-2 text-xs text-slate-400"><Wallet size={16}/>رصيد الإيداع الخارجي</div><div className="mt-3 text-3xl font-black">{money(depositUsdt)} <span className="text-sm text-cyan-300">USDT</span></div><p className="mt-2 text-xs text-slate-500">منفصل عن رصيد السحب العام.</p></div>
+            <div className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.04] p-5">
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-200"><Wallet size={16}/>رصيد الإيداع الخارجي</div>
+              <div className="mt-3 space-y-2">
+                {data?.depositBalances.length ? data.depositBalances.map((item) => (
+                  <div key={String(item.asset).trim().toUpperCase()} className="flex items-center justify-between gap-3 rounded-lg border border-white/5 bg-black/20 px-3 py-2 text-sm">
+                    <span className="font-bold text-slate-300">{String(item.asset).trim().toUpperCase()}</span>
+                    <span className="font-mono font-black text-amber-100">{money(Number(item.available || 0))} <span className="text-[10px] font-normal text-amber-200/70">متاح</span></span>
+                  </div>
+                )) : <div className="text-sm text-slate-500">لا يوجد رصيد إيداع خارجي متاح حاليًا.</div>}
+              </div>
+              <p className="mt-3 text-xs leading-5 text-slate-500">المتاح لتفعيل الباقات المقومة بـUSDT: <strong className="text-cyan-200">{money(depositUsdt)} USDT</strong>. رصيد الإيداع الخارجي منفصل عن رصيد السحب العام.</p>
+            </div>
             <div className="rounded-2xl border border-white/10 bg-[#050a13]/70 p-5"><div className="text-xs text-slate-400">الباقة النشطة</div><div className="mt-3 text-xl font-black">{activePlan?.packageName || "لا توجد باقة نشطة"}</div><p className="mt-2 text-xs text-slate-500">{activePlan ? "قيمة التفعيل " + money(activePlan.investedAmount) + " " + activePlan.asset : "اختر باقة متاحة."}</p></div>
           </div>
         </section>

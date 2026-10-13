@@ -53,10 +53,18 @@ type WalletBalance = {
   locked?: number | string;
 };
 
+type ExternalDepositBalance = {
+  asset: string;
+  available: number;
+  locked: number;
+};
+
 export default function DashboardPage() {
   const [user, setUser] = useState<UserData | null>(null);
   const [markets, setMarkets] = useState<MarketItem[]>([]);
   const [walletBalances, setWalletBalances] = useState<WalletBalance[]>([]);
+  const [externalDepositBalances, setExternalDepositBalances] = useState<ExternalDepositBalance[]>([]);
+  const [accountTotalUsd, setAccountTotalUsd] = useState<number | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [loadingWallet, setLoadingWallet] = useState(true);
 
@@ -93,6 +101,17 @@ export default function DashboardPage() {
             data?.wallet?.balances ??
             []
           );
+          setExternalDepositBalances(
+            Array.isArray(data?.depositBalances)
+              ? data.depositBalances.map((item: ExternalDepositBalance) => ({
+                  asset: String(item.asset || "").trim().toUpperCase(),
+                  available: Number(item.available || 0),
+                  locked: Number(item.locked || 0),
+                })).filter((item: ExternalDepositBalance) => item.asset)
+              : []
+          );
+          const canonicalTotal = Number(data?.wallet?.totalAccountBalanceUsd);
+          setAccountTotalUsd(Number.isFinite(canonicalTotal) ? canonicalTotal : null);
         }
       } catch (error) {
         console.error("Dashboard load error:", error);
@@ -262,7 +281,7 @@ export default function DashboardPage() {
             <div className="mb-6 grid gap-4 xl:grid-cols-[1.4fr_0.8fr]">
               <Panel
                 title="القيمة الإجمالية"
-                description="إجمالي أصولك محسوب من أرصدة المحفظة الحقيقية وأسعار السوق الحالية."
+                description="إجمالي الحساب يشمل أرصدة التداول والتمويل ورصيد الإيداع الخارجي، مع الاحتفاظ بكل مصدر منفصلًا."
                 right={
                   <div className="flex items-center gap-2 text-xs text-slate-600">
                     USDT <Eye size={14} />
@@ -275,13 +294,13 @@ export default function DashboardPage() {
                       <div className="text-3xl font-bold">
                         {loadingWallet
                           ? "..."
-                          : `${formatUsd(portfolio.totalValueUsd)} USDT`}
+                          : `${formatUsd(accountTotalUsd ?? portfolio.totalValueUsd)} USDT`}
                       </div>
                       <div className="mt-2 text-xs text-slate-600">
                         القيمة بالدولار:{" "}
                         {loadingWallet
                           ? "..."
-                          : `$${formatUsd(portfolio.totalValueUsd)}`}
+                          : `$${formatUsd(accountTotalUsd ?? portfolio.totalValueUsd)}`}
                       </div>
                     </div>
 
@@ -313,7 +332,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  <div className="mt-6 grid gap-3 md:grid-cols-3">
+                  <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
                       <div className="text-xs text-slate-600">
                         أرباح / خسائر اليوم
@@ -343,6 +362,20 @@ export default function DashboardPage() {
                           ? "..."
                           : `${formatUsd(portfolio.lockedValueUsd)} USDT`}
                       </div>
+                    </div>
+                    <div className="rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-4">
+                      <div className="text-xs font-bold text-amber-200">
+                        رصيد الإيداع الخارجي
+                      </div>
+                      <div className="mt-2 space-y-1.5">
+                        {loadingWallet ? "..." : externalDepositBalances.length ? externalDepositBalances.map((item) => (
+                          <div key={item.asset} className="flex items-center justify-between gap-2 font-mono text-sm text-amber-100">
+                            <span>{item.asset}</span>
+                            <span>{formatUsd(item.available)} <span className="text-[10px] text-amber-200/60">متاح</span></span>
+                          </div>
+                        )) : <div className="font-mono text-sm text-amber-100">0 USDT</div>}
+                      </div>
+                      <Link href="/dashboard/assets/deposit" className="mt-3 inline-flex text-[11px] font-bold text-amber-200 hover:text-amber-100">تفاصيل الإيداع ←</Link>
                     </div>
                   </div>
                 </div>

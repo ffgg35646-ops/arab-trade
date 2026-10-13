@@ -9,7 +9,9 @@ import PlatformSettings from "@/models/PlatformSettings";
 import LedgerEntry from "@/models/LedgerEntry";
 import Notification from "@/models/Notification";
 import ReferralCommission from "@/models/ReferralCommission";
-import { creditSpotUsdtBalance, USDT_ASSET } from "@/lib/unified-usdt-wallet";
+import DepositBalance from "@/models/DepositBalance";
+import { USDT_ASSET } from "@/lib/unified-usdt-wallet";
+import { creditDepositBalance, separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
 import BlockchainDepositClaim from "@/models/BlockchainDepositClaim";
 
 export async function GET(
@@ -176,7 +178,7 @@ export async function PATCH(request: NextRequest) {
             }
           }
 
-          const credited = await creditSpotUsdtBalance(current.userId, amount, session);
+          const credited = await creditDepositBalance(current.userId, asset, amount, session);
 
           await LedgerEntry.create([{
             userId: current.userId,
@@ -188,7 +190,7 @@ export async function PATCH(request: NextRequest) {
             balanceBefore: credited.availableBefore,
             balanceAfter: credited.availableAfter,
             referenceId: String(current._id),
-            note: adminNote || "إيداع USDT معتمد — أضيف إلى رصيد USDT الموحد القابل للتداول وتفعيل الباقات والتحويل والسحب.",
+            note: adminNote || "إيداع USDT معتمد — أضيف إلى رصيد الإيداع المنفصل، ولا يُضاف إلى رصيد السحب العام.",
           }], { session });
 
           // Referral activity and commission are tied to this one approved external deposit.

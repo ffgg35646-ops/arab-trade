@@ -37,6 +37,7 @@ type WalletData = {
   totalAvailableUsd: number;
   totalLockedUsd: number;
   totalBalanceUsd: number;
+  totalAccountBalanceUsd?: number;
 };
 
 type TransactionItem = {
@@ -114,6 +115,7 @@ export default function WalletPage() {
     totalAvailableUsd: 0,
     totalLockedUsd: 0,
     totalBalanceUsd: 0,
+    totalAccountBalanceUsd: 0,
   });
 
   const [depositBalances, setDepositBalances] = useState<SplitBalance[]>([]);
@@ -181,7 +183,7 @@ export default function WalletPage() {
 
   const displayedBalance = hideBalance
     ? "••••••••"
-    : money(wallet.totalBalanceUsd);
+    : money(wallet.totalAccountBalanceUsd ?? wallet.totalBalanceUsd);
 
   if (loading) {
     return (
@@ -312,7 +314,7 @@ export default function WalletPage() {
                   </div>
 
                   <p className="mt-3 text-xs text-slate-500">
-                    القيمة الإجمالية لجميع أصولك محسوبة بالدولار
+                    يشمل رصيد التداول والتمويل ورصيد الإيداع الخارجي، مع بقاء كل مصدر منفصلًا عند الخصم أو تفعيل الباقات.
                   </p>
                 </div>
 

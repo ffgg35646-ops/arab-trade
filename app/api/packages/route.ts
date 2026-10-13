@@ -14,6 +14,7 @@ import DepositRequest from "@/models/DepositRequest";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
 import PlatformSettings from "@/models/PlatformSettings";
 import { accrueDuePackageEarnings } from "@/lib/accrue-package-earnings";
+import { debitDepositBalance, normalizeDepositBalanceRows } from "@/lib/deposit-balance-source";
 
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8) / 1e8;
 
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
     await connectDB();
     await ensureDefaultInvestmentPackages();
     await accrueDuePackageEarnings({ userId: user._id });
-    const [packages, depositBalances, rawUserPackages, packageLedger, settings, referredUsers] = await Promise.all([
+    const [packages, rawDepositBalances, rawUserPackages, packageLedger, settings, referredUsers] = await Promise.all([
       InvestmentPackage.find({ enabled: true }).sort({ sortOrder: 1, price: 1 }).lean(),
       DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
       UserPackage.find({ userId: user._id }).sort({ createdAt: -1 }).limit(100).lean(),
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
       User.find({ referredBy: user._id }).select("_id").lean(),
     ]);
 
+    const depositBalances = normalizeDepositBalanceRows(rawDepositBalances as any[]);
     const referredIds = referredUsers.map((item: any) => item._id);
     const packageMinimumRows = await InvestmentPackage.find({})
       .select("_id minimumWithdrawal")
@@ -160,18 +162,16 @@ export async function POST(request: NextRequest) {
       const asset = String(plan.asset || "USDT").toUpperCase();
       const session = await mongoose.startSession();
       let purchased: any = null;
+      let availableDepositBefore = 0;
       try {
         await session.withTransaction(async () => {
           // Check inside the same transaction to protect against concurrent activations.
           const existing = await UserPackage.findOne({ userId: user._id, status: "active" }).session(session);
           if (existing) throw new Error("ACTIVE_PACKAGE_EXISTS");
 
-          const debited = await DepositBalance.findOneAndUpdate(
-            { userId: user._id, asset, available: { $gte: price } },
-            { $inc: { available: -price } },
-            { new: true, session }
-          );
-          if (!debited) throw new Error("INSUFFICIENT_DEPOSIT_BALANCE");
+          const debit = await debitDepositBalance(user._id, asset, price, session);
+          availableDepositBefore = debit.availableBefore;
+          if (!debit.ok) throw new Error("INSUFFICIENT_DEPOSIT_BALANCE");
 
           const created = await UserPackage.create([{
             userId: user._id, packageId: plan._id, packageName: plan.name,
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
           message: code === "ACTIVE_PACKAGE_EXISTS"
             ? "لديك باقة نشطة بالفعل؛ ألغها قبل تفعيل باقة أخرى."
             : code === "INSUFFICIENT_DEPOSIT_BALANCE"
-              ? "رصيد الإيداع غير كافٍ. تحتاج إلى " + price + " " + asset + " لتفعيل هذه الباقة."
+              ? "رصيد الإيداع المتاح حاليًا هو " + availableDepositBefore + " " + asset + "، وتحتاج إلى " + price + " " + asset + " لتفعيل هذه الباقة."
               : "لم يتم تفعيل الباقة أو خصم الرصيد لأن المعاملة المالية لم تكتمل.",
         }, { status: code === "ACTIVE_PACKAGE_EXISTS" ? 409 : code === "INSUFFICIENT_DEPOSIT_BALANCE" ? 400 : 500 });
       } finally {
@@ -229,6 +229,7 @@ export async function POST(request: NextRequest) {
       const refund = roundAmount(Number(current.investedAmount || 0) * 0.5);
       const session = await mongoose.startSession();
       let changedPackage: any = null;
+      let availableDepositBefore = 0;
 
       try {
         await session.withTransaction(async () => {
@@ -252,12 +253,9 @@ export async function POST(request: NextRequest) {
           );
           if (!cancelled) throw new Error("CURRENT_PACKAGE_CHANGED");
 
-          const debited = await DepositBalance.findOneAndUpdate(
-            { userId: user._id, asset, available: { $gte: price } },
-            { $inc: { available: -price } },
-            { new: true, session }
-          );
-          if (!debited) throw new Error("INSUFFICIENT_DEPOSIT_BALANCE");
+          const debit = await debitDepositBalance(user._id, asset, price, session);
+          availableDepositBefore = debit.availableBefore;
+          if (!debit.ok) throw new Error("INSUFFICIENT_DEPOSIT_BALANCE");
 
           let wallet = await Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).session(session);
           if (!wallet) {
@@ -336,7 +334,7 @@ export async function POST(request: NextRequest) {
         if (code === "INSUFFICIENT_DEPOSIT_BALANCE" || code === "CURRENT_PACKAGE_CHANGED" || code === "TARGET_PACKAGE_DISABLED") {
           const status = code === "INSUFFICIENT_DEPOSIT_BALANCE" ? 400 : 409;
           const message = code === "INSUFFICIENT_DEPOSIT_BALANCE"
-            ? "رصيد الإيداع غير كافٍ لتفعيل الباقة الجديدة؛ لم يتم إلغاء الباقة الحالية أو تغيير أي رصيد."
+            ? "رصيد الإيداع المتاح حاليًا هو " + availableDepositBefore + " " + asset + "، وتحتاج إلى " + price + " " + asset + " للباقة الجديدة. لم يتم إلغاء الباقة الحالية أو تغيير أي رصيد."
             : code === "TARGET_PACKAGE_DISABLED"
               ? "الباقة الجديدة توقفت أثناء العملية؛ لم يتم تغيير الأرصدة."
               : "حالة الباقة الحالية تغيرت؛ حدّث الصفحة قبل المحاولة مرة أخرى.";

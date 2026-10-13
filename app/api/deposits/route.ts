@@ -8,6 +8,7 @@ import { getPlatformSettings } from "@/lib/platform-settings";
 import Notification from "@/models/Notification";
 import PaymentOption from "@/models/PaymentOption";
 import User from "@/models/User";
+import { normalizeDepositBalanceRows } from "@/lib/deposit-balance-source";
 
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
 
-    const [deposits, depositBalances] = await Promise.all([
+    const [deposits, rawDepositBalances] = await Promise.all([
       DepositRequest.find({ userId: user._id })
         .select("-screenshotData")
         .sort({ createdAt: -1 })
@@ -38,6 +39,8 @@ export async function GET(request: NextRequest) {
         .lean(),
       DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
     ]);
+
+    const depositBalances = normalizeDepositBalanceRows(rawDepositBalances as any[]);
 
     return NextResponse.json({
       success: true,

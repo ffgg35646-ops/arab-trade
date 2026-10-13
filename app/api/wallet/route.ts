@@ -5,6 +5,7 @@ import Wallet from "@/models/Wallet";
 import DepositBalance from "@/models/DepositBalance";
 import UserPackage from "@/models/UserPackage";
 import LedgerEntry from "@/models/LedgerEntry";
+import { normalizeDepositBalanceRows } from "@/lib/deposit-balance-source";
 
 const BINANCE_API = "https://api.binance.com";
 
@@ -66,7 +67,7 @@ export async function GET(request: NextRequest) {
     const requestedMode = new URL(request.url).searchParams.get("mode");
     const mode = String(requestedMode || "live").toLowerCase() === "demo" ? "demo" : "live";
 
-    const [wallets, depositBalances, packageAccounts] = await Promise.all([Wallet.find({
+    const [wallets, rawDepositBalances, packageAccounts] = await Promise.all([Wallet.find({
       userId: user._id,
       mode,
       type: {
@@ -81,6 +82,7 @@ export async function GET(request: NextRequest) {
         .lean(),
     ]);
 
+    const depositBalances = normalizeDepositBalanceRows(rawDepositBalances as any[]);
     const spot = wallets.find(
       (wallet: any) => wallet.type === "spot"
     );
@@ -148,6 +150,7 @@ export async function GET(request: NextRequest) {
         [
           ...rawSpotBalances,
           ...rawFundingBalances,
+          ...depositBalances,
         ].map((item: any) => item.asset)
       )
     );
@@ -261,6 +264,15 @@ export async function GET(request: NextRequest) {
         0
       );
 
+    const externalDepositTotalUsd = depositBalances.reduce(
+      (sum, item) =>
+        sum + (Number(item.available || 0) + Number(item.locked || 0)) * Number(prices.get(item.asset) || 0),
+      0
+    );
+
+    // Overall balance includes deposited funds but keeps their spend source separate.
+    const totalAccountBalanceUsd = totalBalanceUsd + fundingTotalUsd + externalDepositTotalUsd;
+
     // General withdrawal balance includes funds earned inside the platform,
     // regardless of whether they currently sit in spot or funding.
     const generalWithdrawalMap = new Map<string, { asset: string; available: number; locked: number }>();
@@ -309,6 +321,7 @@ export async function GET(request: NextRequest) {
         totalAvailableUsd,
         totalLockedUsd,
         totalBalanceUsd,
+        totalAccountBalanceUsd,
       },
 
       spot: {

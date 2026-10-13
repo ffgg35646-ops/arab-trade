@@ -505,47 +505,12 @@ export async function POST(request: NextRequest) {
           }
 
           if (refund > 0) {
-            let wallet = await Wallet.findOne({
-              userId: user._id,
-              type: "spot",
-              mode: "live",
-            }).session(session);
-
-            if (!wallet) {
-              wallet = new Wallet({
-                userId: user._id,
-                type: "spot",
-                mode: "live",
-                balances: [],
-              });
-            }
-
-            const asset = USDT_ASSET;
-            let balance = wallet.balances.find((item: any) => String(item.asset).toUpperCase() === asset);
-            const before = Number(balance?.available || 0);
-
-            if (!balance) {
-              wallet.balances.push({ asset, available: refund, locked: 0 });
-              balance = wallet.balances[wallet.balances.length - 1] as any;
-            } else {
-              balance.available = Number((before + refund).toFixed(12));
-            }
-
-            const after = Number(balance?.available || 0);
-            await wallet.save({ session });
-
-            await LedgerEntry.create([{
-              userId: user._id,
-              scope: "user",
-              asset,
-              mode: "live",
-              type: "adjustment",
-              amount: refund,
-              balanceBefore: before,
-              balanceAfter: after,
-              referenceId: "package-cancel:" + String(cancelled._id),
-              note: "استرداد 50% من قيمة باقة " + cancelled.packageName + " الملغاة",
-            }], { session });
+            const creditedPackage = await UserPackage.findOneAndUpdate(
+              { _id: cancelled._id, userId: user._id, status: "cancelled" },
+              { $inc: { availableEarnings: refund } },
+              { new: true, session }
+            );
+            if (!creditedPackage) throw new Error("PACKAGE_REFUND_CREDIT_FAILED");
           }
 
           await PackageLedger.create([{
@@ -554,7 +519,7 @@ export async function POST(request: NextRequest) {
             type: "cancellation_refund",
             asset: cancelled.asset,
             amount: refund,
-            note: "تم إلغاء الباقة وإضافة نصف قيمة تفعيلها إلى رصيد السحب العام",
+            note: "تم إلغاء الباقة وإضافة نصف قيمة تفعيلها إلى رصيد سحب الباقة نفسها",
           }], { session });
 
           cancelledPackage = cancelled;
@@ -574,7 +539,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "تم إلغاء الباقة وإضافة " + refund + " " + current.asset + " إلى رصيد السحب العام. تبقى الأرباح المحققة المتاحة في رصيد هذه الباقة.",
+        message: "تم إلغاء الباقة وإضافة " + refund + " " + current.asset + " إلى رصيد سحب الباقة نفسها. تبقى الأرباح المحققة في رصيد هذه الباقة.",
         userPackage: cancelledPackage,
       });
     }

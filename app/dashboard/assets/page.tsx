@@ -285,7 +285,7 @@ export default function WalletPage() {
 
                 <div>
                   <div className="mb-2 flex items-center gap-2 text-sm text-slate-400">
-                    <span>إجمالي الرصيد</span>
+                    <span>إجمالي أصول المحافظ</span>
 
                     <button
                       type="button"
@@ -314,7 +314,7 @@ export default function WalletPage() {
                   </div>
 
                   <p className="mt-3 text-xs text-slate-500">
-                    رصيد السحب العام من الأموال الداخلية القابلة للسحب. الإيداعات الخارجية محفوظة في رصيد منفصل وتُستخدم لتفعيل الباقات.
+                    هذا الإجمالي يشمل رصيد التداول والتمويل والإيداع الخارجي؛ رصيد السحب العام والإيداع الخارجي معروضان بشكل منفصل أدناه.
                   </p>
                 </div>
 

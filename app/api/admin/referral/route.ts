@@ -99,7 +99,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const commissionPercent = Number(body.commissionPercent);
+    const commissionPercent = 0; // Referral rewards are disabled by product request.
     const enabled = body.enabled === true;
 
     if (!Number.isFinite(commissionPercent) || commissionPercent < 0 || commissionPercent > 100) {
@@ -108,7 +108,7 @@ export async function PATCH(request: NextRequest) {
 
     const settings = await getPlatformSettings();
     settings.referral.enabled = enabled;
-    settings.referral.commissionPercent = commissionPercent;
+    settings.referral.commissionPercent = 0;
     await settings.save();
 
     return NextResponse.json({
@@ -116,7 +116,7 @@ export async function PATCH(request: NextRequest) {
       message: "تم حفظ إعدادات الإحالة",
       referral: {
         enabled: settings.referral.enabled,
-        commissionPercent: settings.referral.commissionPercent,
+        commissionPercent: 0,
         minPayout: settings.referral.minPayout
       }
     });

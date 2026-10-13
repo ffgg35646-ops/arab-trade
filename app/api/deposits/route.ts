@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import DepositRequest from "@/models/DepositRequest";
-import Wallet from "@/models/Wallet";
+import DepositBalance from "@/models/DepositBalance";
 import Asset from "@/models/Asset";
 import { getCurrentUser } from "@/lib/current-user";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import Notification from "@/models/Notification";
 import PaymentOption from "@/models/PaymentOption";
 import User from "@/models/User";
-import { migrateLegacyDepositBalancesToSpotWallet, normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
+import { normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
+import { normalizeDepositBalanceRows, separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
 
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
@@ -30,25 +31,17 @@ export async function GET(request: NextRequest) {
     }
 
     await connectDB();
-    await migrateLegacyDepositBalancesToSpotWallet(user._id);
+    await separateLegacyDepositsFromSpotWallet(user._id);
 
-    const [deposits, spotWallet] = await Promise.all([
+    const [deposits, rawDepositBalances] = await Promise.all([
       DepositRequest.find({ userId: user._id })
         .select("-screenshotData")
         .sort({ createdAt: -1 })
         .limit(100)
         .lean(),
-      Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).lean(),
+      DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
     ]);
-
-    const usdtRows = (spotWallet?.balances || []).filter(
-      (item: any) => String(item.asset || "").trim().toUpperCase() === USDT_ASSET,
-    );
-    const depositBalances = [{
-      asset: USDT_ASSET,
-      available: usdtRows.reduce((sum: number, item: any) => sum + Number(item.available || 0), 0),
-      locked: usdtRows.reduce((sum: number, item: any) => sum + Number(item.locked || 0), 0),
-    }];
+    const depositBalances = normalizeDepositBalanceRows(rawDepositBalances as any[]);
 
     return NextResponse.json({
       success: true,

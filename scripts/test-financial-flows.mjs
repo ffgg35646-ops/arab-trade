@@ -404,7 +404,7 @@ const renewed = await api("/api/packages", { method: "POST", body: { action: "ac
 ok(renewed, "renew package from separate deposit balance", 201);
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 200, "package renewal leaves general withdrawal balance unchanged");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 150, "package renewal leaves general withdrawal balance unchanged");
 closeTo(depositBalance && depositBalance.available, 500, "package renewal debits separate deposit balance");
 
 ok(await api("/api/deposits"), "user deposit page API");

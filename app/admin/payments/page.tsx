@@ -21,22 +21,6 @@ type Payment = {
   withdrawalEnabled: boolean;
 };
 
-const EMPTY_PAYMENT: Payment = {
-  name: "",
-  asset: "",
-  network: "",
-  address: "",
-  minDeposit: 0,
-  maxDeposit: 0,
-  minWithdrawal: 0,
-  maxWithdrawal: 0,
-  withdrawalFee: 0,
-  warning: "",
-  enabled: false,
-  depositEnabled: true,
-  withdrawalEnabled: true,
-};
-
 export default function PaymentsAdminPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +30,12 @@ export default function PaymentsAdminPage() {
   const [error, setError] = useState("");
   const [globalDepositsEnabled, setGlobalDepositsEnabled] = useState(true);
   const [savingGlobalDeposits, setSavingGlobalDeposits] = useState(false);
+  const [addingKind, setAddingKind] = useState<"deposit" | "withdrawal" | "">("");
+  const [newCurrency, setNewCurrency] = useState("");
+  const [newNetwork, setNewNetwork] = useState("");
+  const [newMinimum, setNewMinimum] = useState("0");
+  const [newAddress, setNewAddress] = useState("");
+  const [savingNew, setSavingNew] = useState(false);
 
   const load = useCallback(async () => {
 
@@ -120,16 +110,71 @@ export default function PaymentsAdminPage() {
     );
   }
 
-  function addPayment() {
-    setPayments((current) => [
-      {
-        ...EMPTY_PAYMENT,
-      },
-      ...current,
-    ]);
-
+  function addPayment(kind: "deposit" | "withdrawal") {
+    setAddingKind(kind);
+    setNewCurrency("");
+    setNewNetwork("");
+    setNewMinimum("0");
+    setNewAddress("");
     setMessage("");
     setError("");
+  }
+
+  async function saveNewPayment() {
+    const asset = newCurrency.trim().toUpperCase();
+    const network = newNetwork.trim();
+    const minimum = Number(newMinimum);
+    if (!addingKind) return;
+    if (!asset || !network) {
+      setError("اسم العملة والشبكة مطلوبان");
+      return;
+    }
+    if (!Number.isFinite(minimum) || minimum < 0) {
+      setError("الحد الأدنى غير صالح");
+      return;
+    }
+    if (addingKind === "deposit" && !newAddress.trim()) {
+      setError("عنوان الإيداع مطلوب");
+      return;
+    }
+
+    setSavingNew(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch("/api/admin/payment", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: addingKind,
+          name: asset,
+          asset,
+          network,
+          address: addingKind === "deposit" ? newAddress.trim() : "",
+          minDeposit: addingKind === "deposit" ? minimum : 0,
+          minWithdrawal: addingKind === "withdrawal" ? minimum : 0,
+          enabled: true,
+          depositEnabled: addingKind === "deposit",
+          withdrawalEnabled: addingKind === "withdrawal",
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || "تعذر إضافة الوسيلة");
+      }
+      setMessage(addingKind === "deposit" ? "تمت إضافة وسيلة الإيداع بنجاح." : "تمت إضافة وسيلة السحب بنجاح.");
+      setAddingKind("");
+      setNewCurrency("");
+      setNewNetwork("");
+      setNewMinimum("0");
+      setNewAddress("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تعذر إضافة الوسيلة");
+    } finally {
+      setSavingNew(false);
+    }
   }
 
   async function save(index: number) {
@@ -329,13 +374,14 @@ export default function PaymentsAdminPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={addPayment}
-            className="rounded-xl bg-blue-600 px-5 py-3 font-black transition hover:bg-blue-500"
-          >
-            + إضافة وسيلة دفع
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={() => addPayment("deposit")} className="rounded-xl bg-blue-600 px-5 py-3 font-black transition hover:bg-blue-500">
+              + إضافة وسيلة إيداع
+            </button>
+            <button type="button" onClick={() => addPayment("withdrawal")} className="rounded-xl bg-violet-600 px-5 py-3 font-black transition hover:bg-violet-500">
+              + إضافة وسيلة سحب
+            </button>
+          </div>
         </div>
 
         <section className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#08111e] p-5 md:flex-row md:items-center md:justify-between">
@@ -353,6 +399,36 @@ export default function PaymentsAdminPage() {
             {savingGlobalDeposits ? "جاري الحفظ..." : globalDepositsEnabled ? "إيقاف الإيداع مؤقتًا" : "تفعيل الإيداع"}
           </button>
         </section>
+
+        {addingKind ? (
+          <section className="rounded-2xl border border-slate-700 bg-[#08111e] p-5 md:p-6">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <h2 className="text-xl font-black">{addingKind === "deposit" ? "إضافة وسيلة إيداع" : "إضافة وسيلة سحب"}</h2>
+              <button type="button" onClick={() => setAddingKind("")} className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-bold text-slate-300">إلغاء</button>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block text-sm font-bold">اسم العملة / الرمز
+                <input value={newCurrency} onChange={(e) => setNewCurrency(e.target.value.toUpperCase())} placeholder="مثال: USDT" className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 uppercase outline-none focus:border-blue-500" />
+              </label>
+              <label className="block text-sm font-bold">شبكة العملة
+                <input value={newNetwork} onChange={(e) => setNewNetwork(e.target.value)} placeholder="مثال: TRC20" className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
+              </label>
+              <label className="block text-sm font-bold">{addingKind === "deposit" ? "الحد الأدنى للإيداع" : "الحد الأدنى للسحب"}
+                <input type="number" min="0" step="any" value={newMinimum} onChange={(e) => setNewMinimum(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
+              </label>
+              {addingKind === "deposit" ? (
+                <label className="block text-sm font-bold md:col-span-2">عنوان الإيداع
+                  <textarea value={newAddress} onChange={(e) => setNewAddress(e.target.value)} rows={3} placeholder="عنوان المحفظة أو بيانات التحويل التي ستظهر للمستخدم" className="mt-2 w-full resize-y rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
+                </label>
+              ) : null}
+            </div>
+            <p className="mt-4 text-xs leading-5 text-slate-500">يتم حفظ وسيلة الإيداع والسحب في قاعدة البيانات، مع الحفاظ على إعدادات الوسيلة الأخرى عند استخدام العملة والشبكة نفسيهما.</p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button type="button" disabled={savingNew} onClick={() => void saveNewPayment()} className="rounded-xl bg-emerald-500 px-5 py-3 font-black text-slate-950 disabled:opacity-50">{savingNew ? "جاري الحفظ..." : addingKind === "deposit" ? "حفظ وسيلة الإيداع" : "حفظ وسيلة السحب"}</button>
+              <button type="button" disabled={savingNew} onClick={() => setAddingKind("")} className="rounded-xl border border-slate-700 px-5 py-3 font-bold disabled:opacity-50">إلغاء</button>
+            </div>
+          </section>
+        ) : null}
 
         {message ? (
           <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-300">

@@ -324,8 +324,8 @@ export default function Page() {
         </section>
 
         <section className="w-full max-w-3xl rounded-2xl border border-slate-800 bg-[#08111e] p-5">
-          <h2 className="text-lg font-black">حدود سحب أرباح الباقات</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-400">السحب الأول لا يحتاج إحالات نشطة، وحده الافتراضي 100% من قيمة تفعيل الباقة. السحوبات التالية تعتمد على إجمالي الإيداعات الخارجية المعتمدة للإحالات النشطة، والنسبة الافتراضية 50%، مع خصم السحوبات السابقة من هذا الحد.</p>
+          <h2 className="text-lg font-black">إعدادات السحبة الأولى والسحبة الثانية وما بعدها</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-400">السحبة الأولى: الحد الأقصى الافتراضي 100% من قيمة تفعيل الباقة، ولا تحتاج إلى إحالات نشطة. السحبة الثانية وكل سحب بعدها: يتحدد الحد حسب نسبة الإحالات النشطة التي لديها إيداعات خارجية معتمدة. الافتراضي 50%؛ أي كل 100 USDT إيداعات معتمدة تمنح 50 USDT حد سحب. كل السحوبات السابقة تُخصم من الحد، ولا يمكن استخدام نفس الإيداعات لفتح حد جديد بعد استهلاكها.</p>
           {loadingWithdrawalRules ? <p className="py-4 text-sm text-slate-500">جاري تحميل إعدادات السحب...</p> : (
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <label className="block text-sm font-bold">نسبة حد السحب الأول (%)

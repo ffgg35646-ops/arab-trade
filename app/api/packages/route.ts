@@ -286,51 +286,6 @@ export async function POST(request: NextRequest) {
           availableDepositBefore = debit.availableBefore;
           if (!debit.ok) throw new Error("INSUFFICIENT_DEPOSIT_BALANCE");
 
-          // Refund half of the previous package's activation price to the general withdrawal wallet.
-          // Do not add this refund to package earnings: cancelled packages may be subject to referral caps.
-          if (refund > 0) {
-            let wallet = await Wallet.findOne({
-              userId: user._id,
-              type: "spot",
-              mode: "live",
-            }).session(session);
-
-            if (!wallet) {
-              wallet = new Wallet({
-                userId: user._id,
-                type: "spot",
-                mode: "live",
-                balances: [],
-              });
-            }
-
-            let balance = wallet.balances.find((item: any) => String(item.asset).toUpperCase() === asset);
-            const before = Number(balance?.available || 0);
-
-            if (!balance) {
-              wallet.balances.push({ asset, available: refund, locked: 0 });
-              balance = wallet.balances[wallet.balances.length - 1] as any;
-            } else {
-              balance.available = Number((before + refund).toFixed(12));
-            }
-
-            const after = Number(balance?.available || 0);
-            await wallet.save({ session });
-
-            await LedgerEntry.create([{
-              userId: user._id,
-              scope: "user",
-              asset,
-              mode: "live",
-              type: "adjustment",
-              amount: refund,
-              balanceBefore: before,
-              balanceAfter: after,
-              referenceId: "package-change-refund:" + String(cancelled._id),
-              note: "استرداد 50% من قيمة تفعيل باقة " + cancelled.packageName + " إلى رصيد السحب العام عند تغيير الباقة.",
-            }], { session });
-          }
-
           await LedgerEntry.create([{
             userId: user._id, scope: "user", asset: USDT_ASSET, mode: "live",
             type: "adjustment", amount: -price,
@@ -422,6 +377,51 @@ export async function POST(request: NextRequest) {
           const debit = await debitDepositBalance(user._id, asset, price, session);
           availableDepositBefore = debit.availableBefore;
           if (!debit.ok) throw new Error("INSUFFICIENT_DEPOSIT_BALANCE");
+
+          // Refund half of the previous package's activation price to the general withdrawal wallet.
+          // Do not add this refund to package earnings: cancelled packages may be subject to referral caps.
+          if (refund > 0) {
+            let wallet = await Wallet.findOne({
+              userId: user._id,
+              type: "spot",
+              mode: "live",
+            }).session(session);
+
+            if (!wallet) {
+              wallet = new Wallet({
+                userId: user._id,
+                type: "spot",
+                mode: "live",
+                balances: [],
+              });
+            }
+
+            let balance = wallet.balances.find((item: any) => String(item.asset).toUpperCase() === asset);
+            const before = Number(balance?.available || 0);
+
+            if (!balance) {
+              wallet.balances.push({ asset, available: refund, locked: 0 });
+              balance = wallet.balances[wallet.balances.length - 1] as any;
+            } else {
+              balance.available = Number((before + refund).toFixed(12));
+            }
+
+            const after = Number(balance?.available || 0);
+            await wallet.save({ session });
+
+            await LedgerEntry.create([{
+              userId: user._id,
+              scope: "user",
+              asset,
+              mode: "live",
+              type: "adjustment",
+              amount: refund,
+              balanceBefore: before,
+              balanceAfter: after,
+              referenceId: "package-change-refund:" + String(cancelled._id),
+              note: "استرداد 50% من قيمة تفعيل باقة " + cancelled.packageName + " إلى رصيد السحب العام عند تغيير الباقة.",
+            }], { session });
+          }
 
           await LedgerEntry.create([{
             userId: user._id, scope: "user", asset: USDT_ASSET, mode: "live",

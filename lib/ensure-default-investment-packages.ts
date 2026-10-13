@@ -115,6 +115,27 @@ export async function ensureDefaultInvestmentPackages() {
   ]);
   void legacyAccounts;
 
+  // One-time migration: initialize legacy zero-profit plans using the original
+  // package defaults, without overriding values the administrator later edits.
+  const profitMigrationKey = "arab-trade-package-daily-profit-defaults-v1";
+  if (!(await PackageCatalogSeed.exists({ key: profitMigrationKey }))) {
+    const defaultsByPrice: Record<number, number> = { 50: 2, 100: 4, 250: 10, 500: 20 };
+    for (const plan of plans as any[]) {
+      const defaultProfit = defaultsByPrice[Number(plan.price)];
+      if (defaultProfit !== undefined && Number(plan.dailyProfit || 0) === 0) {
+        await InvestmentPackage.updateOne(
+          { _id: plan._id, dailyProfit: 0 },
+          { $set: { dailyProfit: defaultProfit } }
+        );
+      }
+    }
+    try {
+      await PackageCatalogSeed.create({ key: profitMigrationKey, status: "complete", seededAt: new Date() });
+    } catch (error) {
+      if ((error as { code?: number })?.code !== 11000) throw error;
+    }
+  }
+
   for (const plan of plans as any[]) {
     const original = String(plan.description || "");
     const cleaned = original

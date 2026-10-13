@@ -90,7 +90,8 @@ export async function GET() {
 
         const withdrawalEnabled =
           asset.withdrawalEnabled === true &&
-          network.withdrawalEnabled === true;
+          network.withdrawalEnabled === true &&
+          existing.has(key + ':withdrawal') === false;
 
         if (!depositEnabled && !withdrawalEnabled) continue;
 

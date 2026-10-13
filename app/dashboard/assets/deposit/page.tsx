@@ -150,7 +150,7 @@ export default function DepositPage() {
       } else {
         setMessage(json.alreadyProcessed
           ? "تم التحقق من أن هذا الإيداع عولج بالفعل."
-          : `تم التحقق من المعاملة وإضافة ${Number(json.amount || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} ${json.asset} إلى رصيد USDT الموحد في المحفظة الفورية.`);
+          : `تم التحقق من المعاملة وإضافة ${Number(json.amount || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} ${json.asset} إلى رصيد الإيداع المنفصل.`);
       }
 
       const latest = await fetch("/api/deposits", { credentials: "include", cache: "no-store" });
@@ -294,7 +294,7 @@ export default function DepositPage() {
         </header>
 
         <section className="mb-5 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4">
-          <h2 className="text-sm font-bold text-slate-400">رصيد USDT الموحد المتاح</h2>
+          <h2 className="text-sm font-bold text-slate-400">رصيد الإيداع المنفصل</h2>
           {depositBalances.length === 0 ? (
             <p className="mt-2 text-xs text-slate-500">لا يوجد رصيد متاح حتى الآن.</p>
           ) : (
@@ -480,7 +480,7 @@ export default function DepositPage() {
                   </div>
                   <div className="flex flex-col items-start gap-2">
                     <span className={item.status === "approved" ? "rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300" : item.status === "rejected" ? "rounded-full bg-red-400/10 px-3 py-1 text-xs font-bold text-red-300" : "rounded-full bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-200"}>
-                      {item.status === "approved" ? "معتمد — أضيف إلى رصيد USDT" : item.status === "rejected" ? "مرفوض" : "قيد المراجعة"}
+                      {item.status === "approved" ? "معتمد — أضيف إلى رصيد الإيداع" : item.status === "rejected" ? "مرفوض" : "قيد المراجعة"}
                     </span>
                     {item.status === "pending" && item.txHash && methods.some((method) => method.source === "asset-network" && method.asset === item.asset && method.network.toUpperCase() === item.network.toUpperCase()) && (
                       <button type="button" disabled={Boolean(verifyingId)} onClick={() => void verifyBlockchainDeposit(item)} className="rounded-lg border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-2 text-xs font-bold text-cyan-200 disabled:opacity-50">

@@ -19,7 +19,7 @@ export default function UserPackagesPage() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [clockNow, setClockNow] = useState(Date.now());
+  const [clockNow, setClockNow] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -39,6 +39,7 @@ export default function UserPackagesPage() {
   }, [load]);
 
   useEffect(() => {
+    setClockNow(Date.now());
     const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);

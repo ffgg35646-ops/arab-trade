@@ -185,7 +185,7 @@ export default function PaymentsAdminPage() {
     if (!payment) return;
 
     if (!payment.name.trim()) {
-      setError("اسم وسيلة الدفع مطلوب");
+      setError("اسم وسيلة الإيداع مطلوب");
       return;
     }
 
@@ -200,7 +200,7 @@ export default function PaymentsAdminPage() {
     }
 
     if (!payment.address.trim()) {
-      setError("عنوان أو بيانات التحويل مطلوبة");
+      setError("عنوان الإيداع مطلوب");
       return;
     }
 
@@ -424,7 +424,6 @@ export default function PaymentsAdminPage() {
                 </label>
               ) : null}
             </div>
-            <p className="mt-4 text-xs leading-5 text-slate-500">يتم حفظ وسيلة الإيداع والسحب في قاعدة البيانات، مع الحفاظ على إعدادات الوسيلة الأخرى عند استخدام العملة والشبكة نفسيهما.</p>
             <div className="mt-5 flex flex-wrap gap-3">
               <button type="button" disabled={savingNew} onClick={() => void saveNewPayment()} className="rounded-xl bg-emerald-500 px-5 py-3 font-black text-slate-950 disabled:opacity-50">{savingNew ? "جاري الحفظ..." : addingKind === "deposit" ? "حفظ وسيلة الإيداع" : "حفظ وسيلة السحب"}</button>
               <button type="button" disabled={savingNew} onClick={() => setAddingKind("")} className="rounded-xl border border-slate-700 px-5 py-3 font-bold disabled:opacity-50">إلغاء</button>
@@ -511,11 +510,11 @@ export default function PaymentsAdminPage() {
                   </div>
 
                   <details className="group">
-                    <summary className="cursor-pointer rounded-xl border border-slate-700 bg-[#0b1422] p-4 font-bold">تعديل تفاصيل وسيلة الدفع الحالية</summary>
+                    <summary className="cursor-pointer rounded-xl border border-slate-700 bg-[#0b1422] p-4 font-bold">تعديل تفاصيل وسيلة الإيداع</summary>
                     <div className="space-y-4 pt-4">
                     <div>
                       <label className="mb-2 block text-sm font-bold">
-                        اسم وسيلة الدفع
+                        اسم وسيلة الإيداع
                       </label>
 
                       <input
@@ -606,36 +605,11 @@ export default function PaymentsAdminPage() {
                         />
                       </div>
 
-                      <div>
-                        <label className="mb-2 block text-sm font-bold">
-                          الحد الأدنى للسحب
-                        </label>
-
-                        <input
-                          value={payment.minWithdrawal}
-                          onChange={(e) =>
-                            updatePayment(index, {
-                              minWithdrawal:
-                                Number(e.target.value) || 0,
-                            })
-                          }
-                          type="number"
-                          min="0"
-                          step="any"
-                          className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
+                      
 
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                       <label className="block text-sm font-bold">الحد الأقصى للإيداع (0 = غير محدد)
                         <input type="number" min="0" step="any" value={payment.maxDeposit} onChange={(e) => updatePayment(index, { maxDeposit: Number(e.target.value) || 0 })} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"/>
-                      </label>
-                      <label className="block text-sm font-bold">الحد الأقصى للسحب (0 = غير محدد)
-                        <input type="number" min="0" step="any" value={payment.maxWithdrawal} onChange={(e) => updatePayment(index, { maxWithdrawal: Number(e.target.value) || 0 })} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"/>
-                      </label>
-                      <label className="block text-sm font-bold">رسوم السحب
-                        <input type="number" min="0" step="any" value={payment.withdrawalFee} onChange={(e) => updatePayment(index, { withdrawalFee: Number(e.target.value) || 0 })} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"/>
                       </label>
                       <label className="block text-sm font-bold md:col-span-2 xl:col-span-3">تنبيه يظهر في صفحة السحب
                         <textarea value={payment.warning} onChange={(e) => updatePayment(index, { warning: e.target.value })} rows={2} maxLength={1000} placeholder="تنبيه اختياري عن وسيلة الدفع أو الشبكة" className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"/>

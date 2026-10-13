@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
 import Wallet from "@/models/Wallet";
+import DepositBalance from "@/models/DepositBalance";
 
 import UserPackage from "@/models/UserPackage";
 import LedgerEntry from "@/models/LedgerEntry";
-import { migrateLegacyDepositBalancesToSpotWallet, USDT_ASSET } from "@/lib/unified-usdt-wallet";
+import { normalizeDepositBalanceRows, separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
 
 const BINANCE_API = "https://api.binance.com";
 
@@ -66,9 +67,9 @@ export async function GET(request: NextRequest) {
 
     const requestedMode = new URL(request.url).searchParams.get("mode");
     const mode = String(requestedMode || "live").toLowerCase() === "demo" ? "demo" : "live";
-    if (mode === "live") await migrateLegacyDepositBalancesToSpotWallet(user._id);
+    if (mode === "live") await separateLegacyDepositsFromSpotWallet(user._id);
 
-    const [wallets, packageAccounts] = await Promise.all([
+    const [wallets, rawDepositBalances, packageAccounts] = await Promise.all([
       Wallet.find({
         userId: user._id,
         mode,
@@ -76,10 +77,12 @@ export async function GET(request: NextRequest) {
       })
         .sort({ type: 1 })
         .lean(),
+      DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
       UserPackage.find({ userId: user._id, status: { $in: ["active", "cancelled"] } })
         .select("asset availableEarnings lockedEarnings")
         .lean(),
     ]);
+    const depositBalances = normalizeDepositBalanceRows(rawDepositBalances as any[]);
     const spot = wallets.find(
       (wallet: any) => wallet.type === "spot"
     );
@@ -129,15 +132,6 @@ export async function GET(request: NextRequest) {
 
     const rawSpotBalances =
       getRawBalances(spot);
-
-    const usdtRows = (spot?.balances || []).filter(
-      (item: any) => String(item.asset || "").trim().toUpperCase() === USDT_ASSET,
-    );
-    const depositBalances = [{
-      asset: USDT_ASSET,
-      available: usdtRows.reduce((sum: number, item: any) => sum + Number(item.available || 0), 0),
-      locked: usdtRows.reduce((sum: number, item: any) => sum + Number(item.locked || 0), 0),
-    }];
 
     const rawFundingBalances =
       getRawBalances(funding);
@@ -270,8 +264,14 @@ export async function GET(request: NextRequest) {
         0
       );
 
-    // Spot balances already include approved deposits, so do not count them twice.
-    const totalAccountBalanceUsd = totalBalanceUsd + fundingTotalUsd;
+    const externalDepositTotalUsd = depositBalances.reduce(
+      (sum, item) => sum + (Number(item.available || 0) + Number(item.locked || 0)) * Number(prices.get(item.asset) || 0),
+      0,
+    );
+
+    // External deposits live in DepositBalance and are counted once in the account overview,
+    // but are never added to the general withdrawal balance below.
+    const totalAccountBalanceUsd = totalBalanceUsd + fundingTotalUsd + externalDepositTotalUsd;
 
     // General withdrawal balance includes funds earned inside the platform,
     // regardless of whether they currently sit in spot or funding.

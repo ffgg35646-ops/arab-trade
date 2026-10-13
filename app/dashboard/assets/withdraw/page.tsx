@@ -92,7 +92,6 @@ function accountForPackagePlan(planId: string, accounts: PackageAccount[]) {
 export default function WithdrawPage() {
   const [methods, setMethods] = useState<Method[]>([]);
   const [limits, setLimits] = useState<PaymentLimits>({ minDeposit: 0, maxDeposit: 0, minWithdrawal: 0, minGeneralWithdrawal: 0, maxWithdrawal: 0, dailyWithdrawalLimit: 0 });
-  const [depositBalances, setDepositBalances] = useState<Balance[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [packageAccounts, setPackageAccounts] = useState<PackageAccount[]>([]);
   const [packagePlans, setPackagePlans] = useState<PackagePlan[]>([]);
@@ -153,7 +152,6 @@ export default function WithdrawPage() {
       const packageMethods = methodRows.filter((item) => item.asset === "USDT");
 
       setMethods(methodRows);
-      setDepositBalances(Array.isArray(walletData.depositBalances) ? walletData.depositBalances : []);
       setBalances(Array.isArray(walletData.generalWithdrawalBalances) ? walletData.generalWithdrawalBalances : (walletData.spot?.balances || walletData.wallet?.balances || []));
       setHistory(Array.isArray(historyData.withdrawals) ? historyData.withdrawals : []);
       setSavedAddresses(loadedAddresses);
@@ -204,10 +202,6 @@ export default function WithdrawPage() {
   const totalPackageLocked = useMemo(
     () => packageAccounts.reduce((sum, item) => sum + Number(item.lockedEarnings || 0), 0),
     [packageAccounts]
-  );
-  const totalDepositAvailable = useMemo(
-    () => depositBalances.reduce((sum, item) => sum + (String(item.asset).toUpperCase() === "USDT" ? Number(item.available || 0) : 0), 0),
-    [depositBalances]
   );
   const openWithdrawals = history.filter((item) => ["pending", "approved", "processing"].includes(item.status)).length;
   const packageHistory = history.filter((item) => item.source === "package");
@@ -469,8 +463,7 @@ export default function WithdrawPage() {
               </button>
             </div>
 
-            <section className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-amber-300/20 bg-gradient-to-br from-[#18202b] to-[#07101d] p-3"><div className="text-[11px] text-amber-100/80">رصيد الإيداع</div><div className="mt-1.5 text-lg font-black text-amber-200">{money(totalDepositAvailable)} <span className="text-[10px]">USDT</span></div></div>
+            <section className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-xl border border-cyan-300/20 bg-gradient-to-br from-[#0d2534] to-[#07101d] p-3"><div className="text-[11px] text-cyan-100/80">السحب العام</div><div className="mt-1.5 text-lg font-black text-cyan-200">{money(totalGeneralAvailable)} <span className="text-[10px]">USDT</span></div></div>
               <div className="rounded-xl border border-emerald-300/20 bg-gradient-to-br from-[#0e2b26] to-[#07101d] p-3"><div className="text-[11px] text-emerald-100/80">أرباح الباقات</div><div className="mt-1.5 text-lg font-black text-emerald-200">{money(totalPackageAvailable)} <span className="text-[10px]">USDT</span></div></div>
               <div className="rounded-xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-3"><div className="text-[11px] text-slate-400">طلبات مفتوحة · محجوز الباقات</div><div className="mt-1.5 text-lg font-black text-amber-200">{openWithdrawals} <span className="text-[10px]">طلب</span></div><div className="mt-0.5 text-[10px] text-slate-500">{money(totalPackageLocked)} USDT</div></div>

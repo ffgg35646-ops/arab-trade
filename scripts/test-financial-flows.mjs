@@ -221,6 +221,15 @@ statusIs(await api("/api/withdrawals", {
 spotWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
 closeTo(spotWallet.balances.find((x) => x.asset === "USDT").available, 50, "unsupported network leaves general balance unchanged");
 
+statusIs(await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 1000, source: "wallet" },
+}), 400, "general withdrawal is limited to the general wallet");
+spotWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
+closeTo(spotWallet.balances.find((x) => x.asset === "USDT").available, 50, "failed withdrawal preserves general wallet funds");
+closeTo(depositBalance && depositBalance.available, 1000, "failed withdrawal leaves deposit balance untouched");
+
 const userReferral = await api("/api/referral", { as: "referrer" });
 ok(userReferral, "user referral API");
 assert.equal(userReferral.data.referral.active, 1, "user sees one active referral");
@@ -372,7 +381,7 @@ await db.collection("depositbalances").updateOne({ userId: user._id, asset: "USD
 statusIs(await api("/api/packages", {
   method: "POST",
   body: { action: "change", packageId: String(plan100._id), userPackageId: String(package200._id) },
-}), 400, "package change is rejected when the new price exceeds shared USDT balance");
+}), 400, "package change is rejected when the new price exceeds separate deposit balance");
 const activeAfterFailedChange = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package200._id)) });
 assert.equal(activeAfterFailedChange.status, "active", "failed package change rolls back old package cancellation");
 closeTo(activeAfterFailedChange.cancellationRefund, 0, "failed package change does not credit cancellation refund");

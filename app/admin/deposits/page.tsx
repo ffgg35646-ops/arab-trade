@@ -249,7 +249,7 @@ export default function AdminDepositsPage() {
                   proofLoadError ? (
                     <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.04] p-4 text-center text-xs text-amber-200">تعذر تحميل صورة الإثبات من الخادم. تحقق من التخزين ثم أعد المحاولة.</div>
                   ) : (
-                  <button type="button" onClick={() => setProofExpanded(true) className="block w-full cursor-zoom-in rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-300/60" aria-label="تكبير صورة إثبات الدفع">
+                  <button type="button" onClick={() => setProofExpanded(true)} className="block w-full cursor-zoom-in rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-300/60" aria-label="تكبير صورة إثبات الدفع">
                     <img src={"/api/admin/deposits/file?id=" + encodeURIComponent(selected._id)} alt="إثبات الدفع" onError={() => setProofLoadError(true)} className="mx-auto max-h-[300px] w-full rounded-lg border border-white/10 bg-black object-contain" />
                   </button>
                   )

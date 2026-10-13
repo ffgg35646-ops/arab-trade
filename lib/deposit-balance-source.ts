@@ -4,8 +4,6 @@ import Wallet from "@/models/Wallet";
 import LedgerEntry from "@/models/LedgerEntry";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
 
-const LEGACY_UNIFIED_DEPOSIT_CUTOVER_AT = new Date("2026-10-13T09:42:10.000Z").getTime();
-
 type DepositBalanceLike = {
   asset?: unknown;
   available?: unknown;
@@ -198,10 +196,14 @@ export async function separateLegacyDepositsFromSpotWallet(
         if (isSeparateDepositCredit || isSeparateDepositSpend) continue;
 
         const isLegacyMigrationCredit = referenceId.startsWith("legacy-deposit-migration:");
-        const isPostCutoverDeposit = String(entry.type || "") === "deposit" &&
-          new Date(entry.createdAt).getTime() >= LEGACY_UNIFIED_DEPOSIT_CUTOVER_AT;
+        // Older approved deposits may predate the source cutover and still be
+        // credited to the spot/funding wallet. Current DepositBalance credits
+        // were excluded above by their external-deposit-balance reference ID,
+        // so every other positive deposit ledger entry is legacy wallet credit.
+        const isLegacyDepositCredit =
+          String(entry.type || "").trim().toLowerCase() === "deposit" && amount > 0;
 
-        if (isLegacyMigrationCredit || isPostCutoverDeposit) {
+        if (isLegacyMigrationCredit || isLegacyDepositCredit) {
           hasLegacyDepositActivity = true;
           if (amount > 0) depositExposure = roundAmount(depositExposure + amount);
           continue;

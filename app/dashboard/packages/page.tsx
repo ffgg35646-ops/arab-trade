@@ -122,7 +122,7 @@ export default function UserPackagesPage() {
                 <div className="flex justify-between gap-2"><span>الربح اليومي</span><strong className="text-emerald-200">{money(Number(plan.dailyProfit || 0))} {plan.asset}</strong></div>
                 <div className="flex justify-between gap-2"><span>الحد الأدنى للسحب</span><strong className="text-white">{money(Number(plan.minimumWithdrawal ?? 100))} USDT</strong></div>
               </div>
-              <button type="button" onClick={() => void action(activePlan ? "change" : "activate", plan._id)} disabled={Boolean(busy)} className="mt-4 w-full rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold disabled:opacity-50">{busy === plan._id ? "جاري التنفيذ..." : activePlan ? activePlan.packageName === plan.name ? "إعادة التفعيل" : "التغيير إلى هذه الباقة" : "تفعيل الباقة"}</button>
+              <button type="button" onClick={() => void action(activePlan ? "change" : "activate", plan._id)} disabled={Boolean(busy) || activePlan?.packageName === plan.name} className="mt-4 w-full rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50">{busy === plan._id ? "جاري التنفيذ..." : activePlan?.packageName === plan.name ? "تم التفعيل" : activePlan ? "التغيير إلى هذه الباقة" : "تفعيل الباقة"}</button>
             </article>)}</div>}
         </section>
 

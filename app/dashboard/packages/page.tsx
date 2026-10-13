@@ -23,10 +23,23 @@ export default function UserPackagesPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/packages", { credentials: "include", cache: "no-store" });
+      const [res, walletRes] = await Promise.all([
+        fetch("/api/packages", { credentials: "include", cache: "no-store" }),
+        fetch("/api/wallet?mode=live", { credentials: "include", cache: "no-store" }),
+      ]);
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || "تعذر تحميل الباقات");
-      setData(json as Data);
+
+      // Use the exact deposit-balance feed already used by the navbar.
+      // This keeps the activation amount consistent across the navbar and package page.
+      let packageData = json as Data;
+      if (walletRes.ok) {
+        const walletJson = await walletRes.json();
+        if (walletJson?.success && Array.isArray(walletJson.depositBalances)) {
+          packageData = { ...packageData, depositBalances: walletJson.depositBalances };
+        }
+      }
+      setData(packageData);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذر تحميل الباقات");

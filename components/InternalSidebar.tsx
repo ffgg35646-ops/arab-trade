@@ -81,7 +81,7 @@ export default function InternalSidebar() {
     <aside
       dir="rtl"
       className={`hidden shrink-0 border-l border-white/10 bg-[#07101d] lg:block ${
-        collapsed ? "w-[76px]" : "w-[260px]"
+        collapsed ? "w-[76px]" : "w-[240px]"
       } transition-all duration-200`}
     >
       <div className="sticky top-16 flex h-[calc(100vh-4rem)] flex-col">
@@ -104,7 +104,7 @@ export default function InternalSidebar() {
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-3">
+        <nav className="flex-1 overflow-y-auto p-2.5">
           <div className="space-y-1">
             {sections.map((section) => {
               const Icon = section.icon;
@@ -125,7 +125,7 @@ export default function InternalSidebar() {
                           [section.title]: !old[section.title],
                         }))
                       }
-                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition ${
                         expanded || sectionActive
                           ? "text-white"
                           : "text-slate-400 hover:bg-white/5 hover:text-white"
@@ -155,7 +155,7 @@ export default function InternalSidebar() {
                           <Link
                             key={href}
                             href={href}
-                            className={`block rounded-lg px-3 py-2.5 text-xs transition ${
+                            className={`block rounded-md px-3 py-2 text-xs transition ${
                               active(href)
                                 ? "bg-blue-500/15 font-semibold text-cyan-300"
                                 : "text-slate-500 hover:bg-white/5 hover:text-slate-200"

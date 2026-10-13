@@ -131,6 +131,10 @@ export async function PATCH(request: NextRequest) {
       await BlockchainDepositClaim.init();
     }
 
+    if (status === "approved") {
+      await separateLegacyDepositsFromSpotWallet(initial.userId);
+    }
+
     const session = await mongoose.startSession();
     let processed: any = null;
 

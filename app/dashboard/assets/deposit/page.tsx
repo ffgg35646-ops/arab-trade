@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
+import { Check, Copy, ImagePlus, UploadCloud } from "lucide-react";
 
 type DepositBalance = { asset: string; available: number; locked: number };
 type DepositRecord = { _id?: string; id?: string; asset: string; network: string; amount: number; status: string; txHash?: string; adminNote?: string; createdAt?: string };
@@ -35,6 +36,8 @@ export default function DepositPage() {
   const [amount, setAmount] = useState("");
   const [txHash, setTxHash] = useState("");
   const [screenshot, setScreenshot] = useState<File | null>(null);
+  const [screenshotPreview, setScreenshotPreview] = useState("");
+  const [copiedAddress, setCopiedAddress] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -45,11 +48,20 @@ export default function DepositPage() {
 
   useEffect(() => {
     void loadMethods();
+    const refresh = window.setInterval(() => {
+      void loadMethods(true);
+    }, 60000);
+    return () => window.clearInterval(refresh);
   }, []);
 
-  async function loadMethods() {
-    setLoading(true);
-    setError("");
+  useEffect(() => {
+    if (!screenshotPreview) return;
+    return () => URL.revokeObjectURL(screenshotPreview);
+  }, [screenshotPreview]);
+
+  async function loadMethods(background = false) {
+    if (!background) setLoading(true);
+    if (!background) setError("");
 
     try {
       const [res, balanceRes] = await Promise.all([
@@ -82,26 +94,28 @@ export default function DepositPage() {
       }
 
       const rows = Array.isArray(json.methods)
-        ? json.methods.filter(
-            (method: Method) =>
+        ? json.methods.filter((method: Method) => {
+            const network = String(method.network || "");
+            return String(method.asset || "").toUpperCase() === "USDT" &&
+              /trc|tron|bnb|bep20|bsc|binance/i.test(network) &&
               method.enabled !== false &&
-              method.depositEnabled !== false
-          )
+              method.depositEnabled !== false &&
+              Boolean(String(method.address || "").trim());
+          })
         : [];
 
       setMethods(rows);
-
-      if (rows.length > 0) {
-        setSelectedId(rows[0]._id);
-      }
+      setSelectedId((current) => rows.some((method: Method) => method._id === current)
+        ? current
+        : rows[0]?._id || "");
     } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : "تعذر تحميل وسائل الدفع"
-      );
+      if (!background) {
+        setError(e instanceof Error ? e.message : "تعذر تحميل وسائل الإيداع");
+      } else {
+        console.warn("Background deposit options refresh failed", e);
+      }
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   }
 
@@ -149,6 +163,17 @@ export default function DepositPage() {
       setError(e instanceof Error ? e.message : "تعذر التحقق من الإيداع");
     } finally {
       setVerifyingId("");
+    }
+  }
+
+  async function copyDepositAddress() {
+    if (!selected?.address) return;
+    try {
+      await navigator.clipboard.writeText(selected.address);
+      setCopiedAddress(true);
+      window.setTimeout(() => setCopiedAddress(false), 1800);
+    } catch {
+      setError("تعذر النسخ تلقائيًا. يمكنك تحديد العنوان ونسخه يدويًا.");
     }
   }
 
@@ -222,6 +247,7 @@ export default function DepositPage() {
       setAmount("");
       setTxHash("");
       setScreenshot(null);
+      setScreenshotPreview("");
       const latest = await fetch("/api/deposits", { credentials: "include", cache: "no-store" });
       const latestData = await latest.json().catch(() => ({}));
       if (latest.ok && latestData.success) {
@@ -254,21 +280,23 @@ export default function DepositPage() {
         <InternalSidebar />
         <main
           dir="rtl"
-      className="min-h-screen bg-[#050a13] p-4 text-white sm:p-6"
+      className="min-h-screen w-full flex-1 bg-[#050a13] p-4 text-white sm:p-6"
     >
-      <div className="mx-auto max-w-4xl">
-        <h1 className="text-3xl font-black">
-          إيداع
-        </h1>
+      <div className="mx-auto w-full max-w-3xl">
+        <header className="mb-6 text-center">
+          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-300/[0.06] px-4 py-2 text-xs font-bold tracking-wide text-cyan-100">
+            <span className="h-2 w-2 rounded-full bg-cyan-300" />
+            USDT · TRC / BNB
+          </div>
+          <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">إيداع USDT</h1>
+          <p className="mt-2 text-sm text-slate-500">اختر الشبكة وأدخل بيانات التحويل.</p>
+          {loading && methods.length > 0 && <p className="mt-2 text-xs text-slate-600">تحديث بيانات الشبكات في الخلفية…</p>}
+        </header>
 
-        <p className="mt-2 text-sm text-slate-500">
-          اختر وسيلة الدفع المفعلة من إدارة المنصة. الإيداعات الخارجية المعتمدة تضاف إلى رصيد الإيداع المنفصل.
-        </p>
-
-        <section className="mt-5 rounded-2xl border border-cyan-300/15 bg-[#08111e] p-5">
-          <h2 className="text-sm font-bold text-slate-300">رصيد الإيداع المتاح</h2>
+        <section className="mb-5 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4">
+          <h2 className="text-sm font-bold text-slate-400">رصيد الإيداع</h2>
           {depositBalances.length === 0 ? (
-            <p className="mt-2 text-xs text-slate-500">لا يوجد رصيد إيداع معتمد حتى الآن.</p>
+            <p className="mt-2 text-xs text-slate-500">لا يوجد رصيد متاح حتى الآن.</p>
           ) : (
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {depositBalances.map((item) => (
@@ -310,117 +338,134 @@ export default function DepositPage() {
           </div>
         )}
 
-        <section className="mt-5 rounded-2xl border border-blue-400/20 bg-[#08111e] p-5 md:p-6">
-          <div className="mb-5">
-            <h2 className="text-xl font-black">إنشاء طلب إيداع</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
-              أدخل مبلغ التحويل، واختر العملة والشبكة، واستخدم عنوان الإيداع الذي ضبطه الأدمن، ثم أرفق رقم المعاملة وصورة الإثبات.
-            </p>
-          </div>
-
+        <section className="rounded-3xl border border-white/[0.08] bg-gradient-to-b from-[#0b1725] to-[#08111e] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.28)] sm:p-7">
           <form onSubmit={submit} className="space-y-5">
-            <div>
-              <label htmlFor="deposit-method" className="mb-2 block text-sm font-bold">وسيلة الإيداع / العملة والشبكة</label>
-              <select
-                id="deposit-method"
-                value={selectedId}
-                onChange={(event) => setSelectedId(event.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-[#0b1422] p-4 outline-none focus:border-blue-400/50"
-              >
-                <option value="">اختر وسيلة الإيداع</option>
-                {methods.map((method) => (
-                  <option key={method._id} value={method._id}>
-                    {method.name} — {method.asset} / {method.network}
-                  </option>
-                ))}
-              </select>
-              {methods.length === 0 && !loading && (
-                <p className="mt-2 rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-3 text-xs leading-5 text-amber-200">
-                  لا توجد وسيلة إيداع مفعلة حاليًا. خانات الإيداع موجودة، لكن إرسال الطلب يتطلب أن يضيف الأدمن وسيلة دفع ويفعّلها ويحدد عنوان التحويل.
-                </p>
-              )}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label htmlFor="deposit-currency" className="block text-sm font-bold text-slate-300">
+                العملة
+                <select id="deposit-currency" defaultValue="USDT" className="mt-2 w-full rounded-2xl border border-white/10 bg-[#050a13] px-4 py-3.5 font-black text-white outline-none focus:border-cyan-300/40">
+                  <option value="USDT">USDT · Tether</option>
+                </select>
+              </label>
+              <label htmlFor="deposit-network" className="block text-sm font-bold text-slate-300">
+                الشبكة
+                <select
+                  id="deposit-network"
+                  value={selectedId}
+                  onChange={(event) => setSelectedId(event.target.value)}
+                  required
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-[#050a13] px-4 py-3.5 font-bold text-white outline-none focus:border-cyan-300/40"
+                >
+                  <option value="">اختر شبكة الإيداع</option>
+                  {methods.map((method) => (
+                    <option key={method._id} value={method._id}>{method.network}</option>
+                  ))}
+                </select>
+              </label>
             </div>
 
-            <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] p-4">
-              <div className="text-xs font-bold text-cyan-200">عنوان الإيداع الذي حدده الأدمن</div>
-              <div className="mt-2 break-all rounded-lg border border-white/5 bg-black/20 p-3 text-sm leading-6 text-white">
-                {selected?.address || "سيظهر عنوان التحويل هنا بعد اختيار وسيلة إيداع مفعلة من الإدارة."}
+            {methods.length === 0 && !loading && (
+              <div className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.04] p-4 text-sm text-amber-100/90">
+                لا توجد وسيلة USDT مفعّلة على شبكة TRC أو BNB حاليًا.
+              </div>
+            )}
+            {loading && methods.length === 0 && (
+              <div className="rounded-2xl border border-white/[0.08] bg-black/10 p-4 text-sm text-slate-500">
+                جاري تحميل شبكات الإيداع…
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-cyan-300/15 bg-[#06121d] p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-bold text-slate-500">عنوان الإيداع</div>
+                  <div className="mt-1 font-bold text-white">{selected ? `USDT · ${selected.network}` : "اختر الشبكة لعرض العنوان"}</div>
+                </div>
+                {selected?.address && (
+                  <button type="button" onClick={() => void copyDepositAddress()} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-bold text-slate-200 transition hover:border-cyan-300/30">
+                    {copiedAddress ? <Check size={15} /> : <Copy size={15} />}
+                    {copiedAddress ? "تم النسخ" : "نسخ العنوان"}
+                  </button>
+                )}
+              </div>
+              <div className="mt-4 min-h-[74px] rounded-xl border border-white/[0.06] bg-[#030912] p-4 font-mono text-sm leading-6 text-cyan-100 sm:text-base">
+                {selected?.address || <span className="font-sans text-sm text-slate-600">سيظهر هنا عنوان الشبكة الذي أضافه الأدمن.</span>}
               </div>
               {selected && (
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg border border-white/5 bg-black/20 p-3">
-                    <div className="text-xs text-slate-500">العملة والشبكة</div>
-                    <div className="mt-1 font-bold">{selected.asset} · {selected.network}</div>
-                  </div>
-                  <div className="rounded-lg border border-white/5 bg-black/20 p-3">
-                    <div className="text-xs text-slate-500">الحد الأدنى للإيداع حسب الوسيلة</div>
-                    <div className="mt-1 font-black">{Math.max(Number(selected.minDeposit || 0), Number(limits.minDeposit || 0))} {selected.asset}</div>
-                  </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                  <span className="text-sm text-slate-400">الحد الأدنى للإيداع</span>
+                  <strong className="text-lg font-black text-emerald-200">
+                    {Math.max(Number(selected.minDeposit || 0), Number(limits.minDeposit || 0)).toLocaleString("en-US", { maximumFractionDigits: 8 })} <span className="text-sm">USDT</span>
+                  </strong>
                 </div>
               )}
             </div>
 
-            <div>
-              <label htmlFor="deposit-amount" className="mb-2 block text-sm font-bold">مبلغ الإيداع</label>
-              <input
-                id="deposit-amount"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                type="number"
-                min="0"
-                step="any"
-                required
-                placeholder="اكتب مبلغ التحويل الذي أرسلته"
-                className="w-full rounded-xl border border-slate-700 bg-[#0b1422] p-4 text-lg font-bold outline-none focus:border-blue-400/50"
-              />
-              <p className="mt-2 text-xs leading-5 text-slate-500">الحد المسموح لهذه الوسيلة: {Math.max(Number(selected?.minDeposit || 0), Number(limits.minDeposit || 0))} إلى {(() => { const values = [Number(selected?.maxDeposit || 0), Number(limits.maxDeposit || 0)].filter((value) => value > 0); return values.length ? Math.min(...values).toLocaleString("en-US") : "غير محدد"; })()} {selected?.asset || ""}. هذه الحدود يتحكم فيها الأدمن.</p>
-            </div>
-
-            <div>
-              <label htmlFor="deposit-txhash" className="mb-2 block text-sm font-bold">رقم المعاملة (TX Hash)</label>
-              <input
-                id="deposit-txhash"
-                value={txHash}
-                onChange={(event) => setTxHash(event.target.value)}
-                placeholder="الصق رقم المعاملة من المحفظة (إن توفر)"
-                className="w-full rounded-xl border border-slate-700 bg-[#0b1422] p-4 font-mono text-sm outline-none focus:border-blue-400/50"
-              />
-            </div>
-
-            <div className="rounded-xl border border-slate-800 p-4">
-              <label htmlFor="deposit-screenshot" className="mb-2 block font-bold">صورة إثبات التحويل</label>
+            <label htmlFor="deposit-screenshot" className="block cursor-pointer rounded-2xl border border-dashed border-cyan-200/25 bg-cyan-200/[0.025] p-5 transition hover:border-cyan-200/45 hover:bg-cyan-200/[0.045] sm:p-6">
+              <span className="flex items-center gap-3">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-cyan-200/15 bg-cyan-200/[0.08] text-cyan-100"><UploadCloud size={22}/></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-black text-white">صورة التحويل (Screenshot)</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">اضغط لاختيار صورة واضحة · JPG أو PNG أو WEBP · حتى 4MB</span>
+                </span>
+                <ImagePlus size={20} className="shrink-0 text-cyan-200"/>
+              </span>
               <input
                 id="deposit-screenshot"
                 type="file"
                 required
                 accept="image/jpeg,image/png,image/webp"
-                onChange={(event) => setScreenshot(event.target.files?.[0] || null)}
-                className="block w-full text-sm"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] || null;
+                  setScreenshot(file);
+                  setScreenshotPreview(file ? URL.createObjectURL(file) : "");
+                }}
+                className="sr-only"
               />
-              <p className="mt-2 text-xs text-slate-500">JPG / PNG / WEBP — الحد الأقصى 4MB</p>
+              {screenshot && (
+                <span className="mt-4 block overflow-hidden rounded-xl border border-white/10 bg-[#030912] p-3">
+                  {screenshotPreview && <img src={screenshotPreview} alt="معاينة صورة التحويل" className="mx-auto max-h-56 w-auto rounded-lg object-contain"/>}
+                  <span className="mt-2 block break-all text-center text-xs text-emerald-200">{screenshot.name}</span>
+                </span>
+              )}
+            </label>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label htmlFor="deposit-amount" className="block text-sm font-bold text-slate-300">
+                مبلغ الإيداع (USDT)
+                <input
+                  id="deposit-amount"
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                  type="number"
+                  min={Math.max(Number(selected?.minDeposit || 0), Number(limits.minDeposit || 0))}
+                  max={(() => { const values = [Number(selected?.maxDeposit || 0), Number(limits.maxDeposit || 0)].filter((value) => value > 0); return values.length ? Math.min(...values) : undefined; })()}
+                  step="any"
+                  required
+                  placeholder="اكتب المبلغ"
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-[#050a13] px-4 py-3.5 text-lg font-black text-white outline-none focus:border-cyan-300/40"
+                />
+              </label>
+              <label htmlFor="deposit-txhash" className="block text-sm font-bold text-slate-300">
+                رقم المعاملة <span className="font-normal text-slate-600">(اختياري)</span>
+                <input
+                  id="deposit-txhash"
+                  value={txHash}
+                  onChange={(event) => setTxHash(event.target.value)}
+                  placeholder="TX Hash"
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-[#050a13] px-4 py-3.5 font-mono text-sm text-white outline-none focus:border-cyan-300/40"
+                />
+              </label>
             </div>
 
             <button
               type="submit"
               disabled={sending || loading || !selected || !depositsEnabled}
-              className="w-full rounded-xl bg-blue-600 px-5 py-4 font-black transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+              className="w-full rounded-2xl bg-cyan-300 px-5 py-4 font-black text-[#03111c] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {sending ? "جاري إرسال طلب الإيداع..." : !depositsEnabled ? "الإيداع متوقف مؤقتًا" : "إرسال طلب الإيداع للمراجعة"}
+              {sending ? "جاري إرسال طلب الإيداع…" : !depositsEnabled ? "الإيداع متوقف مؤقتًا" : "تأكيد الإيداع"}
             </button>
           </form>
-        </section>
-        <section className="mt-6 rounded-2xl border border-cyan-400/20 bg-[#08111e] p-5 md:p-6">
-          <h2 className="text-lg font-black">تعليمات الإيداع بالتفصيل</h2>
-          <div className="mt-4 space-y-3 text-sm leading-6 text-slate-400">
-            <p><span className="ml-2 font-black text-cyan-200">1.</span>اختر وسيلة الدفع والعملة والشبكة المفعّلة من الإدارة.</p>
-            <p><span className="ml-2 font-black text-cyan-200">2.</span>حوّل إلى عنوان الإيداع الظاهر للوسيلة والشبكة المختارتين فقط، وتأكد من الشبكة قبل الإرسال.</p>
-            <p><span className="ml-2 font-black text-cyan-200">3.</span>اكتب المبلغ الفعلي الذي أرسلته، وأضف TX Hash إن كان متاحًا. لا تستخدم رقم معاملة لإيداع آخر.</p>
-            <p><span className="ml-2 font-black text-cyan-200">4.</span>ارفع صورة واضحة لإثبات التحويل بصيغة JPG أو PNG أو WEBP، بحد أقصى 4MB.</p>
-            <p><span className="ml-2 font-black text-cyan-200">5.</span>سيظهر الطلب في سجل الإيداعات بحالة «قيد المراجعة». لا يُضاف الرصيد إلا بعد اعتماد الإدارة أو إكمال التحقق الآلي المدعوم للمعاملة.</p>
-          </div>
-          <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/[0.05] p-4 text-sm leading-6 text-amber-100">
-            رصيد الإيداع منفصل عن رصيد السحب العام، ويُستخدم حسب قواعد المنصة للتفعيل. لا ترسل أموالًا إلى عنوان غير ظاهر في وسيلة الدفع المعتمدة.
-          </div>
         </section>
 
         <section className="mt-7 rounded-2xl border border-slate-800 bg-[#08111e] p-5">

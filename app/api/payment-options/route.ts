@@ -54,7 +54,7 @@ export async function GET() {
         withdrawalEnabled: kind !== "deposit" && method.withdrawalEnabled !== false,
         source: "payment-option",
       };
-      existing.set(key, row);
+      existing.add(key); // mark the configured asset/network pair
       methods.push(row);
     }
 

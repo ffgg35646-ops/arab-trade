@@ -445,5 +445,45 @@ form.append("screenshot", new Blob(["test-proof"], { type: "image/png" }), "proo
 const disabledDeposit = await api("/api/deposits", { method: "POST", body: form });
 statusIs(disabledDeposit, 400, "backend rejects deposit when admin disabled that channel");
 
+// Legacy merged deposits are moved out of BOTH spot and funding, but never
+// while a general withdrawal is pending (it may be rejected and returned).
+const legacyDepositAt = new Date(Date.now() + 5000);
+const legacyWithdrawalId = new mongoose.Types.ObjectId();
+await db.collection("wallets").updateOne(
+  { userId: user._id, type: "spot", mode: "live", "balances.asset": "USDT" },
+  { $set: { "balances.$.available": 20, "balances.$.locked": 0 } },
+);
+await db.collection("wallets").insertOne({
+  userId: user._id, type: "funding", mode: "live",
+  balances: [{ asset: "USDT", available: 50, locked: 0 }],
+  createdAt: new Date(), updatedAt: new Date(),
+});
+await db.collection("ledgerentries").insertOne({
+  userId: user._id, scope: "user", asset: "USDT", mode: "live",
+  type: "deposit", amount: 70, balanceBefore: 0, balanceAfter: 70,
+  referenceId: "ci-legacy-merged-deposit", note: "CI legacy merged deposit",
+  createdAt: legacyDepositAt, updatedAt: legacyDepositAt,
+});
+await db.collection("withdrawalrequests").insertOne({
+  _id: legacyWithdrawalId, userId: user._id, source: "wallet", status: "pending",
+  asset: "USDT", network: "TRC20", amount: 10, address: "ci-pending-address",
+  createdAt: new Date(), updatedAt: new Date(),
+});
+
+let legacyWalletApi = await api("/api/wallet");
+ok(legacyWalletApi, "wallet API while legacy withdrawal is pending");
+let legacyDepositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
+closeTo(legacyDepositBalance.available, 500, "legacy repair waits while general withdrawal is pending");
+closeTo((legacyWalletApi.data.generalWithdrawalBalances || []).reduce((sum, item) => sum + (item.asset === "USDT" ? item.available : 0), 0), 70, "pending withdrawal keeps the original wallet allocation unchanged");
+
+await db.collection("withdrawalrequests").deleteOne({ _id: legacyWithdrawalId });
+legacyWalletApi = await api("/api/wallet");
+ok(legacyWalletApi, "wallet API after legacy withdrawal is resolved");
+legacyDepositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
+closeTo(legacyDepositBalance.available, 570, "legacy merged deposit is moved into deposit balance");
+closeTo((legacyWalletApi.data.generalWithdrawalBalances || []).reduce((sum, item) => sum + (item.asset === "USDT" ? item.available : 0), 0), 0, "legacy deposit is removed from spot and funding withdrawal balances");
+closeTo((await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" })).balances.find((x) => x.asset === "USDT").available, 0, "legacy deposit portion is removed from spot");
+closeTo((await db.collection("wallets").findOne({ userId: user._id, type: "funding", mode: "live" })).balances.find((x) => x.asset === "USDT").available, 0, "legacy deposit portion is removed from funding");
+
 console.log("PASS: external deposit, idempotency, active referral, referral commission, package activation, first-withdrawal cap, admin settlement, balance rollback, package switch, cancellation, renewal, and admin/user APIs");
 await mongoose.disconnect();

@@ -195,6 +195,11 @@ export async function POST(request: NextRequest) {
     const payment = await PaymentOption.findOne({
       asset: assetCode,
       network: networkCode,
+      $or: [
+        { kind: "withdrawal" },
+        { kind: "both" },
+        { kind: { $exists: false } },
+      ],
     }).lean();
 
     let minAmount = source === "wallet"

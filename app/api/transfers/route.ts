@@ -5,6 +5,7 @@ import Wallet from "@/models/Wallet";
 import Transfer from "@/models/Transfer";
 import Notification from "@/models/Notification";
 import { getCurrentUser } from "@/lib/current-user";
+import { migrateLegacyDepositBalancesToSpotWallet } from "@/lib/unified-usdt-wallet";
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     await connectDB();
+    await migrateLegacyDepositBalancesToSpotWallet(user._id);
 
     const body = await request.json();
 

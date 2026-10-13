@@ -409,8 +409,8 @@ export default function InternalNavbar() {
           </Link>
 
           <div className="hidden items-center gap-1 md:flex xl:gap-2">
-            <Link href="/dashboard/assets/deposit" className="max-w-[230px] rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-2 py-2 transition hover:bg-amber-300/[0.1] xl:px-3" title={`رصيد الإيداع الخارجي: ${depositBalanceSummary}`}>
-              <span className="block text-[10px] text-amber-200/80">رصيد الإيداع الخارجي</span>
+            <Link href="/dashboard/assets/deposit" className="max-w-[230px] rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-2 py-2 transition hover:bg-amber-300/[0.1] xl:px-3" title={`رصيد USDT الموحد: ${depositBalanceSummary}`}>
+              <span className="block text-[10px] text-amber-200/80">رصيد USDT الموحد</span>
               <span className="block max-w-[205px] truncate text-xs font-black text-amber-100">{depositBalanceSummary}</span>
             </Link>
             <Link href="/dashboard/assets/withdraw" className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] px-2 py-2 transition hover:bg-cyan-300/[0.1] xl:px-3" title="إجمالي رصيد السحب العام وأرصدة الباقات">
@@ -581,7 +581,7 @@ export default function InternalNavbar() {
 
             <div className="grid grid-cols-2 gap-2">
               <Link href="/dashboard/assets/deposit" onClick={() => setMobile(false)} className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-3">
-                <span className="block text-[10px] text-amber-200/80">رصيد الإيداع الخارجي</span>
+                <span className="block text-[10px] text-amber-200/80">رصيد USDT الموحد</span>
                 <span className="mt-1 block break-words text-xs font-black leading-5 text-amber-100">{depositBalanceSummary}</span>
               </Link>
               <Link href="/dashboard/assets/withdraw" onClick={() => setMobile(false)} className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-3">

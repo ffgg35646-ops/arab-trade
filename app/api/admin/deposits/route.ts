@@ -9,7 +9,7 @@ import PlatformSettings from "@/models/PlatformSettings";
 import LedgerEntry from "@/models/LedgerEntry";
 import Notification from "@/models/Notification";
 import ReferralCommission from "@/models/ReferralCommission";
-import DepositBalance from "@/models/DepositBalance";
+import { creditSpotUsdtBalance, USDT_ASSET } from "@/lib/unified-usdt-wallet";
 import BlockchainDepositClaim from "@/models/BlockchainDepositClaim";
 
 export async function GET(
@@ -120,8 +120,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     const amount = Number(initial.amount);
-    const asset = String(initial.asset || "").trim().toUpperCase();
-    if (!Number.isFinite(amount) || amount <= 0 || !asset) {
+    const asset = USDT_ASSET;
+    if (!Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json({ success: false, message: "قيمة الإيداع أو العملة غير صحيحة" }, { status: 400 });
     }
 
@@ -141,7 +141,7 @@ export async function PATCH(request: NextRequest) {
             $set: {
               status,
               adminNote,
-              ...(status === "approved" ? { creditedAt: new Date() } : {}),
+              ...(status === "approved" ? { creditedAt: new Date(), asset: USDT_ASSET } : {}),
             },
           },
           { new: true, session, runValidators: true }
@@ -176,24 +176,19 @@ export async function PATCH(request: NextRequest) {
             }
           }
 
-          const credited = await DepositBalance.findOneAndUpdate(
-            { userId: current.userId, asset },
-            {
-              $inc: { available: amount },
-              $setOnInsert: { userId: current.userId, asset, locked: 0 },
-            },
-            { new: true, upsert: true, setDefaultsOnInsert: true, session }
-          );
+          const credited = await creditSpotUsdtBalance(current.userId, amount, session);
 
           await LedgerEntry.create([{
             userId: current.userId,
-            asset,
+            scope: "user",
+            asset: USDT_ASSET,
+            mode: "live",
             type: "deposit",
             amount,
-            balanceBefore: Number(credited.available || 0) - amount,
-            balanceAfter: Number(credited.available || 0),
+            balanceBefore: credited.availableBefore,
+            balanceAfter: credited.availableAfter,
             referenceId: String(current._id),
-            note: adminNote || "إيداع خارجي معتمد — أضيف إلى رصيد الإيداع المنفصل",
+            note: adminNote || "إيداع USDT معتمد — أضيف إلى رصيد USDT الموحد القابل للتداول وتفعيل الباقات والتحويل والسحب.",
           }], { session });
 
           // Referral activity and commission are tied to this one approved external deposit.

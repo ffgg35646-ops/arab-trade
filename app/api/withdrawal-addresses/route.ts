@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
 import WithdrawalAddress from "@/models/WithdrawalAddress";
+import { normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
 
 type AddressSource = "wallet" | "package";
 function normalizeSource(value: unknown): AddressSource {
@@ -57,12 +58,12 @@ export async function POST(request: NextRequest) {
     await connectDB();
     const body = await request.json();
     const asset = String(body.asset || "").trim().toUpperCase();
-    const network = String(body.network || "").trim();
+    const network = normalizePaymentNetwork(body.network);
     const address = String(body.address || "").trim();
     const source = normalizeSource(body.source);
 
-    if (!asset || !network || !address) {
-      return NextResponse.json({ success: false, message: "بيانات العنوان غير مكتملة" }, { status: 400 });
+    if (asset !== USDT_ASSET || !network || !address) {
+      return NextResponse.json({ success: false, message: "عناوين السحب تدعم USDT فقط على شبكة TRC20 أو BNB Smart Chain (BEP20)." }, { status: 400 });
     }
     if (address.length > 500) {
       return NextResponse.json({ success: false, message: "عنوان المحفظة أطول من الحد المسموح" }, { status: 400 });

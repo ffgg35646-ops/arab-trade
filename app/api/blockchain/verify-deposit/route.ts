@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/current-user";
 import { connectDB } from "@/lib/mongodb";
 import DepositRequest from "@/models/DepositRequest";
 import Asset from "@/models/Asset";
-import DepositBalance from "@/models/DepositBalance";
+import { creditSpotUsdtBalance, normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
 import LedgerEntry from "@/models/LedgerEntry";
 import Wallet from "@/models/Wallet";
 import User from "@/models/User";
@@ -120,6 +120,13 @@ export async function POST(
       );
     }
 
+    if (String(deposit.asset || "").trim().toUpperCase() !== USDT_ASSET) {
+      return NextResponse.json(
+        { success: false, message: "التحقق الآلي يدعم USDT فقط. طلبات الإيداع القديمة بعملة أخرى تحتاج مراجعة الإدارة." },
+        { status: 400 }
+      );
+    }
+
     const asset =
       await Asset.findOne({
         symbol:
@@ -141,15 +148,11 @@ export async function POST(
       );
     }
 
+    const networkCode = normalizePaymentNetwork(deposit.network);
     const network =
       asset.networks.find(
         (item: any) =>
-          String(
-            item.code
-          ).toUpperCase() ===
-            String(
-              deposit.network
-            ).toUpperCase() &&
+          normalizePaymentNetwork(item.code) === networkCode &&
           item.enabled &&
           item.depositEnabled
       );
@@ -299,8 +302,8 @@ export async function POST(
             txHash: String(current.txHash).trim().toLowerCase(),
             depositRequestId: current._id,
             userId: current.userId,
-            asset: String(current.asset).toUpperCase(),
-            network: String(current.network).toUpperCase(),
+            asset: USDT_ASSET,
+            network: normalizePaymentNetwork(current.network) || String(current.network).toUpperCase(),
             amount: expectedAmount,
           }], { session });
         } catch (claimError: any) {
@@ -308,56 +311,26 @@ export async function POST(
           throw claimError;
         }
 
-        let depositBalance = await DepositBalance.findOne({
-          userId: current.userId,
-          asset: String(current.asset).toUpperCase(),
-        }).session(session);
-
-        if (!depositBalance) {
-          depositBalance = new DepositBalance({
-            userId: current.userId,
-            asset: String(current.asset).toUpperCase(),
-            available: 0,
-            locked: 0,
-          });
-        }
-
-        const before = Number(depositBalance.available || 0);
-        depositBalance.available = Number((before + expectedAmount).toFixed(12));
-        const after = Number(depositBalance.available || 0);
-        await depositBalance.save({ session });
+        const credited = await creditSpotUsdtBalance(
+          current.userId,
+          expectedAmount,
+          session,
+        );
 
         await LedgerEntry.create(
-          [
-            {
-              userId:
-                current.userId,
-              scope: "user",
-              asset:
-                String(
-                  current.asset
-                ).toUpperCase(),
-              mode: "live",
-              type: "deposit",
-              amount:
-                Number(
-                  expectedAmount.toFixed(12)
-                ),
-              balanceBefore:
-                Number(
-                  before.toFixed(12)
-                ),
-              balanceAfter:
-                Number(
-                  after.toFixed(12)
-                ),
-              referenceId:
-                `DEPOSIT:${current._id}`,
-              note:
-                "External blockchain deposit credited to separate deposit balance",
-            },
-          ],
-          { session }
+          [{
+            userId: current.userId,
+            scope: "user",
+            asset: USDT_ASSET,
+            mode: "live",
+            type: "deposit",
+            amount: Number(expectedAmount.toFixed(12)),
+            balanceBefore: credited.availableBefore,
+            balanceAfter: credited.availableAfter,
+            referenceId: `DEPOSIT:${current._id}`,
+            note: "تم تأكيد إيداع USDT وإضافته إلى رصيد USDT الموحد المتاح للتداول وتفعيل الباقات والتحويل.",
+          }],
+          { session },
         );
 
         current.confirmations = confirmations;

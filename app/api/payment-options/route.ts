@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/mongodb";
 import PaymentOption from "@/models/PaymentOption";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import Asset from "@/models/Asset";
+import { normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
 
 export async function GET() {
   try {
@@ -25,13 +26,10 @@ export async function GET() {
      * التي أنشأها الأدمن.
      */
     for (const method of paymentOptions) {
-      const asset = String(method.asset || "")
-        .trim()
-        .toUpperCase();
+      const asset = String(method.asset || "").trim().toUpperCase();
+      const network = normalizePaymentNetwork(method.network);
 
-      const network = String(method.network || "").trim();
-
-      if (!asset || !network) continue;
+      if (asset !== USDT_ASSET || !network) continue;
 
       const key = `${asset}:${network}`;
       const kind = String((method as any).kind || "both");
@@ -73,13 +71,10 @@ export async function GET() {
       for (const network of networks) {
         if (!network.enabled) continue;
 
-        const assetCode = String(asset.symbol || "")
-          .trim()
-          .toUpperCase();
+        const assetCode = String(asset.symbol || "").trim().toUpperCase();
+        const networkCode = normalizePaymentNetwork(network.code);
 
-        const networkCode = String(network.code || "").trim();
-
-        if (!assetCode || !networkCode) continue;
+        if (assetCode !== USDT_ASSET || !networkCode) continue;
 
         const key = `${assetCode}:${networkCode}`;
 

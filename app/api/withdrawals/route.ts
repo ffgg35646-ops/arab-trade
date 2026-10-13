@@ -16,6 +16,7 @@ import PackageLedger from "@/models/PackageLedger";
 import User from "@/models/User";
 import DepositRequest from "@/models/DepositRequest";
 import { accrueDuePackageEarnings } from "@/lib/accrue-package-earnings";
+import { migrateLegacyDepositBalancesToSpotWallet, normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
 
 function normalizeAsset(value: unknown) {
   return String(value || "").trim().toUpperCase();
@@ -129,6 +130,7 @@ export async function POST(request: NextRequest) {
     }
 
     await connectDB();
+    await migrateLegacyDepositBalancesToSpotWallet(user._id);
     await accrueDuePackageEarnings({ userId: user._id });
 
     const settings = await getPlatformSettings();
@@ -159,12 +161,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    const assetCode = String(body.asset || "")
-      .trim()
-      .toUpperCase();
-
-    const networkCode = String(body.network || "")
-      .trim();
+    const assetCode = String(body.asset || "").trim().toUpperCase();
+    const networkCode = normalizePaymentNetwork(body.network);
 
     const address = String(body.address || "")
       .trim();
@@ -174,7 +172,7 @@ export async function POST(request: NextRequest) {
     const userPackageId = String(body.userPackageId || "").trim();
 
     if (
-      !assetCode ||
+      assetCode !== USDT_ASSET ||
       !networkCode ||
       !address ||
       !Number.isFinite(amount) ||
@@ -192,15 +190,17 @@ export async function POST(request: NextRequest) {
     /*
      * نبحث أولًا عن وسيلة الدفع التي أنشأها الأدمن.
      */
-    const payment = await PaymentOption.findOne({
-      asset: assetCode,
-      network: networkCode,
+    const paymentCandidates = await PaymentOption.find({
+      asset: USDT_ASSET,
       $or: [
         { kind: "withdrawal" },
         { kind: "both" },
         { kind: { $exists: false } },
       ],
     }).lean();
+    const payment = paymentCandidates.find(
+      (item: any) => normalizePaymentNetwork(item.network) === networkCode,
+    );
 
     let minAmount = source === "wallet"
       ? Number(settings.withdrawals.minGeneralWithdrawal ?? settings.withdrawals.minAmount ?? 0)
@@ -241,7 +241,7 @@ export async function POST(request: NextRequest) {
        * الموجودة في النظام.
        */
       const asset = await Asset.findOne({
-        symbol: assetCode,
+        symbol: USDT_ASSET,
         enabled: true,
         withdrawalEnabled: true,
       });
@@ -258,7 +258,7 @@ export async function POST(request: NextRequest) {
 
       const network = asset.networks.find(
         (item) =>
-          item.code === networkCode &&
+          normalizePaymentNetwork(item.code) === networkCode &&
           item.enabled &&
           item.withdrawalEnabled
       );

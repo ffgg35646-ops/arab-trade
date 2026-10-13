@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
-import DepositBalance from "@/models/DepositBalance";
+
 import InvestmentPackage from "@/models/InvestmentPackage";
 import UserPackage from "@/models/UserPackage";
 import PackageLedger from "@/models/PackageLedger";
@@ -14,7 +14,7 @@ import DepositRequest from "@/models/DepositRequest";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
 import PlatformSettings from "@/models/PlatformSettings";
 import { accrueDuePackageEarnings } from "@/lib/accrue-package-earnings";
-import { debitDepositBalance, normalizeDepositBalanceRows } from "@/lib/deposit-balance-source";
+import { debitSpotUsdtBalance, migrateLegacyDepositBalancesToSpotWallet, USDT_ASSET } from "@/lib/unified-usdt-wallet";
 
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8) / 1e8;
 
@@ -24,11 +24,17 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
 
     await connectDB();
+    await migrateLegacyDepositBalancesToSpotWallet(user._id);
+    await Promise.all([
+      UserPackage.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
+      PackageLedger.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
+      WithdrawalRequest.updateMany({ userId: user._id, source: "package", asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
+    ]);
     await ensureDefaultInvestmentPackages();
     await accrueDuePackageEarnings({ userId: user._id });
-    const [packages, rawDepositBalances, rawUserPackages, packageLedger, settings, referredUsers] = await Promise.all([
+    const [packages, spotWallet, rawUserPackages, packageLedger, settings, referredUsers] = await Promise.all([
       InvestmentPackage.find({ enabled: true }).sort({ sortOrder: 1, price: 1 }).lean(),
-      DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
+      Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).lean(),
       UserPackage.find({ userId: user._id }).sort({ createdAt: -1 }).limit(100).lean(),
       PackageLedger.find({ userId: user._id })
         .populate("userPackageId", "packageName")
@@ -39,7 +45,12 @@ export async function GET(request: NextRequest) {
       User.find({ referredBy: user._id }).select("_id").lean(),
     ]);
 
-    const depositBalances = normalizeDepositBalanceRows(rawDepositBalances as any[]);
+    const spotUsdtRows = (spotWallet?.balances || []).filter((item: any) => String(item.asset || "").trim().toUpperCase() === USDT_ASSET);
+    const depositBalances = [{
+      asset: USDT_ASSET,
+      available: spotUsdtRows.reduce((sum: number, item: any) => sum + Number(item.available || 0), 0),
+      locked: spotUsdtRows.reduce((sum: number, item: any) => sum + Number(item.locked || 0), 0),
+    }];
     const referredIds = referredUsers.map((item: any) => item._id);
     const packageMinimumRows = await InvestmentPackage.find({})
       .select("_id minimumWithdrawal")
@@ -105,7 +116,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      packages: packages.map((plan: any) => ({ ...plan, durationDays: 0, dailyProfit: Number(plan.dailyProfit || 0) })),
+      packages: packages.map((plan: any) => ({ ...plan, asset: USDT_ASSET, durationDays: 0, dailyProfit: Number(plan.dailyProfit || 0) })),
       depositBalances,
       userPackages,
       packageLedger: packageLedger.map((row: any) => ({
@@ -120,7 +131,7 @@ export async function GET(request: NextRequest) {
         dailyReturnsAutomatic: true,
         earningsNotice: "يضاف الربح اليومي الذي يحدده الأدمن لكل باقة بعد اكتمال كل 24 ساعة من فترة الاستحقاق، ويظهر في رصيد السحب الخاص بهذه الباقة.",
         singleActivePackageNotice: "يسمح لكل مستخدم بباقة نشطة واحدة فقط.",
-        activationSourceNotice: "تفعيل أي باقة يكون من رصيد الإيداع الخارجي فقط، ولا يمكن استخدام رصيد السحب للتفعيل.",
+        activationSourceNotice: "تفعيل الباقات يتم من رصيد USDT الموحد في المحفظة الفورية، وهو نفس الرصيد المستخدم للتداول والتحويل.",
         cancellationNotice: "عند إلغاء باقة نشطة أو التغيير إلى باقة أخرى، يضاف 50% من قيمة تفعيل الباقة السابقة إلى رصيد السحب العام وليس رصيد الإيداع، وتظل الأرباح المحققة المتاحة مسجلة في الباقة.",
       },
     });
@@ -136,6 +147,12 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
 
     await connectDB();
+    await migrateLegacyDepositBalancesToSpotWallet(user._id);
+    await Promise.all([
+      UserPackage.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
+      PackageLedger.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
+      WithdrawalRequest.updateMany({ userId: user._id, source: "package", asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
+    ]);
     await accrueDuePackageEarnings({ userId: user._id });
     const body = await request.json();
     const action = String(body.action || "");
@@ -159,7 +176,7 @@ export async function POST(request: NextRequest) {
       }
 
       const price = Number(plan.price);
-      const asset = String(plan.asset || "USDT").toUpperCase();
+      const asset = USDT_ASSET;
       const session = await mongoose.startSession();
       let purchased: any = null;
       let availableDepositBefore = 0;
@@ -169,13 +186,21 @@ export async function POST(request: NextRequest) {
           const existing = await UserPackage.findOne({ userId: user._id, status: "active" }).session(session);
           if (existing) throw new Error("ACTIVE_PACKAGE_EXISTS");
 
-          const debit = await debitDepositBalance(user._id, asset, price, session);
+          const debit = await debitSpotUsdtBalance(user._id, price, session);
           availableDepositBefore = debit.availableBefore;
           if (!debit.ok) throw new Error("INSUFFICIENT_DEPOSIT_BALANCE");
 
+          await LedgerEntry.create([{
+            userId: user._id, scope: "user", asset: USDT_ASSET, mode: "live",
+            type: "adjustment", amount: -price,
+            balanceBefore: debit.availableBefore, balanceAfter: debit.availableAfter,
+            referenceId: "package-activation:" + String(plan._id) + ":" + String(user._id) + ":" + String(Date.now()),
+            note: "خصم تفعيل باقة " + plan.name + " من رصيد USDT الموحد.",
+          }], { session });
+
           const created = await UserPackage.create([{
             userId: user._id, packageId: plan._id, packageName: plan.name,
-            investedAmount: price, asset, durationDays: 0, lastProfitAt: new Date(),
+            investedAmount: price, asset: USDT_ASSET, durationDays: 0, lastProfitAt: new Date(),
             status: "active", availableEarnings: 0, lockedEarnings: 0,
             totalRealizedEarnings: 0, totalWithdrawn: 0,
             cancellationRefund: 0, activatedAt: new Date(),
@@ -204,7 +229,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "تم تفعيل الباقة من رصيد الإيداع.",
+        message: "تم تفعيل الباقة من رصيد USDT الموحد.",
         userPackage: purchased,
       }, { status: 201 });
     }
@@ -225,7 +250,7 @@ export async function POST(request: NextRequest) {
       }
 
       const price = Number(plan.price);
-      const asset = String(plan.asset || "USDT").toUpperCase();
+      const asset = USDT_ASSET;
       const refund = roundAmount(Number(current.investedAmount || 0) * 0.5);
       const session = await mongoose.startSession();
       let changedPackage: any = null;
@@ -253,15 +278,23 @@ export async function POST(request: NextRequest) {
           );
           if (!cancelled) throw new Error("CURRENT_PACKAGE_CHANGED");
 
-          const debit = await debitDepositBalance(user._id, asset, price, session);
+          const debit = await debitSpotUsdtBalance(user._id, price, session);
           availableDepositBefore = debit.availableBefore;
           if (!debit.ok) throw new Error("INSUFFICIENT_DEPOSIT_BALANCE");
+
+          await LedgerEntry.create([{
+            userId: user._id, scope: "user", asset: USDT_ASSET, mode: "live",
+            type: "adjustment", amount: -price,
+            balanceBefore: debit.availableBefore, balanceAfter: debit.availableAfter,
+            referenceId: "package-change-debit:" + String(cancelled._id) + ":" + String(plan._id) + ":" + String(Date.now()),
+            note: "خصم تفعيل الباقة الجديدة " + plan.name + " من رصيد USDT الموحد.",
+          }], { session });
 
           let wallet = await Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).session(session);
           if (!wallet) {
             wallet = new Wallet({ userId: user._id, type: "spot", mode: "live", balances: [] });
           }
-          const oldAsset = String(cancelled.asset || "USDT").toUpperCase();
+          const oldAsset = USDT_ASSET;
           let walletBalance = wallet.balances.find((item: any) => String(item.asset).toUpperCase() === oldAsset);
           const before = Number(walletBalance?.available || 0);
           if (!walletBalance) {
@@ -348,7 +381,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "تم تغيير الباقة بنجاح. خُصمت قيمة الباقة الجديدة من رصيد الإيداع، وأضيف 50% من قيمة تفعيل الباقة السابقة إلى رصيد السحب العام.",
+        message: "تم تغيير الباقة بنجاح. خُصمت قيمة الباقة الجديدة من رصيد USDT الموحد، وأضيف 50% من قيمة الباقة السابقة إلى رصيد USDT العام.",
         userPackage: changedPackage,
         cancellationRefund: refund,
       });
@@ -408,7 +441,7 @@ export async function POST(request: NextRequest) {
               });
             }
 
-            const asset = String(cancelled.asset).toUpperCase();
+            const asset = USDT_ASSET;
             let balance = wallet.balances.find((item: any) => String(item.asset).toUpperCase() === asset);
             const before = Number(balance?.available || 0);
 

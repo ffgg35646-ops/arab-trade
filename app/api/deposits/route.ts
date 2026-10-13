@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import DepositRequest from "@/models/DepositRequest";
-import DepositBalance from "@/models/DepositBalance";
+import Wallet from "@/models/Wallet";
 import Asset from "@/models/Asset";
 import { getCurrentUser } from "@/lib/current-user";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import Notification from "@/models/Notification";
 import PaymentOption from "@/models/PaymentOption";
 import User from "@/models/User";
-import { normalizeDepositBalanceRows } from "@/lib/deposit-balance-source";
+import { migrateLegacyDepositBalancesToSpotWallet, normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
 
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
@@ -30,17 +30,25 @@ export async function GET(request: NextRequest) {
     }
 
     await connectDB();
+    await migrateLegacyDepositBalancesToSpotWallet(user._id);
 
-    const [deposits, rawDepositBalances] = await Promise.all([
+    const [deposits, spotWallet] = await Promise.all([
       DepositRequest.find({ userId: user._id })
         .select("-screenshotData")
         .sort({ createdAt: -1 })
         .limit(100)
         .lean(),
-      DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
+      Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).lean(),
     ]);
 
-    const depositBalances = normalizeDepositBalanceRows(rawDepositBalances as any[]);
+    const usdtRows = (spotWallet?.balances || []).filter(
+      (item: any) => String(item.asset || "").trim().toUpperCase() === USDT_ASSET,
+    );
+    const depositBalances = [{
+      asset: USDT_ASSET,
+      available: usdtRows.reduce((sum: number, item: any) => sum + Number(item.available || 0), 0),
+      locked: usdtRows.reduce((sum: number, item: any) => sum + Number(item.locked || 0), 0),
+    }];
 
     return NextResponse.json({
       success: true,
@@ -81,24 +89,21 @@ export async function POST(request: NextRequest) {
 
     const form = await request.formData();
 
-    const assetCode = String(form.get("asset") || "")
-      .trim()
-      .toUpperCase();
-
-    const networkCode = String(form.get("network") || "").trim();
+    const assetCode = String(form.get("asset") || "").trim().toUpperCase();
+    const networkCode = normalizePaymentNetwork(form.get("network"));
     const amount = Number(form.get("amount"));
     const txHash = String(form.get("txHash") || "").trim();
 
     const screenshot = form.get("screenshot");
 
     if (
-      !assetCode ||
+      assetCode !== USDT_ASSET ||
       !networkCode ||
       !Number.isFinite(amount) ||
       amount <= 0
     ) {
       return NextResponse.json(
-        { success: false, message: "بيانات الإيداع غير مكتملة" },
+        { success: false, message: "الإيداع يدعم USDT فقط على شبكة TRC20 أو BNB Smart Chain (BEP20)، مع إدخال مبلغ صحيح." },
         { status: 400 }
       );
     }
@@ -133,15 +138,17 @@ export async function POST(request: NextRequest) {
 
     // Validate the same payment method that was displayed in the user's form.
     // Do not bypass a disabled PaymentOption through a legacy Asset network.
-    const payment = await PaymentOption.findOne({
-      asset: assetCode,
-      network: networkCode,
+    const paymentCandidates = await PaymentOption.find({
+      asset: USDT_ASSET,
       $or: [
         { kind: "deposit" },
         { kind: "both" },
         { kind: { $exists: false } },
       ],
     }).lean();
+    const payment = paymentCandidates.find(
+      (item: any) => normalizePaymentNetwork(item.network) === networkCode,
+    );
 
     if (payment) {
       if (!payment.enabled || payment.depositEnabled === false) {
@@ -168,7 +175,7 @@ export async function POST(request: NextRequest) {
 
       const network = asset && (asset.networks || []).find(
         (item: any) =>
-          item.code === networkCode &&
+          normalizePaymentNetwork(item.code) === networkCode &&
           item.enabled &&
           item.depositEnabled
       );

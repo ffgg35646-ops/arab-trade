@@ -33,7 +33,7 @@ export default function PaymentsAdminPage() {
   const [globalDepositsEnabled, setGlobalDepositsEnabled] = useState(true);
   const [savingGlobalDeposits, setSavingGlobalDeposits] = useState(false);
   const [addingKind, setAddingKind] = useState<"deposit" | "withdrawal" | "">("");
-  const [newCurrency, setNewCurrency] = useState("");
+  const [newCurrency, setNewCurrency] = useState("USDT");
   const [newNetwork, setNewNetwork] = useState("");
   const [newMinimum, setNewMinimum] = useState("0");
   const [newAddress, setNewAddress] = useState("");
@@ -146,7 +146,7 @@ export default function PaymentsAdminPage() {
 
   function addPayment(kind: "deposit" | "withdrawal") {
     setAddingKind(kind);
-    setNewCurrency("");
+    setNewCurrency("USDT");
     setNewNetwork("");
     setNewMinimum("0");
     setNewAddress("");
@@ -199,7 +199,7 @@ export default function PaymentsAdminPage() {
       }
       setMessage(addingKind === "deposit" ? "تمت إضافة وسيلة الإيداع بنجاح." : "تمت إضافة وسيلة السحب بنجاح.");
       setAddingKind("");
-      setNewCurrency("");
+      setNewCurrency("USDT");
       setNewNetwork("");
       setNewMinimum("0");
       setNewAddress("");
@@ -475,10 +475,16 @@ export default function PaymentsAdminPage() {
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block text-sm font-bold">اسم العملة / الرمز
-                <input value={newCurrency} onChange={(e) => setNewCurrency(e.target.value.toUpperCase())} placeholder="مثال: USDT" className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 uppercase outline-none focus:border-blue-500" />
+                <select value={newCurrency} onChange={(e) => setNewCurrency(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500">
+                  <option value="USDT">USDT — Tether</option>
+                </select>
               </label>
               <label className="block text-sm font-bold">شبكة العملة
-                <input value={newNetwork} onChange={(e) => setNewNetwork(e.target.value)} placeholder="مثال: TRC20" className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
+                <select value={newNetwork} onChange={(e) => setNewNetwork(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500">
+                  <option value="">اختر الشبكة</option>
+                  <option value="TRC20">TRC (TRC20)</option>
+                  <option value="BEP20">BNB Smart Chain (BEP20)</option>
+                </select>
               </label>
               <label className="block text-sm font-bold">{addingKind === "deposit" ? "الحد الأدنى للإيداع" : "الحد الأدنى للسحب"}
                 <input type="number" min="0" step="any" value={newMinimum} onChange={(e) => setNewMinimum(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
@@ -635,16 +641,13 @@ export default function PaymentsAdminPage() {
                           العملة / الرمز
                         </label>
 
-                        <input
-                          value={payment.asset}
-                          onChange={(e) =>
-                            updatePayment(index, {
-                              asset: e.target.value.toUpperCase(),
-                            })
-                          }
-                          placeholder="مثال: USDT"
-                          className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 uppercase outline-none focus:border-blue-500"
-                        />
+                        <select
+                          value="USDT"
+                          onChange={() => updatePayment(index, { asset: "USDT" })}
+                          className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"
+                        >
+                          <option value="USDT">USDT — Tether</option>
+                        </select>
                       </div>
 
                       <div>
@@ -652,16 +655,14 @@ export default function PaymentsAdminPage() {
                           الشبكة / النوع
                         </label>
 
-                        <input
+                        <select
                           value={payment.network}
-                          onChange={(e) =>
-                            updatePayment(index, {
-                              network: e.target.value,
-                            })
-                          }
-                          placeholder="مثال: TRC20 أو SHAM"
+                          onChange={(e) => updatePayment(index, { network: e.target.value })}
                           className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"
-                        />
+                        >
+                          <option value="TRC20">TRC (TRC20)</option>
+                          <option value="BEP20">BNB Smart Chain (BEP20)</option>
+                        </select>
                       </div>
                     </div>
 

@@ -38,8 +38,8 @@ export default function UserPackagesPage() {
   }, [load]);
 
   async function action(kind: "activate" | "cancel" | "change", id: string) {
-    if (kind === "cancel" && !window.confirm("إلغاء هذه الباقة سيحوّل 50% فقط من قيمة التفعيل إلى رصيد السحب العام. ستبقى الأرباح المحققة المتاحة في سجل الباقة. هل تريد المتابعة؟")) return;
-    if (kind === "change" && (!activePlan || !window.confirm("تغيير الباقة سيضيف 50% من قيمة تفعيل الباقة الحالية إلى رصيد السحب العام، ويخصم سعر الباقة الجديدة من رصيد الإيداع. إذا لم يكف رصيد الإيداع فلن تتغير الباقة أو الأرصدة. هل تريد المتابعة؟"))) return;
+    if (kind === "cancel" && !window.confirm("إلغاء هذه الباقة سيحوّل 50% فقط من قيمة التفعيل إلى رصيد USDT المتاح في المحفظة الفورية. ستبقى الأرباح المحققة المتاحة في سجل الباقة. هل تريد المتابعة؟")) return;
+    if (kind === "change" && (!activePlan || !window.confirm("تغيير الباقة سيضيف 50% من قيمة تفعيل الباقة الحالية إلى رصيد USDT في المحفظة الفورية، ويخصم سعر الباقة الجديدة من رصيد USDT نفسه. إذا لم يكفِ الرصيد فلن تتغير الباقة أو الأرصدة. هل تريد المتابعة؟"))) return;
     setBusy(id); setError(""); setMessage("");
     try {
       const body = kind === "cancel"
@@ -73,12 +73,12 @@ export default function UserPackagesPage() {
       <main dir="rtl" className="min-w-0 flex-1 bg-[#050a13] p-4 text-white md:p-8">
         <section className="rounded-3xl border border-white/10 bg-gradient-to-l from-blue-500/[0.14] to-cyan-400/[0.04] p-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div><div className="text-[10px] font-bold tracking-[0.2em] text-cyan-300">ARAB TRADE</div><h1 className="mt-3 text-3xl font-black">الباقات</h1><p className="mt-2 text-sm leading-7 text-slate-400">فعّل باقة من رصيد الإيداع الخارجي، وتابع رصيد كل باقة بصورة منفصلة.</p></div>
+            <div><div className="text-[10px] font-bold tracking-[0.2em] text-cyan-300">ARAB TRADE</div><h1 className="mt-3 text-3xl font-black">الباقات</h1><p className="mt-2 text-sm leading-7 text-slate-400">فعّل باقة من رصيد USDT الموحد في المحفظة الفورية، وهو نفس الرصيد الذي تستخدمه للتداول والتحويل.</p></div>
             <button type="button" onClick={() => { setLoading(true); setError(""); void load(); }} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm"><RefreshCw size={16} className={loading ? "animate-spin" : ""}/>تحديث</button>
           </div>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.04] p-5">
-              <div className="flex items-center gap-2 text-xs font-bold text-amber-200"><Wallet size={16}/>رصيد الإيداع الخارجي</div>
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-200"><Wallet size={16}/>رصيد USDT الموحد</div>
               <div className="mt-3 space-y-2">
                 {data?.depositBalances.length ? data.depositBalances.map((item) => (
                   <div key={String(item.asset).trim().toUpperCase()} className="flex items-center justify-between gap-3 rounded-lg border border-white/5 bg-black/20 px-3 py-2 text-sm">
@@ -87,14 +87,14 @@ export default function UserPackagesPage() {
                   </div>
                 )) : <div className="text-sm text-slate-500">لا يوجد رصيد إيداع خارجي متاح حاليًا.</div>}
               </div>
-              <p className="mt-3 text-xs leading-5 text-slate-500">المتاح لتفعيل الباقات المقومة بـUSDT: <strong className="text-cyan-200">{money(depositUsdt)} USDT</strong>. رصيد الإيداع الخارجي منفصل عن رصيد السحب العام.</p>
+              <p className="mt-3 text-xs leading-5 text-slate-500">المتاح لتفعيل الباقات أو التداول أو التحويل من محفظة USDT الفورية: <strong className="text-cyan-200">{money(depositUsdt)} USDT</strong>. الخصم من أي خدمة يحدّث الرصيد نفسه.</p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-[#050a13]/70 p-5"><div className="text-xs text-slate-400">الباقة النشطة</div><div className="mt-3 text-xl font-black">{activePlan?.packageName || "لا توجد باقة نشطة"}</div><p className="mt-2 text-xs text-slate-500">{activePlan ? "قيمة التفعيل " + money(activePlan.investedAmount) + " " + activePlan.asset : "اختر باقة متاحة."}</p></div>
           </div>
         </section>
         <section role="note" className="mt-4 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-4 text-sm leading-7 text-amber-100">
           <div className="font-black">تنبيه مهم: لك باقة نشطة واحدة فقط للتفعيل.</div>
-          <p className="mt-1">عند التغيير إلى باقة أخرى، يتم إنهاء الباقة الحالية وإرجاع 50% من قيمة تفعيلها إلى <strong>رصيد السحب العام</strong> وليس رصيد الإيداع. سعر الباقة الجديدة يُخصم كاملًا من <strong>رصيد الإيداع الخارجي فقط</strong>، ولا يمكن استخدام رصيد السحب لتفعيل أي باقة.</p>
+          <p className="mt-1">عند تغيير الباقة، يُضاف 50% من قيمة التفعيل السابقة إلى محفظة USDT الفورية، ويُخصم سعر الباقة الجديدة من رصيد USDT المتاح في المحفظة نفسها. أرباح الباقات تظل في سجل الباقة حتى تُعالج وفق قواعد السحب.</p>
         </section>
         <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
@@ -123,10 +123,10 @@ export default function UserPackagesPage() {
         <section className="mt-7"><h2 className="mb-4 text-xl font-black">الباقات المتاحة</h2>
           {loading ? <div className="p-10 text-center text-slate-500"><Loader2 className="mx-auto animate-spin"/></div> : !data?.packages.length ? <div className="rounded-2xl border border-white/10 p-8 text-center text-slate-500">لا توجد باقات مفعلة حاليًا.</div> :
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.packages.map((plan) => <article key={plan._id} className="rounded-2xl border border-white/10 bg-[#07101d] p-5"><div className="flex items-center justify-between"><Package size={22} className="text-cyan-300"/><span className="text-xs text-emerald-200">تفعيل دائم</span></div><h3 className="mt-5 text-xl font-black">{plan.name}</h3><p className="mt-2 min-h-10 text-sm leading-6 text-slate-400">{plan.description || "باقة بمدة وقيمة تفعيل محددتين."}</p><div className="mt-4 space-y-2 text-xs text-slate-400">
-                <div className="flex items-center gap-2"><CheckCircle2 size={14} className="text-cyan-300" />التفعيل من رصيد الإيداع الخارجي</div>
+                <div className="flex items-center gap-2"><CheckCircle2 size={14} className="text-cyan-300" />التفعيل من رصيد USDT الموحد</div>
                 <div className="flex items-center gap-2"><ShieldCheck size={14} className="text-cyan-300" />رصيد الباقة منفصل عن السحب العام</div>
                 <div className="flex items-center gap-2"><Wallet size={14} className="text-cyan-300" />سجل مستقل للعوائد والسحوبات</div>
-              </div><div className="mt-4 text-3xl font-black">{money(plan.price)} <span className="text-sm text-cyan-300">{plan.asset}</span></div><div className="mt-2 text-xs text-emerald-200">الربح اليومي المحدد من الإدارة: {money(Number(plan.dailyProfit || 0))} {plan.asset}</div><button type="button" onClick={() => void action(activePlan ? "change" : "activate", plan._id)} disabled={Boolean(busy)} className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-black disabled:opacity-50">{busy === plan._id ? "جاري التنفيذ..." : activePlan ? activePlan.packageName === plan.name ? "إعادة تفعيل هذه الباقة" : "التغيير إلى هذه الباقة" : "تفعيل من رصيد الإيداع"}</button></article>)}</div>}
+              </div><div className="mt-4 text-3xl font-black">{money(plan.price)} <span className="text-sm text-cyan-300">{plan.asset}</span></div><div className="mt-2 text-xs text-emerald-200">الربح اليومي المحدد من الإدارة: {money(Number(plan.dailyProfit || 0))} {plan.asset}</div><button type="button" onClick={() => void action(activePlan ? "change" : "activate", plan._id)} disabled={Boolean(busy)} className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-black disabled:opacity-50">{busy === plan._id ? "جاري التنفيذ..." : activePlan ? activePlan.packageName === plan.name ? "إعادة تفعيل هذه الباقة" : "التغيير إلى هذه الباقة" : "تفعيل من رصيد USDT"}</button></article>)}</div>}
         </section>
         <section className="mt-8 rounded-2xl border border-white/10 bg-[#07101d] p-5">
           <h2 className="text-xl font-black">باقاتي وأرصدة السحب</h2><p className="mt-2 text-xs leading-6 text-slate-500">رصيد كل باقة منفصل. من صفحة السحب اختر رصيد الباقة لسحب المبالغ المتاحة.</p>

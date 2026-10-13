@@ -281,7 +281,7 @@ export default function DashboardPage() {
             <div className="mb-6 grid gap-4 xl:grid-cols-[1.4fr_0.8fr]">
               <Panel
                 title="القيمة الإجمالية"
-                description="إجمالي الحساب يشمل أرصدة التداول والتمويل ورصيد الإيداع الخارجي، مع الاحتفاظ بكل مصدر منفصلًا."
+                description="إجمالي الحساب يجمع أرصدة USDT والعملات داخل محافظ التداول والتمويل، دون احتساب أي رصيد مرتين."
                 right={
                   <div className="flex items-center gap-2 text-xs text-slate-600">
                     USDT <Eye size={14} />
@@ -365,7 +365,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-4">
                       <div className="text-xs font-bold text-amber-200">
-                        رصيد الإيداع الخارجي
+                        رصيد USDT الموحد
                       </div>
                       <div className="mt-2 space-y-1.5">
                         {loadingWallet ? "..." : externalDepositBalances.length ? externalDepositBalances.map((item) => (

@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/lib/current-user";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import { matchOrder } from "@/lib/matching-engine";
 import { calculateTradingFee } from "@/lib/fee-engine";
+import { migrateLegacyDepositBalancesToSpotWallet } from "@/lib/unified-usdt-wallet";
 import {
   getIdempotentResponse,
   hashRequest,
@@ -345,6 +346,7 @@ export async function POST(
     idempotencyUserId = user._id;
 
     await connectDB();
+    await migrateLegacyDepositBalancesToSpotWallet(user._id);
 
     const settings =
       await getPlatformSettings();

@@ -314,7 +314,7 @@ export default function WalletPage() {
                   </div>
 
                   <p className="mt-3 text-xs text-slate-500">
-                    يشمل رصيد التداول والتمويل ورصيد الإيداع الخارجي، مع بقاء كل مصدر منفصلًا عند الخصم أو تفعيل الباقات.
+                    يشمل رصيد التداول والتمويل؛ رصيد USDT من الإيداعات موجود داخل المحفظة الفورية نفسها ويُستخدم مباشرةً للتداول والتحويل وتفعيل الباقات.
                   </p>
                 </div>
 
@@ -349,7 +349,7 @@ export default function WalletPage() {
             {/* Separate funding sources: external deposits vs earnings/refunds from inside the platform */}
             <section className="mb-6 grid gap-4 lg:grid-cols-2">
               <div className="rounded-2xl border border-sky-400/20 bg-sky-500/[0.06] p-5">
-                <div className="text-sm font-bold text-sky-200">رصيد الإيداع الخارجي</div>
+                <div className="text-sm font-bold text-sky-200">رصيد USDT الموحد</div>
                 <p className="mt-1 text-xs text-slate-400">الأموال التي أودعتها من خارج الموقع فقط. يُستخدم لتفعيل الباقات.</p>
                 <div className="mt-4 space-y-2">
                   {depositBalances.length ? depositBalances.map((item) => (

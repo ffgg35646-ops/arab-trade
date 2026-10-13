@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminLeader } from "@/lib/admin-auth";
 import { connectDB } from "@/lib/mongodb";
 import PaymentOption from "@/models/PaymentOption";
+import { normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,17 +17,26 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
 
-    const methods = await PaymentOption.find({})
+    const savedMethods = await PaymentOption.find({})
       .sort({ createdAt: -1 })
       .lean();
-
-    return NextResponse.json({
-      success: true,
-      methods: methods.map((item: any) => ({
+    const seen = new Set<string>();
+    const methods = savedMethods.flatMap((item: any) => {
+      const asset = String(item.asset || "").trim().toUpperCase();
+      const network = normalizePaymentNetwork(item.network);
+      if (asset !== USDT_ASSET || !network) return [];
+      const key = asset + ":" + network;
+      if (seen.has(key)) return [];
+      seen.add(key);
+      return [{
         ...item,
+        asset: USDT_ASSET,
+        network,
         _id: item._id ? String(item._id) : undefined,
-      })),
+      }];
     });
+
+    return NextResponse.json({ success: true, methods });
   } catch (error) {
     console.error("ADMIN PAYMENT GET ERROR:", error);
 
@@ -50,12 +60,20 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const kind = body.kind === "withdrawal" ? "withdrawal" : "deposit";
-    const name = String(body.name || body.asset || "").trim();
-    const asset = String(body.asset || "").trim().toUpperCase();
-    const network = String(body.network || "").trim();
+    const name = String(body.name || body.asset || USDT_ASSET).trim();
+    const requestedAsset = String(body.asset || "").trim().toUpperCase();
+    const asset = USDT_ASSET;
+    const network = normalizePaymentNetwork(body.network);
     const address = String(body.address || "").trim();
     const minDeposit = Number(body.minDeposit ?? 0);
     const minWithdrawal = Number(body.minWithdrawal ?? 0);
+
+    if (requestedAsset !== USDT_ASSET) {
+      return NextResponse.json({ success: false, message: "عملة الإيداع والسحب الوحيدة المدعومة هي USDT." }, { status: 400 });
+    }
+    if (!network) {
+      return NextResponse.json({ success: false, message: "اختر شبكة TRC20 أو BNB Smart Chain (BEP20)." }, { status: 400 });
+    }
 
     if (
       !name || !asset || !network ||
@@ -73,12 +91,17 @@ export async function POST(request: NextRequest) {
 
     // Keep the existing unique asset/network key and merge the selected
     // operation into an existing record instead of creating a conflicting row.
-    const existing = await PaymentOption.findOne({ asset, network });
+    const existingCandidates = await PaymentOption.find({ asset }).sort({ createdAt: -1 });
+    const existing = existingCandidates.find(
+      (item: any) => normalizePaymentNetwork(item.network) === network,
+    );
     if (existing) {
       const oldKind = String((existing as any).kind || "both");
       const mergedKind = oldKind === "both" || oldKind === kind ? oldKind : "both";
       const update: Record<string, unknown> = {
         name,
+        asset: USDT_ASSET,
+        network,
         enabled: true,
         kind: mergedKind,
       };
@@ -177,11 +200,19 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (body.asset !== undefined) {
-      update.asset = String(body.asset).trim().toUpperCase();
+      const requestedAsset = String(body.asset).trim().toUpperCase();
+      if (requestedAsset !== USDT_ASSET) {
+        return NextResponse.json({ success: false, message: "عملة الإيداع والسحب الوحيدة المدعومة هي USDT." }, { status: 400 });
+      }
+      update.asset = USDT_ASSET;
     }
 
     if (body.network !== undefined) {
-      update.network = String(body.network).trim();
+      const network = normalizePaymentNetwork(body.network);
+      if (!network) {
+        return NextResponse.json({ success: false, message: "اختر شبكة TRC20 أو BNB Smart Chain (BEP20)." }, { status: 400 });
+      }
+      update.network = network;
     }
 
     if (body.address !== undefined) {

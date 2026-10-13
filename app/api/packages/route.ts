@@ -290,7 +290,7 @@ export async function POST(request: NextRequest) {
             userId: user._id, scope: "user", asset: USDT_ASSET, mode: "live",
             type: "adjustment", amount: -price,
             balanceBefore: debit.availableBefore, balanceAfter: roundAmount(debit.availableBefore - price),
-            referenceId: "package-activation:" + String(plan._id) + ":" + String(user._id) + ":" + String(Date.now()),
+            referenceId: "separate-deposit-spend:package-activation:" + String(plan._id) + ":" + String(user._id) + ":" + String(Date.now()),
             note: "خصم تفعيل باقة " + plan.name + " من رصيد الإيداع المنفصل.",
           }], { session });
 
@@ -382,7 +382,7 @@ export async function POST(request: NextRequest) {
             userId: user._id, scope: "user", asset: USDT_ASSET, mode: "live",
             type: "adjustment", amount: -price,
             balanceBefore: debit.availableBefore, balanceAfter: roundAmount(debit.availableBefore - price),
-            referenceId: "package-change-debit:" + String(cancelled._id) + ":" + String(plan._id) + ":" + String(Date.now()),
+            referenceId: "separate-deposit-spend:package-change-debit:" + String(cancelled._id) + ":" + String(plan._id) + ":" + String(Date.now()),
             note: "خصم تفعيل الباقة الجديدة " + plan.name + " من رصيد الإيداع المنفصل.",
           }], { session });
 

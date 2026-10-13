@@ -7,7 +7,7 @@ import { Loader2, RefreshCw, Clock3, Gift } from "lucide-react";
 
 type Plan = { _id: string; name: string; description?: string; price: number; asset: string; durationDays: number; dailyProfit?: number; minimumWithdrawal?: number };
 type DepositBalance = { asset: string; available: number; locked: number };
-type UserPlan = { _id: string; packageName: string; investedAmount: number; asset: string; durationDays: number; status: string; availableEarnings: number; lockedEarnings: number; totalRealizedEarnings: number; totalWithdrawn: number; firstWithdrawalStatus?: "available" | "pending" | "completed"; activatedAt: string; lastProfitAt?: string; dailyProfit?: number; nextCollectAt?: string; collectWindowEndsAt?: string; collectWindowOpen?: boolean; };
+type UserPlan = { _id: string; packageName: string; investedAmount: number; asset: string; durationDays: number; status: string; availableEarnings: number; lockedEarnings: number; totalRealizedEarnings: number; totalWithdrawn: number; firstWithdrawalStatus?: "available" | "pending" | "completed"; activatedAt: string; lastProfitAt?: string; dailyProfit?: number; minimumWithdrawal?: number; nextCollectAt?: string; collectWindowEndsAt?: string; collectWindowOpen?: boolean; };
 type LedgerRow = { _id: string; type: string; asset: string; amount: number; note?: string; createdAt: string; userPackageId?: { packageName?: string } | null };
 type Data = { packages: Plan[]; depositBalances: DepositBalance[]; userPackages: UserPlan[]; packageLedger?: LedgerRow[]; policy?: { earningsNotice?: string; cancellationNotice?: string } };
 const money = (n: number) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 }).format(Number(n || 0));
@@ -107,7 +107,7 @@ export default function UserPackagesPage() {
               </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-black/20 p-3">
-              <div><div className="text-xs text-slate-400">الربح اليومي المحدد من الإدارة</div><div className="mt-1 text-lg font-black text-emerald-200">{money(Number(activePlan.dailyProfit || 0))} {activePlan.asset}</div><div className="mt-1 text-[11px] text-slate-500">يضاف إلى رصيد سحب هذه الباقة فقط.</div></div>
+              <div><div className="text-xs text-slate-400">الربح اليومي المحدد من الإدارة</div><div className="mt-1 text-lg font-black text-emerald-200">{money(Number(activePlan.dailyProfit || 0))} {activePlan.asset}</div><div className="mt-1 text-[11px] text-slate-500">يضاف إلى رصيد سحب هذه الباقة فقط.</div><div className="mt-2 text-xs text-slate-400">الحد الأدنى للسحب من الباقة: <strong className="text-white">{money(Number(activePlan.minimumWithdrawal ?? 100))} USDT</strong></div></div>
               <button type="button" onClick={() => void action("collect", activePlan._id)} disabled={!windowOpen || Boolean(busy)} className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"><Gift size={16}/>{busy === activePlan._id ? "جاري الجمع..." : windowOpen ? "جمع الأرباح" : "الجمع غير متاح الآن"}</button>
             </div>
             {windowOpen && <p className="mt-3 text-xs font-bold text-amber-200">فرصة الجمع مفتوحة الآن — تنتهي خلال {formatRemaining(endsAt - clockNow)}.</p>}

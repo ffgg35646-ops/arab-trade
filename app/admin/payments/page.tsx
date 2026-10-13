@@ -502,7 +502,7 @@ export default function PaymentsAdminPage() {
                       <div>
                         <label className="mb-2 block text-sm font-bold">اسم وسيلة الإيداع</label>
                         <input value={payment.name} onChange={(e) => updatePayment(index, { name: e.target.value })} placeholder="مثال: USDT TRC20" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
-                        <p className="mt-2 text-xs leading-5 text-slate-500">عنوان الاستلام الذي يراه المستخدم للإيداع فقط. عنوان السحب يكتبه المستخدم في صفحة السحب.</p>
+                        
                       </div>
 
                       <div className="grid gap-4 md:grid-cols-2">
@@ -523,7 +523,7 @@ export default function PaymentsAdminPage() {
 
                       <div>
                         <label className="mb-2 block text-sm font-bold">عنوان الإيداع / بيانات التحويل</label>
-                        <textarea value={payment.address} onChange={(e) => updatePayment(index, { address: e.target.value })} rows={2} placeholder="عنوان محفظة الإيداع أو بيانات التحويل" className="w-full resize-y rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
+                        <input value={payment.address} onChange={(e) => updatePayment(index, { address: e.target.value })} placeholder="عنوان محفظة الإيداع أو بيانات التحويل" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
                       </div>
 
                       <div className="grid gap-4 md:grid-cols-2">
@@ -535,18 +535,7 @@ export default function PaymentsAdminPage() {
                           <label className="mb-2 block text-sm font-bold">الحد الأقصى للإيداع</label>
                           <input value={payment.maxDeposit} onChange={(e) => updatePayment(index, { maxDeposit: Number(e.target.value) || 0 })} type="number" min="0" step="any" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
                         </div>
-                        <div>
-                          <label className="mb-2 block text-sm font-bold">الحد الأدنى للسحب</label>
-                          <input value={payment.minWithdrawal} onChange={(e) => updatePayment(index, { minWithdrawal: Number(e.target.value) || 0 })} type="number" min="0" step="any" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-sm font-bold">الحد الأقصى للسحب</label>
-                          <input value={payment.maxWithdrawal} onChange={(e) => updatePayment(index, { maxWithdrawal: Number(e.target.value) || 0 })} type="number" min="0" step="any" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
-                        </div>
-                        <div>
-                          <label className="mb-2 block text-sm font-bold">رسوم السحب</label>
-                          <input value={payment.withdrawalFee} onChange={(e) => updatePayment(index, { withdrawalFee: Number(e.target.value) || 0 })} type="number" min="0" step="any" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
-                        </div>
+                        
                       </div>
 
                       <div>
@@ -563,10 +552,7 @@ export default function PaymentsAdminPage() {
                           <span className="text-sm font-bold">السماح بالإيداع</span>
                           <input type="checkbox" checked={payment.depositEnabled} onChange={(e) => updatePayment(index, { depositEnabled: e.target.checked })} className="h-5 w-5 accent-violet-400" />
                         </label>
-                        <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-black/10 p-3">
-                          <span className="text-sm font-bold">السماح بالسحب</span>
-                          <input type="checkbox" checked={payment.withdrawalEnabled} onChange={(e) => updatePayment(index, { withdrawalEnabled: e.target.checked })} className="h-5 w-5 accent-violet-400" />
-                        </label>
+                        
                       </div>
                     </div>
                   </details>

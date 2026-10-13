@@ -16,21 +16,40 @@ for (const file of [".env.local", ".env"]) {
 }
 
 const accounts = [
-  { name: "Test Admin", username: "admin2", email: "admin2@arabtrade.com", role: "admin", password: process.env.ADMIN_TEST_PASSWORD },
+  { name: "Test Admin", username: "admin2", email: "admin2@arabtrade.com", role: "admin_leader", password: process.env.ADMIN_TEST_PASSWORD },
   { name: "Test User", username: "user2", email: "user2@arabtrade.com", role: "user", password: process.env.USER_TEST_PASSWORD },
 ];
 
 async function main() {
   if (!process.env.MONGODB_URI) throw Error("MONGODB_URI is missing");
   for (const a of accounts) {
-    if (!a.password || a.password.length < 12) throw Error(a.role + " password must be at least 12 characters");
+    if (!a.password || a.password.length < 8) throw Error(a.role + " password must be at least 8 characters");
   }
   await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10000 });
   const users = mongoose.connection.collection("users");
   for (const a of accounts) {
     const conflict = await users.findOne({ $or: [{ email: a.email }, { username: a.username }] });
     if (conflict) {
-      console.log("SKIPPED existing email/username:", a.email, "(no password or role changed)");
+      const sameDedicatedAccount =
+        String(conflict.email || "").toLowerCase() === a.email &&
+        String(conflict.username || "").toLowerCase() === a.username;
+      if (!sameDedicatedAccount) {
+        throw Error("Email or username already belongs to a different account: " + a.email);
+      }
+      await users.updateOne(
+        { _id: conflict._id },
+        { $set: {
+          name: a.name,
+          username: a.username,
+          email: a.email,
+          password: await bcrypt.hash(a.password, 12),
+          role: a.role,
+          isVerified: true,
+          isActive: true,
+          updatedAt: new Date()
+        } }
+      );
+      console.log("UPDATED:", a.email, "role:", a.role);
       continue;
     }
     let arabTradeId, referralCode;

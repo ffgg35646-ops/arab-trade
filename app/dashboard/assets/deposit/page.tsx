@@ -26,6 +26,7 @@ type Method = {
 
 export default function DepositPage() {
   const [methods, setMethods] = useState<Method[]>([]);
+  const [depositsEnabled, setDepositsEnabled] = useState(true);
   const [limits, setLimits] = useState<PaymentLimits>({ minDeposit: 0, maxDeposit: 0, minWithdrawal: 0, minGeneralWithdrawal: 0, maxWithdrawal: 0, dailyWithdrawalLimit: 0 });
   const [depositBalances, setDepositBalances] = useState<DepositBalance[]>([]);
   const [deposits, setDeposits] = useState<DepositRecord[]>([]);
@@ -57,6 +58,7 @@ export default function DepositPage() {
       ]);
 
       const json = await res.json();
+      setDepositsEnabled(json.depositsEnabled !== false);
       if (json.limits) {
         setLimits({
           minDeposit: Number(json.limits.minDeposit || 0),
@@ -302,6 +304,12 @@ export default function DepositPage() {
           </div>
         )}
 
+        {!loading && !depositsEnabled && (
+          <div role="status" className="mt-5 rounded-xl border border-amber-400/25 bg-amber-400/[0.06] p-4 text-sm leading-6 text-amber-100">
+            الإيداع متوقف مؤقتًا من إعدادات الإدارة. ستظل طلباتك السابقة ظاهرة، لكن لن يمكن إرسال طلب جديد حتى تعيد الإدارة تفعيل الإيداع.
+          </div>
+        )}
+
         <section className="mt-5 rounded-2xl border border-blue-400/20 bg-[#08111e] p-5 md:p-6">
           <div className="mb-5">
             <h2 className="text-xl font-black">إنشاء طلب إيداع</h2>
@@ -394,10 +402,10 @@ export default function DepositPage() {
 
             <button
               type="submit"
-              disabled={sending || loading || !selected}
+              disabled={sending || loading || !selected || !depositsEnabled}
               className="w-full rounded-xl bg-blue-600 px-5 py-4 font-black transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {sending ? "جاري إرسال طلب الإيداع..." : "إرسال طلب الإيداع للمراجعة"}
+              {sending ? "جاري إرسال طلب الإيداع..." : !depositsEnabled ? "الإيداع متوقف مؤقتًا" : "إرسال طلب الإيداع للمراجعة"}
             </button>
           </form>
         </section>

@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/current-user";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import Notification from "@/models/Notification";
 import PaymentOption from "@/models/PaymentOption";
+import User from "@/models/User";
 
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
@@ -222,13 +223,34 @@ export async function POST(request: NextRequest) {
       hasScreenshot: true,
     });
 
-    await Notification.create({
-      userId: user._id,
-      type: "deposit",
-      title: "تم إنشاء طلب إيداع",
-      message: `تم تسجيل طلب إيداع ${amount} ${assetCode} على شبكة ${networkCode} وهو قيد المراجعة.`,
-      read: false,
-    });
+    // Notifications are ancillary: never turn a stored deposit request into a false failure.
+    try {
+      const admins = await User.find({
+        role: "admin_leader",
+        isActive: true,
+      }).select("_id").lean();
+
+      const notifications = [
+        {
+          userId: user._id,
+          type: "deposit" as const,
+          title: "تم إنشاء طلب إيداع",
+          message: `تم تسجيل طلب إيداع ${amount} ${assetCode} على شبكة ${networkCode} وهو قيد المراجعة.`,
+          read: false,
+        },
+        ...admins.map((admin: any) => ({
+          userId: admin._id,
+          type: "deposit" as const,
+          title: "طلب إيداع جديد",
+          message: `وصل طلب إيداع جديد بقيمة ${amount} ${assetCode} على شبكة ${networkCode} من ${String(user.email || user.username || user._id)}. افتح مراجعة الإيداعات لاتخاذ القرار.`,
+          read: false,
+        })),
+      ];
+
+      await Notification.insertMany(notifications);
+    } catch (notificationError) {
+      console.error("DEPOSIT REQUEST NOTIFICATION ERROR:", notificationError);
+    }
 
     return NextResponse.json(
       {

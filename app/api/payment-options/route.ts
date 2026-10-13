@@ -130,6 +130,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       methods,
+      depositsEnabled: platformSettings.deposits?.enabled !== false,
       limits: {
         minDeposit: Number(platformSettings.deposits?.minAmount || 0),
         maxDeposit: Number(platformSettings.deposits?.maxAmount || 0),

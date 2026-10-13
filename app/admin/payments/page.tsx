@@ -1,6 +1,7 @@
 "use client";
 
 import AdminPageFrame from "@/components/AdminPageFrame";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 type Payment = {
@@ -43,14 +44,27 @@ export default function PaymentsAdminPage() {
   const [deleting, setDeleting] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [globalDepositsEnabled, setGlobalDepositsEnabled] = useState(true);
+  const [savingGlobalDeposits, setSavingGlobalDeposits] = useState(false);
 
   const load = useCallback(async () => {
 
     try {
-      const res = await fetch("/api/admin/payment", {
-        credentials: "include",
-        cache: "no-store",
-      });
+      const [res, settingsRes] = await Promise.all([
+        fetch("/api/admin/payment", {
+          credentials: "include",
+          cache: "no-store",
+        }),
+        fetch("/api/admin/settings", {
+          credentials: "include",
+          cache: "no-store",
+        }),
+      ]);
+
+      const settingsJson = await settingsRes.json().catch(() => ({}));
+      if (settingsRes.ok && settingsJson.success) {
+        setGlobalDepositsEnabled(settingsJson.settings?.deposits?.enabled !== false);
+      }
 
       const json = await res.json().catch(() => ({}));
 
@@ -223,6 +237,33 @@ export default function PaymentsAdminPage() {
     }
   }
 
+
+  async function toggleGlobalDeposits() {
+    if (savingGlobalDeposits) return;
+    const nextValue = !globalDepositsEnabled;
+    setSavingGlobalDeposits(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deposits: { enabled: nextValue } }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || "تعذر تغيير حالة الإيداع");
+      }
+      setGlobalDepositsEnabled(json.settings?.deposits?.enabled !== false);
+      setMessage(nextValue ? "تم تفعيل الإيداع للمستخدمين." : "تم إيقاف الإيداع مؤقتًا؛ لن يمكن إرسال طلبات جديدة.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تعذر تغيير حالة الإيداع");
+    } finally {
+      setSavingGlobalDeposits(false);
+    }
+  }
+
   async function removePayment(payment: Payment) {
     if (!payment._id) {
       setPayments((current) =>
@@ -296,6 +337,22 @@ export default function PaymentsAdminPage() {
             + إضافة وسيلة دفع
           </button>
         </div>
+
+        <section className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#08111e] p-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-lg font-black">حالة الإيداع العامة</h2>
+              <span className={globalDepositsEnabled ? "rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-200" : "rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs font-bold text-amber-200"}>
+                {globalDepositsEnabled ? "مفعل" : "متوقف"}
+              </span>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-slate-400">هذا المفتاح يوقف أو يفعّل إرسال طلبات الإيداع الجديدة على المنصة. حدود الإيداع العامة يمكن تعديلها من إعدادات المنصة، كما يمكن ضبط حدود مختلفة لكل وسيلة أدناه.</p>
+            <Link href="/admin/settings" className="mt-2 inline-flex text-sm font-bold text-cyan-300 hover:text-cyan-200">تعديل الحدود العامة للإيداع ←</Link>
+          </div>
+          <button type="button" onClick={() => void toggleGlobalDeposits()} disabled={savingGlobalDeposits} className={globalDepositsEnabled ? "rounded-xl border border-amber-400/25 bg-amber-400/10 px-5 py-3 font-black text-amber-100 disabled:opacity-50" : "rounded-xl bg-emerald-500 px-5 py-3 font-black text-slate-950 disabled:opacity-50"}>
+            {savingGlobalDeposits ? "جاري الحفظ..." : globalDepositsEnabled ? "إيقاف الإيداع مؤقتًا" : "تفعيل الإيداع"}
+          </button>
+        </section>
 
         {message ? (
           <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-300">

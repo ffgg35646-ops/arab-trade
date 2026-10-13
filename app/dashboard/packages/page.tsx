@@ -99,7 +99,7 @@ export default function UserPackagesPage() {
           return <section className="mt-5 rounded-xl border border-cyan-300/20 bg-[#07101d] p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div><h2 className="flex items-center gap-2 text-base font-black"><Clock3 size={17} className="text-cyan-300"/>دورة أرباح باقتك: {activePlan.packageName}</h2>
-                <p className="mt-1 text-xs text-slate-400">الباقة مستمرة دون مدة انتهاء. بعد كل 24 ساعة توجد مهلة جمع مدتها 30 دقيقة فقط؛ إذا فاتتك تسقط أرباح الدورة ولا تُرحّل.</p>
+                
               </div>
               <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-center">
                 <div className="text-[11px] text-slate-400">{windowOpen ? "الوقت المتبقي للجمع" : "الوقت المتبقي لفتح الجمع"}</div>
@@ -107,7 +107,7 @@ export default function UserPackagesPage() {
               </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-black/20 p-3">
-              <div><div className="text-xs text-slate-400">الربح اليومي المحدد من الإدارة</div><div className="mt-1 text-lg font-black text-emerald-200">{money(Number(activePlan.dailyProfit || 0))} {activePlan.asset}</div><div className="mt-1 text-[11px] text-slate-500">يضاف إلى رصيد سحب هذه الباقة فقط.</div><div className="mt-2 text-xs text-slate-400">الحد الأدنى للسحب من الباقة: <strong className="text-white">{money(Number(activePlan.minimumWithdrawal ?? 100))} USDT</strong></div></div>
+              <div><div className="text-xs text-slate-400">الربح اليومي</div><div className="mt-1 text-lg font-black text-emerald-200">{money(Number(activePlan.dailyProfit || 0))} {activePlan.asset}</div><div className="mt-1 text-[11px] text-slate-500">يضاف إلى رصيد سحب هذه الباقة فقط.</div><div className="mt-2 text-xs text-slate-400">الحد الأدنى للسحب من الباقة: <strong className="text-white">{money(Number(activePlan.minimumWithdrawal ?? 100))} USDT</strong></div></div>
               <button type="button" onClick={() => void action("collect", activePlan._id)} disabled={!windowOpen || Boolean(busy)} className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"><Gift size={16}/>{busy === activePlan._id ? "جاري الجمع..." : windowOpen ? "جمع الأرباح" : "الجمع غير متاح الآن"}</button>
             </div>
             {windowOpen && <p className="mt-3 text-xs font-bold text-amber-200">فرصة الجمع مفتوحة الآن — تنتهي خلال {formatRemaining(endsAt - clockNow)}.</p>}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
-import { Activity, CheckCircle2, Clock3, Loader2, Package, RefreshCw, ShieldCheck, Wallet } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 
 type Plan = { _id: string; name: string; description?: string; price: number; asset: string; durationDays: number; dailyProfit?: number; minimumWithdrawal?: number };
 type DepositBalance = { asset: string; available: number; locked: number };
@@ -61,72 +61,29 @@ export default function UserPackagesPage() {
     .filter((x) => String(x.asset || "").trim().toUpperCase() === "USDT")
     .reduce((sum, x) => sum + Number(x.available || 0), 0) || 0;
   const activePlan = data?.userPackages.find((x) => x.status === "active");
-  const activePackageCount = data?.userPackages.filter((x) => x.status === "active").length || 0;
-  const availablePackageTotal = data?.userPackages.reduce((sum, x) => sum + Number(x.availableEarnings || 0), 0) || 0;
-  const lockedPackageTotal = data?.userPackages.reduce((sum, x) => sum + Number(x.lockedEarnings || 0), 0) || 0;
-  const totalPackageWithdrawn = data?.userPackages.reduce((sum, x) => sum + Number(x.totalWithdrawn || 0), 0) || 0;
 
   return <>
     <InternalNavbar />
     <div className="mx-auto flex max-w-[1700px]">
       <InternalSidebar />
       <main dir="rtl" className="min-w-0 flex-1 bg-[#050a13] p-4 text-white md:p-8">
-        <section className="rounded-3xl border border-white/10 bg-gradient-to-l from-blue-500/[0.14] to-cyan-400/[0.04] p-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div><div className="text-[10px] font-bold tracking-[0.2em] text-cyan-300">ARAB TRADE</div><h1 className="mt-3 text-3xl font-black">الباقات</h1><p className="mt-2 text-sm leading-7 text-slate-400">فعّل باقة من رصيد USDT الموحد في المحفظة الفورية، وهو نفس الرصيد الذي تستخدمه للتداول والتحويل.</p></div>
-            <button type="button" onClick={() => { setLoading(true); setError(""); void load(); }} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm"><RefreshCw size={16} className={loading ? "animate-spin" : ""}/>تحديث</button>
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.04] p-5">
-              <div className="flex items-center gap-2 text-xs font-bold text-amber-200"><Wallet size={16}/>رصيد USDT الموحد</div>
-              <div className="mt-3 space-y-2">
-                {data?.depositBalances.length ? data.depositBalances.map((item) => (
-                  <div key={String(item.asset).trim().toUpperCase()} className="flex items-center justify-between gap-3 rounded-lg border border-white/5 bg-black/20 px-3 py-2 text-sm">
-                    <span className="font-bold text-slate-300">{String(item.asset).trim().toUpperCase()}</span>
-                    <span className="font-mono font-black text-amber-100">{money(Number(item.available || 0))} <span className="text-[10px] font-normal text-amber-200/70">متاح</span></span>
-                  </div>
-                )) : <div className="text-sm text-slate-500">لا يوجد رصيد إيداع خارجي متاح حاليًا.</div>}
-              </div>
-              <p className="mt-3 text-xs leading-5 text-slate-500">المتاح لتفعيل الباقات أو التداول أو التحويل من محفظة USDT الفورية: <strong className="text-cyan-200">{money(depositUsdt)} USDT</strong>. الخصم من أي خدمة يحدّث الرصيد نفسه.</p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-[#050a13]/70 p-5"><div className="text-xs text-slate-400">الباقة النشطة</div><div className="mt-3 text-xl font-black">{activePlan?.packageName || "لا توجد باقة نشطة"}</div><p className="mt-2 text-xs text-slate-500">{activePlan ? "قيمة التفعيل " + money(activePlan.investedAmount) + " " + activePlan.asset : "اختر باقة متاحة."}</p></div>
-          </div>
-        </section>
-        <section role="note" className="mt-4 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-4 text-sm leading-7 text-amber-100">
-          <div className="font-black">تنبيه مهم: لك باقة نشطة واحدة فقط للتفعيل.</div>
-          <p className="mt-1">عند تغيير الباقة، يُضاف 50% من قيمة التفعيل السابقة إلى محفظة USDT الفورية، ويُخصم سعر الباقة الجديدة من رصيد USDT المتاح في المحفظة نفسها. أرباح الباقات تظل في سجل الباقة حتى تُعالج وفق قواعد السحب.</p>
-        </section>
-        <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
-            <div className="flex items-center gap-2 text-xs text-slate-400"><Package size={16} className="text-cyan-300" />الباقات النشطة</div>
-            <div className="mt-3 text-2xl font-black text-white">{activePackageCount}</div>
-            <p className="mt-1 text-xs text-slate-500">حسابات الباقات الحالية</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
-            <div className="flex items-center gap-2 text-xs text-slate-400"><Wallet size={16} className="text-emerald-300" />متاح للسحب من الباقات</div>
-            <div className="mt-3 text-2xl font-black text-emerald-200">{money(availablePackageTotal)} <span className="text-xs">USDT</span></div>
-            <p className="mt-1 text-xs text-slate-500">مبالغ محققة وغير محجوزة</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
-            <div className="flex items-center gap-2 text-xs text-slate-400"><Clock3 size={16} className="text-amber-300" />سحوبات قيد المراجعة</div>
-            <div className="mt-3 text-2xl font-black text-amber-200">{money(lockedPackageTotal)} <span className="text-xs">USDT</span></div>
-            <p className="mt-1 text-xs text-slate-500">محجوزة لحين معالجة الطلب</p>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-4">
-            <div className="flex items-center gap-2 text-xs text-slate-400"><Activity size={16} className="text-blue-300" />إجمالي السحب السابق</div>
-            <div className="mt-3 text-2xl font-black text-blue-200">{money(totalPackageWithdrawn)} <span className="text-xs">USDT</span></div>
-            <p className="mt-1 text-xs text-slate-500">إجمالي عمليات السحب المكتملة</p>
-          </div>
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#07101d] px-4 py-3">
+          <div><h1 className="text-xl font-black">الباقات</h1><p className="mt-1 text-xs text-slate-400">الرصيد المتاح للتفعيل: <strong className="text-cyan-200">{money(depositUsdt)} USDT</strong> · الباقة الحالية: <strong className="text-white">{activePlan?.packageName || "لا توجد"}</strong></p></div>
+          <button type="button" onClick={() => { setLoading(true); setError(""); void load(); }} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs"><RefreshCw size={14} className={loading ? "animate-spin" : ""}/>تحديث</button>
         </section>
         {message && <div role="status" className="mt-5 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.07] p-4 text-sm text-emerald-300">{message}</div>}
         {error && <div role="alert" className="mt-5 rounded-xl border border-red-400/20 bg-red-400/[0.07] p-4 text-sm text-red-300">{error}</div>}
-        <section className="mt-7"><h2 className="mb-4 text-xl font-black">الباقات المتاحة</h2>
-          {loading ? <div className="p-10 text-center text-slate-500"><Loader2 className="mx-auto animate-spin"/></div> : !data?.packages.length ? <div className="rounded-2xl border border-white/10 p-8 text-center text-slate-500">لا توجد باقات مفعلة حاليًا.</div> :
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{data.packages.map((plan) => <article key={plan._id} className="rounded-2xl border border-white/10 bg-[#07101d] p-5"><div className="flex items-center justify-between"><Package size={22} className="text-cyan-300"/><span className="text-xs text-emerald-200">تفعيل دائم</span></div><h3 className="mt-5 text-xl font-black">{plan.name}</h3><p className="mt-2 min-h-10 text-sm leading-6 text-slate-400">{plan.description || "باقة بمدة وقيمة تفعيل محددتين."}</p><div className="mt-4 space-y-2 text-xs text-slate-400">
-                <div className="flex items-center gap-2"><CheckCircle2 size={14} className="text-cyan-300" />التفعيل من رصيد USDT الموحد</div>
-                <div className="flex items-center gap-2"><ShieldCheck size={14} className="text-cyan-300" />رصيد الباقة منفصل عن السحب العام</div>
-                <div className="flex items-center gap-2"><Wallet size={14} className="text-cyan-300" />سجل مستقل للعوائد والسحوبات</div>
-              </div><div className="mt-4 text-3xl font-black">{money(plan.price)} <span className="text-sm text-cyan-300">{plan.asset}</span></div><div className="mt-2 text-xs text-emerald-200">الربح اليومي المحدد من الإدارة: {money(Number(plan.dailyProfit || 0))} {plan.asset}</div><div className="mt-1 text-xs text-cyan-200">الحد الأدنى للسحب: {money(Number(plan.minimumWithdrawal ?? 100))} USDT</div><button type="button" onClick={() => void action(activePlan ? "change" : "activate", plan._id)} disabled={Boolean(busy)} className="mt-5 w-full rounded-xl bg-blue-600 px-4 py-3 font-black disabled:opacity-50">{busy === plan._id ? "جاري التنفيذ..." : activePlan ? activePlan.packageName === plan.name ? "إعادة تفعيل هذه الباقة" : "التغيير إلى هذه الباقة" : "تفعيل من رصيد USDT"}</button></article>)}</div>}
+        <section className="mt-5"><h2 className="mb-3 text-base font-black">الباقات المتاحة</h2>
+          {loading ? <div className="p-8 text-center text-slate-500"><Loader2 className="mx-auto animate-spin"/></div> : !data?.packages.length ? <div className="rounded-xl border border-white/10 p-6 text-center text-slate-500">لا توجد باقات مفعلة حاليًا.</div> :
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{data.packages.map((plan) => <article key={plan._id} className="flex flex-col rounded-xl border border-white/10 bg-[#07101d] p-4">
+              <div className="flex items-center justify-between gap-2"><h3 className="text-base font-black">{plan.name}</h3><span className="rounded-md bg-emerald-400/10 px-2 py-1 text-[10px] text-emerald-200">تفعيل دائم</span></div>
+              <div className="mt-3 text-2xl font-black">{money(plan.price)} <span className="text-xs text-cyan-300">{plan.asset}</span></div>
+              <div className="mt-3 space-y-1.5 border-t border-white/10 pt-3 text-xs text-slate-400">
+                <div className="flex justify-between gap-2"><span>الربح اليومي</span><strong className="text-emerald-200">{money(Number(plan.dailyProfit || 0))} {plan.asset}</strong></div>
+                <div className="flex justify-between gap-2"><span>الحد الأدنى للسحب</span><strong className="text-white">{money(Number(plan.minimumWithdrawal ?? 100))} USDT</strong></div>
+              </div>
+              <button type="button" onClick={() => void action(activePlan ? "change" : "activate", plan._id)} disabled={Boolean(busy)} className="mt-4 w-full rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold disabled:opacity-50">{busy === plan._id ? "جاري التنفيذ..." : activePlan ? activePlan.packageName === plan.name ? "إعادة التفعيل" : "التغيير إلى هذه الباقة" : "تفعيل الباقة"}</button>
+            </article>)}</div>}
         </section>
         <section className="mt-8 rounded-2xl border border-white/10 bg-[#07101d] p-5">
           <h2 className="text-xl font-black">باقاتي وأرصدة السحب</h2><p className="mt-2 text-xs leading-6 text-slate-500">رصيد كل باقة منفصل. من صفحة السحب اختر رصيد الباقة لسحب المبالغ المتاحة.</p>

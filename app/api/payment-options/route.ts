@@ -18,7 +18,7 @@ export async function GET() {
       .lean();
 
     const methods: any[] = [];
-    const existing = new Map<string, any>();
+    const existing = new Set<string>();
 
     /*
      * PaymentOption هو المصدر الأساسي لوسائل الدفع

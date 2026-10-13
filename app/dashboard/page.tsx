@@ -356,7 +356,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-4">
                       <div className="text-xs font-bold text-amber-200">
-                        رصيد USDT الموحد
+                        رصيد الإيداع الخارجي
                       </div>
                       <div className="mt-2 space-y-1.5">
                         {loadingWallet ? "..." : externalDepositBalances.length ? externalDepositBalances.map((item) => (

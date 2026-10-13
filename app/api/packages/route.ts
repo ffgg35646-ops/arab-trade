@@ -13,7 +13,7 @@ import User from "@/models/User";
 import DepositRequest from "@/models/DepositRequest";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
 import PlatformSettings from "@/models/PlatformSettings";
-import { accrueDuePackageEarnings } from "@/lib/accrue-package-earnings";
+import { normalizeMissedPackageCollectionWindows } from "@/lib/package-collection-window";
 import { debitSpotUsdtBalance, migrateLegacyDepositBalancesToSpotWallet, USDT_ASSET } from "@/lib/unified-usdt-wallet";
 
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8) / 1e8;
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       WithdrawalRequest.updateMany({ userId: user._id, source: "package", asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
     ]);
     await ensureDefaultInvestmentPackages();
-    await accrueDuePackageEarnings({ userId: user._id });
+    await normalizeMissedPackageCollectionWindows({ userId: user._id });
     const [packages, spotWallet, rawUserPackages, packageLedger, settings, referredUsers] = await Promise.all([
       InvestmentPackage.find({ enabled: true }).sort({ sortOrder: 1, price: 1 }).lean(),
       Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).lean(),
@@ -89,7 +89,16 @@ export async function GET(request: NextRequest) {
       const key = String(row.userPackageId || "");
       referralWithdrawalByPackage.set(key, (referralWithdrawalByPackage.get(key) || 0) + Number(row.amount || 0));
     }
+    const dailyProfitByPackage = new Map(
+      (packages as any[]).map((plan) => [String(plan._id), Math.max(0, Number(plan.dailyProfit || 0))])
+    );
+    const collectionNow = Date.now();
     const userPackages = rawUserPackages.map((item: any) => {
+      const anchor = item.lastProfitAt ? new Date(item.lastProfitAt).getTime() : new Date(item.activatedAt || collectionNow).getTime();
+      const nextCollectAt = anchor + 24 * 60 * 60 * 1000;
+      const collectWindowEndsAt = nextCollectAt + 30 * 60 * 1000;
+      const dailyProfit = dailyProfitByPackage.get(String(item.packageId)) || 0;
+      const collectWindowOpen = item.status === "active" && collectionNow >= nextCollectAt && collectionNow <= collectWindowEndsAt;
       const firstPending = item.firstWithdrawalStatus === "pending";
       const firstCompleted = item.firstWithdrawalStatus === "completed" || Number(item.totalWithdrawn || 0) > 0;
       const isFirstAvailable = item.status === "active" && !firstPending && !firstCompleted;
@@ -102,6 +111,10 @@ export async function GET(request: NextRequest) {
         : Math.min(Number(item.availableEarnings || 0), referralRemaining);
       return {
         ...item,
+        dailyProfit,
+        nextCollectAt: new Date(nextCollectAt).toISOString(),
+        collectWindowEndsAt: new Date(collectWindowEndsAt).toISOString(),
+        collectWindowOpen,
         minimumWithdrawal: minimumWithdrawalByPlan.get(String(item.packageId)) ?? Number(settings?.withdrawals?.minAmount ?? 0),
         activeReferralCount,
         activeReferralDepositTotal,
@@ -128,8 +141,9 @@ export async function GET(request: NextRequest) {
         } : null,
       })),
       policy: {
-        dailyReturnsAutomatic: true,
-        earningsNotice: "يضاف الربح اليومي الذي يحدده الأدمن لكل باقة بعد اكتمال كل 24 ساعة من فترة الاستحقاق، ويظهر في رصيد السحب الخاص بهذه الباقة.",
+        dailyReturnsAutomatic: false,
+        collectionWindowMinutes: 30,
+        earningsNotice: "يصبح الربح اليومي متاحًا للجمع بعد اكتمال 24 ساعة، وتستمر فرصة الجمع 30 دقيقة فقط. إذا انتهت المهلة دون جمع، يسقط ربح الدورة وتبدأ دورة جديدة؛ والباقة نفسها مستمرة دون مدة انتهاء.",
         singleActivePackageNotice: "يسمح لكل مستخدم بباقة نشطة واحدة فقط.",
         activationSourceNotice: "تفعيل الباقات يتم من رصيد USDT الموحد في المحفظة الفورية، وهو نفس الرصيد المستخدم للتداول والتحويل.",
         cancellationNotice: "عند إلغاء باقة نشطة أو التغيير إلى باقة أخرى، يضاف 50% من قيمة تفعيل الباقة السابقة إلى رصيد السحب العام وليس رصيد الإيداع، وتظل الأرباح المحققة المتاحة مسجلة في الباقة.",
@@ -153,11 +167,96 @@ export async function POST(request: NextRequest) {
       PackageLedger.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
       WithdrawalRequest.updateMany({ userId: user._id, source: "package", asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
     ]);
-    await accrueDuePackageEarnings({ userId: user._id });
     const body = await request.json();
     const action = String(body.action || "");
     const packageId = String(body.packageId || "").trim();
     const userPackageId = String(body.userPackageId || "").trim();
+
+    if (action === "collect") {
+      if (!mongoose.Types.ObjectId.isValid(userPackageId)) {
+        return NextResponse.json({ success: false, message: "معرف الباقة غير صحيح" }, { status: 400 });
+      }
+
+      await normalizeMissedPackageCollectionWindows({ userId: user._id });
+      const current = await UserPackage.findOne({
+        _id: userPackageId,
+        userId: user._id,
+        status: "active",
+      }).lean();
+      if (!current) {
+        return NextResponse.json({ success: false, message: "لا توجد باقة نشطة بهذا المعرف" }, { status: 404 });
+      }
+
+      const anchor = current.lastProfitAt ? new Date(current.lastProfitAt) : new Date(current.activatedAt);
+      const now = new Date();
+      const elapsed = now.getTime() - anchor.getTime();
+      const dayMs = 24 * 60 * 60 * 1000;
+      const windowMs = 30 * 60 * 1000;
+      if (elapsed < dayMs) {
+        return NextResponse.json({ success: false, message: "لم يكتمل عداد الـ24 ساعة بعد." }, { status: 409 });
+      }
+      if (elapsed > dayMs + windowMs) {
+        await normalizeMissedPackageCollectionWindows({ userId: user._id });
+        return NextResponse.json({ success: false, message: "انتهت مهلة الجمع لهذا اليوم وفُقد ربح الدورة. انتظر موعد الجمع التالي." }, { status: 409 });
+      }
+
+      const plan = await InvestmentPackage.findById(current.packageId).select("dailyProfit").lean();
+      const dailyProfit = roundAmount(Math.max(0, Number(plan?.dailyProfit || 0)));
+      const nextAnchor = new Date(anchor.getTime() + dayMs);
+      const session = await mongoose.startSession();
+      let collected: any = null;
+      try {
+        await session.withTransaction(async () => {
+          const update: Record<string, any> = { $set: { lastProfitAt: nextAnchor } };
+          if (dailyProfit > 0) {
+            update.$inc = {
+              availableEarnings: dailyProfit,
+              totalRealizedEarnings: dailyProfit,
+            };
+          }
+          collected = await UserPackage.findOneAndUpdate(
+            {
+              _id: current._id,
+              userId: user._id,
+              status: "active",
+              lastProfitAt: anchor,
+            },
+            update,
+            { new: true, session }
+          );
+          if (!collected) throw new Error("COLLECTION_WINDOW_ALREADY_USED");
+          if (dailyProfit > 0) {
+            await PackageLedger.create([{
+              userId: user._id,
+              userPackageId: current._id,
+              type: "daily_earning",
+              asset: current.asset || USDT_ASSET,
+              amount: dailyProfit,
+              note: "جمع الربح اليومي يدويًا خلال مهلة 30 دقيقة",
+            }], { session });
+          }
+        });
+      } catch (collectError) {
+        const conflict = collectError instanceof Error && collectError.message === "COLLECTION_WINDOW_ALREADY_USED";
+        if (!conflict) console.error("PACKAGE EARNINGS COLLECTION:", collectError);
+        return NextResponse.json({
+          success: false,
+          message: conflict ? "تم جمع ربح هذه الدورة بالفعل أو تغيّرت حالة الباقة. حدّث الصفحة." : "تعذر تسجيل الجمع؛ لم يتم تغيير الرصيد.",
+        }, { status: conflict ? 409 : 500 });
+      } finally {
+        await session.endSession();
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: dailyProfit > 0
+          ? "تم جمع " + dailyProfit + " " + (current.asset || USDT_ASSET) + " وإضافتها إلى رصيد سحب هذه الباقة."
+          : "تم إغلاق دورة الجمع؛ الربح اليومي المحدد لهذه الباقة يساوي صفرًا.",
+        userPackage: collected,
+      });
+    }
+
+
 
     if (action === "activate") {
       if (!mongoose.Types.ObjectId.isValid(packageId)) {

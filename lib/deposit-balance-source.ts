@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import DepositBalance from "@/models/DepositBalance";
 import Wallet from "@/models/Wallet";
 import LedgerEntry from "@/models/LedgerEntry";
+import WithdrawalRequest from "@/models/WithdrawalRequest";
 
 const LEGACY_UNIFIED_DEPOSIT_CUTOVER_AT = new Date("2026-10-13T09:42:10.000Z").getTime();
 
@@ -163,6 +164,16 @@ export async function separateLegacyDepositsFromSpotWallet(
         referenceId: marker,
       }).session(session).lean();
       if (alreadySeparated) return;
+
+      // Do not rebalance a wallet while a general withdrawal has an amount
+      // locked in it. If that request is later rejected, its original wallet
+      // allocation must be returned before legacy deposits are moved out.
+      const openGeneralWithdrawal = await WithdrawalRequest.findOne({
+        userId,
+        source: { $ne: "package" },
+        status: { $in: ["pending", "approved", "processing"] },
+      }).session(session).select("_id").lean();
+      if (openGeneralWithdrawal) return;
 
       const entries = await LedgerEntry.find({
         userId,

@@ -73,7 +73,6 @@ export default function AdminDashboard() {
       <AdminShell title="لوحة التحكم">
         {data ? (
           <div className="space-y-6">
-          <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-black">نظرة عامة</h1>

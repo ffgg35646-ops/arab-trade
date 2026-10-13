@@ -326,15 +326,9 @@ export default function DepositPage() {
           </div>
         )}
 
-        {loading && (
-          <div className="mt-5 rounded-xl border border-cyan-400/20 bg-cyan-400/[0.04] p-3 text-sm text-cyan-100">
-            جاري تحميل وسائل الإيداع من إعدادات الإدارة؛ خانات الإيداع ظاهرة ويمكنك إكمالها بمجرد ظهور الوسيلة.
-          </div>
-        )}
-
         {!loading && !depositsEnabled && (
-          <div role="status" className="mt-5 rounded-xl border border-amber-400/25 bg-amber-400/[0.06] p-4 text-sm leading-6 text-amber-100">
-            الإيداع متوقف مؤقتًا من إعدادات الإدارة. ستظل طلباتك السابقة ظاهرة، لكن لن يمكن إرسال طلب جديد حتى تعيد الإدارة تفعيل الإيداع.
+          <div role="status" className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-3 text-center text-sm text-amber-100">
+            الإيداع متوقف مؤقتًا.
           </div>
         )}
 

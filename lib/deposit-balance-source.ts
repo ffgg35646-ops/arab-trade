@@ -217,34 +217,65 @@ export async function separateLegacyDepositsFromSpotWallet(
 
       if (!hasLegacyDepositActivity) return;
 
-      const wallet = await Wallet.findOne({
+      const wallets = await Wallet.find({
         userId,
-        type: "spot",
+        type: { $in: ["spot", "funding"] },
         mode: "live",
       }).session(session);
 
-      const usdtRows = (wallet?.balances || []).filter(
-        (row: any) => String(row.asset || "").trim().toUpperCase() === "USDT",
-      );
+      const walletRows = wallets
+        .map((wallet: any) => ({
+          wallet,
+          rows: (wallet.balances || []).filter(
+            (row: any) => String(row.asset || "").trim().toUpperCase() === "USDT",
+          ),
+        }))
+        // Use spot first, then funding, so the general spot account is normalized
+        // consistently while still protecting funds transferred to funding.
+        .sort((a: any, b: any) => (a.wallet.type === "spot" ? 0 : 1) - (b.wallet.type === "spot" ? 0 : 1));
+
       const availableBefore = roundAmount(
-        usdtRows.reduce((sum: number, row: any) => sum + Math.max(0, Number(row.available || 0)), 0),
+        walletRows.reduce(
+          (sum: number, item: any) => sum + item.rows.reduce(
+            (rowSum: number, row: any) => rowSum + Math.max(0, Number(row.available || 0)),
+            0,
+          ),
+          0,
+        ),
       );
+      const lockedTotal = roundAmount(
+        walletRows.reduce(
+          (sum: number, item: any) => sum + item.rows.reduce(
+            (rowSum: number, row: any) => rowSum + Math.max(0, Number(row.locked || 0)),
+            0,
+          ),
+          0,
+        ),
+      );
+
+      // Locked trading/funding funds may be restored later. Wait for them to
+      // unlock before marking legacy deposits as reconciled.
+      if (lockedTotal > 1e-8) return;
+
       const moveAmount = roundAmount(Math.min(depositExposure, availableBefore));
 
-      if (moveAmount > 0 && wallet) {
+      if (moveAmount > 0 && walletRows.length > 0) {
         await creditDepositBalance(userId, "USDT", moveAmount, session);
 
         let remaining = moveAmount;
-        for (const row of usdtRows) {
-          if (remaining <= 0) break;
-          const available = roundAmount(Math.max(0, Number(row.available || 0)));
-          const debit = roundAmount(Math.min(available, remaining));
-          if (debit <= 0) continue;
-          row.available = roundAmount(available - debit);
-          remaining = roundAmount(remaining - debit);
+        for (const item of walletRows) {
+          if (remaining <= 1e-8) break;
+          for (const row of item.rows) {
+            if (remaining <= 1e-8) break;
+            const available = roundAmount(Math.max(0, Number(row.available || 0)));
+            const debit = roundAmount(Math.min(available, remaining));
+            if (debit <= 0) continue;
+            row.available = roundAmount(available - debit);
+            remaining = roundAmount(remaining - debit);
+          }
+          await item.wallet.save({ session });
         }
         if (remaining > 1e-8) throw new Error("LEGACY_DEPOSIT_SEPARATION_RACE");
-        await wallet.save({ session });
       }
 
       await LedgerEntry.create([{
@@ -258,8 +289,8 @@ export async function separateLegacyDepositsFromSpotWallet(
         balanceAfter: roundAmount(availableBefore - moveAmount),
         referenceId: marker,
         note: moveAmount > 0
-          ? "فصل الرصيد المتبقي من الإيداعات الخارجية القديمة عن رصيد السحب العام."
-          : "تمت مراجعة رصيد الإيداعات القديمة؛ لا يوجد مبلغ متاح للنقل من المحفظة العامة.",
+          ? "فصل الرصيد المتبقي من الإيداعات الخارجية القديمة عن أرصدة السحب العامة."
+          : "تمت مراجعة رصيد الإيداعات القديمة؛ لا يوجد مبلغ متاح للنقل من المحافظ العامة.",
       }], { session });
     });
   } finally {

@@ -65,7 +65,6 @@ export default function DashboardPage() {
   const [walletBalances, setWalletBalances] = useState<WalletBalance[]>([]);
   const [externalDepositBalances, setExternalDepositBalances] = useState<ExternalDepositBalance[]>([]);
   const [accountTotalUsd, setAccountTotalUsd] = useState<number | null>(null);
-  const [loadingUser, setLoadingUser] = useState(true);
   const [loadingWallet, setLoadingWallet] = useState(true);
 
   useEffect(() => {
@@ -117,7 +116,6 @@ export default function DashboardPage() {
         console.error("Dashboard load error:", error);
       } finally {
         if (active) {
-          setLoadingUser(false);
           setLoadingWallet(false);
         }
       }
@@ -286,7 +284,7 @@ export default function DashboardPage() {
                     <div>
                       <div className="text-3xl font-bold">
                         {loadingWallet
-                          ? "..."
+                          ? "—"
                           : `${formatUsd(accountTotalUsd ?? portfolio.totalValueUsd)} USDT`}
                       </div>
                       <div className="mt-2 text-xs text-slate-600">

@@ -841,30 +841,60 @@ main > section:first-child {
 
 /* =========================================================
    ARABTRADE COMPACT UI — shared by user and admin screens
-   Smaller cards, calmer spacing, clearer information hierarchy.
+   Packages page is the density reference: compact cards, less copy,
+   consistent gutters and calmer spacing without shrinking form controls.
    ========================================================= */
 @media (min-width: 640px) {
-  main :is(.rounded-2xl, .rounded-3xl)[class~="p-6"],
-  main :is(.rounded-2xl, .rounded-3xl)[class~="p-5"] {
+  main :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class~="p-8"] {
+    padding: 1.25rem !important;
+  }
+
+  main :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class~="p-7"] {
+    padding: 1.125rem !important;
+  }
+
+  main :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class~="p-6"],
+  main :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class~="p-5"] {
     padding: 1rem !important;
   }
 
-  main :is(.rounded-2xl, .rounded-3xl)[class~="p-4"] {
+  main :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class~="p-4"] {
     padding: 0.875rem !important;
   }
 }
 
-/* Keep card grids compact without squeezing form controls. */
-main .grid.gap-6 {
+/* Reduce the extra-wide content margins used by older dashboard pages. */
+@media (min-width: 768px) {
+  main.min-w-0.flex-1[class~="md:p-8"] {
+    padding: 1.25rem !important;
+  }
+
+  main > div[class~="max-w-[1700px]"][class~="p-4"] {
+    padding: 1rem !important;
+  }
+}
+
+main .grid.gap-6,
+main .flex.gap-6 {
   gap: 1rem !important;
 }
 
-main .grid.gap-5 {
+main .grid.gap-5,
+main .flex.gap-5 {
   gap: 0.875rem !important;
 }
 
-main .grid.gap-4 {
+main .grid.gap-4,
+main .flex.gap-4 {
   gap: 0.75rem !important;
+}
+
+main [class~="mt-8"] {
+  margin-top: 1.25rem !important;
+}
+
+main [class~="mb-8"] {
+  margin-bottom: 1.25rem !important;
 }
 
 main .space-y-6 > :not([hidden]) ~ :not([hidden]) {
@@ -875,33 +905,47 @@ main .space-y-5 > :not([hidden]) ~ :not([hidden]) {
   margin-top: 0.875rem !important;
 }
 
-/* Cards: subtle borders, less visual weight, consistent corners. */
-main :is(.rounded-2xl, .rounded-3xl) {
-  border-radius: 0.875rem;
+/* Cards: smaller corners and softer borders across user and admin areas. */
+main :is(.rounded-xl, .rounded-2xl, .rounded-3xl) {
+  border-radius: 0.75rem;
 }
 
-main :is(.rounded-2xl, .rounded-3xl).border {
+main :is(.rounded-xl, .rounded-2xl, .rounded-3xl).border {
   border-color: rgba(255, 255, 255, 0.075);
 }
 
-/* Long helper copy should read quietly rather than compete with values. */
+/* Keep helper text calm and readable; do not alter input sizing. */
 main :is(.text-slate-500, .text-slate-600, .text-white\/40, .text-white\/45) {
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
-/* Mobile: reduce oversized page gutters and card padding. */
+/* Mobile screens: keep the cards compact and avoid large outer gutters. */
 @media (max-width: 639px) {
-  main .p-6,
-  main .p-5 {
+  main :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class~="p-8"],
+  main :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class~="p-7"],
+  main :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class~="p-6"],
+  main :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class~="p-5"] {
     padding: 0.875rem !important;
   }
 
+  main :is(.rounded-xl, .rounded-2xl, .rounded-3xl)[class~="p-4"] {
+    padding: 0.75rem !important;
+  }
+
+  main.min-w-0.flex-1[class~="p-4"] {
+    padding: 0.75rem !important;
+  }
+
   main .grid.gap-6,
-  main .grid.gap-5 {
+  main .grid.gap-5,
+  main .flex.gap-6,
+  main .flex.gap-5 {
     gap: 0.75rem !important;
   }
 
-  main .mb-8 {
-    margin-bottom: 1.25rem !important;
+  main [class~="mt-8"],
+  main [class~="mb-8"] {
+    margin-top: 1rem !important;
+    margin-bottom: 1rem !important;
   }
 }

@@ -32,8 +32,9 @@ export async function GET(request: NextRequest) {
     ]);
     await ensureDefaultInvestmentPackages();
     await normalizeMissedPackageCollectionWindows({ userId: user._id });
-    const [packages, spotWallet, rawUserPackages, packageLedger, settings, referredUsers] = await Promise.all([
+    const [packages, allPlansForProfit, spotWallet, rawUserPackages, packageLedger, settings, referredUsers] = await Promise.all([
       InvestmentPackage.find({ enabled: true }).sort({ sortOrder: 1, price: 1 }).lean(),
+      InvestmentPackage.find({}).select("_id dailyProfit").lean(),
       Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).lean(),
       UserPackage.find({ userId: user._id }).sort({ createdAt: -1 }).limit(100).lean(),
       PackageLedger.find({ userId: user._id })
@@ -90,7 +91,7 @@ export async function GET(request: NextRequest) {
       referralWithdrawalByPackage.set(key, (referralWithdrawalByPackage.get(key) || 0) + Number(row.amount || 0));
     }
     const dailyProfitByPackage = new Map(
-      (packages as any[]).map((plan) => [String(plan._id), Math.max(0, Number(plan.dailyProfit || 0))])
+      (allPlansForProfit as any[]).map((plan) => [String(plan._id), Math.max(0, Number(plan.dailyProfit || 0))])
     );
     const collectionNow = Date.now();
     const userPackages = rawUserPackages.map((item: any) => {

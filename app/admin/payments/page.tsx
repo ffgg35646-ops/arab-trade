@@ -499,118 +499,75 @@ export default function PaymentsAdminPage() {
                   <details className="group">
                     <summary className="cursor-pointer rounded-xl border border-slate-700 bg-[#0b1422] p-4 font-bold">تعديل تفاصيل وسيلة الإيداع</summary>
                     <div className="space-y-4 pt-4">
-                    <div>
-                      <label className="mb-2 block text-sm font-bold">
-                        اسم وسيلة الإيداع
-                      </label>
-
-                      <input
-                        value={payment.name}
-                        onChange={(e) =>
-                          updatePayment(index, {
-                            name: e.target.value,
-                          })
-                        }
-                        placeholder="مثال: شام سوري"
-                        className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"
-                      />
-                      <p className="mt-2 text-xs leading-5 text-slate-500">
-                        يظهر هذا العنوان في صفحة الإيداع للمستخدمين لهذه العملة والشبكة. عنوان استلام المستخدم عند السحب يكتبه المستخدم في صفحة السحب ولا يُستبدل بعنوان الإيداع.
-                      </p>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
                       <div>
-                        <label className="mb-2 block text-sm font-bold">
-                          العملة / الرمز
-                        </label>
+                        <label className="mb-2 block text-sm font-bold">اسم وسيلة الإيداع</label>
+                        <input value={payment.name} onChange={(e) => updatePayment(index, { name: e.target.value })} placeholder="مثال: USDT TRC20" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
+                        <p className="mt-2 text-xs leading-5 text-slate-500">عنوان الاستلام الذي يراه المستخدم للإيداع فقط. عنوان السحب يكتبه المستخدم في صفحة السحب.</p>
+                      </div>
 
-                        <select
-                          value="USDT"
-                          onChange={() => updatePayment(index, { asset: "USDT" })}
-                          className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"
-                        >
-                          <option value="USDT">USDT — Tether</option>
-                        </select>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-sm font-bold">العملة / الرمز</label>
+                          <select value={payment.asset} onChange={(e) => updatePayment(index, { asset: e.target.value })} className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500">
+                            <option value="USDT">USDT — Tether</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-sm font-bold">الشبكة / النوع</label>
+                          <select value={payment.network} onChange={(e) => updatePayment(index, { network: e.target.value })} className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500">
+                            <option value="TRC20">TRC20</option>
+                            <option value="BEP20">BEP20</option>
+                          </select>
+                        </div>
                       </div>
 
                       <div>
-                        <label className="mb-2 block text-sm font-bold">
-                          الشبكة / النوع
-                        </label>
-
-                        <select
-                          value={payment.network}
-                          onChange={(e) => updatePayment(index, { network: e.target.value })}
-                          className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"
-                        >
-                          <option value="TRC20">TRC (TRC20)</option>
-                          <option value="BEP20">BNB Smart Chain (BEP20)</option>
-                        </select>
+                        <label className="mb-2 block text-sm font-bold">عنوان الإيداع / بيانات التحويل</label>
+                        <textarea value={payment.address} onChange={(e) => updatePayment(index, { address: e.target.value })} rows={2} placeholder="عنوان محفظة الإيداع أو بيانات التحويل" className="w-full resize-y rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
                       </div>
-                    </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="mb-2 block text-sm font-bold">
-                          عنوان الإيداع / بيانات التحويل التي ستظهر للمستخدم
-                        </label>
-                        <textarea
-                          value={payment.address}
-                          onChange={(e) =>
-                            updatePayment(index, { address: e.target.value })
-                          }
-                          rows={1}
-                          placeholder="عنوان محفظة الإيداع أو بيانات التحويل"
-                          className="mt-2 w-full resize-none rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"
-                        />
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-sm font-bold">الحد الأدنى للإيداع</label>
+                          <input value={payment.minDeposit} onChange={(e) => updatePayment(index, { minDeposit: Number(e.target.value) || 0 })} type="number" min="0" step="any" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-sm font-bold">الحد الأقصى للإيداع</label>
+                          <input value={payment.maxDeposit} onChange={(e) => updatePayment(index, { maxDeposit: Number(e.target.value) || 0 })} type="number" min="0" step="any" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-sm font-bold">الحد الأدنى للسحب</label>
+                          <input value={payment.minWithdrawal} onChange={(e) => updatePayment(index, { minWithdrawal: Number(e.target.value) || 0 })} type="number" min="0" step="any" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-sm font-bold">الحد الأقصى للسحب</label>
+                          <input value={payment.maxWithdrawal} onChange={(e) => updatePayment(index, { maxWithdrawal: Number(e.target.value) || 0 })} type="number" min="0" step="any" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-sm font-bold">رسوم السحب</label>
+                          <input value={payment.withdrawalFee} onChange={(e) => updatePayment(index, { withdrawalFee: Number(e.target.value) || 0 })} type="number" min="0" step="any" className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
                       <div>
-                        <label className="mb-2 block text-sm font-bold">
-                          الحد الأدنى للإيداع
-
-                      <textarea
-                        value={payment.address}
-                        onChange={(e) =>
-                          updatePayment(index, {
-                            address: e.target.value,
-                          })
-                        }
-                        rows={3}
-                        placeholder="عنوان محفظة الإيداع أو رقم الحساب أو بيانات التحويل"
-                        className="w-full resize-none rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"
-                      />
-                      <p className="mt-2 text-xs leading-5 text-slate-500">
-                        يظهر هذا العنوان في صفحة الإيداع للمستخدمين لهذه العملة والشبكة. عنوان استلام المستخدم عند السحب يكتبه المستخدم في صفحة السحب ولا يُستبدل بعنوان الإيداع.
-                      </p>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="mb-2 block text-sm font-bold">
-                          الحد الأدنى للإيداع
-                        </label>
-
-                        <input
-                          value={payment.minDeposit}
-                          onChange={(e) =>
-                            updatePayment(index, {
-                              minDeposit:
-                                Number(e.target.value) || 0,
-                            })
-                          }
-                          type="number"
-                          min="0"
-                          step="any"
-                          className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500"
-                        />
+                        <label className="mb-2 block text-sm font-bold">تنبيه للمستخدم</label>
+                        <textarea value={payment.warning} onChange={(e) => updatePayment(index, { warning: e.target.value })} rows={2} placeholder="تعليمات أو تنبيه اختياري" className="w-full resize-y rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
                       </div>
-                    </div>
 
-
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-black/10 p-3">
+                          <span className="text-sm font-bold">تفعيل الوسيلة</span>
+                          <input type="checkbox" checked={payment.enabled} onChange={(e) => updatePayment(index, { enabled: e.target.checked })} className="h-5 w-5 accent-violet-400" />
+                        </label>
+                        <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-black/10 p-3">
+                          <span className="text-sm font-bold">السماح بالإيداع</span>
+                          <input type="checkbox" checked={payment.depositEnabled} onChange={(e) => updatePayment(index, { depositEnabled: e.target.checked })} className="h-5 w-5 accent-violet-400" />
+                        </label>
+                        <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-black/10 p-3">
+                          <span className="text-sm font-bold">السماح بالسحب</span>
+                          <input type="checkbox" checked={payment.withdrawalEnabled} onChange={(e) => updatePayment(index, { withdrawalEnabled: e.target.checked })} className="h-5 w-5 accent-violet-400" />
+                        </label>
+                      </div>
                     </div>
                   </details>
 

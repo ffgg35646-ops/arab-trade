@@ -34,22 +34,22 @@ export function Frame({
   return (
     <main dir="rtl" className="min-h-[calc(100vh-4rem)] bg-[#050a13] text-white">
       <div className="border-b border-white/10 bg-[#07101d]">
-        <div className="mx-auto max-w-[1700px] px-4 py-4 md:px-6 lg:px-8">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="mx-auto max-w-[1700px] px-3 py-3 md:px-4 lg:px-5">
+          <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-400/10">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10">
                 <Icon size={19} className="text-cyan-300" />
               </div>
 
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-xl font-bold tracking-tight">{title}</h1>
+                  <h1 className="text-lg font-bold tracking-tight">{title}</h1>
                   <span className="rounded-full border border-white/10 bg-white/[0.025] px-2.5 py-1 text-[9px] text-slate-500">
                     مساحة الحساب
                   </span>
                 </div>
 
-                <p className="mt-1 max-w-3xl text-[11px] leading-5 text-slate-500">
+                <p className="mt-0.5 max-w-3xl truncate text-[10px] leading-4 text-slate-500">
                   {description}
                 </p>
               </div>
@@ -64,7 +64,7 @@ export function Frame({
                     <Link
                       key={action.href}
                       href={action.href}
-                      className={`flex items-center gap-2 rounded-xl px-4 py-3 text-xs font-bold transition ${
+                      className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition ${
                         action.primary
                           ? "bg-blue-500 text-white hover:bg-blue-400"
                           : "border border-white/10 bg-white/[0.02] text-slate-300 hover:bg-white/[0.05]"
@@ -81,7 +81,7 @@ export function Frame({
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1700px] p-4 md:p-6 lg:p-8">
+      <div className="mx-auto max-w-[1700px] p-3 md:p-4 lg:p-5">
         {children}
       </div>
     </main>
@@ -101,11 +101,11 @@ export function Panel({
 }) {
   return (
     <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#07101d]">
-      <div className="flex flex-col justify-between gap-3 border-b border-white/10 px-5 py-4 md:flex-row md:items-center">
+      <div className="flex flex-col justify-between gap-2 border-b border-white/10 px-4 py-3 md:flex-row md:items-center">
         <div>
           <h2 className="text-sm font-bold text-slate-100">{title}</h2>
           {description && (
-            <p className="mt-1 text-[10px] leading-5 text-slate-600">
+            <p className="mt-0.5 line-clamp-1 text-[10px] leading-4 text-slate-600">
               {description}
             </p>
           )}
@@ -132,7 +132,7 @@ export function Tabs({
         <button
           type="button"
           key={item}
-          className={`whitespace-nowrap border-b-2 px-4 py-3 text-xs transition ${
+          className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-xs transition ${
             index === active
               ? "border-cyan-400 text-cyan-300"
               : "border-transparent text-slate-500 hover:text-slate-300"
@@ -151,7 +151,7 @@ export function Toolbar({
   placeholder?: string;
 }) {
   return (
-    <div className="flex flex-col gap-3 border-b border-white/10 p-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex flex-col gap-2 border-b border-white/10 p-3 lg:flex-row lg:items-center lg:justify-between">
       <div className="relative w-full max-w-md">
         <Search
           size={15}
@@ -159,7 +159,7 @@ export function Toolbar({
         />
 
         <input
-          className="w-full rounded-xl border border-white/10 bg-[#050a13] py-3 pr-9 pl-3 text-xs text-white outline-none placeholder:text-slate-600 focus:border-cyan-400/30"
+          className="w-full rounded-xl border border-white/10 bg-[#050a13] py-2.5 pr-9 pl-3 text-xs text-white outline-none placeholder:text-slate-600 focus:border-cyan-400/30"
           placeholder={placeholder}
         />
       </div>
@@ -169,7 +169,7 @@ export function Toolbar({
           <button
             type="button"
             key={filter}
-            className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs ${
+            className={`whitespace-nowrap rounded-xl px-3 py-2 text-xs ${
               index === 0
                 ? "bg-blue-500/15 text-cyan-300"
                 : "border border-white/10 text-slate-500 hover:bg-white/5"
@@ -198,18 +198,18 @@ export function EmptyState({
 }) {
   const body = (
     <>
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.02]">
+      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.02]">
         <Icon size={22} className="text-slate-600" />
       </div>
 
-      <h3 className="mt-4 text-sm font-semibold text-slate-300">{title}</h3>
+      <h3 className="mt-3 text-sm font-semibold text-slate-300">{title}</h3>
 
-      <p className="mx-auto mt-2 max-w-xl text-[11px] leading-6 text-slate-600">
+      <p className="mx-auto mt-1 max-w-xl text-[11px] leading-5 text-slate-600">
         {description}
       </p>
 
       {action && href && (
-        <span className="mt-5 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-2.5 text-xs font-semibold text-cyan-300">
+        <span className="mt-3 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 text-xs font-semibold text-cyan-300">
           {action}
           <ChevronLeft size={14} />
         </span>
@@ -218,7 +218,7 @@ export function EmptyState({
   );
 
   return (
-    <div className="px-5 py-16 text-center">
+    <div className="px-4 py-10 text-center">
       {href ? <Link href={href}>{body}</Link> : body}
     </div>
   );
@@ -232,9 +232,9 @@ export function Notice({
   icon?: LucideIcon;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-blue-400/10 bg-blue-500/[0.055] p-4">
+    <div className="flex items-start gap-3 rounded-xl border border-blue-400/10 bg-blue-500/[0.055] p-3">
       <Icon size={18} className="mt-0.5 shrink-0 text-cyan-300" />
-      <div className="text-xs leading-6 text-slate-400">{children}</div>
+      <div className="text-xs leading-5 text-slate-400">{children}</div>
     </div>
   );
 }
@@ -244,12 +244,12 @@ export function ActionCards() {
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       <Link
         href="/dashboard/assets/deposit"
-        className="group rounded-2xl border border-white/10 bg-[#07101d] p-5 transition hover:border-cyan-400/20"
+        className="group rounded-xl border border-white/10 bg-[#07101d] p-4 transition hover:border-cyan-400/20"
       >
         <ArrowDownToLine size={20} className="text-cyan-300" />
-        <div className="mt-4 text-sm font-bold">إيداع</div>
-        <div className="mt-2 text-[10px] leading-5 text-slate-600">
-          ابدأ عملية إيداع من خلال نظام الأصول.
+        <div className="mt-2 text-sm font-bold">إيداع</div>
+        <div className="mt-1 text-[10px] leading-4 text-slate-600">
+          إيداع رصيد إلى حسابك.
         </div>
       </Link>
 
@@ -260,7 +260,7 @@ export function ActionCards() {
         <ArrowUpFromLine size={20} className="text-cyan-300" />
         <div className="mt-4 text-sm font-bold">سحب</div>
         <div className="mt-2 text-[10px] leading-5 text-slate-600">
-          انتقل إلى إدارة طلبات السحب.
+          إدارة طلبات السحب.
         </div>
       </Link>
 
@@ -271,7 +271,7 @@ export function ActionCards() {
         <ArrowLeftRight size={20} className="text-cyan-300" />
         <div className="mt-4 text-sm font-bold">تحويل</div>
         <div className="mt-2 text-[10px] leading-5 text-slate-600">
-          التحويل بين محافظ الحساب.
+          تحويل بين المحافظ.
         </div>
       </Link>
     </div>

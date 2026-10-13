@@ -9,7 +9,6 @@ import PlatformSettings from "@/models/PlatformSettings";
 import LedgerEntry from "@/models/LedgerEntry";
 import Notification from "@/models/Notification";
 import ReferralCommission from "@/models/ReferralCommission";
-import DepositBalance from "@/models/DepositBalance";
 import { USDT_ASSET } from "@/lib/unified-usdt-wallet";
 import { creditDepositBalance, separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
 import BlockchainDepositClaim from "@/models/BlockchainDepositClaim";

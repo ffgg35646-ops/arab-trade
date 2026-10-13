@@ -446,7 +446,7 @@ export default function PaymentsAdminPage() {
               + إضافة وسيلة سحب عام
             </button>
             <a href="#package-withdrawal-settings" className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-3 font-black text-emerald-200 transition hover:bg-emerald-400/15">
-              + إعداد سحب الباقات
+              + إضافة وسيلة سحب من الباقات
             </a>
           </div>
         </div>

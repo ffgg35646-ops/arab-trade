@@ -416,46 +416,36 @@ export default function WithdrawPage() {
     const isSubmitting = submittingKey === key;
     const isSaving = savingAddressKey === key;
     return (
-      <form onSubmit={(event) => void submitWithdrawal(event, source, packageAccount, packageId)} className={source === "wallet" ? "grid gap-2 md:grid-cols-2" : "space-y-2"}>
+      <form onSubmit={(event) => void submitWithdrawal(event, source, packageAccount, packageId)} className="grid grid-cols-2 items-start gap-2">
         <div className="min-w-0">
-          <label className="mb-1 block text-[11px] font-bold">وسيلة السحب</label>
-          <select value={form.methodId} onChange={(event) => changeMethod(source, packageId, event.target.value)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-3 py-2 text-sm outline-none focus:border-cyan-400/50">
+          <select aria-label="وسيلة السحب" value={form.methodId} onChange={(event) => changeMethod(source, packageId, event.target.value)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50">
             <option value="">اختر الوسيلة</option>
-            {renderMethodOptions(source === "package")}
+            {methods.filter((item) => source !== "package" || item.asset === "USDT").map((item) => (
+              <option key={item._id} value={item._id}>{item.name}</option>
+            ))}
           </select>
-          {methods.length === 0 && <p className="mt-2 text-xs text-amber-200">لا توجد وسيلة سحب مفعّلة حاليًا.</p>}
+          {methods.length === 0 && <p className="mt-1 text-[10px] text-amber-200">لا توجد وسيلة مفعّلة.</p>}
+        </div>
+        <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.025] px-2 py-1.5 text-[10px]">
+          <span className="text-slate-500">المتاح</span>
+          <strong className="mr-1 text-cyan-100">{money(available)} {selected?.asset || "USDT"}</strong>
         </div>
 
-        <div className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.025] px-3 py-2 text-xs">
-          <div><span className="text-slate-500">المتاح</span><div className="mt-0.5 font-black text-cyan-100">{money(available)} {selected?.asset || "USDT"}</div></div>
-          <div className="text-left"><span className="text-slate-500">الحد الأدنى</span><div className="mt-0.5 font-black">{money(minimum)} {selected?.asset || "USDT"}</div></div>
-        </div>
-
-        <div className={source === "wallet" ? "min-w-0 md:col-span-2" : "min-w-0"}>
-          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-            <label className="block text-[11px] font-bold">عنوان الاستلام</label>
-            <span className="text-[10px] text-slate-500">{savedAddress ? "عنوان محفوظ" : ""}</span>
-          </div>
-          <textarea value={form.address} onChange={(event) => updateForm(source, packageId, "address", event.target.value)} rows={2} required placeholder="عنوان محفظة الاستلام" className="w-full resize-y rounded-lg border border-white/10 bg-[#050a13] px-3 py-2 text-sm outline-none focus:border-cyan-400/50" />
-          <button type="button" onClick={() => void saveAddress(source, packageId)} disabled={isSaving || !form.address.trim() || !selected} className="mt-1 rounded-lg border border-cyan-400/20 bg-cyan-400/[0.06] px-2.5 py-1 text-[10px] font-bold text-cyan-200 disabled:opacity-40">
+        <div className="min-w-0">
+          <input aria-label="عنوان الاستلام" value={form.address} onChange={(event) => updateForm(source, packageId, "address", event.target.value)} required placeholder="عنوان الاستلام" className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50" />
+          <button type="button" onClick={() => void saveAddress(source, packageId)} disabled={isSaving || !form.address.trim() || !selected} className="mt-1 rounded-lg border border-cyan-400/20 bg-cyan-400/[0.06] px-2 py-1 text-[10px] font-bold text-cyan-200 disabled:opacity-40">
             {isSaving ? "جارٍ الحفظ…" : savedAddress ? "تحديث العنوان" : "حفظ العنوان"}
           </button>
         </div>
 
-        <div>
-          <label className="mb-1 block text-[11px] font-bold">مبلغ السحب</label>
-          <input type="number" min={minimum} max={source === "package" ? Math.min(packageMax, maximum || packageMax) : maximum} step="any" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", event.target.value)} disabled={Boolean(packagePending || (source === "package" && (!packageAccount || packageMax <= 0)))} required placeholder="المبلغ" className="w-full rounded-lg border border-white/10 bg-[#050a13] px-3 py-2 text-sm outline-none focus:border-cyan-400/50 disabled:opacity-50" />
-          {source === "package" && <p className="mt-1 text-[10px] leading-4 text-slate-500">أقصى مبلغ: {money(Math.min(packageMax, maximum || packageMax))} USDT</p>}
-        </div>
-
-        <div className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.025] px-3 py-2 text-[11px]">
-          <span className="text-slate-500">الرسوم: <b className="text-slate-200">{money(Number(selected?.withdrawalFee || 0))} {selected?.asset || ""}</b></span>
-          <span className="text-slate-500">الصافي: <b className="text-emerald-200">{money(Math.max(0, Number(form.amount || 0) - Number(selected?.withdrawalFee || 0)))} {selected?.asset || ""}</b></span>
+        <div className="min-w-0">
+          <input aria-label="مبلغ السحب" type="number" min={minimum} max={source === "package" ? Math.min(packageMax, maximum || packageMax) : maximum} step="any" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", event.target.value)} disabled={Boolean(packagePending || (source === "package" && (!packageAccount || packageMax <= 0)))} required placeholder={money(minimum)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50 disabled:opacity-50" />
+          {source === "package" && <p className="mt-1 text-[10px] leading-4 text-slate-500">الأقصى {money(Math.min(packageMax, maximum || packageMax))} USDT</p>}
         </div>
         {selected?.warning && <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-2 text-xs text-amber-200">{selected.warning}</div>}
         {packagePending && <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-2 text-[11px] text-amber-200">طلب السحب الأول قيد المراجعة.</div>}
 
-        <button type="submit" disabled={isSubmitting || !selected || (source === "package" && (!packageAccount || packagePending || packageMax <= 0))} className={"w-full rounded-lg bg-cyan-300 px-3 py-2 text-xs font-black text-[#03111c] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40 " + (source === "wallet" ? "md:col-span-2" : "")}>
+        <button type="submit" disabled={isSubmitting || !selected || (source === "package" && (!packageAccount || packagePending || packageMax <= 0))} className="col-span-2 w-full rounded-lg bg-cyan-300 px-3 py-1.5 text-xs font-black text-[#03111c] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40">
           {isSubmitting ? "جارٍ الإرسال…" : "تأكيد السحب"}
         </button>
       </form>
@@ -526,7 +516,6 @@ export default function WithdrawPage() {
                               </div>
                             </div>
                             <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
-                              <span className="text-slate-500">الحد الأدنى: <b className="text-slate-200">{money(Number(item?.minimumWithdrawal ?? plan.minimumWithdrawal ?? 100))} USDT</b></span>
                               <span className="text-slate-500">محجوز: <b className="text-slate-200">{money(Number(item?.lockedEarnings || 0))} USDT</b></span>
                             </div>
                             {!item ? (

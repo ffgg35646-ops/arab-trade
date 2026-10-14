@@ -33,6 +33,10 @@ type PackageAccount = {
   totalRealizedEarnings: number;
   totalWithdrawn: number;
   firstWithdrawalStatus?: "available" | "pending" | "completed";
+  firstPackageWithdrawalCap?: number;
+  firstPackageWithdrawalUsed?: number;
+  firstPackageWithdrawalRemaining?: number;
+  firstPackageWithdrawalPending?: boolean;
   activeReferralCount?: number;
   activeReferralDepositTotal?: number;
   firstPackageWithdrawalPercent?: number;
@@ -66,8 +70,12 @@ const statusLabel = (status: string) => status === "completed" ? "مكتمل" : 
 const statusClass = (status: string) => status === "completed" ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : status === "rejected" || status === "failed" ? "border-red-400/20 bg-red-400/10 text-red-200" : status === "approved" || status === "processing" ? "border-blue-400/20 bg-blue-400/10 text-blue-200" : "border-amber-400/20 bg-amber-400/10 text-amber-200";
 
 function packageMaximum(item: PackageAccount) {
-  // availableEarnings is authoritative; lockedEarnings is already reserved separately.
-  return Math.max(0, Number(item.availableEarnings || 0));
+  // Show and enforce the smaller of the actual package balance and the current phase cap.
+  const available = Math.max(0, Number(item.availableEarnings || 0));
+  const cap = item.withdrawalLimit === undefined
+    ? available
+    : Math.max(0, Number(item.withdrawalLimit || 0));
+  return Math.min(available, cap);
 }
 
 function packagePlanId(item: PackageAccount) {
@@ -391,7 +399,7 @@ export default function WithdrawPage() {
     const configuredMaximums = [Number(selected?.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : undefined;
     const packageMax = packageAccount ? packageMaximum(packageAccount) : 0;
-    const packagePending = packageAccount?.firstWithdrawalStatus === "pending";
+    const packagePending = Boolean(packageAccount?.firstPackageWithdrawalPending);
     const savedAddress = selected && savedAddresses.some((item) =>
       item.asset === selected.asset && item.network === selected.network && item.source === source
     );
@@ -422,10 +430,18 @@ export default function WithdrawPage() {
 
         <div className="min-w-0">
           <input aria-label="مبلغ السحب" type="number" min={minimum} max={source === "package" ? Math.min(packageMax, maximum || packageMax) : maximum} step="any" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", event.target.value)} disabled={Boolean(source === "package" && (!packageAccount || packageMax <= 0))} required placeholder={money(minimum)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50 disabled:opacity-50" />
-          {source === "package" && <p className="mt-1 text-[10px] leading-4 text-slate-500">الأقصى {money(Math.min(packageMax, maximum || packageMax))} USDT</p>}
+          {source === "package" && <p className="mt-1 text-[10px] leading-4 text-slate-500">الأقصى حسب مرحلة السحب الحالية: {money(Math.min(packageMax, maximum || packageMax))} USDT</p>}
         </div>
+        {source === "package" && packageAccount && (
+          <p className="col-span-2 rounded-lg border border-white/10 bg-white/[0.025] p-2 text-[10px] leading-4 text-slate-400">
+            {packagePending
+              ? "طلب من سقف السحب الأول قيد المراجعة؛ انتظر حسمه قبل استكمال السقف أو الانتقال إلى الإحالات."
+              : Number(packageAccount.firstPackageWithdrawalRemaining || 0) > 0
+                ? "المتبقي من سقف المرحلة الأولى (حسب قيمة الباقة الأصلية): " + money(Number(packageAccount.firstPackageWithdrawalRemaining || 0)) + " USDT."
+                : "المتاح من سقف السحب مقابل الإحالات النشطة: " + money(Number(packageAccount.referralRemaining || 0)) + " USDT."}
+          </p>
+        )}
         {selected?.warning && <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-2 text-xs text-amber-200">{selected.warning}</div>}
-        {packagePending && <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-2 text-[11px] text-amber-200">يوجد مبلغ محجوز لطلب سابق؛ الرصيد المتاح أعلاه مستقل وقابل للسحب.</div>}
 
         <button type="submit" disabled={isSubmitting || !selected || (source === "package" && (!packageAccount || packageMax <= 0))} className="col-span-2 w-full rounded-lg bg-cyan-300 px-3 py-1.5 text-xs font-black text-[#03111c] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40">
           {isSubmitting ? "جارٍ الإرسال…" : "تأكيد السحب"}

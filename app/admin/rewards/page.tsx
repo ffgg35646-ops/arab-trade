@@ -50,7 +50,7 @@ export default function RewardsAdminPage() {
   const [maxAmount, setMaxAmount] = useState("3");
 
   const [title, setTitle] = useState("مكافأة");
-  const [asset, setAsset] = useState("USDT");
+  const asset = "USDT";
   const [durationHours, setDurationHours] = useState("12");
 
   const [boxes, setBoxes] = useState<RewardBox[]>([]);
@@ -556,9 +556,11 @@ export default function RewardsAdminPage() {
 
               <input
                 value={asset}
-                onChange={(e) => setAsset(e.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 uppercase outline-none"
+                readOnly
+                aria-label="عملة مكافأة الصندوق"
+                className="w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 uppercase outline-none opacity-80"
               />
+              <p className="mt-1 text-xs text-slate-500">تُضاف المكافأة إلى رصيد سحب الباقة النشطة بعملة USDT فقط.</p>
             </div>
 
             <div>

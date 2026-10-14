@@ -172,12 +172,8 @@ export async function POST(request: NextRequest) {
         body.title || "مكافأة"
       ).trim();
 
-    const asset =
-      String(
-        body.asset || "USDT"
-      )
-        .trim()
-        .toUpperCase();
+    // Box rewards feed the active package withdrawal balance, which is USDT-only.
+    const asset = "USDT";
 
     const amountMode =
       body.amountMode === "random"

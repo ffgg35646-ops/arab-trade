@@ -455,7 +455,6 @@ export async function POST(request: NextRequest) {
         WithdrawalRequest.find({
           userId: user._id,
           source: "package",
-          userPackageId: currentPackage._id,
           isFirstPackageWithdrawal: { $ne: true },
           status: { $in: countedStatuses },
         }).select("amount").lean(),

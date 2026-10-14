@@ -96,16 +96,12 @@ export async function GET(request: NextRequest) {
       const collectWindowEndsAt = nextCollectAt + 30 * 60 * 1000;
       const dailyProfit = dailyProfitByPackage.get(String(item.packageId)) || 0;
       const collectWindowOpen = item.status === "active" && collectionNow >= nextCollectAt && collectionNow <= collectWindowEndsAt;
-      const firstPending = item.firstWithdrawalStatus === "pending";
-      const firstCompleted = item.firstWithdrawalStatus === "completed" || Number(item.totalWithdrawn || 0) > 0;
-      const isFirstAvailable = item.status === "active" && !firstPending && !firstCompleted;
       const referralCap = activeReferralDepositTotal * referralPackageWithdrawalPercent / 100;
       const referralAlreadyWithdrawn = referralWithdrawalByPackage.get(String(item._id)) || 0;
       const referralRemaining = Math.max(0, referralCap - referralAlreadyWithdrawn);
-      const firstCap = Number(item.investedAmount || 0) * firstPackageWithdrawalPercent / 100;
-      const withdrawalLimit = firstPending ? 0 : isFirstAvailable
-        ? Math.min(Number(item.availableEarnings || 0), firstCap)
-        : Math.min(Number(item.availableEarnings || 0), referralRemaining);
+      // The package account is the single source of truth. Locked withdrawals are already
+      // deducted from availableEarnings, so the remaining balance is the withdrawable amount.
+      const withdrawalLimit = Math.max(0, Number(item.availableEarnings || 0));
       return {
         ...item,
         dailyProfit,

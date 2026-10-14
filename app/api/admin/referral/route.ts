@@ -15,6 +15,13 @@ export async function GET(request: NextRequest) {
     await connectDB();
     const settings = await getPlatformSettings();
 
+    // The previous handler forcibly wrote 0%, which disabled referral credits.
+    // Restore the intended default for an enabled referral program that was left at 0.
+    if (settings.referral?.enabled !== false && Number(settings.referral?.commissionPercent ?? 0) <= 0) {
+      settings.referral.commissionPercent = 10;
+      await settings.save();
+    }
+
     const [invitedCount, activeCountRows, depositTotals, referrals] = await Promise.all([
       User.countDocuments({ referredBy: { $exists: true, $ne: null } }),
       DepositRequest.aggregate([
@@ -99,7 +106,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const commissionPercent = 0; // Referral rewards are disabled by product request.
+    const commissionPercent = Number(body.commissionPercent ?? 10);
     const enabled = body.enabled === true;
 
     if (!Number.isFinite(commissionPercent) || commissionPercent < 0 || commissionPercent > 100) {
@@ -108,7 +115,7 @@ export async function PATCH(request: NextRequest) {
 
     const settings = await getPlatformSettings();
     settings.referral.enabled = enabled;
-    settings.referral.commissionPercent = 0;
+    settings.referral.commissionPercent = commissionPercent;
     await settings.save();
 
     return NextResponse.json({
@@ -116,7 +123,7 @@ export async function PATCH(request: NextRequest) {
       message: "تم حفظ إعدادات الإحالة",
       referral: {
         enabled: settings.referral.enabled,
-        commissionPercent: 0,
+        commissionPercent: settings.referral.commissionPercent,
         minPayout: settings.referral.minPayout
       }
     });

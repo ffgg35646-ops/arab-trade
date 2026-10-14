@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       ])
     );
 
-    const [activeReferralDeposits, referralWithdrawalRows] = await Promise.all([
+    const [activeReferralDeposits, referralWithdrawalRows, firstWithdrawalRows] = await Promise.all([
       referredIds.length
         ? DepositRequest.aggregate([
             { $match: { userId: { $in: referredIds }, status: "approved", asset: "USDT" } },
@@ -73,6 +73,12 @@ export async function GET(request: NextRequest) {
         isFirstPackageWithdrawal: { $ne: true },
         status: { $in: ["pending", "approved", "processing", "completed"] },
       }).select("userPackageId amount").lean(),
+      WithdrawalRequest.find({
+        userId: user._id,
+        source: "package",
+        isFirstPackageWithdrawal: true,
+        status: { $in: ["pending", "approved", "processing", "completed"] },
+      }).select("userPackageId amount status").lean(),
     ]);
 
     const activeReferralCount = activeReferralDeposits.length;
@@ -86,6 +92,15 @@ export async function GET(request: NextRequest) {
       const key = String(row.userPackageId || "");
       referralWithdrawalByPackage.set(key, (referralWithdrawalByPackage.get(key) || 0) + Number(row.amount || 0));
     }
+    const firstWithdrawalByPackage = new Map<string, number>();
+    const firstWithdrawalPendingPackages = new Set<string>();
+    for (const row of firstWithdrawalRows as any[]) {
+      const key = String(row.userPackageId || "");
+      firstWithdrawalByPackage.set(key, (firstWithdrawalByPackage.get(key) || 0) + Number(row.amount || 0));
+      if (["pending", "approved", "processing"].includes(String(row.status))) {
+        firstWithdrawalPendingPackages.add(key);
+      }
+    }
     const dailyProfitByPackage = new Map(
       (allPlansForProfit as any[]).map((plan) => [String(plan._id), Math.max(0, Number(plan.dailyProfit || 0))])
     );
@@ -96,14 +111,29 @@ export async function GET(request: NextRequest) {
       const collectWindowEndsAt = nextCollectAt + 30 * 60 * 1000;
       const dailyProfit = dailyProfitByPackage.get(String(item.packageId)) || 0;
       const collectWindowOpen = item.status === "active" && collectionNow >= nextCollectAt && collectionNow <= collectWindowEndsAt;
+      const packageKey = String(item._id);
       const referralCap = activeReferralDepositTotal * referralPackageWithdrawalPercent / 100;
-      const referralAlreadyWithdrawn = referralWithdrawalByPackage.get(String(item._id)) || 0;
+      const referralAlreadyWithdrawn = referralWithdrawalByPackage.get(packageKey) || 0;
       const referralRemaining = Math.max(0, referralCap - referralAlreadyWithdrawn);
-      // The package account is the single source of truth. Locked withdrawals are already
-      // deducted from availableEarnings, so the remaining balance is the withdrawable amount.
-      const withdrawalLimit = Math.max(0, Number(item.availableEarnings || 0));
+      const firstPackageWithdrawalCap = Math.max(0, Number(item.investedAmount || 0) * firstPackageWithdrawalPercent / 100);
+      const firstPackageWithdrawalUsed = firstWithdrawalByPackage.get(packageKey) || 0;
+      const firstPackageWithdrawalRemaining = Math.max(0, firstPackageWithdrawalCap - firstPackageWithdrawalUsed);
+      const firstPackageWithdrawalPending = firstWithdrawalPendingPackages.has(packageKey);
+      // Phase 1 is capped by the original package purchase amount. Once exhausted,
+      // the next phase is capped by a percentage of approved active-referral deposits.
+      // Pending phase-1 requests reserve that phase until the administrator settles them.
+      const availableEarnings = Math.max(0, Number(item.availableEarnings || 0));
+      const withdrawalLimit = firstPackageWithdrawalPending
+        ? 0
+        : Math.min(availableEarnings, firstPackageWithdrawalRemaining > 0
+          ? firstPackageWithdrawalRemaining
+          : referralRemaining);
       return {
         ...item,
+        firstPackageWithdrawalCap,
+        firstPackageWithdrawalUsed,
+        firstPackageWithdrawalRemaining,
+        firstPackageWithdrawalPending,
         dailyProfit,
         nextCollectAt: new Date(nextCollectAt).toISOString(),
         collectWindowEndsAt: new Date(collectWindowEndsAt).toISOString(),

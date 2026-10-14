@@ -364,7 +364,7 @@ export async function POST(
             await PlatformSettings.updateOne(
               { key: "global" },
               { $set: { "referral.commissionPercent": 10 } },
-              { session }
+              { session: session! }
             );
           }
 

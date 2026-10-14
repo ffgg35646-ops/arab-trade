@@ -255,6 +255,7 @@ export async function POST(request: NextRequest) {
 
 
 
+    // Activation only debits the new package; refunds are handled by change/cancel actions.
     if (action === "activate") {
       if (!mongoose.Types.ObjectId.isValid(packageId)) {
         return NextResponse.json({ success: false, message: "الباقة غير صحيحة" }, { status: 400 });

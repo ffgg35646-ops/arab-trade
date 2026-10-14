@@ -318,7 +318,16 @@ export default function WithdrawPage() {
       : Math.max(Number(selectedMethod.minWithdrawal || 0), Number(limits.minGeneralWithdrawal ?? limits.minWithdrawal ?? 0));
     const configuredMaximums = [Number(selectedMethod.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : 0;
-    if (numericAmount < minimum) {
+    const firstRemainder = Number(packageAccount?.firstPackageWithdrawalRemaining || 0);
+    const finalFirstAllowanceBelowMinimum =
+      source === "package" &&
+      Boolean(packageAccount) &&
+      packageAccount?.firstPackageWithdrawalPending !== true &&
+      firstRemainder > 0 &&
+      firstRemainder < minimum &&
+      Math.abs(numericAmount - firstRemainder) <= 1e-8 &&
+      Number(packageAccount?.availableEarnings || 0) >= firstRemainder;
+    if (numericAmount < minimum && !finalFirstAllowanceBelowMinimum) {
       setError("الحد الأدنى للسحب هو " + money(minimum) + " " + selectedMethod.asset);
       return;
     }
@@ -396,6 +405,15 @@ export default function WithdrawPage() {
     const minimum = source === "package"
       ? Math.max(Number(selected?.minWithdrawal || 0), Number(packageAccount?.minimumWithdrawal ?? packagePlan?.minimumWithdrawal ?? 100))
       : Math.max(Number(selected?.minWithdrawal || 0), Number(limits.minGeneralWithdrawal ?? limits.minWithdrawal ?? 0));
+    const firstRemainder = Number(packageAccount?.firstPackageWithdrawalRemaining || 0);
+    const inputMinimum = source === "package" &&
+      packageAccount &&
+      packageAccount.firstPackageWithdrawalPending !== true &&
+      firstRemainder > 0 &&
+      firstRemainder < minimum &&
+      available >= firstRemainder
+        ? firstRemainder
+        : minimum;
     const configuredMaximums = [Number(selected?.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : undefined;
     const packageMax = packageAccount ? packageMaximum(packageAccount) : 0;
@@ -429,7 +447,7 @@ export default function WithdrawPage() {
         </div>
 
         <div className="min-w-0">
-          <input aria-label="مبلغ السحب" type="number" min={minimum} max={source === "package" ? Math.min(packageMax, maximum || packageMax) : maximum} step="any" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", event.target.value)} disabled={Boolean(source === "package" && (!packageAccount || packageMax <= 0))} required placeholder={money(minimum)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50 disabled:opacity-50" />
+          <input aria-label="مبلغ السحب" type="number" min={inputMinimum} max={source === "package" ? Math.min(packageMax, maximum || packageMax) : maximum} step="any" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", event.target.value)} disabled={Boolean(source === "package" && (!packageAccount || packageMax <= 0))} required placeholder={money(minimum)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50 disabled:opacity-50" />
           {source === "package" && <p className="mt-1 text-[10px] leading-4 text-slate-500">الأقصى حسب مرحلة السحب الحالية: {money(Math.min(packageMax, maximum || packageMax))} USDT</p>}
         </div>
         {source === "package" && packageAccount && (

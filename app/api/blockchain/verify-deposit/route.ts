@@ -361,10 +361,14 @@ export async function POST(
 
           // Recover the 0% value written by the previous broken settings handler.
           if (enabled && commissionPercent === 10 && configuredCommissionPercent <= 0) {
+            const settingsSession = session;
+            if (!settingsSession) {
+              throw new Error("TRANSACTION_SESSION_UNAVAILABLE");
+            }
             await PlatformSettings.updateOne(
               { key: "global" },
               { $set: { "referral.commissionPercent": 10 } },
-              { session: session! }
+              { session: settingsSession }
             );
           }
 

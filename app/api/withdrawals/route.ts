@@ -436,13 +436,6 @@ export async function POST(request: NextRequest) {
         Number(configuredPackageMinimum ?? packagePlan?.minimumWithdrawal ?? settings.withdrawals.minAmount ?? 0),
         Number(minAmount || 0)
       );
-      if (amount < packageMinimum) {
-        return NextResponse.json(
-          { success: false, message: "الحد الأدنى للسحب من باقة " + currentPackage.packageName + " هو " + packageMinimum + " " + assetCode, minAmount: packageMinimum },
-          { status: 400 }
-        );
-      }
-
       const countedStatuses = ["pending", "approved", "processing", "completed"];
       const [firstWithdrawalRows, referralWithdrawalRows, referredUsers] = await Promise.all([
         WithdrawalRequest.find({
@@ -546,6 +539,23 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
+      }
+
+      // If the last remainder of phase one is below the normal minimum, allow
+      // exactly that full remainder when the package balance can cover it.
+      // This avoids stranding a small first-stage remainder (for example $50).
+      const finalFirstAllowanceBelowMinimum =
+        isFirstPackageWithdrawal &&
+        firstPackageWithdrawalRemaining > 0 &&
+        firstPackageWithdrawalRemaining < packageMinimum &&
+        Math.abs(amount - firstPackageWithdrawalRemaining) <= 1e-8 &&
+        Number(currentPackage.availableEarnings || 0) >= firstPackageWithdrawalRemaining;
+
+      if (amount < packageMinimum && !finalFirstAllowanceBelowMinimum) {
+        return NextResponse.json(
+          { success: false, message: "الحد الأدنى للسحب من باقة " + currentPackage.packageName + " هو " + packageMinimum + " " + assetCode, minAmount: packageMinimum },
+          { status: 400 }
+        );
       }
 
       const packageFilter: Record<string, any> = {

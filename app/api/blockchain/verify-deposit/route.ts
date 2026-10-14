@@ -354,7 +354,19 @@ export async function POST(
         if (referredUser?.referredBy) {
           const settings = await PlatformSettings.findOne({ key: "global" }).session(session).lean();
           const enabled = settings?.referral?.enabled !== false;
-          const commissionPercent = Number(settings?.referral?.commissionPercent ?? 0);
+          const configuredCommissionPercent = Number(settings?.referral?.commissionPercent ?? 10);
+          const commissionPercent = enabled && (!Number.isFinite(configuredCommissionPercent) || configuredCommissionPercent <= 0)
+            ? 10
+            : configuredCommissionPercent;
+
+          // Recover the 0% value written by the previous broken settings handler.
+          if (enabled && commissionPercent === 10 && configuredCommissionPercent <= 0) {
+            await PlatformSettings.updateOne(
+              { key: "global" },
+              { $set: { "referral.commissionPercent": 10 } },
+              { session }
+            );
+          }
 
           if (enabled && Number.isFinite(commissionPercent) && commissionPercent > 0 && commissionPercent <= 100) {
             const commission = Number((expectedAmount * commissionPercent / 100).toFixed(12));

@@ -7,7 +7,6 @@ import Reward from "@/models/Reward";
 import UserPackage from "@/models/UserPackage";
 import PackageLedger from "@/models/PackageLedger";
 import PlatformSettings from "@/models/PlatformSettings";
-import LedgerEntry from "@/models/LedgerEntry";
 
 export async function GET(request: NextRequest) {
   try {
@@ -193,7 +192,6 @@ export async function POST(request: NextRequest) {
         throw new Error("ACTIVE_PACKAGE_REQUIRED");
       }
 
-      const before = Number(activePackage.availableEarnings || 0);
       const updatedPackage = await UserPackage.findOneAndUpdate(
         {
           _id: activePackage._id,
@@ -214,9 +212,6 @@ export async function POST(request: NextRequest) {
         throw new Error("REWARD_PACKAGE_UPDATE_FAILED");
       }
 
-      const balanceAfter = Number(updatedPackage.availableEarnings || 0);
-      const destinationNote = "رصيد سحب الباقة النشطة: " + activePackage.packageName;
-
       await PackageLedger.create(
         [
           {
@@ -226,22 +221,6 @@ export async function POST(request: NextRequest) {
             asset: "USDT",
             amount,
             note: "مكافأة صندوق: " + reward.title + " — أضيفت إلى رصيد سحب الباقة النشطة",
-          },
-        ],
-        { session }
-      );
-
-      await LedgerEntry.create(
-        [
-          {
-            userId: user._id,
-            asset,
-            type: "reward",
-            amount,
-            balanceBefore: before,
-            balanceAfter,
-            referenceId: String(reward._id),
-            note: String(reward.title || "مكافأة") + " — " + destinationNote,
           },
         ],
         { session }

@@ -66,16 +66,8 @@ const statusLabel = (status: string) => status === "completed" ? "مكتمل" : 
 const statusClass = (status: string) => status === "completed" ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : status === "rejected" || status === "failed" ? "border-red-400/20 bg-red-400/10 text-red-200" : status === "approved" || status === "processing" ? "border-blue-400/20 bg-blue-400/10 text-blue-200" : "border-amber-400/20 bg-amber-400/10 text-amber-200";
 
 function packageMaximum(item: PackageAccount) {
-  const isFirst = item.status === "active" &&
-    item.firstWithdrawalStatus !== "pending" &&
-    item.firstWithdrawalStatus !== "completed" &&
-    Number(item.totalWithdrawn || 0) <= 0;
-  const configuredLimit = item.withdrawalLimit ?? (
-    isFirst
-      ? Number(item.investedAmount || 0) * Number(item.firstPackageWithdrawalPercent ?? 100) / 100
-      : Number(item.referralRemaining || 0)
-  );
-  return Math.max(0, Math.min(Number(item.availableEarnings || 0), Number(configuredLimit || 0)));
+  // availableEarnings is authoritative; lockedEarnings is already reserved separately.
+  return Math.max(0, Number(item.availableEarnings || 0));
 }
 
 function packagePlanId(item: PackageAccount) {
@@ -298,10 +290,6 @@ export default function WithdrawPage() {
         setError("تعذر تحديد الباقة المطلوبة");
         return;
       }
-      if (packageAccount.firstWithdrawalStatus === "pending") {
-        setError("يوجد أول طلب سحب قيد المراجعة لهذه الباقة.");
-        return;
-      }
       const max = packageMaximum(packageAccount);
       if (numericAmount > max) {
         setError(max > 0
@@ -433,13 +421,13 @@ export default function WithdrawPage() {
         </div>
 
         <div className="min-w-0">
-          <input aria-label="مبلغ السحب" type="number" min={minimum} max={source === "package" ? Math.min(packageMax, maximum || packageMax) : maximum} step="any" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", event.target.value)} disabled={Boolean(packagePending || (source === "package" && (!packageAccount || packageMax <= 0)))} required placeholder={money(minimum)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50 disabled:opacity-50" />
+          <input aria-label="مبلغ السحب" type="number" min={minimum} max={source === "package" ? Math.min(packageMax, maximum || packageMax) : maximum} step="any" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", event.target.value)} disabled={Boolean(source === "package" && (!packageAccount || packageMax <= 0))} required placeholder={money(minimum)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50 disabled:opacity-50" />
           {source === "package" && <p className="mt-1 text-[10px] leading-4 text-slate-500">الأقصى {money(Math.min(packageMax, maximum || packageMax))} USDT</p>}
         </div>
         {selected?.warning && <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-2 text-xs text-amber-200">{selected.warning}</div>}
-        {packagePending && <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-2 text-[11px] text-amber-200">طلب السحب الأول قيد المراجعة.</div>}
+        {packagePending && <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-2 text-[11px] text-amber-200">يوجد مبلغ محجوز لطلب سابق؛ الرصيد المتاح أعلاه مستقل وقابل للسحب.</div>}
 
-        <button type="submit" disabled={isSubmitting || !selected || (source === "package" && (!packageAccount || packagePending || packageMax <= 0))} className="col-span-2 w-full rounded-lg bg-cyan-300 px-3 py-1.5 text-xs font-black text-[#03111c] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40">
+        <button type="submit" disabled={isSubmitting || !selected || (source === "package" && (!packageAccount || packageMax <= 0))} className="col-span-2 w-full rounded-lg bg-cyan-300 px-3 py-1.5 text-xs font-black text-[#03111c] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40">
           {isSubmitting ? "جارٍ الإرسال…" : "تأكيد السحب"}
         </button>
       </form>

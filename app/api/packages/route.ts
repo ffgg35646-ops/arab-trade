@@ -87,11 +87,12 @@ export async function GET(request: NextRequest) {
     );
     const firstPackageWithdrawalPercent = Math.max(0, Math.min(100, Number(settings?.withdrawals?.firstPackageWithdrawalPercent ?? 100)));
     const referralPackageWithdrawalPercent = Math.max(0, Math.min(100, Number(settings?.withdrawals?.referralPackageWithdrawalPercent ?? 50)));
-    const referralWithdrawalByPackage = new Map<string, number>();
-    for (const row of referralWithdrawalRows as any[]) {
-      const key = String(row.userPackageId || "");
-      referralWithdrawalByPackage.set(key, (referralWithdrawalByPackage.get(key) || 0) + Number(row.amount || 0));
-    }
+    // Referral-deposit capacity is user-wide, so the same referral deposits
+    // cannot unlock repeated withdrawal limits across multiple package accounts.
+    const referralAlreadyWithdrawnTotal = (referralWithdrawalRows as any[]).reduce(
+      (sum: number, row: any) => sum + Number(row.amount || 0),
+      0
+    );
     const firstWithdrawalByPackage = new Map<string, number>();
     const firstWithdrawalPendingPackages = new Set<string>();
     for (const row of firstWithdrawalRows as any[]) {
@@ -113,7 +114,7 @@ export async function GET(request: NextRequest) {
       const collectWindowOpen = item.status === "active" && collectionNow >= nextCollectAt && collectionNow <= collectWindowEndsAt;
       const packageKey = String(item._id);
       const referralCap = activeReferralDepositTotal * referralPackageWithdrawalPercent / 100;
-      const referralAlreadyWithdrawn = referralWithdrawalByPackage.get(packageKey) || 0;
+      const referralAlreadyWithdrawn = referralAlreadyWithdrawnTotal;
       const referralRemaining = Math.max(0, referralCap - referralAlreadyWithdrawn);
       const firstPackageWithdrawalCap = Math.max(0, Number(item.investedAmount || 0) * firstPackageWithdrawalPercent / 100);
       const firstPackageWithdrawalUsed = firstWithdrawalByPackage.get(packageKey) || 0;

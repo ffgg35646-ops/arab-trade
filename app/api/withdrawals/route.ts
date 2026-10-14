@@ -436,7 +436,7 @@ export async function POST(request: NextRequest) {
         Number(configuredPackageMinimum ?? packagePlan?.minimumWithdrawal ?? settings.withdrawals.minAmount ?? 0),
         Number(minAmount || 0)
       );
-      const countedStatuses = ["pending", "approved", "processing", "completed"];
+      const countedStatuses = ["pending", "approved", "processing", "completed"] as const;
       const [firstWithdrawalRows, referralWithdrawalRows, referredUsers] = await Promise.all([
         WithdrawalRequest.find({
           userId: user._id,

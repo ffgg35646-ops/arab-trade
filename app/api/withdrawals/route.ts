@@ -13,6 +13,8 @@ import { rateLimit } from "@/lib/rate-limit";
 import UserPackage from "@/models/UserPackage";
 import InvestmentPackage from "@/models/InvestmentPackage";
 import PackageLedger from "@/models/PackageLedger";
+import User from "@/models/User";
+import DepositRequest from "@/models/DepositRequest";
 import { accrueDuePackageEarnings } from "@/lib/accrue-package-earnings";
 import { normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
 import { separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
@@ -425,23 +427,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      let firstStatus = currentPackage.firstWithdrawalStatus;
-      if (firstStatus !== "pending" && Number(currentPackage.totalWithdrawn || 0) > 0) {
-        firstStatus = "completed";
-        if (currentPackage.firstWithdrawalStatus !== "completed") {
-          await UserPackage.updateOne(
-            { _id: currentPackage._id, firstWithdrawalStatus: { $ne: "pending" } },
-            { $set: { firstWithdrawalStatus: "completed" } }
-          );
-        }
-      } else if (!firstStatus) {
-        firstStatus = "available";
-        await UserPackage.updateOne(
-          { _id: currentPackage._id, firstWithdrawalStatus: { $exists: false } },
-          { $set: { firstWithdrawalStatus: "available" } }
-        );
-      }
-
       const packagePlan = await InvestmentPackage.findById(currentPackage.packageId)
         .select("minimumWithdrawal")
         .lean();
@@ -458,14 +443,111 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const countedStatuses = ["pending", "approved", "processing", "completed"];
+      const [firstWithdrawalRows, referralWithdrawalRows, referredUsers] = await Promise.all([
+        WithdrawalRequest.find({
+          userId: user._id,
+          source: "package",
+          userPackageId: currentPackage._id,
+          isFirstPackageWithdrawal: true,
+          status: { $in: countedStatuses },
+        }).select("amount status").lean(),
+        WithdrawalRequest.find({
+          userId: user._id,
+          source: "package",
+          userPackageId: currentPackage._id,
+          isFirstPackageWithdrawal: { $ne: true },
+          status: { $in: countedStatuses },
+        }).select("amount").lean(),
+        User.find({ referredBy: user._id }).select("_id").lean(),
+      ]);
 
-      // Each package withdraws only from its own availableEarnings balance.
-      // Existing pending requests remain in lockedEarnings and do not block withdrawals
-      // from the unreserved remainder of this same package.
-      isFirstPackageWithdrawal =
-        currentPackage.status === "active" &&
-        firstStatus === "available" &&
-        Number(currentPackage.totalWithdrawn || 0) <= 0;
+      const firstPackageWithdrawalPercent = Math.max(
+        0,
+        Math.min(100, Number(settings.withdrawals.firstPackageWithdrawalPercent ?? 100))
+      );
+      const firstPackageWithdrawalCap = Math.max(
+        0,
+        Number(currentPackage.investedAmount || 0) * firstPackageWithdrawalPercent / 100
+      );
+      const firstPackageWithdrawalUsed = firstWithdrawalRows.reduce(
+        (sum: number, row: any) => sum + Number(row.amount || 0),
+        0
+      );
+      const firstPackageWithdrawalRemaining = Math.max(
+        0,
+        firstPackageWithdrawalCap - firstPackageWithdrawalUsed
+      );
+      const firstPackageWithdrawalPending = firstWithdrawalRows.some(
+        (row: any) => ["pending", "approved", "processing"].includes(String(row.status))
+      );
+
+      if (firstPackageWithdrawalPending) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "يوجد طلب من سقف السحب الأول قيد المراجعة؛ انتظر حسمه قبل استكمال السحب أو الانتقال لمرحلة الإحالات.",
+            firstPackageWithdrawalRemaining,
+          },
+          { status: 409 }
+        );
+      }
+
+      // Phase one: cumulative withdrawals are capped by the original package amount
+      // multiplied by the admin-configured first-withdrawal percentage.
+      if (firstPackageWithdrawalRemaining > 0) {
+        if (amount > firstPackageWithdrawalRemaining) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: "المتاح من سقف السحب الأول لباقة " + currentPackage.packageName + " هو " + firstPackageWithdrawalRemaining + " " + assetCode + ". بعد استهلاك هذا السقف يصبح السحب مقابل الإحالات النشطة.",
+              firstPackageWithdrawalCap,
+              firstPackageWithdrawalUsed,
+              firstPackageWithdrawalRemaining,
+            },
+            { status: 400 }
+          );
+        }
+        isFirstPackageWithdrawal = true;
+      } else {
+        // Phase two and later: the configured percentage of approved USDT deposits
+        // made by the user's referred accounts defines the cumulative withdrawal cap.
+        const referredIds = referredUsers.map((item: any) => item._id);
+        const activeReferralDeposits = referredIds.length
+          ? await DepositRequest.aggregate([
+              { $match: { userId: { $in: referredIds }, status: "approved", asset: "USDT" } },
+              { $group: { _id: "$userId", total: { $sum: "$amount" } } },
+            ])
+          : [];
+        const activeReferralDepositTotal = activeReferralDeposits.reduce(
+          (sum: number, row: any) => sum + Number(row.total || 0),
+          0
+        );
+        const referralPercent = Math.max(
+          0,
+          Math.min(100, Number(settings.withdrawals.referralPackageWithdrawalPercent ?? 50))
+        );
+        const referralCap = activeReferralDepositTotal * referralPercent / 100;
+        const referralUsed = referralWithdrawalRows.reduce(
+          (sum: number, row: any) => sum + Number(row.amount || 0),
+          0
+        );
+        const referralRemaining = Math.max(0, referralCap - referralUsed);
+
+        if (amount > referralRemaining) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: "حد السحب المتبقي مقابل إيداعات الإحالات النشطة هو " + referralRemaining + " " + assetCode + ". تحتاج إلى إحالات نشطة وإيداعات معتمدة إضافية لزيادة الحد.",
+              activeReferralDepositTotal,
+              referralCap,
+              referralUsed,
+              referralRemaining,
+            },
+            { status: 400 }
+          );
+        }
+      }
 
       const packageFilter: Record<string, any> = {
         _id: userPackageId,
@@ -476,9 +558,9 @@ export async function POST(request: NextRequest) {
       };
 
       if (isFirstPackageWithdrawal) {
-        // Keep the one-time marker race-safe, while allowing other requests to use
-        // the remaining available balance when an earlier request is already reserved.
-        packageFilter.firstWithdrawalStatus = { $in: ["available", null] };
+        // Allow repeat requests against the remaining first-stage allowance only
+        // after the previous first-stage request has been settled.
+        packageFilter.firstWithdrawalStatus = { $in: ["available", "completed", null] };
       }
 
       lockedUserPackage = await UserPackage.findOneAndUpdate(

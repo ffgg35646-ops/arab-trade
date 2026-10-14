@@ -175,16 +175,6 @@ export async function POST(request: NextRequest) {
         throw new Error("INVALID_REWARD");
       }
 
-      // Route each reward to the currently active package's withdrawal balance.
-      // If there is no active package for this asset, use the general withdrawal wallet.
-      const activePackage = await UserPackage.findOne({
-        userId: user._id,
-        status: "active",
-        asset,
-      })
-        .sort({ activatedAt: -1, createdAt: -1 })
-        .session(session);
-
       if (asset !== "USDT") {
         throw new Error("REWARD_ASSET_NOT_SUPPORTED");
       }

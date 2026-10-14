@@ -4,7 +4,6 @@ import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
 import Reward from "@/models/Reward";
-import Wallet from "@/models/Wallet";
 import UserPackage from "@/models/UserPackage";
 import PackageLedger from "@/models/PackageLedger";
 import PlatformSettings from "@/models/PlatformSettings";
@@ -186,86 +185,61 @@ export async function POST(request: NextRequest) {
         .sort({ activatedAt: -1, createdAt: -1 })
         .session(session);
 
-      let before = 0;
-      let balanceAfter = 0;
-      let destinationNote = "";
-
-      if (activePackage) {
-        before = Number(activePackage.availableEarnings || 0);
-
-        const updatedPackage = await UserPackage.findOneAndUpdate(
-          {
-            _id: activePackage._id,
-            userId: user._id,
-            status: "active",
-          },
-          {
-            $inc: {
-              availableEarnings: amount,
-              totalRealizedEarnings: amount,
-            },
-          },
-          { new: true, session }
-        );
-
-        if (!updatedPackage) {
-          throw new Error("REWARD_PACKAGE_UPDATE_FAILED");
-        }
-
-        balanceAfter = Number(updatedPackage.availableEarnings || 0);
-        destinationNote = "رصيد سحب الباقة المفعّلة: " + activePackage.packageName;
-
-        await PackageLedger.create(
-          [
-            {
-              userId: user._id,
-              userPackageId: activePackage._id,
-              type: "reward",
-              asset,
-              amount,
-              note: "مكافأة صندوق: " + reward.title,
-            },
-          ],
-          { session }
-        );
-      } else {
-        let wallet = await Wallet.findOne({
-          userId: user._id,
-          type: "funding",
-          mode: "live",
-        }).session(session);
-
-        if (!wallet) {
-          wallet = new Wallet({
-            userId: user._id,
-            type: "funding",
-            mode: "live",
-            balances: [],
-          });
-        }
-
-        let balance = wallet.balances.find(
-          (item: any) => String(item.asset || "").toUpperCase() === asset
-        );
-
-        if (!balance) {
-          wallet.balances.push({
-            asset,
-            available: amount,
-            locked: 0,
-          });
-
-          balance = wallet.balances[wallet.balances.length - 1] as any;
-          before = 0;
-        } else {
-          before = Number(balance.available || 0);
-          balance.available = before + amount;
-        }
-
-        balanceAfter = Number(balance?.available ?? amount);
-        await wallet.save({ session });
-        destinationNote = "رصيد السحب العام";
+      if (asset !== "USDT") {
+        throw new Error("REWARD_ASSET_NOT_SUPPORTED");
       }
+
+      // A box reward must be credited to the currently active package only.
+      // Never fall back to the general wallet or an older/cancelled package.
+      const activePackage = await UserPackage.findOne({
+        userId: user._id,
+        status: "active",
+        asset: "USDT",
+      })
+        .sort({ activatedAt: -1, createdAt: -1 })
+        .session(session);
+
+      if (!activePackage) {
+        throw new Error("ACTIVE_PACKAGE_REQUIRED");
+      }
+
+      const before = Number(activePackage.availableEarnings || 0);
+      const updatedPackage = await UserPackage.findOneAndUpdate(
+        {
+          _id: activePackage._id,
+          userId: user._id,
+          status: "active",
+          asset: "USDT",
+        },
+        {
+          $inc: {
+            availableEarnings: amount,
+            totalRealizedEarnings: amount,
+          },
+        },
+        { new: true, session }
+      );
+
+      if (!updatedPackage) {
+        throw new Error("REWARD_PACKAGE_UPDATE_FAILED");
+      }
+
+      const balanceAfter = Number(updatedPackage.availableEarnings || 0);
+      const destinationNote = "رصيد سحب الباقة النشطة: " + activePackage.packageName;
+
+      await PackageLedger.create(
+        [
+          {
+            userId: user._id,
+            userPackageId: activePackage._id,
+            type: "reward",
+            asset: "USDT",
+            amount,
+            note: "مكافأة صندوق: " + reward.title + " — أضيفت إلى رصيد سحب الباقة النشطة",
+          },
+        ],
+        { session }
+      );
 
       await LedgerEntry.create(
         [
@@ -326,6 +300,26 @@ export async function POST(request: NextRequest) {
           message: "انتهت صلاحية المكافأة",
         },
         { status: 409 }
+      );
+    }
+
+    if (code === "ACTIVE_PACKAGE_REQUIRED") {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "لاستلام مكافأة الصندوق يجب أن تكون لديك باقة USDT نشطة؛ لم يتم تحويل المكافأة إلى المحفظة العامة.",
+        },
+        { status: 409 }
+      );
+    }
+
+    if (code === "REWARD_ASSET_NOT_SUPPORTED") {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "مكافآت الصندوق تُضاف إلى رصيد سحب الباقة النشطة بعملة USDT فقط.",
+        },
+        { status: 400 }
       );
     }
 

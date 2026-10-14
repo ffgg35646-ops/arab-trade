@@ -69,6 +69,15 @@ export async function GET(request: NextRequest) {
       ])
     ]);
 
+    // Restore the intended 10% default if an earlier settings handler stored 0%.
+    if (settings?.referral?.enabled !== false && Number(settings?.referral?.commissionPercent ?? 0) <= 0) {
+      await PlatformSettings.updateOne(
+        { key: "global" },
+        { $set: { "referral.commissionPercent": 10 } }
+      );
+      if (settings?.referral) settings.referral.commissionPercent = 10;
+    }
+
     const depositsByUser = new Map<string, { asset: string; amount: number; count: number }[]>();
     for (const row of depositGroups as DepositGroup[]) {
       const id = String(row._id.userId);

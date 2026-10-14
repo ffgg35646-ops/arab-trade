@@ -13,8 +13,6 @@ import { rateLimit } from "@/lib/rate-limit";
 import UserPackage from "@/models/UserPackage";
 import InvestmentPackage from "@/models/InvestmentPackage";
 import PackageLedger from "@/models/PackageLedger";
-import User from "@/models/User";
-import DepositRequest from "@/models/DepositRequest";
 import { accrueDuePackageEarnings } from "@/lib/accrue-package-earnings";
 import { normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
 import { separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
@@ -444,13 +442,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      if (firstStatus === "pending") {
-        return NextResponse.json(
-          { success: false, message: "أول طلب سحب من هذه الباقة ما زال قيد المراجعة. انتظر حسمه قبل تقديم طلب آخر." },
-          { status: 409 }
-        );
-      }
-
       const packagePlan = await InvestmentPackage.findById(currentPackage.packageId)
         .select("minimumWithdrawal")
         .lean();
@@ -468,75 +459,13 @@ export async function POST(request: NextRequest) {
       }
 
 
-      // Only the currently active package receives the special first-withdrawal cap.
-      // Inactive/cancelled package balances require referral-backed cap like later withdrawals.
-      isFirstPackageWithdrawal = currentPackage.status === "active" && firstStatus === "available";
-
-      const firstWithdrawalPercent = Math.max(0, Math.min(100, Number(settings.withdrawals.firstPackageWithdrawalPercent ?? 100)));
-      const referralWithdrawalPercent = Math.max(0, Math.min(100, Number(settings.withdrawals.referralPackageWithdrawalPercent ?? 50)));
-      const firstWithdrawalCap = Number(currentPackage.investedAmount || 0) * firstWithdrawalPercent / 100;
-
-      if (isFirstPackageWithdrawal && amount > firstWithdrawalCap) {
-        return NextResponse.json(
-          { success: false, message: "الحد الأقصى لأول سحب من هذه الباقة هو " + firstWithdrawalCap + " " + assetCode + " (النسبة المضبوطة: " + firstWithdrawalPercent + "% من قيمة تفعيل الباقة)." },
-          { status: 400 }
-        );
-      }
-
-      if (!isFirstPackageWithdrawal) {
-        const referredUsers = await User.find({ referredBy: user._id }).select("_id").lean();
-        const referredIds = referredUsers.map((item: any) => item._id);
-        const approvedReferralDeposits = referredIds.length
-          ? await DepositRequest.aggregate([
-              { $match: { userId: { $in: referredIds }, status: "approved", asset: assetCode } },
-              { $group: { _id: "$userId", total: { $sum: "$amount" } } },
-            ])
-          : [];
-        const referralDepositTotal = approvedReferralDeposits.reduce(
-          (sum: number, row: any) => sum + Number(row.total || 0), 0
-        );
-        const referralWithdrawalCap = referralDepositTotal * referralWithdrawalPercent / 100;
-        const previousReferralWithdrawals = await WithdrawalRequest.aggregate([
-          {
-            $match: {
-              userId: user._id,
-              source: "package",
-              userPackageId: currentPackage._id,
-              isFirstPackageWithdrawal: { $ne: true },
-              status: { $in: ["pending", "approved", "processing", "completed"] },
-            },
-          },
-          { $group: { _id: null, total: { $sum: "$amount" } } },
-        ]);
-        const alreadyWithdrawnAgainstReferrals = Number(previousReferralWithdrawals[0]?.total || 0);
-        const referralRemaining = Math.max(0, referralWithdrawalCap - alreadyWithdrawnAgainstReferrals);
-        if (amount > referralRemaining) {
-          return NextResponse.json(
-            {
-              success: false,
-              message: referralRemaining > 0
-                ? "طاقة الباقة للسحب الإضافي محدودة حاليًا. المتاح لك حسب الإحالات النشطة هو " + referralRemaining + " " + assetCode + " فقط. نسبة الاستحقاق " + referralWithdrawalPercent + "% من إيداعات الإحالات النشطة المعتمدة، وتم خصم السحوبات السابقة من الحد."
-                : currentPackage.status === "cancelled"
-                  ? "هذه الباقة غير نشطة للسحب الآن. اجمع إحالات نشطة لديها إيداعات خارجية معتمدة لزيادة حد السحب."
-                  : "للأسف، طاقة الباقة للسحب الإضافي منخفضة حاليًا. اجمع إحالات نشطة لديها إيداعات خارجية معتمدة لزيادة حد السحب. أي حد استُخدم في سحب سابق لا يُحتسب مرة أخرى.",
-              activeReferrals: approvedReferralDeposits.length,
-              referralDepositTotal,
-              referralWithdrawalPercent,
-              referralWithdrawalCap,
-              alreadyWithdrawnAgainstReferrals,
-              referralRemaining,
-            },
-            { status: 400 }
-          );
-        }
-      }
-
-      if (isFirstPackageWithdrawal && amount > Number(currentPackage.investedAmount || 0)) {
-        return NextResponse.json(
-          { success: false, message: "الحد الأقصى لأول سحب من هذه الباقة هو " + firstWithdrawalCap + " " + assetCode + ". السحوبات التالية تعتمد على نسبة إيداعات الإحالات النشطة المضبوطة من الإدارة." },
-          { status: 400 }
-        );
-      }
+      // Each package withdraws only from its own availableEarnings balance.
+      // Existing pending requests remain in lockedEarnings and do not block withdrawals
+      // from the unreserved remainder of this same package.
+      isFirstPackageWithdrawal =
+        currentPackage.status === "active" &&
+        firstStatus === "available" &&
+        Number(currentPackage.totalWithdrawn || 0) <= 0;
 
       const packageFilter: Record<string, any> = {
         _id: userPackageId,
@@ -547,12 +476,9 @@ export async function POST(request: NextRequest) {
       };
 
       if (isFirstPackageWithdrawal) {
+        // Keep the one-time marker race-safe, while allowing other requests to use
+        // the remaining available balance when an earlier request is already reserved.
         packageFilter.firstWithdrawalStatus = { $in: ["available", null] };
-      } else if (currentPackage.status === "cancelled" && firstStatus === "available") {
-        // Keep the unused-first marker for audit, but treat this inactive account as referral-gated.
-        packageFilter.firstWithdrawalStatus = { $in: ["available", null] };
-      } else {
-        packageFilter.firstWithdrawalStatus = "completed";
       }
 
       lockedUserPackage = await UserPackage.findOneAndUpdate(

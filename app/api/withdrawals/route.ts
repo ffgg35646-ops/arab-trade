@@ -313,7 +313,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (amount < minAmount) {
+    // Package requests use the package-specific minimum below, derived from
+    // the admin-configured package minimum. Do not reject them here using the
+    // general payment/network minimum, which can show a stale lower value.
+    if (source !== "package" && amount < minAmount) {
       return NextResponse.json(
         {
           success: false,

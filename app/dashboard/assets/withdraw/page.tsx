@@ -340,9 +340,10 @@ export default function WithdrawPage() {
         const firstRemaining = Math.max(0, Number(packageAccount.firstPackageWithdrawalRemaining || 0));
         const activeReferralCount = Math.max(0, Number(packageAccount.activeReferralCount || 0));
         const referralRemaining = Math.max(0, Number(packageAccount.referralRemaining || 0));
-        if (firstRemaining <= 1e-8 && activeReferralCount <= 0) {
+        const phaseTwo = packageAccount.packageWithdrawalAlreadyUsed === true || firstRemaining <= 1e-8;
+        if (phaseTwo && activeReferralCount <= 0) {
           setError("الطاقة منخفضة الآن، يُرجى جلب إحالات نشطة.");
-        } else if (firstRemaining <= 1e-8 && referralRemaining <= 1e-8) {
+        } else if (phaseTwo && referralRemaining <= 1e-8) {
           setError("لا يوجد حد سحب متاح مقابل الإحالات النشطة حاليًا.");
         } else {
           setError("عفوًا، الرصيد المتاح للسحب من باقة " + packageAccount.packageName + " هو " + money(max) + " USDT فقط.");
@@ -376,7 +377,7 @@ export default function WithdrawPage() {
     const finalReferralAllowanceBelowMinimum =
       source === "package" &&
       Boolean(packageAccount) &&
-      firstRemainder <= 1e-8 &&
+      (packageAccount?.packageWithdrawalAlreadyUsed === true || firstRemainder <= 1e-8) &&
       referralRemainder > 0 &&
       fullReferralAllowance > 0 &&
       fullReferralAllowance < minimum &&
@@ -583,16 +584,13 @@ export default function WithdrawPage() {
                               <p className="rounded-lg bg-white/[0.025] px-2 py-2 text-[10px] text-slate-500">فعّل الباقة أولًا لتتاح عمليات السحب.</p>
                             ) : (
                               <>
-                                {item.packageWithdrawalAlreadyUsed ? (
+                                {item.packageWithdrawalAlreadyUsed && (
                                   <p className="mb-2 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-2 text-[10px] leading-5 text-amber-200">
-                                    تمت الموافقة على طلب سحب من هذه الباقة بالفعل. لا يُسمح بطلب سحب ثانٍ من نفس الباقة.
+                                    تمت الموافقة على السحب الأول من هذه الباقة. أي سحب لاحق يخضع لحد الإحالات النشطة؛ المتاح منها الآن {money(Number(item.referralRemaining || 0))} USDT.
                                   </p>
-                                ) : (
-                                  <>
-                                    {item.firstWithdrawalStatus === "pending" && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب الأول قيد المراجعة.</p>}
-                                    {renderWithdrawalFields("package", item, plan)}
-                                  </>
                                 )}
+                                {item.firstWithdrawalStatus === "pending" && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب الأول قيد المراجعة.</p>}
+                                {renderWithdrawalFields("package", item, plan)}
                               </>
                             )}
                           </article>

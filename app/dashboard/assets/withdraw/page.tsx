@@ -37,6 +37,9 @@ type PackageAccount = {
   firstPackageWithdrawalUsed?: number;
   firstPackageWithdrawalRemaining?: number;
   firstPackageWithdrawalPending?: boolean;
+  packageWithdrawalPending?: boolean;
+  unresolvedWithdrawalAmount?: number | null;
+  unresolvedWithdrawalStatus?: string | null;
   packageWithdrawalCap?: number;
   packageWithdrawalUsed?: number;
   packageWithdrawalRemaining?: number;
@@ -423,7 +426,7 @@ export default function WithdrawPage() {
       : Math.max(Number(selected?.minWithdrawal || 0), Number(limits.minGeneralWithdrawal ?? limits.minWithdrawal ?? 0));
     const configuredMaximums = [Number(selected?.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : undefined;
-    const packagePending = Boolean(packageAccount?.firstPackageWithdrawalPending);
+    const packagePending = Boolean(packageAccount?.packageWithdrawalPending || packageAccount?.firstPackageWithdrawalPending);
     const savedAddress = selected && savedAddresses.some((item) =>
       item.asset === selected.asset && item.network === selected.network && item.source === source
     );
@@ -459,10 +462,10 @@ export default function WithdrawPage() {
         </div>
         {source === "package" && packageAccount && (
           <p className="col-span-2 rounded-lg border border-white/10 bg-white/[0.025] p-2 text-[10px] leading-4 text-slate-400">
-            {Number(packageAccount.packageWithdrawalRemaining ?? packageMax) <= 0
-              ? "تم استخدام أو حجز سقف الباقة الإجمالي (" + money(Number(packageAccount.packageWithdrawalCap ?? packageAccount.investedAmount ?? 0)) + " USDT). تُحتسب الطلبات المعلقة والموافق عليها والمكتملة، ولا يسمح بطلبات تتجاوز هذا السقف."
-              : packagePending
-                ? "يوجد طلب سحب من المرحلة الحالية قيد المراجعة؛ انتظر حسمه قبل تقديم طلب آخر."
+            {packagePending
+              ? "يوجد طلب سحب قائم لهذه الباقة بقيمة " + money(Number(packageAccount.unresolvedWithdrawalAmount || 0)) + " USDT. السحب الجديد متوقف حتى يُرفض الطلب أو يكتمل تنفيذه."
+              : Number(packageAccount.packageWithdrawalRemaining ?? packageMax) <= 0
+                ? "تم استخدام أو حجز سقف الباقة الإجمالي (" + money(Number(packageAccount.packageWithdrawalCap ?? packageAccount.investedAmount ?? 0)) + " USDT). تُحتسب الطلبات المعلقة والموافق عليها والمكتملة، ولا يسمح بطلبات تتجاوز هذا السقف."
                 : Number(packageAccount.firstPackageWithdrawalRemaining || 0) > 0
                   ? "المتبقي من سقف المرحلة الأولى: " + money(Number(packageAccount.firstPackageWithdrawalRemaining || 0)) + " USDT."
                   : "حد الإحالات المتبقي لا يتجاوز سقف الباقة الإجمالي: " + money(Number(packageAccount.referralRemaining || 0)) + " USDT."}

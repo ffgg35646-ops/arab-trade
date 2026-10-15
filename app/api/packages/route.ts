@@ -497,10 +497,6 @@ export async function GET(request: NextRequest) {
       const packageWithdrawalCap = firstPackageWithdrawalCap;
       const packageWithdrawalUsed = firstWithdrawalByPackageName.get(packageGroupKey) || 0;
       const packageWithdrawalRemaining = firstPackageWithdrawalRemaining;
-      // Return only this activation's real bucket. Family totals are policy
-      // metadata, never a substitute for the balance owned by this account.
-      const packageGroupAvailableEarnings = Math.max(0, Number(item.availableEarnings || 0));
-      const packageGroupLockedEarnings = Math.max(0, Number(item.lockedEarnings || 0));
       // The first approved withdrawal changes the phase: any later request is
       // limited by active-referral capacity, but can never exceed this account's money.
       const phaseWithdrawalLimit = packageWithdrawalPending || firstPackageWithdrawalPending
@@ -511,8 +507,6 @@ export async function GET(request: NextRequest) {
       const withdrawalLimit = phaseWithdrawalLimit;
       return {
         ...item,
-        packageGroupAvailableEarnings,
-        packageGroupLockedEarnings,
         firstPackageWithdrawalCap,
         firstPackageWithdrawalUsed,
         firstPackageWithdrawalRemaining,

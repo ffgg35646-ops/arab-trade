@@ -433,7 +433,6 @@ export default function WithdrawPage() {
       : Math.max(Number(selected?.minWithdrawal || 0), Number(limits.minGeneralWithdrawal ?? limits.minWithdrawal ?? 0));
     const configuredMaximums = [Number(selected?.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : undefined;
-    const packagePending = Boolean(packageAccount?.packageWithdrawalPending || packageAccount?.firstPackageWithdrawalPending);
     const savedAddress = selected && savedAddresses.some((item) =>
       item.asset === selected.asset && item.network === selected.network && item.source === source
     );
@@ -441,7 +440,7 @@ export default function WithdrawPage() {
     const isSaving = savingAddressKey === key;
     return (
       <form onSubmit={(event) => void submitWithdrawal(event, source, packageAccount, packageId)} className="grid grid-cols-2 items-start gap-2">
-        <div className="min-w-0">
+        <div className={source === "package" ? "col-span-2 min-w-0" : "min-w-0"}>
           <select aria-label="وسيلة السحب" value={form.methodId} onChange={(event) => changeMethod(source, packageId, event.target.value)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50">
             <option value="">اختر الوسيلة</option>
             {methods.filter((item) => source !== "package" || item.asset === "USDT").map((item) => (
@@ -450,10 +449,12 @@ export default function WithdrawPage() {
           </select>
           {methods.length === 0 && <p className="mt-1 text-[10px] text-amber-200">لا توجد وسيلة مفعّلة.</p>}
         </div>
-        <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.025] px-2 py-1.5 text-[10px]">
-          <span className="text-slate-500">المتاح</span>
-          <strong className="mr-1 text-cyan-100">{money(available)} {selected?.asset || "USDT"}</strong>
-        </div>
+        {source === "wallet" && (
+          <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.025] px-2 py-1.5 text-[10px]">
+            <span className="text-slate-500">المتاح</span>
+            <strong className="mr-1 text-cyan-100">{money(available)} {selected?.asset || "USDT"}</strong>
+          </div>
+        )}
 
         <div className="min-w-0">
           <input aria-label="عنوان الاستلام" value={form.address} onChange={(event) => updateForm(source, packageId, "address", event.target.value)} required placeholder="عنوان الاستلام" className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50" />
@@ -467,17 +468,7 @@ export default function WithdrawPage() {
           <p className="mt-1 text-[10px] leading-4 text-slate-500">أقل مبلغ للسحب: {money(minimum)} {selected?.asset || "USDT"}</p>
           {source === "package" && <p className="mt-1 text-[10px] leading-4 text-slate-500">الحد المتاح الآن بعد احتساب سقف الباقة والطلبات السابقة: {money(Math.min(packageMax, maximum || packageMax))} USDT</p>}
         </div>
-        {source === "package" && packageAccount && (
-          <p className="col-span-2 rounded-lg border border-white/10 bg-white/[0.025] p-2 text-[10px] leading-4 text-slate-400">
-            {packagePending
-              ? "يوجد طلب سحب قائم لهذه الباقة بقيمة " + money(Number(packageAccount.unresolvedWithdrawalAmount || 0)) + " USDT. السحب الجديد متوقف حتى تقرر الإدارة الموافقة عليه أو رفضه."
-              : Number(packageAccount.packageWithdrawalRemaining ?? packageMax) <= 0
-                ? "تم استخدام أو حجز سقف الباقة الإجمالي (" + money(Number(packageAccount.packageWithdrawalCap ?? packageAccount.investedAmount ?? 0)) + " USDT). تُحتسب الطلبات المعلقة والموافق عليها والمكتملة، ولا يسمح بطلبات تتجاوز هذا السقف."
-                : Number(packageAccount.firstPackageWithdrawalRemaining || 0) > 0
-                  ? "المتبقي من سقف المرحلة الأولى: " + money(Number(packageAccount.firstPackageWithdrawalRemaining || 0)) + " USDT."
-                  : "حد الإحالات المتبقي لا يتجاوز سقف الباقة الإجمالي: " + money(Number(packageAccount.referralRemaining || 0)) + " USDT."}
-          </p>
-        )}
+
         {selected?.warning && <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-2 text-xs text-amber-200">{selected.warning}</div>}
 
         <button type="submit" disabled={isSubmitting || hasPendingWithdrawal || !selected || (source === "package" && (!packageAccount || packageMax <= 0))} className="col-span-2 w-full rounded-lg bg-cyan-300 px-3 py-1.5 text-xs font-black text-[#03111c] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40">

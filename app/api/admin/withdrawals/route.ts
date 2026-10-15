@@ -573,7 +573,7 @@ export async function PATCH(
       await session.withTransaction(async () => {
         const updatedRequest = await WithdrawalRequest.findOneAndUpdate(
           { _id: withdrawal._id, status: currentStatus },
-          { $set: { status: nextStatus, adminNote, ...(nextStatus === "completed" ? { completedAt: new Date() } : {}) } },
+          { $set: { status: nextStatus, adminNote, ...(nextStatus === "completed" ? { completedAt: new Date() } : {}), ...(["approved", "rejected", "completed"].includes(nextStatus) ? { walletBalanceSettled: true } : {}) } },
           { new: true, session }
         );
         if (!updatedRequest) throw new Error("WITHDRAWAL_STATUS_CHANGED");

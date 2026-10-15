@@ -62,18 +62,83 @@ export async function ensurePackagePrincipalWithdrawalCredit(
     const credit = wasAlreadyCredited
       ? 0
       : Math.round((remainingFirstAmount + Number.EPSILON) * 1e8) / 1e8;
+    const migrationLedgerNote = "إتاحة المتبقي من قيمة تفعيل الباقة ضمن حد السحب الأول.";
+    const migrationCorrectionNote = "تصحيح رصيد مكرر من ترحيل قديم بعد مطابقة طلبات السحب السابقة.";
     const priorMigrationLedger = wasAlreadyCredited && legacyRowsToClassify.length
       ? await PackageLedger.findOne({
           userId,
           userPackageId: account._id,
           type: "activation_withdrawable",
-          note: "إتاحة المتبقي من قيمة تفعيل الباقة ضمن حد السحب الأول.",
-        }).select("amount").lean()
+          note: migrationLedgerNote,
+        }).select("_id amount createdAt").lean()
       : null;
-    const excessMigrationCredit = Math.max(
+    let excessMigrationCredit = Math.max(
       0,
       Number(priorMigrationLedger?.amount || 0) - remainingFirstAmount
     );
+    let protectedPackageCredits = 0;
+
+    // A legacy correction must only remove duplicated principal. Cancellation
+    // refunds, collected earnings, rewards, and returned withdrawals are real
+    // credits in the same package bucket and must not be consumed by migration.
+    if (priorMigrationLedger && excessMigrationCredit > 1e-8) {
+      const packageLedgerRows = await PackageLedger.find({
+        userId,
+        userPackageId: account._id,
+      }).select("_id type amount note createdAt").sort({ createdAt: 1, _id: 1 }).lean();
+
+      let passedMigrationCredit = false;
+      for (const row of packageLedgerRows as any[]) {
+        if (String(row._id) === String(priorMigrationLedger._id)) {
+          passedMigrationCredit = true;
+          continue;
+        }
+
+        const amount = Number(row.amount || 0);
+        const type = String(row.type || "");
+        const note = String(row.note || "");
+
+        if (
+          type === "activation_withdrawable" &&
+          note === migrationCorrectionNote &&
+          amount < -1e-8
+        ) {
+          // Do not repeat a correction already written by an earlier request.
+          excessMigrationCredit = Math.max(0, excessMigrationCredit - Math.abs(amount));
+          continue;
+        }
+
+        if (!passedMigrationCredit) {
+          // Old packages can have legitimate earnings/refunds recorded before
+          // the principal migration ran. Keep those credits protected too.
+          if (
+            amount > 1e-8 &&
+            ["cancellation_refund", "daily_earning", "realized_earning", "reward", "withdrawal_reversal"].includes(type)
+          ) {
+            protectedPackageCredits += amount;
+          }
+          continue;
+        }
+
+        if (type === "withdrawal" && amount < -1e-8) {
+          // Funds already paid out cannot also be removed as a duplicated
+          // migration credit. Consume the correction target before real credits.
+          const debit = Math.abs(amount);
+          const alreadyConsumedDuplicate = Math.min(excessMigrationCredit, debit);
+          excessMigrationCredit = Math.max(0, excessMigrationCredit - alreadyConsumedDuplicate);
+          const debitAgainstRealCredits = Math.max(0, debit - alreadyConsumedDuplicate);
+          protectedPackageCredits = Math.max(0, protectedPackageCredits - debitAgainstRealCredits);
+          continue;
+        }
+
+        if (
+          amount > 1e-8 &&
+          ["cancellation_refund", "daily_earning", "realized_earning", "reward", "withdrawal_reversal"].includes(type)
+        ) {
+          protectedPackageCredits += amount;
+        }
+      }
+    }
 
     const session = await mongoose.startSession();
     try {
@@ -94,8 +159,10 @@ export async function ensurePackagePrincipalWithdrawalCredit(
             withdrawablePrincipalCredited: true,
           }).select("availableEarnings").session(session).lean();
           if (!current) return;
+          const currentAvailable = Math.max(0, Number(current.availableEarnings || 0));
+          const protectedAvailable = Math.min(currentAvailable, Math.max(0, protectedPackageCredits));
           const correction = Math.min(
-            Math.max(0, Number(current.availableEarnings || 0)),
+            Math.max(0, currentAvailable - protectedAvailable),
             excessMigrationCredit
           );
           if (correction > 1e-8) {

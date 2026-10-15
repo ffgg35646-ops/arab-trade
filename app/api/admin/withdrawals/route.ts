@@ -11,6 +11,8 @@ import Notification from "@/models/Notification";
 import UserPackage from "@/models/UserPackage";
 import PackageLedger from "@/models/PackageLedger";
 import User from "@/models/User";
+import DepositRequest from "@/models/DepositRequest";
+import PlatformSettings from "@/models/PlatformSettings";
 
 function normalizeAsset(
   value: unknown
@@ -270,6 +272,61 @@ export async function PATCH(
       if (!foundTarget) {
         return NextResponse.json(
           { success: false, message: "تعذر التحقق من ترتيب طلب السحب ضمن سقف الباقة." },
+          { status: 409 }
+        );
+      }
+    }
+
+    if (
+      withdrawal.source === "package" &&
+      withdrawal.isFirstPackageWithdrawal !== true &&
+      ["approved", "completed"].includes(nextStatus) &&
+      withdrawal.userPackageId
+    ) {
+      const [settings, referredUsers] = await Promise.all([
+        PlatformSettings.findOne({ key: "global" }).lean(),
+        User.find({ referredBy: withdrawal.userId }).select("_id").lean(),
+      ]);
+      const referredIds = referredUsers.map((item: any) => item._id);
+      const activeReferralDeposits = referredIds.length
+        ? await DepositRequest.aggregate([
+            { $match: { userId: { $in: referredIds }, status: "approved", asset: "USDT" } },
+            { $group: { _id: "$userId", total: { $sum: "$amount" } } },
+          ])
+        : [];
+      const activeReferralDepositTotal = activeReferralDeposits.reduce(
+        (sum: number, row: any) => sum + Number(row.total || 0),
+        0
+      );
+      const referralPercent = Math.max(
+        0,
+        Math.min(100, Number(settings?.withdrawals?.referralPackageWithdrawalPercent ?? 50))
+      );
+      const referralCap = activeReferralDepositTotal * referralPercent / 100;
+      const otherSecondStageRequests = await WithdrawalRequest.find({
+        _id: { $ne: withdrawal._id },
+        userId: withdrawal.userId,
+        source: "package",
+        isFirstPackageWithdrawal: { $ne: true },
+        status: { $in: ["pending", "approved", "processing", "completed"] },
+      }).select("amount").lean();
+      const referralUsedByOtherRequests = otherSecondStageRequests.reduce(
+        (sum: number, row: any) => sum + Number(row.amount || 0),
+        0
+      );
+      const allowedForThisRequest = Math.max(0, referralCap - referralUsedByOtherRequests);
+      const amount = Number(withdrawal.amount);
+      if (amount > allowedForThisRequest + 1e-8) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "لا يمكن اعتماد هذا الطلب؛ حد الإحالات النشطة هو " + referralCap +
+              " USDT، والمحجوز أو المستخدم منه " + referralUsedByOtherRequests +
+              " USDT، والمتاح لهذا الطلب " + allowedForThisRequest + " USDT.",
+            referralCap,
+            referralUsedByOtherRequests,
+            allowedForThisRequest,
+          },
           { status: 409 }
         );
       }

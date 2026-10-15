@@ -202,7 +202,8 @@ export default function WithdrawPage() {
               item.status === "active" ||
               Number(item.availableEarnings || 0) > 1e-8 ||
               Number(item.lockedEarnings || 0) > 1e-8 ||
-              item.packageWithdrawalStatus === "pending"
+              item.packageWithdrawalStatus === "pending" ||
+              item.packageWithdrawalStatus === "processing"
             )
           )
         : [];

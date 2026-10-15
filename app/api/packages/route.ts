@@ -127,6 +127,7 @@ export async function GET(request: NextRequest) {
     const unresolvedWithdrawalByPackageName = new Map<string, any>();
     const successfulWithdrawalPackageNames = new Set<string>();
     const inFlightWithdrawalPackageNames = new Set<string>();
+    const inFlightWithdrawalStatusByPackageName = new Map<string, string>();
     for (const row of successfulPackageWithdrawalRows as any[]) {
       const key = String(row.userPackageId || "");
       const groupKey = packageGroupByAccountId.get(key) || key;
@@ -134,6 +135,10 @@ export async function GET(request: NextRequest) {
         successfulWithdrawalPackageNames.add(groupKey);
         if (["approved", "processing"].includes(String(row.status))) {
           inFlightWithdrawalPackageNames.add(groupKey);
+          // Query results are newest-first; keep the latest unresolved transfer status.
+          if (!inFlightWithdrawalStatusByPackageName.has(groupKey)) {
+            inFlightWithdrawalStatusByPackageName.set(groupKey, String(row.status));
+          }
         }
       }
     }
@@ -198,9 +203,13 @@ export async function GET(request: NextRequest) {
         unresolvedWithdrawalByPackage.get(packageKey) ||
         unresolvedWithdrawalByPackageName.get(packageGroupKey) ||
         null;
-      const packageWithdrawalPending = item.withdrawalRequestPending === true ||
-        Boolean(unresolvedPackageWithdrawal) ||
+      // WithdrawalRequest status is authoritative. The package flag can be stale
+      // after earlier admin decisions, so never show a pending-review notice from it.
+      const packageWithdrawalPending = Boolean(unresolvedPackageWithdrawal) ||
         inFlightWithdrawalPackageNames.has(packageGroupKey);
+      const packageWithdrawalStatus = unresolvedPackageWithdrawal
+        ? "pending"
+        : inFlightWithdrawalStatusByPackageName.get(packageGroupKey) || null;
       const packageWithdrawalAlreadyUsed =
         successfulWithdrawalPackageNames.has(packageGroupKey) ||
         completedFirstWithdrawalPackageNames.has(packageGroupKey);
@@ -233,6 +242,7 @@ export async function GET(request: NextRequest) {
         firstPackageWithdrawalRemaining,
         firstPackageWithdrawalPending,
         packageWithdrawalPending,
+        packageWithdrawalStatus,
         packageWithdrawalAlreadyUsed,
         unresolvedWithdrawalAmount: unresolvedPackageWithdrawal ? Number(unresolvedPackageWithdrawal.amount || 0) : null,
         unresolvedWithdrawalStatus: unresolvedPackageWithdrawal ? String(unresolvedPackageWithdrawal.status) : null,

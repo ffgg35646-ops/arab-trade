@@ -266,13 +266,14 @@ spotWallet = await db.collection("wallets").findOne({ userId: user._id, type: "s
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(spotWallet.balances.find((x) => x.asset === "USDT").available, 50, "package activation does not debit the general spot balance");
 closeTo(depositBalance && depositBalance.available, 900, "package activation debits the separate deposit balance");
+closeTo(Number(package100.availableEarnings || 0), 100, "package activation principal is withdrawable within the first-stage cap");
 
 ok(await api("/api/admin/packages/credit", {
   as: "admin", method: "POST",
   body: { userPackageId: String(package100._id), amount: 600, note: "CI realized proceeds test credit" },
 }), "admin credits realized earnings to package");
 let package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 600, "realized earnings stay in package withdrawal bucket");
+closeTo(package100Doc.availableEarnings, 700, "withdrawable activation principal plus realized earnings stay in package withdrawal bucket");
 
 const tooLargeFirst = await api("/api/withdrawals", {
   method: "POST",
@@ -280,7 +281,7 @@ const tooLargeFirst = await api("/api/withdrawals", {
 });
 statusIs(tooLargeFirst, 400, "first package withdrawal cannot exceed activation price");
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 600, "rejected over-limit first withdrawal preserves bucket");
+closeTo(package100Doc.availableEarnings, 700, "rejected over-limit first withdrawal preserves bucket");
 
 const firstWithdrawal = await api("/api/withdrawals", {
   method: "POST",
@@ -289,7 +290,7 @@ const firstWithdrawal = await api("/api/withdrawals", {
 ok(firstWithdrawal, "first package withdrawal in activation limit", 201);
 const rejectedPackageWithdrawalId = String(firstWithdrawal.data.withdrawal._id);
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 500, "package available earnings decrease while request is pending");
+closeTo(package100Doc.availableEarnings, 600, "package available earnings decrease by the requested amount while pending");
 closeTo(package100Doc.lockedEarnings, 100, "package withdrawal reserved as locked");
 assert.equal(package100Doc.firstWithdrawalStatus, "pending", "first package withdrawal marked pending");
 
@@ -311,7 +312,7 @@ ok(await api("/api/admin/withdrawals", {
   body: { id: rejectedPackageWithdrawalId, status: "rejected", adminNote: "CI verify package balance restoration" },
 }), "admin rejects package withdrawal");
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 600, "rejected package withdrawal restores available earnings");
+closeTo(package100Doc.availableEarnings, 700, "rejected package withdrawal restores available earnings");
 closeTo(package100Doc.lockedEarnings, 0, "rejected package withdrawal unlocks funds");
 assert.equal(package100Doc.firstWithdrawalStatus, "available", "rejected first package withdrawal can be retried");
 
@@ -322,7 +323,7 @@ const retryFirstWithdrawal = await api("/api/withdrawals", {
 ok(retryFirstWithdrawal, "first package withdrawal can be retried after rejection", 201);
 const packageWithdrawalId = String(retryFirstWithdrawal.data.withdrawal._id);
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 500, "retried package withdrawal decreases available earnings");
+closeTo(package100Doc.availableEarnings, 600, "retried package withdrawal decreases available earnings");
 closeTo(package100Doc.lockedEarnings, 100, "retried package withdrawal locks funds again");
 assert.equal(package100Doc.firstWithdrawalStatus, "pending", "retried first package withdrawal marked pending");
 
@@ -340,7 +341,7 @@ ok(await api("/api/admin/withdrawals", {
   body: { id: packageWithdrawalId, status: "completed", adminNote: "CI completed payout" },
 }), "admin completes package withdrawal");
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 500, "remaining package earnings");
+closeTo(package100Doc.availableEarnings, 600, "remaining package principal and earnings after completed withdrawal");
 closeTo(package100Doc.lockedEarnings, 0, "completed package withdrawal unlocks reserved amount");
 closeTo(package100Doc.totalWithdrawn, 100, "package withdrawal total");
 assert.equal(package100Doc.firstWithdrawalStatus, "completed", "first package withdrawal marked completed");

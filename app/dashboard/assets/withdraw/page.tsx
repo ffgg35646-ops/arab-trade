@@ -88,8 +88,8 @@ const statusLabel = (status: string) => status === "completed" ? "مكتمل" : 
 const statusClass = (status: string) => status === "completed" ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : status === "rejected" || status === "failed" ? "border-red-400/20 bg-red-400/10 text-red-200" : status === "approved" || status === "processing" ? "border-blue-400/20 bg-blue-400/10 text-blue-200" : "border-amber-400/20 bg-amber-400/10 text-amber-200";
 
 function packageMaximum(item: PackageAccount) {
-  // A visible package card represents every activation record with this package name.
-  const available = Math.max(0, Number(item.packageGroupAvailableEarnings ?? item.availableEarnings ?? 0));
+  // Money belongs to this exact activation/cancellation account, not its siblings.
+  const available = Math.max(0, Number(item.availableEarnings || 0));
   const cap = item.withdrawalLimit === undefined
     ? available
     : Math.max(0, Number(item.withdrawalLimit || 0));
@@ -232,98 +232,66 @@ export default function WithdrawPage() {
     () => packageAccounts.reduce((sum, item) => sum + Number(item.lockedEarnings || 0), 0),
     [packageAccounts]
   );
-  // Build one visible card per configured package, not per historical activation record.
-  // Multiple activations of the same package stay accessible inside that package's card.
+  // Every UserPackage activation is its own withdrawal account. A cancelled
+  // package keeps its refund on its own card instead of being merged into a newer
+  // activation that happens to have the same displayed package name.
   const withdrawalPackageCards = useMemo(() => {
-    // Package records can contain duplicate catalog entries with the same visible
-    // name but different database IDs. Group by normalized visible name so the
-    // withdrawal page renders one card per package name while keeping every
-    // individual account and its balance selectable inside that card.
     const normalizePackageName = (value: string) =>
-      value.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
-    const groupKeyFor = (name: string, id: string) => {
-      const normalizedName = normalizePackageName(name);
-      return normalizedName ? "name:" + normalizedName : "plan:" + id;
-    };
-    const groups = new Map<string, {
-      plan: PackagePlan;
-      accounts: PackageAccount[];
-      order: number;
-      planIds: Set<string>;
-    }>();
-    const groupKeyByPlanId = new Map<string, string>();
-    const groupKeyByPackageName = new Map<string, string>();
+      value.normalize("NFKC").trim().replace(/\\s+/g, " ").toLocaleLowerCase("en-US");
+    const planById = new Map(packagePlans.map((plan) => [String(plan._id), plan]));
+    const accountPlanIds = new Set(packageAccounts.map((account) => packagePlanId(account)).filter(Boolean));
+    const accountNames = new Set(packageAccounts.map((account) => normalizePackageName(account.packageName || "")).filter(Boolean));
 
-    packagePlans.forEach((plan, index) => {
-      const id = String(plan._id);
-      const groupKey = groupKeyFor(plan.name, id);
-      const existing = groups.get(groupKey);
-      if (existing) {
-        existing.planIds.add(id);
-        existing.order = Math.min(existing.order, index);
-      } else {
-        groups.set(groupKey, { plan, accounts: [], order: index, planIds: new Set([id]) });
-      }
-      groupKeyByPlanId.set(id, groupKey);
-      const normalizedName = normalizePackageName(plan.name);
-      if (normalizedName) groupKeyByPackageName.set(normalizedName, groupKey);
+    const accountCards = packageAccounts.map((account, index) => {
+      const planId = packagePlanId(account);
+      const configuredPlan = planById.get(planId);
+      const plan: PackagePlan = {
+        _id: planId || account._id,
+        name: account.packageName || configuredPlan?.name || "باقة سابقة",
+        asset: account.asset,
+        minimumWithdrawal: account.minimumWithdrawal ?? configuredPlan?.minimumWithdrawal,
+        enabled: configuredPlan?.enabled,
+      };
+      const time = new Date(account.activatedAt || account.createdAt || 0).getTime();
+      return {
+        key: "account-" + account._id,
+        groupKey: account._id,
+        plan,
+        accounts: [account],
+        item: account,
+        order: planId && packagePlans.findIndex((row) => String(row._id) === planId) >= 0
+          ? packagePlans.findIndex((row) => String(row._id) === planId)
+          : Number.MAX_SAFE_INTEGER,
+        accountTime: Number.isFinite(time) ? time : 0,
+        accountIndex: index,
+      };
     });
 
-    for (const account of packageAccounts) {
-      const id = packagePlanId(account);
-      if (!id) continue;
+    // Keep an inactive catalogue card only when there is no existing account for
+    // that plan/name. Historical balances always take precedence over placeholders.
+    const placeholders = packagePlans
+      .filter((plan) =>
+        !accountPlanIds.has(String(plan._id)) &&
+        !accountNames.has(normalizePackageName(plan.name))
+      )
+      .map((plan, index) => ({
+        key: "plan-" + String(plan._id),
+        groupKey: String(plan._id),
+        plan,
+        accounts: [] as PackageAccount[],
+        item: null as PackageAccount | null,
+        order: packagePlans.findIndex((row) => String(row._id) === String(plan._id)),
+        accountTime: 0,
+        accountIndex: index,
+      }));
 
-      // The packages API calculates family balances by normalized package name.
-      // Use the same key here; grouping by catalog ID first can hide a cancelled
-      // account's refund on the original package card after the catalog is edited.
-      const normalizedName = normalizePackageName(account.packageName || "");
-      const groupKey = normalizedName
-        ? (groupKeyByPackageName.get(normalizedName) || groupKeyFor(account.packageName || "", id))
-        : (groupKeyByPlanId.get(id) || groupKeyFor("", id));
-      const existing = groups.get(groupKey);
-      if (existing) {
-        if (!existing.accounts.some((row) => row._id === account._id)) {
-          existing.accounts.push(account);
-        }
-        existing.planIds.add(id);
-        if (!normalizedName) groupKeyByPlanId.set(id, groupKey);
-      } else {
-        // Keep a historical package under its own name when its catalog entry
-        // was renamed or removed. Its refund remains withdrawable from that account.
-        groups.set(groupKey, {
-          plan: {
-            _id: id,
-            name: account.packageName || "باقة سابقة",
-            asset: account.asset,
-            minimumWithdrawal: account.minimumWithdrawal,
-          },
-          accounts: [account],
-          order: Number.MAX_SAFE_INTEGER,
-          planIds: new Set([id]),
-        });
-        if (!normalizedName) groupKeyByPlanId.set(id, groupKey);
-      }
-    }
-
-    return [...groups.entries()]
-      .map(([groupKey, { plan, accounts, order }]) => {
-        const sortedAccounts = [...accounts].sort((a, b) => {
-          const activeOrder = Number(b.status === "active") - Number(a.status === "active");
-          if (activeOrder) return activeOrder;
-          const aTime = new Date(a.activatedAt || a.createdAt || 0).getTime();
-          const bTime = new Date(b.activatedAt || b.createdAt || 0).getTime();
-          return bTime - aTime;
-        });
-        // One visible card per package name. Pick an eligible account automatically;
-        // never let the user switch account records to reopen a first-withdrawal allowance.
-        const item = sortedAccounts.find((account) => account.status === "active" && packageMaximum(account) > 1e-8)
-          || sortedAccounts.find((account) => packageMaximum(account) > 1e-8)
-          || sortedAccounts.find((account) => account.status === "active")
-          || sortedAccounts[0]
-          || null;
-        return { key: "plan-" + groupKey, groupKey, plan, accounts: sortedAccounts, item, order };
-      })
-      .sort((a, b) => a.order - b.order);
+    return [...accountCards, ...placeholders].sort((a, b) => {
+      if (a.order !== b.order) return a.order - b.order;
+      const statusOrder = Number(b.item?.status === "active") - Number(a.item?.status === "active");
+      if (statusOrder) return statusOrder;
+      if (a.accountTime !== b.accountTime) return b.accountTime - a.accountTime;
+      return a.accountIndex - b.accountIndex;
+    });
   }, [packageAccounts, packagePlans]);
   const pendingWithdrawal = history.find((item) => item.status === "pending");
   const hasPendingWithdrawal = Boolean(pendingWithdrawal);
@@ -653,7 +621,7 @@ export default function WithdrawPage() {
                       {withdrawalPackageCards.map(({ key, groupKey, plan, accounts, item }) => {
                         const packageFormId = item?._id || String(plan._id);
                         const packageBalanceForPlan = item
-                          ? Math.max(0, Number(item.packageGroupAvailableEarnings ?? item.availableEarnings ?? 0))
+                          ? Math.max(0, Number(item.availableEarnings || 0))
                           : 0;
                         // packageMaximum is the current policy limit, not the real money recorded in the bucket.
                         const availableForPlan = item ? packageMaximum(item) : 0;
@@ -681,7 +649,7 @@ export default function WithdrawPage() {
                               </div>
                             </div>
                             <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
-                              <span className="text-slate-500">محجوز: <b className="text-slate-200">{money(Number(item?.packageGroupLockedEarnings ?? item?.lockedEarnings ?? 0))} USDT</b></span>
+                              <span className="text-slate-500">محجوز: <b className="text-slate-200">{money(Number(item?.lockedEarnings || 0))} USDT</b></span>
                             </div>
                             {!item ? (
                               <p className="rounded-lg bg-white/[0.025] px-2 py-2 text-[10px] text-slate-500">فعّل الباقة أولًا لتتاح عمليات السحب.</p>

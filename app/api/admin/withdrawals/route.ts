@@ -25,7 +25,7 @@ function normalizeAsset(
 }
 
 function normalizePackageName(value: unknown) {
-  return String(value ?? "").normalize("NFKC").trim().replace(/\\s+/g, " ").toLocaleLowerCase("en-US");
+  return String(value ?? "").normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
 }
 
 export async function GET(

@@ -218,6 +218,7 @@ export async function PATCH(
 
     if (
       withdrawal.source === "package" &&
+      withdrawal.isFirstPackageWithdrawal === true &&
       ["approved", "completed"].includes(nextStatus) &&
       withdrawal.userPackageId
     ) {
@@ -238,6 +239,7 @@ export async function PATCH(
         userId: withdrawal.userId,
         source: "package",
         userPackageId: withdrawal.userPackageId,
+        isFirstPackageWithdrawal: true,
         status: { $in: ["pending", "approved", "processing", "completed"] },
       }).select("_id amount createdAt").sort({ createdAt: 1, _id: 1 }).lean();
 

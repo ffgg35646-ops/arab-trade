@@ -12,6 +12,7 @@ export interface IUserPackage {
   lockedEarnings: number;
   totalRealizedEarnings: number;
   totalWithdrawn: number;
+  withdrawablePrincipalCredited?: boolean;
   firstWithdrawalStatus: "available" | "pending" | "approved" | "completed";
   withdrawalRequestPending: boolean;
   cancellationRefund: number;
@@ -35,6 +36,7 @@ const UserPackageSchema = new Schema<IUserPackage>(
     lockedEarnings: { type: Number, default: 0, min: 0 },
     totalRealizedEarnings: { type: Number, default: 0, min: 0 },
     totalWithdrawn: { type: Number, default: 0, min: 0 },
+    withdrawablePrincipalCredited: { type: Boolean, default: false },
     firstWithdrawalStatus: { type: String, enum: ["available", "pending", "approved", "completed"], default: "available", index: true },
     withdrawalRequestPending: { type: Boolean, default: false, index: true },
     cancellationRefund: { type: Number, default: 0, min: 0 },

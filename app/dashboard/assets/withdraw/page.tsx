@@ -317,16 +317,16 @@ export default function WithdrawPage() {
         return;
       }
       const max = packageMaximum(packageAccount);
-      const lifetimeCap = Math.max(0, Number(packageAccount.packageWithdrawalCap ?? packageAccount.investedAmount ?? 0));
-      const lifetimeUsed = Math.max(0, Number(packageAccount.packageWithdrawalUsed || 0));
-      const lifetimeRemaining = Math.max(0, Number(packageAccount.packageWithdrawalRemaining ?? max));
-      if (numericAmount > max) {
-        if (lifetimeRemaining <= 1e-8) {
-          setError("تم بلوغ سقف السحب الإجمالي لباقة " + packageAccount.packageName + " وهو " + money(lifetimeCap) + " USDT. الطلبات المعلقة والموافق عليها والمكتملة محسوبة ضمن الإجمالي (" + money(lifetimeUsed) + " USDT).");
-        } else if (numericAmount > lifetimeRemaining) {
-          setError("المتبقي من سقف السحب الإجمالي لباقة " + packageAccount.packageName + " هو " + money(lifetimeRemaining) + " USDT فقط.");
+      if (numericAmount > max + 1e-8) {
+        const firstRemaining = Math.max(0, Number(packageAccount.firstPackageWithdrawalRemaining || 0));
+        const activeReferralCount = Math.max(0, Number(packageAccount.activeReferralCount || 0));
+        const referralRemaining = Math.max(0, Number(packageAccount.referralRemaining || 0));
+        if (firstRemaining <= 1e-8 && activeReferralCount <= 0) {
+          setError("عفوًا، طاقة الشحن ضعيفة، لابد من إحالات نشطة.");
+        } else if (firstRemaining <= 1e-8 && referralRemaining <= 1e-8) {
+          setError("لا يوجد حد سحب متاح مقابل الإحالات النشطة حاليًا.");
         } else {
-          setError("المتاح للسحب الآن من باقة " + packageAccount.packageName + " هو " + money(max) + " USDT فقط؛ تم احتساب الرصيد وسقف السحب والطلبات السابقة.");
+          setError("عفوًا، الرصيد المتاح للسحب من باقة " + packageAccount.packageName + " هو " + money(max) + " USDT فقط.");
         }
         return;
       }
@@ -464,14 +464,14 @@ export default function WithdrawPage() {
         </div>
 
         <div className="min-w-0">
-          <input aria-label="مبلغ السحب" type="text" inputMode="decimal" autoComplete="off" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", sanitizeAmountInput(event.target.value))} disabled={Boolean(source === "package" && (!packageAccount || packageMax <= 0))} required placeholder={source === "package" ? "مبلغ السحب" : money(minimum)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50 disabled:opacity-50" />
+          <input aria-label="مبلغ السحب" type="text" inputMode="decimal" autoComplete="off" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", sanitizeAmountInput(event.target.value))} disabled={Boolean(source === "package" && !packageAccount)} required placeholder={source === "package" ? "مبلغ السحب" : money(minimum)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50 disabled:opacity-50" />
           {source === "wallet" && <p className="mt-1 text-[10px] leading-4 text-slate-500">أقل مبلغ للسحب: {money(minimum)} {selected?.asset || "USDT"}</p>}
 
         </div>
 
         {selected?.warning && <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-2 text-xs text-amber-200">{selected.warning}</div>}
 
-        <button type="submit" disabled={isSubmitting || hasPendingWithdrawal || !selected || (source === "package" && (!packageAccount || packageMax <= 0))} className="col-span-2 w-full rounded-lg bg-cyan-300 px-3 py-1.5 text-xs font-black text-[#03111c] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40">
+        <button type="submit" disabled={isSubmitting || hasPendingWithdrawal || !selected || (source === "package" && !packageAccount)} className="col-span-2 w-full rounded-lg bg-cyan-300 px-3 py-1.5 text-xs font-black text-[#03111c] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40">
           {isSubmitting ? "جارٍ الإرسال…" : hasPendingWithdrawal ? "يوجد طلب قيد المراجعة" : "تأكيد السحب"}
         </button>
       </form>

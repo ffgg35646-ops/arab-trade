@@ -17,6 +17,7 @@ import PlatformSettings from "@/models/PlatformSettings";
 import { normalizeMissedPackageCollectionWindows } from "@/lib/package-collection-window";
 import { USDT_ASSET } from "@/lib/unified-usdt-wallet";
 import { debitDepositBalance, normalizeDepositBalanceRows, separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
+import { ensurePackagePrincipalWithdrawalCredit } from "@/lib/ensure-package-principal-withdrawal";
 
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8) / 1e8;
 
@@ -34,18 +35,24 @@ export async function GET(request: NextRequest) {
     ]);
     await ensureDefaultInvestmentPackages();
     await normalizeMissedPackageCollectionWindows({ userId: user._id });
-    const [packages, allPlansForProfit, rawDepositBalances, rawUserPackages, packageLedger, settings, referredUsers] = await Promise.all([
+    const [packages, allPlansForProfit, rawDepositBalances, settings, referredUsers] = await Promise.all([
       InvestmentPackage.find({ enabled: true }).sort({ sortOrder: 1, price: 1 }).lean(),
       InvestmentPackage.find({}).select("_id dailyProfit").lean(),
       DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
+      PlatformSettings.findOne({ key: "global" }).lean(),
+      User.find({ referredBy: user._id }).select("_id").lean(),
+    ]);
+    await ensurePackagePrincipalWithdrawalCredit(
+      user._id,
+      Number(settings?.withdrawals?.firstPackageWithdrawalPercent ?? 100)
+    );
+    const [rawUserPackages, packageLedger] = await Promise.all([
       UserPackage.find({ userId: user._id }).sort({ createdAt: -1 }).limit(100).lean(),
       PackageLedger.find({ userId: user._id })
         .populate("userPackageId", "packageName")
         .sort({ createdAt: -1 })
         .limit(200)
         .lean(),
-      PlatformSettings.findOne({ key: "global" }).lean(),
-      User.find({ referredBy: user._id }).select("_id").lean(),
     ]);
     const depositBalances = normalizeDepositBalanceRows(rawDepositBalances as any[]);
     const referredIds = referredUsers.map((item: any) => item._id);
@@ -155,7 +162,7 @@ export async function GET(request: NextRequest) {
         : Math.min(availableEarnings, firstPackageWithdrawalRemaining > 0
           ? firstPackageWithdrawalRemaining
           : referralRemaining);
-      const withdrawalLimit = Math.min(phaseWithdrawalLimit, packageWithdrawalRemaining);
+      const withdrawalLimit = phaseWithdrawalLimit;
       return {
         ...item,
         firstPackageWithdrawalCap,
@@ -219,6 +226,11 @@ export async function POST(request: NextRequest) {
 
     await connectDB();
     await separateLegacyDepositsFromSpotWallet(user._id);
+    const withdrawalSettings = await PlatformSettings.findOne({ key: "global" }).select("withdrawals.firstPackageWithdrawalPercent").lean();
+    await ensurePackagePrincipalWithdrawalCredit(
+      user._id,
+      Number((withdrawalSettings as any)?.withdrawals?.firstPackageWithdrawalPercent ?? 100)
+    );
     await Promise.all([
       UserPackage.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
       PackageLedger.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
@@ -358,16 +370,24 @@ export async function POST(request: NextRequest) {
           const created = await UserPackage.create([{
             userId: user._id, packageId: plan._id, packageName: plan.name,
             investedAmount: price, asset: USDT_ASSET, durationDays: 0, lastProfitAt: new Date(),
-            status: "active", availableEarnings: 0, lockedEarnings: 0,
+            status: "active", availableEarnings: price, lockedEarnings: 0,
             totalRealizedEarnings: 0, totalWithdrawn: 0,
+            withdrawablePrincipalCredited: true,
             cancellationRefund: 0, activatedAt: new Date(),
           }], { session });
           purchased = created[0];
-          await PackageLedger.create([{
-            userId: user._id, userPackageId: purchased._id,
-            type: "activation", asset, amount: -price,
-            note: "تفعيل باقة " + plan.name + " من رصيد الإيداع",
-          }], { session });
+          await PackageLedger.create([
+            {
+              userId: user._id, userPackageId: purchased._id,
+              type: "activation", asset, amount: -price,
+              note: "تفعيل باقة " + plan.name + " من رصيد الإيداع",
+            },
+            {
+              userId: user._id, userPackageId: purchased._id,
+              type: "activation_withdrawable", asset, amount: price,
+              note: "إضافة قيمة تفعيل الباقة إلى رصيد السحب المتاح للمرحلة الأولى.",
+            },
+          ], { session, ordered: true });
         });
       } catch (activationError) {
         console.error("PACKAGE ACTIVATION:", activationError);
@@ -467,10 +487,11 @@ export async function POST(request: NextRequest) {
             durationDays: 0,
             lastProfitAt: new Date(),
             status: "active",
-            availableEarnings: 0,
+            availableEarnings: price,
             lockedEarnings: 0,
             totalRealizedEarnings: 0,
             totalWithdrawn: 0,
+            withdrawablePrincipalCredited: true,
             firstWithdrawalStatus: "available",
             cancellationRefund: 0,
             activatedAt: new Date(),
@@ -493,6 +514,14 @@ export async function POST(request: NextRequest) {
               asset,
               amount: -price,
               note: "تفعيل باقة " + plan.name + " من رصيد الإيداع عند تغيير الباقة",
+            },
+            {
+              userId: user._id,
+              userPackageId: changedPackage._id,
+              type: "activation_withdrawable",
+              asset,
+              amount: price,
+              note: "إضافة قيمة تفعيل الباقة الجديدة إلى رصيد السحب المتاح للمرحلة الأولى.",
             },
           ], { session, ordered: true });
         });

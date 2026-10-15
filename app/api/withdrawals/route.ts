@@ -17,6 +17,7 @@ import DepositRequest from "@/models/DepositRequest";
 import { accrueDuePackageEarnings } from "@/lib/accrue-package-earnings";
 import { normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
 import { separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
+import { ensurePackagePrincipalWithdrawalCredit } from "@/lib/ensure-package-principal-withdrawal";
 
 function normalizeAsset(value: unknown) {
   return String(value || "").trim().toUpperCase();
@@ -176,6 +177,12 @@ export async function POST(request: NextRequest) {
     const amount = Number(body.amount);
     const source = body.source === "package" ? "package" : "wallet";
     const userPackageId = String(body.userPackageId || "").trim();
+    if (source === "package") {
+      await ensurePackagePrincipalWithdrawalCredit(
+        user._id,
+        Number(settings.withdrawals.firstPackageWithdrawalPercent ?? 100)
+      );
+    }
 
     if (
       assetCode !== USDT_ASSET ||
@@ -458,43 +465,7 @@ export async function POST(request: NextRequest) {
       }
 
       const packageAvailable = Math.max(0, Number(currentPackage.availableEarnings || 0));
-      if (amount > packageAvailable) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `رصيد باقة ${currentPackage.packageName} المتاح للسحب هو ${packageAvailable} ${assetCode} فقط. أدخل مبلغًا لا يتجاوز الرصيد المتاح.`,
-            availableAmount: packageAvailable,
-          },
-          { status: 400 }
-        );
-      }
-
       const countedStatuses = ["pending", "approved", "processing", "completed"] as const;
-      const packageWithdrawalRows = await WithdrawalRequest.find({
-        userId: user._id,
-        source: "package",
-        userPackageId: currentPackage._id,
-        status: { $in: countedStatuses },
-      }).select("amount").lean();
-      const packageWithdrawalCap = Math.max(0, Number(currentPackage.investedAmount || 0));
-      const packageWithdrawalUsed = packageWithdrawalRows.reduce(
-        (sum: number, row: any) => sum + Number(row.amount || 0),
-        0
-      );
-      const packageWithdrawalRemaining = Math.max(0, packageWithdrawalCap - packageWithdrawalUsed);
-      if (amount > packageWithdrawalRemaining + 1e-8) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `سقف السحب الإجمالي لباقة ${currentPackage.packageName} هو ${packageWithdrawalCap} ${assetCode}. سبق استخدام أو حجز ${packageWithdrawalUsed} ${assetCode}، والمتبقي المسموح به هو ${packageWithdrawalRemaining} ${assetCode} فقط.`,
-            packageWithdrawalCap,
-            packageWithdrawalUsed,
-            packageWithdrawalRemaining,
-          },
-          { status: 400 }
-        );
-      }
-
       const packagePlan = await InvestmentPackage.findById(currentPackage.packageId)
         .select("minimumWithdrawal")
         .lean();
@@ -552,14 +523,16 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Phase one: cumulative withdrawals are capped by the original package amount
-      // multiplied by the admin-configured first-withdrawal percentage.
+      // Phase one: cumulative withdrawals are capped by the original package amount.
+      // Once used, later withdrawals require capacity from active referrals.
       if (firstPackageWithdrawalRemaining > 0) {
-        if (amount > firstPackageWithdrawalRemaining) {
+        const firstStageAvailable = Math.min(packageAvailable, firstPackageWithdrawalRemaining);
+        if (amount > firstStageAvailable + 1e-8) {
           return NextResponse.json(
             {
               success: false,
-              message: "المتاح من سقف السحب الأول لباقة " + currentPackage.packageName + " هو " + firstPackageWithdrawalRemaining + " " + assetCode + ". بعد استهلاك هذا السقف يصبح السحب مقابل الإحالات النشطة.",
+              message: `عفوًا، الرصيد المتاح للسحب من باقة ${currentPackage.packageName} هو ${firstStageAvailable} ${assetCode} فقط.`,
+              availableAmount: firstStageAvailable,
               firstPackageWithdrawalCap,
               firstPackageWithdrawalUsed,
               firstPackageWithdrawalRemaining,
@@ -569,8 +542,7 @@ export async function POST(request: NextRequest) {
         }
         isFirstPackageWithdrawal = true;
       } else {
-        // Phase two and later: the configured percentage of approved USDT deposits
-        // made by the user's referred accounts defines the cumulative withdrawal cap.
+        // Phase two and later: approved USDT deposits from referred accounts define the cap.
         const referredIds = referredUsers.map((item: any) => item._id);
         const activeReferralDeposits = referredIds.length
           ? await DepositRequest.aggregate([
@@ -593,11 +565,15 @@ export async function POST(request: NextRequest) {
         );
         const referralRemaining = Math.max(0, referralCap - referralUsed);
 
-        if (amount > referralRemaining) {
+        if (amount > referralRemaining + 1e-8) {
+          const noActiveReferrals = activeReferralDeposits.length === 0 || activeReferralDepositTotal <= 1e-8;
           return NextResponse.json(
             {
               success: false,
-              message: "حد السحب المتبقي مقابل إيداعات الإحالات النشطة هو " + referralRemaining + " " + assetCode + ". تحتاج إلى إحالات نشطة وإيداعات معتمدة إضافية لزيادة الحد.",
+              message: noActiveReferrals
+                ? "عفوًا، طاقة الشحن ضعيفة، لابد من إحالات نشطة."
+                : "المتاح للسحب مقابل الإحالات النشطة هو " + referralRemaining + " " + assetCode + " فقط.",
+              activeReferralCount: activeReferralDeposits.length,
               activeReferralDepositTotal,
               referralCap,
               referralUsed,
@@ -606,6 +582,17 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
+      }
+
+      if (amount > packageAvailable + 1e-8) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `عفوًا، الرصيد المتاح للسحب من باقة ${currentPackage.packageName} هو ${packageAvailable} ${assetCode} فقط.`,
+            availableAmount: packageAvailable,
+          },
+          { status: 400 }
+        );
       }
 
       // If the last remainder of phase one is below the normal minimum, allow
@@ -632,18 +619,6 @@ export async function POST(request: NextRequest) {
         status: { $in: ["active", "cancelled"] },
         availableEarnings: { $gte: amount },
         withdrawalRequestPending: { $ne: true },
-        $expr: {
-          $lte: [
-            {
-              $add: [
-                { $ifNull: ["$totalWithdrawn", 0] },
-                { $ifNull: ["$lockedEarnings", 0] },
-                amount,
-              ],
-            },
-            { $ifNull: ["$investedAmount", 0] },
-          ],
-        },
       };
 
       if (isFirstPackageWithdrawal) {
@@ -668,26 +643,19 @@ export async function POST(request: NextRequest) {
         const latestPackage = await UserPackage.findOne({
           _id: userPackageId,
           userId: user._id,
-        }).select("investedAmount totalWithdrawn lockedEarnings availableEarnings packageName withdrawalRequestPending").lean();
+        }).select("availableEarnings packageName withdrawalRequestPending").lean();
         if (latestPackage?.withdrawalRequestPending === true) {
           return NextResponse.json(
             { success: false, message: "يوجد طلب سحب آخر لهذه الباقة قيد المراجعة أو التنفيذ. انتظر حسمه قبل تقديم طلب جديد." },
             { status: 409 }
           );
         }
-        const latestCapRemaining = Math.max(
-          0,
-          Number(latestPackage?.investedAmount || 0) -
-            Number(latestPackage?.totalWithdrawn || 0) -
-            Number(latestPackage?.lockedEarnings || 0)
-        );
+        const latestAvailable = Math.max(0, Number(latestPackage?.availableEarnings || 0));
         return NextResponse.json(
           {
             success: false,
-            message: latestCapRemaining < amount
-              ? `سقف السحب الإجمالي لباقة ${latestPackage?.packageName || currentPackage.packageName} وصل إلى الحد المسموح. المتبقي للسحب ${latestCapRemaining} ${assetCode} فقط.`
-              : "رصيد السحب المتاح غير كافٍ، أو يوجد طلب أول سحب قيد المراجعة بالفعل.",
-            packageWithdrawalRemaining: latestCapRemaining,
+            message: `رصيد باقة ${latestPackage?.packageName || currentPackage.packageName} المتاح للسحب هو ${latestAvailable} ${assetCode} فقط.`,
+            availableAmount: latestAvailable,
           },
           { status: 400 }
         );

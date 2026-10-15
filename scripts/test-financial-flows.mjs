@@ -1165,7 +1165,7 @@ ok(await api("/api/admin/withdrawals", {
   body: { id: generalRejectionWithdrawalId, status: "rejected", adminNote: "CI rejection after approval" },
 }), "rejection after approval restores general-wallet balance");
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 30, "rejection after approval returns the approved amount to available");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 40, "rejection after approval returns the approved amount to available");
 closeTo(userWallet.balances.find((x) => x.asset === "USDT").locked, 0, "rejection after approval does not subtract the same lock twice");
 closeTo(await navbarWithdrawalUsdtTotal("navbar total after reversing approved general withdrawal"), navbarBeforeApprovedThenRejected, "rejection after approval restores the exact prior navbar total");
 

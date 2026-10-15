@@ -1333,7 +1333,7 @@ ok(approvedPackagePage, "package API loads after a package withdrawal is approve
 const approvedPackageView = approvedPackagePage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
 assert.equal(approvedPackageView.packageWithdrawalStatus, null, "approved package request is terminal rather than in transfer");
 assert.equal(approvedPackageView.packageWithdrawalPending, false, "approval leaves no open package-withdrawal flag");
-closeTo(approvedPackageView.packageGroupLockedEarnings, 0, "approved payout clears the reserved amount immediately");
+closeTo(approvedPackageView.lockedEarnings, 0, "approved payout clears the reserved amount immediately");
 singleRequestPackage = await db.collection("userpackages").findOne({ _id: singleRequestPackageId });
 closeTo(singleRequestPackage.availableEarnings, 200, "approval consumes the first payout without refunding it to available");
 closeTo(singleRequestPackage.lockedEarnings, 0, "approved first-stage request leaves no locked amount");
@@ -1341,7 +1341,7 @@ closeTo(singleRequestPackage.totalWithdrawn, 100, "approved first-stage request 
 const approvedWithdrawalPackagesPage = approvedPackagePage;
 const completedPackageView = approvedWithdrawalPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
 assert.equal(completedPackageView.packageWithdrawalStatus, null, "accepted request does not show as pending review or in transfer");
-closeTo(completedPackageView.packageGroupLockedEarnings, 0, "accepted request leaves no reserved amount in the package card");
+closeTo(completedPackageView.lockedEarnings, 0, "accepted request leaves no reserved amount in the package card");
 ok(approvedWithdrawalPackagesPage, "package API exposes the post-approval withdrawal phase");
 const approvedWithdrawalPackageView = approvedWithdrawalPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
 assert.equal(approvedWithdrawalPackageView.packageWithdrawalAlreadyUsed, true, "package API marks a successful first-stage withdrawal");

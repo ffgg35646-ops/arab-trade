@@ -445,27 +445,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // A settled first-stage withdrawal moves later requests to the referral-cap
-      // phase. It must not permanently block the package from being used again.
-      const successfulPackageWithdrawal = await WithdrawalRequest.findOne({
-        userId: user._id,
-        source: "package",
-        userPackageId: currentPackage._id,
-        status: { $in: ["approved", "processing"] },
-      }).select("_id amount status createdAt").sort({ createdAt: -1 }).lean();
-
-      if (successfulPackageWithdrawal) {
-        return NextResponse.json(
-          {
-            success: false,
-            alreadyWithdrawn: true,
-            message: "طلب السحب من باقة " + currentPackage.packageName + " تمت الموافقة عليه أو ما زال قيد التنفيذ. لا يُسمح بطلب جديد حتى يكتمل التحويل أو يُرفض الطلب.",
-            previousWithdrawalId: String(successfulPackageWithdrawal._id),
-          },
-          { status: 409 }
-        );
-      }
-
       const activePackageWithdrawal = await WithdrawalRequest.findOne({
         userId: user._id,
         source: "package",
@@ -529,8 +508,11 @@ export async function POST(request: NextRequest) {
         0,
         firstPackageWithdrawalCap - firstPackageWithdrawalUsed
       );
-      const completedFirstStageWithdrawal = firstWithdrawalRows.some(
-        (row: any) => String(row.status) === "completed"
+      // After the first-stage withdrawal is approved, later requests must use
+      // the active-referral allowance. Do not treat an approved/in-flight first
+      // withdrawal as permission to split the original package cap into requests.
+      const firstStageWithdrawalApproved = firstWithdrawalRows.some(
+        (row: any) => ["approved", "processing", "completed"].includes(String(row.status))
       );
       let referralRemainingForRequest = 0;
       const firstPackageWithdrawalPending = firstWithdrawalRows.some(
@@ -550,7 +532,7 @@ export async function POST(request: NextRequest) {
 
       // Phase one: cumulative withdrawals are capped by the original package amount.
       // Once used, later withdrawals require capacity from active referrals.
-      if (firstPackageWithdrawalRemaining > 0 && !completedFirstStageWithdrawal) {
+      if (firstPackageWithdrawalRemaining > 0 && !firstStageWithdrawalApproved) {
         const firstStageAvailable = Math.min(packageAvailable, firstPackageWithdrawalRemaining);
         if (amount > firstStageAvailable + 1e-8) {
           return NextResponse.json(
@@ -632,7 +614,7 @@ export async function POST(request: NextRequest) {
         Number(currentPackage.availableEarnings || 0) >= firstPackageWithdrawalRemaining;
       const finalReferralAllowanceBelowMinimum =
         !isFirstPackageWithdrawal &&
-        (firstPackageWithdrawalRemaining <= 1e-8 || Boolean(successfulPackageWithdrawal) || completedFirstStageWithdrawal) &&
+        (firstPackageWithdrawalRemaining <= 1e-8 || firstStageWithdrawalApproved) &&
         referralRemainingForRequest > 0 &&
         Math.min(referralRemainingForRequest, packageAvailable) < packageMinimum &&
         Math.abs(amount - Math.min(referralRemainingForRequest, packageAvailable)) <= 1e-8;

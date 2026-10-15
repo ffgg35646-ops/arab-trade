@@ -29,7 +29,7 @@ if (uriDatabase !== "arabtrade") {
   );
 }
 
-const activeStatuses = ["pending", "approved", "processing"];
+const activeStatuses = ["pending", "processing"];
 const epsilon = 1e-7;
 const asNumber = (value) => {
   const n = Number(value ?? 0);
@@ -170,13 +170,13 @@ try {
         userId: idOf(account.userId),
         packageAccountId: accountId,
         packageName: String(account.packageName || ""),
-        note: "withdrawalRequestPending is true but no pending/approved/processing request allocation references this account.",
+        note: "withdrawalRequestPending is true but no pending/processing package request allocation references this account.",
       });
     }
   }
 
   const terminalStillLocked = allPackageRequests.filter(
-    (request) => ["rejected", "failed", "completed"].includes(String(request.status)),
+    (request) => ["approved", "rejected", "failed", "completed"].includes(String(request.status)),
   );
   const terminalReferences = new Set();
   for (const request of terminalStillLocked) {

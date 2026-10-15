@@ -431,6 +431,32 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const countedStatuses = ["pending", "approved", "processing", "completed"] as const;
+      const packageWithdrawalRows = await WithdrawalRequest.find({
+        userId: user._id,
+        source: "package",
+        userPackageId: currentPackage._id,
+        status: { $in: countedStatuses },
+      }).select("amount").lean();
+      const packageWithdrawalCap = Math.max(0, Number(currentPackage.investedAmount || 0));
+      const packageWithdrawalUsed = packageWithdrawalRows.reduce(
+        (sum: number, row: any) => sum + Number(row.amount || 0),
+        0
+      );
+      const packageWithdrawalRemaining = Math.max(0, packageWithdrawalCap - packageWithdrawalUsed);
+      if (amount > packageWithdrawalRemaining + 1e-8) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `سقف السحب الإجمالي لباقة ${currentPackage.packageName} هو ${packageWithdrawalCap} ${assetCode}. سبق استخدام أو حجز ${packageWithdrawalUsed} ${assetCode}، والمتبقي المسموح به هو ${packageWithdrawalRemaining} ${assetCode} فقط.`,
+            packageWithdrawalCap,
+            packageWithdrawalUsed,
+            packageWithdrawalRemaining,
+          },
+          { status: 400 }
+        );
+      }
+
       const packagePlan = await InvestmentPackage.findById(currentPackage.packageId)
         .select("minimumWithdrawal")
         .lean();
@@ -440,7 +466,6 @@ export async function POST(request: NextRequest) {
         Number(configuredPackageMinimum ?? packagePlan?.minimumWithdrawal ?? settings.withdrawals.minAmount ?? 0),
         Number(minAmount || 0)
       );
-      const countedStatuses = ["pending", "approved", "processing", "completed"] as const;
       const [firstWithdrawalRows, referralWithdrawalRows, referredUsers] = await Promise.all([
         WithdrawalRequest.find({
           userId: user._id,
@@ -568,6 +593,18 @@ export async function POST(request: NextRequest) {
         asset: assetCode,
         status: { $in: ["active", "cancelled"] },
         availableEarnings: { $gte: amount },
+        $expr: {
+          $lte: [
+            {
+              $add: [
+                { $ifNull: ["$totalWithdrawn", 0] },
+                { $ifNull: ["$lockedEarnings", 0] },
+                amount,
+              ],
+            },
+            { $ifNull: ["$investedAmount", 0] },
+          ],
+        },
       };
 
       if (isFirstPackageWithdrawal) {
@@ -586,8 +623,24 @@ export async function POST(request: NextRequest) {
       );
 
       if (!lockedUserPackage) {
+        const latestPackage = await UserPackage.findOne({
+          _id: userPackageId,
+          userId: user._id,
+        }).select("investedAmount totalWithdrawn lockedEarnings availableEarnings packageName").lean();
+        const latestCapRemaining = Math.max(
+          0,
+          Number(latestPackage?.investedAmount || 0) -
+            Number(latestPackage?.totalWithdrawn || 0) -
+            Number(latestPackage?.lockedEarnings || 0)
+        );
         return NextResponse.json(
-          { success: false, message: "رصيد السحب المتاح غير كافٍ، أو يوجد طلب أول سحب قيد المراجعة بالفعل." },
+          {
+            success: false,
+            message: latestCapRemaining < amount
+              ? `سقف السحب الإجمالي لباقة ${latestPackage?.packageName || currentPackage.packageName} وصل إلى الحد المسموح. المتبقي للسحب ${latestCapRemaining} ${assetCode} فقط.`
+              : "رصيد السحب المتاح غير كافٍ، أو يوجد طلب أول سحب قيد المراجعة بالفعل.",
+            packageWithdrawalRemaining: latestCapRemaining,
+          },
           { status: 400 }
         );
       }

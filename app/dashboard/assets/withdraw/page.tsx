@@ -322,7 +322,7 @@ export default function WithdrawPage() {
         const activeReferralCount = Math.max(0, Number(packageAccount.activeReferralCount || 0));
         const referralRemaining = Math.max(0, Number(packageAccount.referralRemaining || 0));
         if (firstRemaining <= 1e-8 && activeReferralCount <= 0) {
-          setError("عفوًا، طاقة الشحن ضعيفة، لابد من إحالات نشطة.");
+          setError("الطاقة منخفضة الآن، يُرجى جلب إحالات نشطة.");
         } else if (firstRemaining <= 1e-8 && referralRemaining <= 1e-8) {
           setError("لا يوجد حد سحب متاح مقابل الإحالات النشطة حاليًا.");
         } else {
@@ -344,6 +344,8 @@ export default function WithdrawPage() {
     const configuredMaximums = [Number(selectedMethod.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : 0;
     const firstRemainder = Number(packageAccount?.firstPackageWithdrawalRemaining || 0);
+    const referralRemainder = Number(packageAccount?.referralRemaining || 0);
+    const fullReferralAllowance = Math.min(referralRemainder, Number(packageAccount?.availableEarnings || 0));
     const finalFirstAllowanceBelowMinimum =
       source === "package" &&
       Boolean(packageAccount) &&
@@ -352,7 +354,15 @@ export default function WithdrawPage() {
       firstRemainder < minimum &&
       Math.abs(numericAmount - firstRemainder) <= 1e-8 &&
       Number(packageAccount?.availableEarnings || 0) >= firstRemainder;
-    if (numericAmount < minimum && !finalFirstAllowanceBelowMinimum) {
+    const finalReferralAllowanceBelowMinimum =
+      source === "package" &&
+      Boolean(packageAccount) &&
+      firstRemainder <= 1e-8 &&
+      referralRemainder > 0 &&
+      fullReferralAllowance > 0 &&
+      fullReferralAllowance < minimum &&
+      Math.abs(numericAmount - fullReferralAllowance) <= 1e-8;
+    if (numericAmount < minimum && !finalFirstAllowanceBelowMinimum && !finalReferralAllowanceBelowMinimum) {
       setError((source === "package" ? "أقل مبلغ يمكن سحبه من باقة " + (packageAccount?.packageName || "") : "أقل مبلغ يمكن سحبه") + " هو " + money(minimum) + " " + selectedMethod.asset + ". أدخل مبلغًا مساويًا للحد الأدنى أو أكبر، مع عدم تجاوز الرصيد المتاح.");
       return;
     }

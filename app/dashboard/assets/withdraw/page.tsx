@@ -37,6 +37,9 @@ type PackageAccount = {
   firstPackageWithdrawalUsed?: number;
   firstPackageWithdrawalRemaining?: number;
   firstPackageWithdrawalPending?: boolean;
+  packageWithdrawalCap?: number;
+  packageWithdrawalUsed?: number;
+  packageWithdrawalRemaining?: number;
   activeReferralCount?: number;
   activeReferralDepositTotal?: number;
   firstPackageWithdrawalPercent?: number;
@@ -304,10 +307,17 @@ export default function WithdrawPage() {
         return;
       }
       const max = packageMaximum(packageAccount);
+      const lifetimeCap = Math.max(0, Number(packageAccount.packageWithdrawalCap ?? packageAccount.investedAmount ?? 0));
+      const lifetimeUsed = Math.max(0, Number(packageAccount.packageWithdrawalUsed || 0));
+      const lifetimeRemaining = Math.max(0, Number(packageAccount.packageWithdrawalRemaining ?? max));
       if (numericAmount > max) {
-        setError(max > 0
-          ? "رصيد باقة " + packageAccount.packageName + " المتاح للسحب هو " + money(max) + " USDT فقط. أدخل مبلغًا لا يتجاوز الرصيد المتاح."
-          : "لا يوجد رصيد متاح للسحب من باقة " + packageAccount.packageName + " حاليًا.");
+        if (lifetimeRemaining <= 1e-8) {
+          setError("تم بلوغ سقف السحب الإجمالي لباقة " + packageAccount.packageName + " وهو " + money(lifetimeCap) + " USDT. الطلبات المعلقة والموافق عليها والمكتملة محسوبة ضمن الإجمالي (" + money(lifetimeUsed) + " USDT).");
+        } else if (numericAmount > lifetimeRemaining) {
+          setError("المتبقي من سقف السحب الإجمالي لباقة " + packageAccount.packageName + " هو " + money(lifetimeRemaining) + " USDT فقط.");
+        } else {
+          setError("المتاح للسحب الآن من باقة " + packageAccount.packageName + " هو " + money(max) + " USDT فقط؛ تم احتساب الرصيد وسقف السحب والطلبات السابقة.");
+        }
         return;
       }
     } else {
@@ -445,15 +455,17 @@ export default function WithdrawPage() {
         <div className="min-w-0">
           <input aria-label="مبلغ السحب" type="text" inputMode="decimal" autoComplete="off" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", sanitizeAmountInput(event.target.value))} disabled={Boolean(source === "package" && (!packageAccount || packageMax <= 0))} required placeholder={money(minimum)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50 disabled:opacity-50" />
           <p className="mt-1 text-[10px] leading-4 text-slate-500">أقل مبلغ للسحب: {money(minimum)} {selected?.asset || "USDT"}</p>
-          {source === "package" && <p className="mt-1 text-[10px] leading-4 text-slate-500">الأقصى حسب مرحلة السحب الحالية: {money(Math.min(packageMax, maximum || packageMax))} USDT</p>}
+          {source === "package" && <p className="mt-1 text-[10px] leading-4 text-slate-500">الحد المتاح الآن بعد احتساب سقف الباقة والطلبات السابقة: {money(Math.min(packageMax, maximum || packageMax))} USDT</p>}
         </div>
         {source === "package" && packageAccount && (
           <p className="col-span-2 rounded-lg border border-white/10 bg-white/[0.025] p-2 text-[10px] leading-4 text-slate-400">
-            {packagePending
-              ? "طلب من سقف السحب الأول قيد المراجعة؛ انتظر حسمه قبل استكمال السقف أو الانتقال إلى الإحالات."
-              : Number(packageAccount.firstPackageWithdrawalRemaining || 0) > 0
-                ? "المتبقي من سقف المرحلة الأولى (حسب قيمة الباقة الأصلية): " + money(Number(packageAccount.firstPackageWithdrawalRemaining || 0)) + " USDT."
-                : "المتاح من سقف السحب مقابل الإحالات النشطة: " + money(Number(packageAccount.referralRemaining || 0)) + " USDT."}
+            Number(packageAccount.packageWithdrawalRemaining ?? packageMax) <= 0
+              ? "تم استخدام أو حجز سقف الباقة الإجمالي (" + money(Number(packageAccount.packageWithdrawalCap ?? packageAccount.investedAmount ?? 0)) + " USDT). تُحتسب الطلبات المعلقة والموافق عليها والمكتملة، ولا يسمح بطلبات تتجاوز هذا السقف."
+              : packagePending
+                ? "يوجد طلب سحب من المرحلة الحالية قيد المراجعة؛ انتظر حسمه قبل تقديم طلب آخر."
+                : Number(packageAccount.firstPackageWithdrawalRemaining || 0) > 0
+                  ? "المتبقي من سقف المرحلة الأولى: " + money(Number(packageAccount.firstPackageWithdrawalRemaining || 0)) + " USDT."
+                  : "حد الإحالات المتبقي لا يتجاوز سقف الباقة الإجمالي: " + money(Number(packageAccount.referralRemaining || 0)) + " USDT."}
           </p>
         )}
         {selected?.warning && <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-2 text-xs text-amber-200">{selected.warning}</div>}

@@ -464,6 +464,28 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // An approved or processing request is still in flight. Do not create
+      // another request for the same package until that transfer completes.
+      // Once completed, the next request is evaluated against active-referral capacity.
+      const successfulPackageWithdrawal = await WithdrawalRequest.findOne({
+        userId: user._id,
+        source: "package",
+        userPackageId: currentPackage._id,
+        status: { $in: ["approved", "processing"] },
+      }).select("_id amount status createdAt").sort({ createdAt: -1 }).lean();
+
+      if (successfulPackageWithdrawal) {
+        return NextResponse.json(
+          {
+            success: false,
+            alreadyWithdrawn: true,
+            message: "طلب السحب من باقة " + currentPackage.packageName + " ما زال معتمدًا أو قيد التنفيذ. انتظر اكتماله قبل تقديم طلب جديد.",
+            previousWithdrawalId: String(successfulPackageWithdrawal._id),
+          },
+          { status: 409 }
+        );
+      }
+
       const packageAvailable = Math.max(0, Number(currentPackage.availableEarnings || 0));
       const countedStatuses = ["pending", "approved", "processing", "completed"] as const;
       const packagePlan = await InvestmentPackage.findById(currentPackage.packageId)

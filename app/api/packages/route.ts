@@ -101,6 +101,14 @@ async function reconcileLegacyPackageRefunds(userId: mongoose.Types.ObjectId) {
           return;
         }
 
+        const legacyPackageRefundLedger = await PackageLedger.findOne({
+          userId,
+          userPackageId: account._id,
+          type: "cancellation_refund",
+          amount: { $gte: refund - 1e-7, $lte: refund + 1e-7 },
+          note: { $regex: "رصيد السحب العام|المحفظة العامة" },
+        }).session(session).lean();
+
         const wallet = await Wallet.findOne({
           userId,
           type: "spot",
@@ -133,14 +141,28 @@ async function reconcileLegacyPackageRefunds(userId: mongoose.Types.ObjectId) {
         );
         if (!creditedPackage) throw new Error("LEGACY_PACKAGE_REFUND_CHANGED");
 
-        await PackageLedger.create([{
+        const reclassificationEntries: Array<Record<string, unknown>> = [];
+        if (legacyPackageRefundLedger) {
+          // The old code wrote a positive package-ledger row even though the
+          // money was sent to the general wallet. Reverse that misleading row.
+          reclassificationEntries.push({
+            userId,
+            userPackageId: account._id,
+            type: "cancellation_refund",
+            asset,
+            amount: -refund,
+            note: "عكس قيد استرداد قديم كان مسجلًا في سجل الباقة رغم إضافته إلى رصيد السحب العام. المرجع: " + String(legacyCredit.referenceId || ""),
+          });
+        }
+        reclassificationEntries.push({
           userId,
           userPackageId: account._id,
           type: "refund_reclassification",
           asset,
           amount: refund,
           note: migrationNote,
-        }], { session });
+        });
+        await PackageLedger.create(reclassificationEntries, { session });
 
         await LedgerEntry.create([{
           userId,

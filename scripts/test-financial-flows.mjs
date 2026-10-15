@@ -304,7 +304,7 @@ closeTo(stillActivePackage.cancellationRefund, 0, "blocked cancellation does not
 statusIs(await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 10, source: "package", userPackageId: String(package100._id) },
-}), 400, "another package withdrawal is blocked by the package lifetime cap while the first is unresolved");
+}), 409, "another package withdrawal is blocked while the first is unresolved");
 
 ok(await api("/api/admin/withdrawals", {
   as: "admin", method: "PATCH",
@@ -329,7 +329,7 @@ assert.equal(package100Doc.firstWithdrawalStatus, "pending", "retried first pack
 statusIs(await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 10, source: "package", userPackageId: String(package100._id) },
-}), 400, "second package withdrawal blocked by package lifetime cap while first request is pending");
+}), 409, "second package withdrawal blocked while first request is pending");
 
 ok(await api("/api/admin/withdrawals", {
   as: "admin", method: "PATCH",
@@ -412,6 +412,70 @@ const blockedLegacyApproval = await api("/api/admin/withdrawals", {
 });
 statusIs(blockedLegacyApproval, 409, "admin cannot approve a legacy withdrawal request that pushes the package past its lifetime cap");
 await db.collection("withdrawalrequests").deleteOne({ _id: legacyOverCapRequestId });
+
+// One open withdrawal per package: a 300-USDT package has 200 left after a 100-USDT request,
+// but a second request remains blocked until the first is rejected or completed.
+const singleRequestPackageId = new mongoose.Types.ObjectId();
+const singleRequestPackageCreatedAt = new Date();
+await db.collection("userpackages").insertOne({
+  _id: singleRequestPackageId,
+  userId: user._id,
+  packageId: plan200._id,
+  packageName: "CI package 300 one-open-request",
+  investedAmount: 300,
+  asset: "USDT",
+  durationDays: 30,
+  status: "cancelled",
+  availableEarnings: 300,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 300,
+  totalWithdrawn: 0,
+  firstWithdrawalStatus: "available",
+  withdrawalRequestPending: false,
+  cancellationRefund: 0,
+  activatedAt: singleRequestPackageCreatedAt,
+  lastProfitAt: singleRequestPackageCreatedAt,
+  createdAt: singleRequestPackageCreatedAt,
+  updatedAt: singleRequestPackageCreatedAt,
+});
+const firstSingleRequest = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "single-request-test-address", amount: 100, source: "package", userPackageId: String(singleRequestPackageId) },
+});
+ok(firstSingleRequest, "first 100-USDT withdrawal from a 300-USDT package is accepted", 201);
+const firstSingleRequestId = String(firstSingleRequest.data.withdrawal._id);
+let singleRequestPackage = await db.collection("userpackages").findOne({ _id: singleRequestPackageId });
+closeTo(singleRequestPackage.availableEarnings, 200, "300-USDT package still has 200 available after first 100-USDT request");
+assert.equal(singleRequestPackage.withdrawalRequestPending, true, "package account locks while the first withdrawal is unresolved");
+const singleRequestPackagesPage = await api("/api/packages");
+ok(singleRequestPackagesPage, "package API exposes single-request lock");
+const singleRequestPackageView = singleRequestPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
+assert.equal(singleRequestPackageView.packageWithdrawalPending, true, "package API marks unresolved package withdrawal");
+closeTo(singleRequestPackageView.packageWithdrawalRemaining, 200, "package cap still has 200 remaining while first request is pending");
+closeTo(singleRequestPackageView.withdrawalLimit, 0, "package API prevents a second withdrawal despite remaining balance and cap");
+const secondSingleRequest = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "single-request-test-address", amount: 100, source: "package", userPackageId: String(singleRequestPackageId) },
+});
+statusIs(secondSingleRequest, 409, "second 100-USDT request is blocked while the first request is unresolved");
+assert.match(String(secondSingleRequest.data.message || ""), /طلب سحب قائم/, "second request explains that an unresolved withdrawal already exists");
+ok(await api("/api/admin/withdrawals", {
+  as: "admin",
+  method: "PATCH",
+  body: { id: firstSingleRequestId, status: "rejected", adminNote: "CI release single-request lock after rejection" },
+}), "admin rejection releases the package request lock");
+singleRequestPackage = await db.collection("userpackages").findOne({ _id: singleRequestPackageId });
+assert.equal(singleRequestPackage.withdrawalRequestPending, false, "package request lock clears after rejection");
+const retrySingleRequest = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "single-request-test-address", amount: 100, source: "package", userPackageId: String(singleRequestPackageId) },
+});
+ok(retrySingleRequest, "new withdrawal is allowed after the prior request is rejected", 201);
+ok(await api("/api/admin/withdrawals", {
+  as: "admin",
+  method: "PATCH",
+  body: { id: String(retrySingleRequest.data.withdrawal._id), status: "rejected", adminNote: "CI cleanup single-request lock test" },
+}), "test retry is rejected to release its reservation");
 
 const generalWithdrawal = await api("/api/withdrawals", {
   method: "POST",

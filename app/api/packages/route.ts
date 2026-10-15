@@ -162,7 +162,7 @@ export async function GET(request: NextRequest) {
         : Math.min(availableEarnings, firstPackageWithdrawalRemaining > 0
           ? firstPackageWithdrawalRemaining
           : referralRemaining);
-      const withdrawalLimit = phaseWithdrawalLimit;
+      const withdrawalLimit = Math.min(phaseWithdrawalLimit, packageWithdrawalRemaining);
       return {
         ...item,
         firstPackageWithdrawalCap,

@@ -423,7 +423,7 @@ export async function POST(request: NextRequest) {
         userId: user._id,
         source: "package",
         userPackageId: currentPackage._id,
-        status: { $in: ["pending", "approved", "processing"] },
+        status: "pending",
       }).select("_id amount status createdAt").sort({ createdAt: -1 }).lean();
 
       if (activePackageWithdrawal || currentPackage.withdrawalRequestPending === true) {
@@ -519,7 +519,7 @@ export async function POST(request: NextRequest) {
         firstPackageWithdrawalCap - firstPackageWithdrawalUsed
       );
       const firstPackageWithdrawalPending = firstWithdrawalRows.some(
-        (row: any) => ["pending", "approved", "processing"].includes(String(row.status))
+        (row: any) => String(row.status) === "pending"
       );
 
       if (firstPackageWithdrawalPending) {
@@ -630,7 +630,7 @@ export async function POST(request: NextRequest) {
       if (isFirstPackageWithdrawal) {
         // Allow repeat requests against the remaining first-stage allowance only
         // after the previous first-stage request has been settled.
-        packageFilter.firstWithdrawalStatus = { $in: ["available", "completed", null] };
+        packageFilter.firstWithdrawalStatus = { $in: ["available", "approved", "completed", null] };
       }
 
       lockedUserPackage = await UserPackage.findOneAndUpdate(

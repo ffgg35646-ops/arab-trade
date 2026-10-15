@@ -268,6 +268,53 @@ closeTo(spotWallet.balances.find((x) => x.asset === "USDT").available, 50, "pack
 closeTo(depositBalance && depositBalance.available, 900, "package activation debits the separate deposit balance");
 closeTo(Number(package100.availableEarnings || 0), 100, "package activation principal is withdrawable within the first-stage cap");
 
+// Regression: a package minimum of 200 USDT must reject a 50-USDT request,
+// even when 50 is the entire remaining balance for that package.
+const min200Result = await api("/api/admin/packages", {
+  as: "admin", method: "POST",
+  body: { name: "CI Bronze Minimum 200", description: "minimum withdrawal regression", price: 200, durationDays: 30, enabled: true },
+});
+ok(min200Result, "admin creates package for minimum-withdrawal regression", 201);
+const minimumTestPlan = min200Result.data.package;
+await db.collection("investmentpackages").updateOne(
+  { _id: new mongoose.Types.ObjectId(String(minimumTestPlan._id)) },
+  { $set: { minimumWithdrawal: 200 } },
+);
+const minimumTestAccountId = new mongoose.Types.ObjectId();
+await db.collection("userpackages").insertOne({
+  _id: minimumTestAccountId,
+  userId: user._id,
+  packageId: new mongoose.Types.ObjectId(String(minimumTestPlan._id)),
+  packageName: minimumTestPlan.name,
+  investedAmount: 50,
+  asset: "USDT",
+  durationDays: 0,
+  status: "cancelled",
+  availableEarnings: 50,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 0,
+  totalWithdrawn: 0,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "available",
+  withdrawalRequestPending: false,
+  cancellationRefund: 0,
+  activatedAt: new Date(),
+  lastProfitAt: new Date(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+});
+const belowPackageMinimum = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 50, source: "package", userPackageId: String(minimumTestAccountId) },
+});
+statusIs(belowPackageMinimum, 400, "package minimum of 200 rejects a 50-USDT remainder");
+assert.match(String(belowPackageMinimum.data.message || ""), /200/, "minimum error tells user the configured 200-USDT minimum");
+const unchangedMinimumTestAccount = await db.collection("userpackages").findOne({ _id: minimumTestAccountId });
+closeTo(unchangedMinimumTestAccount.availableEarnings, 50, "below-minimum attempt preserves package balance");
+closeTo(unchangedMinimumTestAccount.lockedEarnings, 0, "below-minimum attempt does not lock funds");
+await db.collection("userpackages").deleteOne({ _id: minimumTestAccountId });
+await db.collection("investmentpackages").deleteOne({ _id: new mongoose.Types.ObjectId(String(minimumTestPlan._id)) });
+
 ok(await api("/api/admin/packages/credit", {
   as: "admin", method: "POST",
   body: { userPackageId: String(package100._id), amount: 600, note: "CI realized proceeds test credit" },

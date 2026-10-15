@@ -871,16 +871,13 @@ export async function POST(request: NextRequest) {
 
       if (!claimedWithdrawalLock) {
         if (source === "package" && lockedUserPackage) {
-          await UserPackage.updateOne(
-            { _id: lockedUserPackage._id, userId: user._id },
-            {
-              $inc: { availableEarnings: amount, lockedEarnings: -amount },
-              $set: {
-                withdrawalRequestPending: false,
-                ...(isFirstPackageWithdrawal ? { firstWithdrawalStatus: "available" } : {}),
-              },
-            }
+          await restoreLockedPackageAllocations(
+            user._id,
+            userPackageId,
+            lockedPackageAllocations,
+            isFirstPackageWithdrawal,
           );
+          lockedPackageAllocations = [];
         } else if (lockedWalletAllocations.length) {
           for (const allocation of lockedWalletAllocations) {
             await Wallet.updateOne(
@@ -912,6 +909,7 @@ export async function POST(request: NextRequest) {
           walletType: lockedWalletAllocations[0]?.walletType || "spot",
           walletAllocations: source === "wallet" ? lockedWalletAllocations : [],
           userPackageId: source === "package" ? userPackageId : null,
+          packageAllocations: source === "package" ? lockedPackageAllocations : [],
           isFirstPackageWithdrawal,
           status: "pending",
           adminNote: "",
@@ -954,16 +952,13 @@ export async function POST(request: NextRequest) {
        * نرجع الرصيد مرة أخرى.
        */
       if (source === "package" && lockedUserPackage) {
-        await UserPackage.updateOne(
-          { _id: lockedUserPackage._id, userId: user._id },
-          {
-            $inc: { availableEarnings: amount, lockedEarnings: -amount },
-            $set: {
-              withdrawalRequestPending: false,
-              ...(isFirstPackageWithdrawal ? { firstWithdrawalStatus: "available" } : {}),
-            },
-          }
+        await restoreLockedPackageAllocations(
+          user._id,
+          userPackageId,
+          lockedPackageAllocations,
+          isFirstPackageWithdrawal,
         );
+        lockedPackageAllocations = [];
       } else if (lockedWalletAllocations.length) {
         for (const allocation of lockedWalletAllocations) {
           await Wallet.updateOne(

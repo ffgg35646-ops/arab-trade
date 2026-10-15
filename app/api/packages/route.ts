@@ -154,6 +154,7 @@ export async function GET(request: NextRequest) {
     // package family's actual buckets so the card cannot show only one activation
     // record while the page total includes the others.
     const packageBalancesByName = new Map<string, { available: number; locked: number }>();
+    const packageInvestedByName = new Map<string, number>();
     for (const account of rawUserPackages as any[]) {
       const key = String(account._id);
       const groupKey = packageGroupByAccountId.get(key) || "account:" + key;
@@ -161,6 +162,10 @@ export async function GET(request: NextRequest) {
       balance.available = roundAmount(balance.available + Math.max(0, Number(account.availableEarnings || 0)));
       balance.locked = roundAmount(balance.locked + Math.max(0, Number(account.lockedEarnings || 0)));
       packageBalancesByName.set(groupKey, balance);
+      packageInvestedByName.set(
+        groupKey,
+        roundAmount((packageInvestedByName.get(groupKey) || 0) + Math.max(0, Number(account.investedAmount || 0))),
+      );
     }
 
     const dailyProfitByPackage = new Map(
@@ -178,7 +183,8 @@ export async function GET(request: NextRequest) {
       const referralCap = activeReferralDepositTotal * referralPackageWithdrawalPercent / 100;
       const referralAlreadyWithdrawn = referralAlreadyWithdrawnTotal;
       const referralRemaining = Math.max(0, referralCap - referralAlreadyWithdrawn);
-      const firstPackageWithdrawalCap = Math.max(0, Number(item.investedAmount || 0) * firstPackageWithdrawalPercent / 100);
+      const packageGroupInvestedAmount = packageInvestedByName.get(packageGroupKey) || Math.max(0, Number(item.investedAmount || 0));
+      const firstPackageWithdrawalCap = Math.max(0, packageGroupInvestedAmount * firstPackageWithdrawalPercent / 100);
       const firstPackageWithdrawalUsed = firstWithdrawalByPackageName.get(packageGroupKey) || 0;
       const firstPackageWithdrawalRemaining = Math.max(0, firstPackageWithdrawalCap - firstPackageWithdrawalUsed);
       const firstPackageWithdrawalPending = firstWithdrawalPendingPackageNames.has(packageGroupKey);

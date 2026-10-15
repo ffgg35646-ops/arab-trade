@@ -532,17 +532,6 @@ export async function POST(request: NextRequest) {
       const completedFirstStageWithdrawal = firstWithdrawalRows.some(
         (row: any) => String(row.status) === "completed"
       );
-      if (firstPackageWithdrawalRemaining > 1e-8 && completedFirstStageWithdrawal) {
-        return NextResponse.json(
-          {
-            success: false,
-            alreadyWithdrawn: true,
-            message: "تم تنفيذ سحب من المرحلة الأولى لهذه الباقة بالفعل. لا يُسمح بطلب سحب ثانٍ من نفس سقف المرحلة الأولى.",
-            firstPackageWithdrawalRemaining,
-          },
-          { status: 409 }
-        );
-      }
       let referralRemainingForRequest = 0;
       const firstPackageWithdrawalPending = firstWithdrawalRows.some(
         (row: any) => String(row.status) === "pending"
@@ -561,7 +550,7 @@ export async function POST(request: NextRequest) {
 
       // Phase one: cumulative withdrawals are capped by the original package amount.
       // Once used, later withdrawals require capacity from active referrals.
-      if (firstPackageWithdrawalRemaining > 0) {
+      if (firstPackageWithdrawalRemaining > 0 && !completedFirstStageWithdrawal) {
         const firstStageAvailable = Math.min(packageAvailable, firstPackageWithdrawalRemaining);
         if (amount > firstStageAvailable + 1e-8) {
           return NextResponse.json(
@@ -643,7 +632,7 @@ export async function POST(request: NextRequest) {
         Number(currentPackage.availableEarnings || 0) >= firstPackageWithdrawalRemaining;
       const finalReferralAllowanceBelowMinimum =
         !isFirstPackageWithdrawal &&
-        (firstPackageWithdrawalRemaining <= 1e-8 || Boolean(successfulPackageWithdrawal)) &&
+        (firstPackageWithdrawalRemaining <= 1e-8 || Boolean(successfulPackageWithdrawal) || completedFirstStageWithdrawal) &&
         referralRemainingForRequest > 0 &&
         Math.min(referralRemainingForRequest, packageAvailable) < packageMinimum &&
         Math.abs(amount - Math.min(referralRemainingForRequest, packageAvailable)) <= 1e-8;

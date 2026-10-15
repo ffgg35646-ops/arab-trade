@@ -459,7 +459,7 @@ export default function WithdrawPage() {
         </div>
         {source === "package" && packageAccount && (
           <p className="col-span-2 rounded-lg border border-white/10 bg-white/[0.025] p-2 text-[10px] leading-4 text-slate-400">
-            Number(packageAccount.packageWithdrawalRemaining ?? packageMax) <= 0
+            {Number(packageAccount.packageWithdrawalRemaining ?? packageMax) <= 0
               ? "تم استخدام أو حجز سقف الباقة الإجمالي (" + money(Number(packageAccount.packageWithdrawalCap ?? packageAccount.investedAmount ?? 0)) + " USDT). تُحتسب الطلبات المعلقة والموافق عليها والمكتملة، ولا يسمح بطلبات تتجاوز هذا السقف."
               : packagePending
                 ? "يوجد طلب سحب من المرحلة الحالية قيد المراجعة؛ انتظر حسمه قبل تقديم طلب آخر."

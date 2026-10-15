@@ -132,21 +132,47 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       methods,
-      packageMethods: (packageWithdrawalOptions as any[]).map((method) => ({
-        _id: String(method._id),
-        name: String(method.name || "USDT"),
-        asset: USDT_ASSET,
-        network: normalizePaymentNetwork(method.network),
-        minWithdrawal: Number(method.minWithdrawal || 0),
-        maxWithdrawal: Number(method.maxWithdrawal || 0),
-        withdrawalFee: Number(method.withdrawalFee || 0),
-        warning: String(method.warning || ""),
-        enabled: Boolean(method.enabled),
-        depositEnabled: false,
-        withdrawalEnabled: method.withdrawalEnabled !== false,
-        withdrawalScope: "package",
-        source: "package-withdrawal-method",
-      })),
+      packageMethods: [
+        ...(packageWithdrawalOptions as any[]).map((method) => ({
+          _id: String(method._id),
+          name: String(method.name || "USDT"),
+          asset: USDT_ASSET,
+          network: normalizePaymentNetwork(method.network),
+          minWithdrawal: Number(method.minWithdrawal || 0),
+          maxWithdrawal: Number(method.maxWithdrawal || 0),
+          withdrawalFee: Number(method.withdrawalFee || 0),
+          warning: String(method.warning || ""),
+          enabled: Boolean(method.enabled),
+          depositEnabled: false,
+          withdrawalEnabled: method.withdrawalEnabled !== false,
+          withdrawalScope: "package",
+          source: "package-withdrawal-method",
+        })),
+        // If the admin has not created a separate package method for this
+        // network, make the already-configured USDT withdrawal network usable
+        // for package cards too. An explicit package method (including a
+        // disabled one) always takes precedence for its network.
+        ...(() => {
+          const explicitPackageNetworks = new Set(
+            (packageWithdrawalOptions as any[])
+              .map((method) => normalizePaymentNetwork(method.network))
+              .filter(Boolean),
+          );
+          return methods
+            .filter((method) =>
+              method.asset === USDT_ASSET &&
+              method.enabled === true &&
+              method.withdrawalEnabled === true &&
+              Boolean(method.network) &&
+              !explicitPackageNetworks.has(normalizePaymentNetwork(method.network)),
+            )
+            .map((method) => ({
+              ...method,
+              withdrawalScope: "package",
+              source: "package-fallback",
+            }));
+        })(),
+      ],
       depositsEnabled: platformSettings.deposits?.enabled !== false,
       limits: {
         minDeposit: Number(platformSettings.deposits?.minAmount || 0),

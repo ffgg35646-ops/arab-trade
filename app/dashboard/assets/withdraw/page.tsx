@@ -466,7 +466,7 @@ export default function WithdrawPage() {
         <div className="min-w-0">
           <input aria-label="مبلغ السحب" type="text" inputMode="decimal" autoComplete="off" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", sanitizeAmountInput(event.target.value))} disabled={Boolean(source === "package" && (!packageAccount || packageMax <= 0))} required placeholder={money(minimum)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50 disabled:opacity-50" />
           <p className="mt-1 text-[10px] leading-4 text-slate-500">أقل مبلغ للسحب: {money(minimum)} {selected?.asset || "USDT"}</p>
-          {source === "package" && <p className="mt-1 text-[10px] leading-4 text-slate-500">الحد المتاح الآن بعد احتساب سقف الباقة والطلبات السابقة: {money(Math.min(packageMax, maximum || packageMax))} USDT</p>}
+
         </div>
 
         {selected?.warning && <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-2 text-xs text-amber-200">{selected.warning}</div>}

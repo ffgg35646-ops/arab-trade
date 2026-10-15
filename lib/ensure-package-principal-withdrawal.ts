@@ -18,7 +18,7 @@ export async function ensurePackagePrincipalWithdrawalCredit(
   }).select("_id investedAmount packageName asset").lean();
   if (!accounts.length) return;
 
-  const countedStatuses = ["pending", "approved", "processing", "completed"];
+  const countedStatuses = ["pending", "approved", "processing", "completed"] as const;
   const percent = Math.max(0, Math.min(100, Number(firstWithdrawalPercent ?? 100)));
 
   for (const account of accounts as any[]) {

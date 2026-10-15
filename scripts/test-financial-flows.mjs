@@ -188,6 +188,29 @@ async function navbarWithdrawalUsdtTotal(label) {
     .reduce((sum, row) => sum + Number(row.available || 0) + Number(row.locked || 0), 0);
 }
 
+async function databaseWithdrawalUsdtTotal() {
+  const [wallets, packages] = await Promise.all([
+    db.collection("wallets").find({
+      userId: user._id,
+      mode: "live",
+      type: { $in: ["spot", "funding"] },
+    }).toArray(),
+    db.collection("userpackages").find({
+      userId: user._id,
+      status: { $in: ["active", "cancelled"] },
+    }).toArray(),
+  ]);
+  const walletTotal = wallets.reduce((sum, wallet) =>
+    sum + (wallet.balances || [])
+      .filter((balance) => String(balance.asset || "").toUpperCase() === "USDT")
+      .reduce((inner, balance) => inner + Number(balance.available || 0) + Number(balance.locked || 0), 0),
+  0);
+  const packageTotal = packages.reduce((sum, account) =>
+    sum + Number(account.availableEarnings || 0) + Number(account.lockedEarnings || 0),
+  0);
+  return walletTotal + packageTotal;
+}
+
 if (mode === "prepare") {
   try {
     await prepare();
@@ -727,6 +750,68 @@ closeTo(legacySettledAccount.totalWithdrawn, 60, "repeated refresh never settles
 await db.collection("packageledgers").deleteMany({ userPackageId: legacyApprovedPackageId });
 await db.collection("withdrawalrequests").deleteOne({ _id: legacyApprovedWithdrawalId });
 await db.collection("userpackages").deleteOne({ _id: legacyApprovedPackageId });
+
+// Regression: an older release marked an approved withdrawal settled while its
+// reservation remained locked. Refresh must consume that lock, not move it back
+// to available, and the cumulative withdrawal balance must fall exactly once.
+const flaggedApprovedPackageId = new mongoose.Types.ObjectId();
+const flaggedApprovedWithdrawalId = new mongoose.Types.ObjectId();
+const flaggedApprovedCreatedAt = new Date(Date.now() - 10 * 60 * 1000);
+await db.collection("userpackages").insertOne({
+  _id: flaggedApprovedPackageId,
+  userId: user._id,
+  packageId: package100.packageId,
+  packageName: "CI approved withdrawal with stale settlement flag",
+  investedAmount: 100,
+  asset: "USDT",
+  durationDays: 0,
+  status: "active",
+  availableEarnings: 40,
+  lockedEarnings: 60,
+  totalRealizedEarnings: 60,
+  totalWithdrawn: 60,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "approved",
+  withdrawalRequestPending: false,
+  cancellationRefund: 0,
+  activatedAt: flaggedApprovedCreatedAt,
+  lastProfitAt: flaggedApprovedCreatedAt,
+  createdAt: flaggedApprovedCreatedAt,
+  updatedAt: flaggedApprovedCreatedAt,
+});
+await db.collection("withdrawalrequests").insertOne({
+  _id: flaggedApprovedWithdrawalId,
+  userId: user._id,
+  asset: "USDT",
+  network: "TRC20",
+  amount: 60,
+  fee: 0,
+  receiveAmount: 60,
+  address: "ci-flagged-approved-address",
+  source: "package",
+  userPackageId: flaggedApprovedPackageId,
+  packageAllocations: [{ userPackageId: flaggedApprovedPackageId, amount: 60 }],
+  isFirstPackageWithdrawal: true,
+  packageBalanceSettled: true,
+  status: "approved",
+  adminNote: "Legacy stale package settlement flag",
+  createdAt: flaggedApprovedCreatedAt,
+  updatedAt: flaggedApprovedCreatedAt,
+});
+const flaggedApprovedNavbarBefore = await databaseWithdrawalUsdtTotal();
+ok(await api("/api/packages"), "package API repairs a stale settled flag on an approved withdrawal");
+let flaggedApprovedAccount = await db.collection("userpackages").findOne({ _id: flaggedApprovedPackageId });
+closeTo(flaggedApprovedAccount.availableEarnings, 40, "stale approved withdrawal repair does not credit the paid amount back");
+closeTo(flaggedApprovedAccount.lockedEarnings, 0, "stale approved withdrawal reservation is consumed");
+closeTo(flaggedApprovedAccount.totalWithdrawn, 60, "stale approved withdrawal is not counted twice");
+const flaggedApprovedNavbarAfter = await navbarWithdrawalUsdtTotal("navbar after stale approved withdrawal repair");
+closeTo(flaggedApprovedNavbarAfter, flaggedApprovedNavbarBefore - 60, "cumulative withdrawal balance decreases once for the approved payout");
+ok(await api("/api/packages"), "second refresh is idempotent after stale approved withdrawal repair");
+flaggedApprovedAccount = await db.collection("userpackages").findOne({ _id: flaggedApprovedPackageId });
+closeTo(flaggedApprovedAccount.availableEarnings + flaggedApprovedAccount.lockedEarnings, 40, "repeated refresh cannot restore or re-spend the approved withdrawal");
+await db.collection("packageledgers").deleteMany({ userPackageId: flaggedApprovedPackageId });
+await db.collection("withdrawalrequests").deleteOne({ _id: flaggedApprovedWithdrawalId });
+await db.collection("userpackages").deleteOne({ _id: flaggedApprovedPackageId });
 
 // Regression: legacy rejected requests must return the held amount to the
 // package's available bucket exactly once, while preserving already-booked refunds.
@@ -1366,7 +1451,9 @@ await db.collection("userpackages").insertOne({
   firstWithdrawalStatus: "available",
   withdrawalRequestPending: false,
   cancellationRefund: legacyRefundAmount,
-  cancellationRefundPackageCredited: false,
+  // Simulate the bug: an earlier release set this flag even though the refund
+  // went only to the general wallet. The matching ledger reference must control migration.
+  cancellationRefundPackageCredited: true,
   activatedAt: legacyRefundCreatedAt,
   lastProfitAt: legacyRefundCreatedAt,
   cancelledAt: legacyRefundCreatedAt,

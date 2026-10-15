@@ -31,14 +31,45 @@ const normalizePackageGroup = (value: unknown) =>
  * compare-and-update prevents racing a newly created lock.
  */
 async function reconcileOrphanedPackageWithdrawalLocks(userId: mongoose.Types.ObjectId) {
-  const currentUser = await User.findById(userId).select("hasPendingWithdrawal").lean();
-  if (!currentUser || currentUser.hasPendingWithdrawal === true) return;
+  const currentUser = await User.findById(userId).select("hasPendingWithdrawal updatedAt").lean();
+  if (!currentUser) return;
 
   const activeWithdrawal = await WithdrawalRequest.exists({
     userId,
     status: { $in: ["pending", "approved", "processing"] },
   });
   if (activeWithdrawal) return;
+
+  // The submit endpoint briefly owns these guards while it moves a balance
+  // and creates the withdrawal document. Avoid racing that short critical
+  // section, but recover guards older than the grace window when no live
+  // request exists in the database.
+  const guardGracePeriodMs = 2 * 60 * 1000;
+  const guardCutoff = new Date(Date.now() - guardGracePeriodMs);
+  const userGuardIsFresh = currentUser.hasPendingWithdrawal === true &&
+    currentUser.updatedAt instanceof Date &&
+    currentUser.updatedAt.getTime() >= guardCutoff.getTime();
+  const packageGuardIsFresh = await UserPackage.exists({
+    userId,
+    withdrawalRequestPending: true,
+    updatedAt: { $gte: guardCutoff },
+  });
+  if (userGuardIsFresh || packageGuardIsFresh) return;
+
+  // Request status is authoritative. With no active request and no fresh
+  // submission lock, clear old booleans before attempting to release balances.
+  await User.updateOne(
+    { _id: userId, hasPendingWithdrawal: true },
+    { $set: { hasPendingWithdrawal: false } },
+  );
+  await UserPackage.updateMany(
+    { userId, withdrawalRequestPending: true },
+    { $set: { withdrawalRequestPending: false } },
+  );
+  await UserPackage.updateMany(
+    { userId, firstWithdrawalStatus: "pending" },
+    { $set: { firstWithdrawalStatus: "available" } },
+  );
 
   const accounts = await UserPackage.find({
     userId,

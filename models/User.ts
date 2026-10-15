@@ -13,6 +13,7 @@ export interface IUser {
   isActive: boolean;
   hasPendingWithdrawal?: boolean;
   createdAt: Date;
+  updatedAt?: Date;
 }
 
 const UserSchema = new Schema<IUser>(

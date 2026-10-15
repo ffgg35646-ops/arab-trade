@@ -462,15 +462,15 @@ assert.match(String(secondSingleRequest.data.message || ""), /طلب سحب قا
 ok(await api("/api/admin/withdrawals", {
   as: "admin",
   method: "PATCH",
-  body: { id: firstSingleRequestId, status: "rejected", adminNote: "CI release single-request lock after rejection" },
-}), "admin rejection releases the package request lock");
+  body: { id: firstSingleRequestId, status: "approved", adminNote: "CI review decision releases one-open-pending lock" },
+}), "admin approval releases the review lock");
 singleRequestPackage = await db.collection("userpackages").findOne({ _id: singleRequestPackageId });
-assert.equal(singleRequestPackage.withdrawalRequestPending, false, "package request lock clears after rejection");
+assert.equal(singleRequestPackage.withdrawalRequestPending, false, "package request lock clears after approval");
 const retrySingleRequest = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "single-request-test-address", amount: 100, source: "package", userPackageId: String(singleRequestPackageId) },
 });
-ok(retrySingleRequest, "new withdrawal is allowed after the prior request is rejected", 201);
+ok(retrySingleRequest, "a new withdrawal is allowed after the prior request is approved and the remaining 200-USDT cap remains", 201);
 ok(await api("/api/admin/withdrawals", {
   as: "admin",
   method: "PATCH",

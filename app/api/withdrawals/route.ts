@@ -445,6 +445,25 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const successfulPackageWithdrawal = await WithdrawalRequest.findOne({
+        userId: user._id,
+        source: "package",
+        userPackageId: currentPackage._id,
+        status: { $in: ["approved", "processing", "completed"] },
+      }).select("_id amount status createdAt").sort({ createdAt: -1 }).lean();
+
+      if (successfulPackageWithdrawal) {
+        return NextResponse.json(
+          {
+            success: false,
+            alreadyWithdrawn: true,
+            message: "تمت الموافقة على طلب سحب من باقة " + currentPackage.packageName + " بالفعل. لا يُسمح بطلب سحب ثانٍ من نفس حساب الباقة.",
+            previousWithdrawalId: String(successfulPackageWithdrawal._id),
+          },
+          { status: 409 }
+        );
+      }
+
       const activePackageWithdrawal = await WithdrawalRequest.findOne({
         userId: user._id,
         source: "package",

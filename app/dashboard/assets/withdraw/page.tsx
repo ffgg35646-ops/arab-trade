@@ -218,8 +218,14 @@ export default function WithdrawPage() {
     () => balances.reduce((sum, item) => sum + (String(item.asset).toUpperCase() === "USDT" ? Number(item.available || 0) : 0), 0),
     [balances]
   );
-  const totalPackageAvailable = useMemo(
-    () => packageAccounts.reduce((sum, item) => sum + Number(item.availableEarnings || 0), 0),
+  // Show the cumulative package withdrawal balance: available + reserved.
+  // While a request is pending the reserved amount remains in this total; it
+  // disappears only when the admin approves the withdrawal and consumes the lock.
+  const totalPackageBalance = useMemo(
+    () => packageAccounts.reduce(
+      (sum, item) => sum + Number(item.availableEarnings || 0) + Number(item.lockedEarnings || 0),
+      0
+    ),
     [packageAccounts]
   );
   const totalPackageLocked = useMemo(
@@ -602,7 +608,7 @@ export default function WithdrawPage() {
 
             <section className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-xl border border-cyan-300/20 bg-gradient-to-br from-[#0d2534] to-[#07101d] p-3"><div className="text-[11px] text-cyan-100/80">السحب العام</div><div className="mt-1.5 text-lg font-black text-cyan-200">{money(totalGeneralAvailable)} <span className="text-[10px]">USDT</span></div></div>
-              <div className="rounded-xl border border-emerald-300/20 bg-gradient-to-br from-[#0e2b26] to-[#07101d] p-3"><div className="text-[11px] text-emerald-100/80">أرباح الباقات</div><div className="mt-1.5 text-lg font-black text-emerald-200">{money(totalPackageAvailable)} <span className="text-[10px]">USDT</span></div></div>
+              <div className="rounded-xl border border-emerald-300/20 bg-gradient-to-br from-[#0e2b26] to-[#07101d] p-3"><div className="text-[11px] text-emerald-100/80">أرباح الباقات</div><div className="mt-1.5 text-lg font-black text-emerald-200">{money(totalPackageBalance)} <span className="text-[10px]">USDT</span></div><div className="mt-0.5 text-[10px] text-emerald-100/50">يشمل المتاح والمحجوز، وينقص عند اعتماد السحب</div></div>
               <div className="rounded-xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#07101d] p-3"><div className="text-[11px] text-slate-400">طلبات مفتوحة · محجوز الباقات</div><div className="mt-1.5 text-lg font-black text-amber-200">{openWithdrawals} <span className="text-[10px]">طلب</span></div><div className="mt-0.5 text-[10px] text-slate-500">{money(totalPackageLocked)} USDT</div></div>
             </section>
 
@@ -636,6 +642,10 @@ export default function WithdrawPage() {
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                       {withdrawalPackageCards.map(({ key, groupKey, plan, accounts, item }) => {
                         const packageFormId = item?._id || String(plan._id);
+                        const packageBalanceForPlan = item
+                          ? Math.max(0, Number(item.packageGroupAvailableEarnings ?? item.availableEarnings ?? 0))
+                          : 0;
+                        // packageMaximum is the current policy limit, not the real money recorded in the bucket.
                         const availableForPlan = item ? packageMaximum(item) : 0;
                         const packageForm = packageForms[packageFormId] || emptyForm;
                         const selectedPackageMethod = packageMethods.find((method) => method._id === packageForm.methodId);
@@ -654,8 +664,9 @@ export default function WithdrawPage() {
                                 {item?.activatedAt && <div className="mt-1 text-[9px] text-slate-600">تفعيل {new Date(item.activatedAt).toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo" })}</div>}
                               </div>
                               <div className="shrink-0 text-left">
-                                <div className="text-[10px] text-slate-500">متاح للسحب</div>
-                                <div className="text-sm font-black text-emerald-200">{money(availableForPlan)} USDT</div>
+                                <div className="text-[10px] text-slate-500">رصيد الباقة المتاح</div>
+                                <div className="text-sm font-black text-emerald-200">{money(packageBalanceForPlan)} USDT</div>
+                                <div className="mt-1 text-[10px] text-slate-500">المسموح سحبه الآن: <b className="text-slate-300">{money(availableForPlan)} USDT</b></div>
                                 <div className="mt-1 text-[10px] text-slate-500">أقل طلب: <b className="text-slate-300">{money(minimumWithdrawalForPlan)} USDT</b></div>
                               </div>
                             </div>

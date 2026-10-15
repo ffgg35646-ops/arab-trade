@@ -646,6 +646,12 @@ export default function WithdrawPage() {
                       {withdrawalPackageCards.map(({ key, groupKey, plan, accounts, item }) => {
                         const packageFormId = item?._id || String(plan._id);
                         const availableForPlan = item ? Math.max(0, Number(item.availableEarnings || 0)) : 0;
+                        const packageForm = packageForms[packageFormId] || emptyForm;
+                        const selectedPackageMethod = methods.find((method) => method._id === packageForm.methodId);
+                        const minimumWithdrawalForPlan = Math.max(
+                          Number(selectedPackageMethod?.minWithdrawal || 0),
+                          Number(item?.minimumWithdrawal ?? plan.minimumWithdrawal ?? 100)
+                        );
                         return (
                           <article key={key} className="min-w-0 rounded-xl border border-white/10 bg-[#050a13] p-3">
                             <div className="mb-2 flex items-start justify-between gap-2">
@@ -659,6 +665,7 @@ export default function WithdrawPage() {
                               <div className="shrink-0 text-left">
                                 <div className="text-[10px] text-slate-500">متاح للسحب</div>
                                 <div className="text-sm font-black text-emerald-200">{money(availableForPlan)} USDT</div>
+                                <div className="mt-1 text-[10px] text-slate-500">أقل طلب: <b className="text-slate-300">{money(minimumWithdrawalForPlan)} USDT</b></div>
                               </div>
                             </div>
                             {accounts.length > 1 && (

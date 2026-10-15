@@ -112,6 +112,7 @@ export default function WithdrawPage() {
   const [savingAddressKey, setSavingAddressKey] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPackageAccountByPlan, setSelectedPackageAccountByPlan] = useState<Record<string, string>>({});
+  const [packageCardErrors, setPackageCardErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -375,6 +376,13 @@ export default function WithdrawPage() {
     const selectedMethod = methods.find((item) => item._id === form.methodId);
     setError("");
     setMessage("");
+    if (source === "package") {
+      setPackageCardErrors((current) => {
+        const next = { ...current };
+        delete next[String(packageKey)];
+        return next;
+      });
+    }
 
     if (hasPendingWithdrawal) {
       setError("لديك طلب سحب قيد المراجعة بالفعل. لا يمكنك تقديم طلب آخر حتى تقرر الإدارة الموافقة على الطلب الحالي أو رفضه.");
@@ -407,7 +415,10 @@ export default function WithdrawPage() {
         const referralRemaining = Math.max(0, Number(packageAccount.referralRemaining || 0));
         const phaseTwo = packageAccount.packageWithdrawalAlreadyUsed === true || firstRemaining <= 1e-8;
         if (phaseTwo && activeReferralCount <= 0) {
-          setError("الطاقة منخفضة الآن، يُرجى جلب إحالات نشطة.");
+          setPackageCardErrors((current) => ({
+            ...current,
+            [String(packageKey)]: "الطاقة منخفضة الآن، يُرجى جلب إحالات نشطة.",
+          }));
         } else if (phaseTwo && referralRemaining <= 1e-8) {
           setError("لا يوجد حد سحب متاح مقابل الإحالات النشطة حاليًا.");
         } else {
@@ -477,7 +488,15 @@ export default function WithdrawPage() {
       updateForm(source, packageKey, "amount", "");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "تعذر إرسال طلب السحب");
+      const errorMessage = e instanceof Error ? e.message : "تعذر إرسال طلب السحب";
+      if (source === "package" && errorMessage.includes("الطاقة منخفضة الآن، يُرجى جلب إحالات نشطة")) {
+        setPackageCardErrors((current) => ({
+          ...current,
+          [String(packageKey)]: "الطاقة منخفضة الآن، يُرجى جلب إحالات نشطة.",
+        }));
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setSubmittingKey("");
     }
@@ -673,6 +692,11 @@ export default function WithdrawPage() {
                               <>
                                 {item.firstWithdrawalStatus === "pending" && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب الأول قيد المراجعة.</p>}
                                 {renderWithdrawalFields("package", item || undefined, plan)}
+                                {packageCardErrors[String(item._id)] && (
+                                  <p role="alert" className="mt-2 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-2 text-xs leading-5 text-amber-200">
+                                    {packageCardErrors[String(item._id)]}
+                                  </p>
+                                )}
                               </>
                             )}
                           </article>

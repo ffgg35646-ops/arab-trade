@@ -105,12 +105,12 @@ export default function AdminWithdrawalsPage() {
   const stats = useMemo(() => ({
     total: rows.length,
     pending: rows.filter((r) => r.status === "pending").length,
-    approved: rows.filter((r) => r.status === "approved" || r.status === "processing").length,
+    approved: rows.filter((r) => r.status === "processing" || (r.status === "approved" && r.source !== "package")).length,
     completed: rows.filter((r) => r.status === "completed").length,
     rejected: rows.filter((r) => r.status === "rejected" || r.status === "failed").length,
     packagePending: rows.filter((r) => r.status === "pending" && r.source === "package").length,
     walletPending: rows.filter((r) => r.status === "pending" && r.source !== "package").length,
-    pendingAmount: rows.filter((r) => ["pending", "approved", "processing"].includes(r.status))
+    pendingAmount: rows.filter((r) => r.status === "pending" || (r.source !== "package" && ["approved", "processing"].includes(r.status)))
       .reduce((sum, r) => sum + Number(r.amount || 0), 0),
   }), [rows]);
 
@@ -148,7 +148,9 @@ export default function AdminWithdrawalsPage() {
       }
       setMessage(
         nextStatus === "approved"
-          ? "تمت الموافقة على الطلب ونقله إلى قيد التنفيذ."
+          ? selected.source === "package"
+            ? "تمت الموافقة النهائية على سحب الباقة وتسوية الرصيد المحجوز."
+            : "تمت الموافقة على الطلب ونقله إلى قيد التنفيذ."
           : nextStatus === "rejected"
             ? "تم رفض الطلب وتسوية الرصيد المرتبط به."
             : "تم تسجيل السحب كمكتمل."
@@ -270,10 +272,10 @@ export default function AdminWithdrawalsPage() {
           <div className="mt-4"><label className="mb-2 block text-sm font-bold text-slate-300">ملاحظة الإدارة / مرجع التحويل</label><textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={1000} placeholder="اكتب ملاحظة واضحة تظهر في سجل العملية..." className="w-full rounded-xl border border-white/10 bg-[#030b12] p-4 text-sm outline-none focus:border-cyan-300/30" /></div>
           <div className="mt-5 flex flex-wrap gap-3">
             {selected.status === "pending" && <>
-              <button type="button" onClick={() => void updateStatus("approved")} disabled={Boolean(busyStatus)} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 font-black text-[#03111c] disabled:opacity-50"><CheckCircle2 size={17} />{busyStatus === "approved" ? "جاري الموافقة..." : "موافقة ونقل للتنفيذ"}</button>
+              <button type="button" onClick={() => void updateStatus("approved")} disabled={Boolean(busyStatus)} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 font-black text-[#03111c] disabled:opacity-50"><CheckCircle2 size={17} />{busyStatus === "approved" ? "جاري الموافقة..." : selected.source === "package" ? "موافقة نهائية وتسوية الرصيد" : "موافقة ونقل للتنفيذ"}</button>
               <button type="button" onClick={() => void updateStatus("rejected")} disabled={Boolean(busyStatus)} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-3 font-black text-white disabled:opacity-50"><XCircle size={17} />{busyStatus === "rejected" ? "جاري الرفض..." : "رفض الطلب"}</button>
             </>}
-            {(selected.status === "approved" || selected.status === "processing") && <>
+            {((selected.status === "approved" && selected.source !== "package") || selected.status === "processing") && <>
               <button type="button" onClick={() => void updateStatus("completed")} disabled={Boolean(busyStatus)} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 font-black text-[#03111c] disabled:opacity-50"><CheckCircle2 size={17} />{busyStatus === "completed" ? "جاري الإنهاء..." : "تسجيل التحويل كمكتمل"}</button>
               <button type="button" onClick={() => void updateStatus("rejected")} disabled={Boolean(busyStatus)} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-4 py-3 font-bold text-red-200 disabled:opacity-50"><XCircle size={17} />رفض / إرجاع الرصيد</button>
             </>}

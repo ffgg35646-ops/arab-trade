@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
 import Asset from "@/models/Asset";
 import PaymentOption from "@/models/PaymentOption";
+import PackageWithdrawalMethod from "@/models/PackageWithdrawalMethod";
 import Wallet from "@/models/Wallet";
 import Notification from "@/models/Notification";
 import { getCurrentUser } from "@/lib/current-user";
@@ -21,6 +22,33 @@ import { ensurePackagePrincipalWithdrawalCredit } from "@/lib/ensure-package-pri
 
 function normalizeAsset(value: unknown) {
   return String(value || "").trim().toUpperCase();
+}
+
+async function restoreLockedPackageAllocations(
+  userId: mongoose.Types.ObjectId,
+  primaryPackageId: string,
+  allocations: Array<{ userPackageId: mongoose.Types.ObjectId | string; amount: number }>,
+  isFirstPackageWithdrawal: boolean,
+) {
+  for (const allocation of allocations) {
+    await UserPackage.updateOne(
+      { _id: allocation.userPackageId, userId },
+      {
+        $inc: { availableEarnings: allocation.amount, lockedEarnings: -allocation.amount },
+        $set: { withdrawalRequestPending: false },
+      },
+    );
+  }
+
+  await UserPackage.updateOne(
+    { _id: primaryPackageId, userId },
+    {
+      $set: {
+        withdrawalRequestPending: false,
+        ...(isFirstPackageWithdrawal ? { firstWithdrawalStatus: "available" } : {}),
+      },
+    },
+  );
 }
 
 export async function GET(request: NextRequest) {
@@ -203,25 +231,41 @@ export async function POST(request: NextRequest) {
     /*
      * نبحث أولًا عن وسيلة الدفع التي أنشأها الأدمن.
      */
-    const paymentCandidates = await PaymentOption.find({
-      asset: USDT_ASSET,
-      $or: [
-        { kind: "withdrawal" },
-        { kind: "both" },
-        { kind: { $exists: false } },
-      ],
-    }).lean();
-    const payment = paymentCandidates.find(
-      (item: any) => normalizePaymentNetwork(item.network) === networkCode,
-    );
+    // General-wallet withdrawals and package withdrawals read different method records.
+    // A general method must never satisfy or configure a package withdrawal.
+    let payment: any = null;
+    if (source === "package") {
+      const packageCandidates = await PackageWithdrawalMethod.find({ asset: USDT_ASSET }).lean();
+      payment = packageCandidates.find(
+        (item: any) => normalizePaymentNetwork(item.network) === networkCode,
+      ) || null;
+      if (!payment) {
+        return NextResponse.json(
+          { success: false, message: "وسيلة السحب هذه غير مضافة لسحب الباقات من لوحة الإدارة." },
+          { status: 400 },
+        );
+      }
+    } else {
+      const paymentCandidates = await PaymentOption.find({
+        asset: USDT_ASSET,
+        $or: [
+          { kind: "withdrawal" },
+          { kind: "both" },
+          { kind: { $exists: false } },
+        ],
+      }).lean();
+      payment = paymentCandidates.find(
+        (item: any) => normalizePaymentNetwork(item.network) === networkCode,
+      ) || null;
+    }
 
     let minAmount = source === "wallet"
       ? Number(settings.withdrawals.minGeneralWithdrawal ?? settings.withdrawals.minAmount ?? 0)
       : 0;
 
-    let maxAmount = Number(
-      settings.withdrawals.maxAmount || 0
-    );
+    let maxAmount = source === "wallet"
+      ? Number(settings.withdrawals.maxAmount || 0)
+      : 0;
 
     let fee = 0;
     let networkName = networkCode;
@@ -395,9 +439,9 @@ export async function POST(request: NextRequest) {
       dailyAggregate[0]?.total || 0
     );
 
-    const dailyLimit = Number(
-      settings.withdrawals.dailyLimit || 0
-    );
+    const dailyLimit = source === "wallet"
+      ? Number(settings.withdrawals.dailyLimit || 0)
+      : 0;
 
     if (
       dailyLimit > 0 &&
@@ -423,6 +467,7 @@ export async function POST(request: NextRequest) {
      * رصيد الإيداع الخارجي منفصل ولا يسمح بسحبه مباشرة.
      */
     let lockedWalletAllocations: Array<{ walletType: "spot" | "funding"; amount: number }> = [];
+    let lockedPackageAllocations: Array<{ userPackageId: mongoose.Types.ObjectId | string; amount: number }> = [];
     let lockedUserPackage: any = null;
     let isFirstPackageWithdrawal = false;
 
@@ -452,66 +497,77 @@ export async function POST(request: NextRequest) {
         String(value ?? "").normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
       const normalizedPackageName = normalizePackageName(currentPackage.packageName);
       const sameNamePackageRows = normalizedPackageName
-        ? await UserPackage.find({ userId: user._id }).select("_id packageName").lean()
+        ? await UserPackage.find({ userId: user._id })
+            .select("_id packageName packageId investedAmount availableEarnings lockedEarnings status withdrawalRequestPending firstWithdrawalStatus activatedAt createdAt")
+            .lean()
         : [];
-      const sameNamePackageIds = sameNamePackageRows
-        .filter((row: any) => normalizePackageName(row.packageName) === normalizedPackageName)
-        .map((row: any) => row._id);
+      const packageFamilyRows = sameNamePackageRows.filter(
+        (row: any) => normalizePackageName(row.packageName) === normalizedPackageName &&
+          String(row.status || "") !== "deleted"
+      );
+      const sameNamePackageIds = packageFamilyRows.map((row: any) => row._id);
       if (!sameNamePackageIds.some((id: any) => String(id) === String(currentPackage._id))) {
         sameNamePackageIds.push(currentPackage._id);
+        packageFamilyRows.push(currentPackage as any);
       }
 
       const activePackageWithdrawal = await WithdrawalRequest.findOne({
         userId: user._id,
         source: "package",
-        userPackageId: currentPackage._id,
-        status: "pending",
-      }).select("_id amount status createdAt").sort({ createdAt: -1 }).lean();
-
-      if (activePackageWithdrawal || currentPackage.withdrawalRequestPending === true) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "لديك طلب سحب قائم من باقة " + currentPackage.packageName + (activePackageWithdrawal ? " بقيمة " + Number(activePackageWithdrawal.amount || 0) + " " + assetCode : "") + ". لن يُسمح بطلب جديد من نفس الباقة حتى تقرر الإدارة الموافقة على الطلب الحالي أو رفضه.",
-            activeWithdrawalId: activePackageWithdrawal ? String(activePackageWithdrawal._id) : null,
-            activeWithdrawalStatus: activePackageWithdrawal ? String(activePackageWithdrawal.status) : "pending",
-          },
-          { status: 409 }
-        );
-      }
-
-      // An approved or processing request is still in flight. Do not create
-      // another request for the same package until that transfer completes.
-      // Once completed, the next request is evaluated against active-referral capacity.
-      const successfulPackageWithdrawal = await WithdrawalRequest.findOne({
-        userId: user._id,
-        source: "package",
         userPackageId: { $in: sameNamePackageIds },
-        status: { $in: ["approved", "processing"] },
+        status: { $in: ["pending", "approved", "processing"] },
       }).select("_id amount status createdAt").sort({ createdAt: -1 }).lean();
 
-      if (successfulPackageWithdrawal) {
+      if (activePackageWithdrawal) {
+        const activeStatus = String(activePackageWithdrawal.status || "pending");
+        const activeMessage = activeStatus === "pending"
+          ? "لديك طلب سحب من باقة " + currentPackage.packageName + " بقيمة " + Number(activePackageWithdrawal.amount || 0) + " " + assetCode + " قيد مراجعة الإدارة. لا يمكنك إنشاء طلب آخر من نفس الباقة قبل اتخاذ قرار."
+          : activeStatus === "approved"
+            ? "تمت الموافقة على طلب السحب من باقة " + currentPackage.packageName + "، لكن التحويل لم يُسجل كمكتمل بعد. يظل المبلغ محجوزًا حتى تأكيد إتمام التحويل."
+            : "طلب السحب من باقة " + currentPackage.packageName + " قيد تنفيذ التحويل. لا يمكنك إنشاء طلب آخر حتى يكتمل.";
+
         return NextResponse.json(
           {
             success: false,
-            alreadyWithdrawn: true,
-            message: "طلب السحب من باقة " + currentPackage.packageName + " تمت الموافقة عليه أو ما زال قيد التنفيذ. لا يُسمح بطلب جديد حتى يكتمل التحويل أو يُرفض الطلب.",
-            previousWithdrawalId: String(successfulPackageWithdrawal._id),
+            message: activeMessage,
+            activeWithdrawalId: String(activePackageWithdrawal._id),
+            activeWithdrawalStatus: activeStatus,
           },
           { status: 409 }
         );
       }
 
-      const packageAvailable = Math.max(0, Number(currentPackage.availableEarnings || 0));
+      // The request status is authoritative. Clear legacy flags left behind by
+      // older approval/rejection paths only after confirming there is no open
+      // withdrawal for this package family.
+      await UserPackage.updateMany(
+        {
+          _id: { $in: sameNamePackageIds },
+          userId: user._id,
+          withdrawalRequestPending: true,
+        },
+        { $set: { withdrawalRequestPending: false } },
+      );
+
+      const packageAvailable = Math.max(0, packageFamilyRows.reduce(
+        (sum: number, row: any) => sum + Math.max(0, Number(row.availableEarnings || 0)),
+        0,
+      ));
+      const packageInvestedAmount = packageFamilyRows.reduce(
+        (sum: number, row: any) => sum + Math.max(0, Number(row.investedAmount || 0)),
+        0,
+      );
       const countedStatuses = ["pending", "approved", "processing", "completed"] as const;
       const packagePlan = await InvestmentPackage.findById(currentPackage.packageId)
         .select("minimumWithdrawal")
         .lean();
       const configuredMinimums = settings.withdrawals.withdrawalMinByPackage as unknown as Record<string, number> | undefined;
       const configuredPackageMinimum = configuredMinimums?.[String(currentPackage.packageId)];
+      // Package requests use the package plan minimum and the package-only method.
+      // Global-wallet minimums are intentionally excluded from this calculation.
       const packageMinimum = Math.max(
-        Number(configuredPackageMinimum ?? packagePlan?.minimumWithdrawal ?? settings.withdrawals.minAmount ?? 0),
-        Number(minAmount || 0)
+        Number(configuredPackageMinimum ?? packagePlan?.minimumWithdrawal ?? 100),
+        Number(minAmount || 0),
       );
       const [firstWithdrawalRows, referralWithdrawalRows, referredUsers] = await Promise.all([
         WithdrawalRequest.find({
@@ -536,7 +592,7 @@ export async function POST(request: NextRequest) {
       );
       const firstPackageWithdrawalCap = Math.max(
         0,
-        Number(currentPackage.investedAmount || 0) * firstPackageWithdrawalPercent / 100
+        packageInvestedAmount * firstPackageWithdrawalPercent / 100
       );
       const firstPackageWithdrawalUsed = firstWithdrawalRows.reduce(
         (sum: number, row: any) => sum + Number(row.amount || 0),
@@ -641,75 +697,103 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // If the last remainder of phase one is below the normal minimum, allow
-      // exactly that full remainder when the package balance can cover it.
-      // This avoids stranding a small first-stage remainder (for example $50).
-      const finalFirstAllowanceBelowMinimum =
-        isFirstPackageWithdrawal &&
-        firstPackageWithdrawalRemaining > 0 &&
-        firstPackageWithdrawalRemaining < packageMinimum &&
-        Math.abs(amount - firstPackageWithdrawalRemaining) <= 1e-8 &&
-        Number(currentPackage.availableEarnings || 0) >= firstPackageWithdrawalRemaining;
-      const finalReferralAllowanceBelowMinimum =
-        !isFirstPackageWithdrawal &&
-        (firstPackageWithdrawalRemaining <= 1e-8 || firstStageWithdrawalApproved) &&
-        referralRemainingForRequest > 0 &&
-        Math.min(referralRemainingForRequest, packageAvailable) < packageMinimum &&
-        Math.abs(amount - Math.min(referralRemainingForRequest, packageAvailable)) <= 1e-8;
-
-      if (amount < packageMinimum && !finalFirstAllowanceBelowMinimum && !finalReferralAllowanceBelowMinimum) {
+      // The administrator-configured minimum is mandatory for every package
+      // request. A small remaining balance/referral allowance must never bypass it.
+      if (amount < packageMinimum) {
         return NextResponse.json(
           { success: false, message: "الحد الأدنى للسحب من باقة " + currentPackage.packageName + " هو " + packageMinimum + " " + assetCode, minAmount: packageMinimum },
           { status: 400 }
         );
       }
 
-      const packageFilter: Record<string, any> = {
-        _id: userPackageId,
-        userId: user._id,
-        asset: assetCode,
-        status: { $in: ["active", "cancelled"] },
-        availableEarnings: { $gte: amount },
-        withdrawalRequestPending: { $ne: true },
-      };
+      // Lock the requested amount against the entire visible package family.
+      // Prefer the record chosen by the card, then use sibling records with the same
+      // normalized package name; persist the exact allocations for admin settlement.
+      const accountsToLock = [...packageFamilyRows].sort((a: any, b: any) => {
+        const aPrimary = String(a._id) === userPackageId ? 0 : 1;
+        const bPrimary = String(b._id) === userPackageId ? 0 : 1;
+        if (aPrimary !== bPrimary) return aPrimary - bPrimary;
+        const aTime = new Date(a.activatedAt || a.createdAt || 0).getTime();
+        const bTime = new Date(b.activatedAt || b.createdAt || 0).getTime();
+        return bTime - aTime;
+      });
+      let remainingToLock = amount;
+      for (const account of accountsToLock) {
+        if (remainingToLock <= 1e-8) break;
+        const accountAvailable = Math.max(0, Number(account.availableEarnings || 0));
+        const allocationAmount = Number(Math.min(remainingToLock, accountAvailable).toFixed(8));
+        if (allocationAmount <= 1e-8) continue;
 
-      if (isFirstPackageWithdrawal) {
-        // Allow another first-stage request only after the prior request is no longer
-        // awaiting an admin decision and the remaining cumulative cap still permits it.
-        packageFilter.firstWithdrawalStatus = { $in: ["available", "approved", "completed", null] };
+        const lockedAccount = await UserPackage.findOneAndUpdate(
+          {
+            _id: account._id,
+            userId: user._id,
+            asset: assetCode,
+            status: { $in: ["active", "cancelled"] },
+            availableEarnings: { $gte: allocationAmount },
+            withdrawalRequestPending: { $ne: true },
+          },
+          {
+            $inc: { availableEarnings: -allocationAmount, lockedEarnings: allocationAmount },
+            $set: { withdrawalRequestPending: true },
+          },
+          { new: true },
+        );
+        if (!lockedAccount) continue;
+
+        lockedPackageAllocations.push({ userPackageId: lockedAccount._id, amount: allocationAmount });
+        remainingToLock = Number(Math.max(0, remainingToLock - allocationAmount).toFixed(8));
+      }
+
+      if (remainingToLock > 1e-8) {
+        for (const allocation of lockedPackageAllocations) {
+          await UserPackage.updateOne(
+            { _id: allocation.userPackageId, userId: user._id },
+            {
+              $inc: { availableEarnings: allocation.amount, lockedEarnings: -allocation.amount },
+              $set: { withdrawalRequestPending: false },
+            },
+          );
+        }
+        lockedPackageAllocations = [];
+        const latestFamily = await UserPackage.find({
+          _id: { $in: sameNamePackageIds },
+          userId: user._id,
+        }).select("availableEarnings").lean();
+        const latestAvailable = latestFamily.reduce(
+          (sum: number, row: any) => sum + Math.max(0, Number(row.availableEarnings || 0)),
+          0,
+        );
+        return NextResponse.json(
+          {
+            success: false,
+            message: `رصيد باقة ${currentPackage.packageName} المتاح للسحب هو ${latestAvailable} ${assetCode} فقط.`,
+            availableAmount: latestAvailable,
+          },
+          { status: 400 },
+        );
       }
 
       lockedUserPackage = await UserPackage.findOneAndUpdate(
-        packageFilter,
         {
-          $inc: { availableEarnings: -amount, lockedEarnings: amount },
+          _id: userPackageId,
+          userId: user._id,
+          status: { $in: ["active", "cancelled"] },
+        },
+        {
           $set: {
             withdrawalRequestPending: true,
             ...(isFirstPackageWithdrawal ? { firstWithdrawalStatus: "pending" } : {}),
           },
         },
-        { new: true }
+        { new: true },
       );
-
       if (!lockedUserPackage) {
-        const latestPackage = await UserPackage.findOne({
-          _id: userPackageId,
-          userId: user._id,
-        }).select("availableEarnings packageName withdrawalRequestPending").lean();
-        if (latestPackage?.withdrawalRequestPending === true) {
-          return NextResponse.json(
-            { success: false, message: "يوجد طلب سحب آخر لهذه الباقة قيد المراجعة أو التنفيذ. انتظر حسمه قبل تقديم طلب جديد." },
-            { status: 409 }
-          );
-        }
-        const latestAvailable = Math.max(0, Number(latestPackage?.availableEarnings || 0));
+        await restoreLockedPackageAllocations(user._id, userPackageId, lockedPackageAllocations, isFirstPackageWithdrawal);
+        lockedPackageAllocations = [];
         return NextResponse.json(
-          {
-            success: false,
-            message: `رصيد باقة ${latestPackage?.packageName || currentPackage.packageName} المتاح للسحب هو ${latestAvailable} ${assetCode} فقط.`,
-            availableAmount: latestAvailable,
-          },
-          { status: 400 }
+          { success: false, message: "تعذر تثبيت رصيد الباقة المرتبط بطلب السحب. حدّث الصفحة ثم حاول مرة أخرى." },
+          { status: 409 },
         );
       }
     } else {
@@ -786,16 +870,13 @@ export async function POST(request: NextRequest) {
 
       if (!claimedWithdrawalLock) {
         if (source === "package" && lockedUserPackage) {
-          await UserPackage.updateOne(
-            { _id: lockedUserPackage._id, userId: user._id },
-            {
-              $inc: { availableEarnings: amount, lockedEarnings: -amount },
-              $set: {
-                withdrawalRequestPending: false,
-                ...(isFirstPackageWithdrawal ? { firstWithdrawalStatus: "available" } : {}),
-              },
-            }
+          await restoreLockedPackageAllocations(
+            user._id,
+            userPackageId,
+            lockedPackageAllocations,
+            isFirstPackageWithdrawal,
           );
+          lockedPackageAllocations = [];
         } else if (lockedWalletAllocations.length) {
           for (const allocation of lockedWalletAllocations) {
             await Wallet.updateOne(
@@ -827,6 +908,7 @@ export async function POST(request: NextRequest) {
           walletType: lockedWalletAllocations[0]?.walletType || "spot",
           walletAllocations: source === "wallet" ? lockedWalletAllocations : [],
           userPackageId: source === "package" ? userPackageId : null,
+          packageAllocations: source === "package" ? lockedPackageAllocations : [],
           isFirstPackageWithdrawal,
           status: "pending",
           adminNote: "",
@@ -869,16 +951,13 @@ export async function POST(request: NextRequest) {
        * نرجع الرصيد مرة أخرى.
        */
       if (source === "package" && lockedUserPackage) {
-        await UserPackage.updateOne(
-          { _id: lockedUserPackage._id, userId: user._id },
-          {
-            $inc: { availableEarnings: amount, lockedEarnings: -amount },
-            $set: {
-              withdrawalRequestPending: false,
-              ...(isFirstPackageWithdrawal ? { firstWithdrawalStatus: "available" } : {}),
-            },
-          }
+        await restoreLockedPackageAllocations(
+          user._id,
+          userPackageId,
+          lockedPackageAllocations,
+          isFirstPackageWithdrawal,
         );
+        lockedPackageAllocations = [];
       } else if (lockedWalletAllocations.length) {
         for (const allocation of lockedWalletAllocations) {
           await Wallet.updateOne(

@@ -126,10 +126,21 @@ export async function GET(request: NextRequest) {
     const unresolvedWithdrawalByPackage = new Map<string, any>();
     const unresolvedWithdrawalByPackageName = new Map<string, any>();
     const successfulWithdrawalPackageNames = new Set<string>();
+    const inFlightWithdrawalPackageNames = new Set<string>();
+    const inFlightWithdrawalStatusByPackageName = new Map<string, string>();
     for (const row of successfulPackageWithdrawalRows as any[]) {
       const key = String(row.userPackageId || "");
       const groupKey = packageGroupByAccountId.get(key) || key;
-      if (groupKey) successfulWithdrawalPackageNames.add(groupKey);
+      if (groupKey) {
+        successfulWithdrawalPackageNames.add(groupKey);
+        if (["approved", "processing"].includes(String(row.status))) {
+          inFlightWithdrawalPackageNames.add(groupKey);
+          // Query results are newest-first; keep the latest unresolved transfer status.
+          if (!inFlightWithdrawalStatusByPackageName.has(groupKey)) {
+            inFlightWithdrawalStatusByPackageName.set(groupKey, String(row.status));
+          }
+        }
+      }
     }
     for (const row of unresolvedPackageWithdrawalRows as any[]) {
       const key = String(row.userPackageId || "");
@@ -149,6 +160,25 @@ export async function GET(request: NextRequest) {
         completedFirstWithdrawalPackageNames.add(groupKey);
       }
     }
+
+    // The page intentionally renders one card per package name. Sum all of that
+    // package family's actual buckets so the card cannot show only one activation
+    // record while the page total includes the others.
+    const packageBalancesByName = new Map<string, { available: number; locked: number }>();
+    const packageInvestedByName = new Map<string, number>();
+    for (const account of rawUserPackages as any[]) {
+      const key = String(account._id);
+      const groupKey = packageGroupByAccountId.get(key) || "account:" + key;
+      const balance = packageBalancesByName.get(groupKey) || { available: 0, locked: 0 };
+      balance.available = roundAmount(balance.available + Math.max(0, Number(account.availableEarnings || 0)));
+      balance.locked = roundAmount(balance.locked + Math.max(0, Number(account.lockedEarnings || 0)));
+      packageBalancesByName.set(groupKey, balance);
+      packageInvestedByName.set(
+        groupKey,
+        roundAmount((packageInvestedByName.get(groupKey) || 0) + Math.max(0, Number(account.investedAmount || 0))),
+      );
+    }
+
     const dailyProfitByPackage = new Map(
       (allPlansForProfit as any[]).map((plan) => [String(plan._id), Math.max(0, Number(plan.dailyProfit || 0))])
     );
@@ -164,7 +194,8 @@ export async function GET(request: NextRequest) {
       const referralCap = activeReferralDepositTotal * referralPackageWithdrawalPercent / 100;
       const referralAlreadyWithdrawn = referralAlreadyWithdrawnTotal;
       const referralRemaining = Math.max(0, referralCap - referralAlreadyWithdrawn);
-      const firstPackageWithdrawalCap = Math.max(0, Number(item.investedAmount || 0) * firstPackageWithdrawalPercent / 100);
+      const packageGroupInvestedAmount = packageInvestedByName.get(packageGroupKey) || Math.max(0, Number(item.investedAmount || 0));
+      const firstPackageWithdrawalCap = Math.max(0, packageGroupInvestedAmount * firstPackageWithdrawalPercent / 100);
       const firstPackageWithdrawalUsed = firstWithdrawalByPackageName.get(packageGroupKey) || 0;
       const firstPackageWithdrawalRemaining = Math.max(0, firstPackageWithdrawalCap - firstPackageWithdrawalUsed);
       const firstPackageWithdrawalPending = firstWithdrawalPendingPackageNames.has(packageGroupKey);
@@ -172,33 +203,46 @@ export async function GET(request: NextRequest) {
         unresolvedWithdrawalByPackage.get(packageKey) ||
         unresolvedWithdrawalByPackageName.get(packageGroupKey) ||
         null;
-      const packageWithdrawalPending = item.withdrawalRequestPending === true || Boolean(unresolvedPackageWithdrawal);
+      // WithdrawalRequest status is authoritative. The package flag can be stale
+      // after earlier admin decisions, so never show a pending-review notice from it.
+      const packageWithdrawalPending = Boolean(unresolvedPackageWithdrawal) ||
+        inFlightWithdrawalPackageNames.has(packageGroupKey);
+      const packageWithdrawalStatus = unresolvedPackageWithdrawal
+        ? "pending"
+        : inFlightWithdrawalStatusByPackageName.get(packageGroupKey) || null;
       const packageWithdrawalAlreadyUsed =
         successfulWithdrawalPackageNames.has(packageGroupKey) ||
         completedFirstWithdrawalPackageNames.has(packageGroupKey);
       // The package principal cap applies to the first completed payout only.
       // Every later payout uses the configured active-referral withdrawal cap.
       const packageWithdrawalCap = firstPackageWithdrawalCap;
-      const packageWithdrawalUsed = firstPackageWithdrawalUsed;
+      const packageWithdrawalUsed = firstWithdrawalByPackageName.get(packageGroupKey) || 0;
       const packageWithdrawalRemaining = firstPackageWithdrawalRemaining;
-      const availableEarnings = Math.max(0, Number(item.availableEarnings || 0));
+      const packageGroupBalance = packageBalancesByName.get(packageGroupKey) || {
+        available: Math.max(0, Number(item.availableEarnings || 0)),
+        locked: Math.max(0, Number(item.lockedEarnings || 0)),
+      };
+      const packageGroupAvailableEarnings = packageGroupBalance.available;
+      const packageGroupLockedEarnings = packageGroupBalance.locked;
       // The first approved withdrawal changes the phase: any later request is
-      // limited by active-referral capacity, even if part of the package principal remains.
-      // Once a first-stage payout is complete, later requests use referral capacity,
-      // even when some of the original package principal remains unwithdrawn.
+      // limited by active-referral capacity, even if package balance remains.
+      // Use the family balance consistently for both display and server limits.
       const phaseWithdrawalLimit = packageWithdrawalPending || firstPackageWithdrawalPending
         ? 0
-        : Math.min(availableEarnings, packageWithdrawalAlreadyUsed || firstPackageWithdrawalRemaining <= 1e-8
+        : Math.min(packageGroupAvailableEarnings, packageWithdrawalAlreadyUsed || firstPackageWithdrawalRemaining <= 1e-8
           ? referralRemaining
           : firstPackageWithdrawalRemaining);
       const withdrawalLimit = phaseWithdrawalLimit;
       return {
         ...item,
+        packageGroupAvailableEarnings,
+        packageGroupLockedEarnings,
         firstPackageWithdrawalCap,
         firstPackageWithdrawalUsed,
         firstPackageWithdrawalRemaining,
         firstPackageWithdrawalPending,
         packageWithdrawalPending,
+        packageWithdrawalStatus,
         packageWithdrawalAlreadyUsed,
         unresolvedWithdrawalAmount: unresolvedPackageWithdrawal ? Number(unresolvedPackageWithdrawal.amount || 0) : null,
         unresolvedWithdrawalStatus: unresolvedPackageWithdrawal ? String(unresolvedPackageWithdrawal.status) : null,
@@ -209,7 +253,7 @@ export async function GET(request: NextRequest) {
         nextCollectAt: new Date(nextCollectAt).toISOString(),
         collectWindowEndsAt: new Date(collectWindowEndsAt).toISOString(),
         collectWindowOpen,
-        minimumWithdrawal: minimumWithdrawalByPlan.get(String(item.packageId)) ?? Number(settings?.withdrawals?.minAmount ?? 0),
+        minimumWithdrawal: minimumWithdrawalByPlan.get(String(item.packageId)) ?? 100,
         activeReferralCount,
         activeReferralDepositTotal,
         firstPackageWithdrawalPercent,
@@ -223,7 +267,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      packages: packages.map((plan: any) => ({ ...plan, minimumWithdrawal: Number(configuredMinimums?.[String(plan._id)] ?? plan.minimumWithdrawal ?? 100), asset: USDT_ASSET, durationDays: 0, dailyProfit: Number(plan.dailyProfit || 0) })),
+      packages: packages.map((plan: any) => ({
+        ...plan,
+        minimumWithdrawal: Number(configuredMinimums?.[String(plan._id)] ?? plan.minimumWithdrawal ?? 100),
+        asset: USDT_ASSET,
+        durationDays: 0,
+        dailyProfit: Number(plan.dailyProfit || 0),
+      })),
       depositBalances,
       userPackages,
       packageLedger: packageLedger.map((row: any) => ({

@@ -23,7 +23,7 @@ async function prepare() {
     "users", "platformsettings", "depositrequests", "depositbalances",
     "investmentpackages", "userpackages", "packageledgers", "withdrawalrequests",
     "wallets", "ledgerentries", "referralcommissions", "blockchaindepositclaims",
-    "notifications", "paymentoptions", "kycrequests", "assets",
+    "notifications", "paymentoptions", "packagewithdrawalmethods", "kycrequests", "assets",
   ];
   for (const name of names) {
     try {
@@ -88,6 +88,14 @@ async function prepare() {
     name: "CI Test Network", asset: "USDT", network: "TRC20",
     address: "test-deposit-address", minDeposit: 1, minWithdrawal: 1,
     enabled: true, depositEnabled: true, withdrawalEnabled: true,
+    createdAt, updatedAt: createdAt,
+  });
+
+  // The package withdrawal path has its own method registry, independent of general withdrawals.
+  await db.collection("packagewithdrawalmethods").insertOne({
+    name: "CI Package Test Network", asset: "USDT", network: "TRC20",
+    minWithdrawal: 1, maxWithdrawal: 0, withdrawalFee: 0, warning: "",
+    enabled: true, withdrawalEnabled: true,
     createdAt, updatedAt: createdAt,
   });
 
@@ -268,6 +276,149 @@ closeTo(spotWallet.balances.find((x) => x.asset === "USDT").available, 50, "pack
 closeTo(depositBalance && depositBalance.available, 900, "package activation debits the separate deposit balance");
 closeTo(Number(package100.availableEarnings || 0), 100, "package activation principal is withdrawable within the first-stage cap");
 
+// Regression: a package minimum of 200 USDT must reject a 50-USDT request,
+// even when 50 is the entire remaining balance for that package.
+const min200Result = await api("/api/admin/packages", {
+  as: "admin", method: "POST",
+  body: { name: "CI Bronze Minimum 200", description: "minimum withdrawal regression", price: 200, durationDays: 30, enabled: true },
+});
+ok(min200Result, "admin creates package for minimum-withdrawal regression", 201);
+const minimumTestPlan = min200Result.data.package;
+await db.collection("investmentpackages").updateOne(
+  { _id: new mongoose.Types.ObjectId(String(minimumTestPlan._id)) },
+  { $set: { minimumWithdrawal: 200 } },
+);
+await db.collection("platformsettings").updateOne(
+  { key: "global" },
+  { $set: { ["withdrawals.withdrawalMinByPackage." + String(minimumTestPlan._id)]: 200 } },
+);
+const minimumTestAccountId = new mongoose.Types.ObjectId();
+await db.collection("userpackages").insertOne({
+  _id: minimumTestAccountId,
+  userId: user._id,
+  packageId: new mongoose.Types.ObjectId(String(minimumTestPlan._id)),
+  packageName: minimumTestPlan.name,
+  investedAmount: 50,
+  asset: "USDT",
+  durationDays: 0,
+  status: "cancelled",
+  availableEarnings: 50,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 0,
+  totalWithdrawn: 0,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "available",
+  withdrawalRequestPending: false,
+  cancellationRefund: 0,
+  activatedAt: new Date(),
+  lastProfitAt: new Date(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+});
+const belowPackageMinimum = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 50, source: "package", userPackageId: String(minimumTestAccountId) },
+});
+statusIs(belowPackageMinimum, 400, "package minimum of 200 rejects a 50-USDT remainder");
+assert.match(String(belowPackageMinimum.data.message || ""), /200/, "minimum error tells user the configured 200-USDT minimum");
+const unchangedMinimumTestAccount = await db.collection("userpackages").findOne({ _id: minimumTestAccountId });
+closeTo(unchangedMinimumTestAccount.availableEarnings, 50, "below-minimum attempt preserves package balance");
+closeTo(unchangedMinimumTestAccount.lockedEarnings, 0, "below-minimum attempt does not lock funds");
+await db.collection("userpackages").deleteOne({ _id: minimumTestAccountId });
+await db.collection("investmentpackages").deleteOne({ _id: new mongoose.Types.ObjectId(String(minimumTestPlan._id)) });
+await db.collection("platformsettings").updateOne(
+  { key: "global" },
+  { $unset: { ["withdrawals.withdrawalMinByPackage." + String(minimumTestPlan._id)]: "" } },
+);
+
+// General withdrawal minimums and general PaymentOption settings must not restrict package withdrawals.
+const isolatedMinimumTestResult = await api("/api/admin/packages", {
+  as: "admin", method: "POST",
+  body: { name: "CI Package Ignores General Minimum", description: "withdrawal scope isolation regression", price: 200, durationDays: 30, enabled: true },
+});
+ok(isolatedMinimumTestResult, "admin creates package for general/package isolation regression", 201);
+const isolatedMinimumPlan = isolatedMinimumTestResult.data.package;
+const isolatedMinimumPlanId = new mongoose.Types.ObjectId(String(isolatedMinimumPlan._id));
+await db.collection("investmentpackages").updateOne(
+  { _id: isolatedMinimumPlanId },
+  { $set: { minimumWithdrawal: 1 } },
+);
+await db.collection("platformsettings").updateOne(
+  { key: "global" },
+  { $set: { ["withdrawals.withdrawalMinByPackage." + String(isolatedMinimumPlan._id)]: 1 } },
+);
+const isolatedMinimumAccountId = new mongoose.Types.ObjectId();
+await db.collection("userpackages").insertOne({
+  _id: isolatedMinimumAccountId,
+  userId: user._id,
+  packageId: isolatedMinimumPlanId,
+  packageName: isolatedMinimumPlan.name,
+  investedAmount: 50,
+  asset: "USDT",
+  durationDays: 0,
+  status: "cancelled",
+  availableEarnings: 50,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 0,
+  totalWithdrawn: 0,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "available",
+  // Simulate a legacy stale flag without any matching unresolved withdrawal.
+  withdrawalRequestPending: true,
+  cancellationRefund: 0,
+  activatedAt: new Date(),
+  lastProfitAt: new Date(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+});
+const globalSettingsBefore = await db.collection("platformsettings").findOne({ key: "global" });
+const previousGlobalMinimum = Number(globalSettingsBefore?.withdrawals?.minAmount ?? 1);
+const generalMethodBefore = await db.collection("paymentoptions").findOne({ asset: "USDT", network: "TRC20" });
+const previousGeneralMethodMinimum = Number(generalMethodBefore?.minWithdrawal ?? 1);
+let isolatedPackageWithdrawalId = "";
+try {
+  await db.collection("platformsettings").updateOne(
+    { key: "global" },
+    { $set: { "withdrawals.minAmount": 200 } },
+  );
+  await db.collection("paymentoptions").updateOne(
+    { asset: "USDT", network: "TRC20" },
+    { $set: { minWithdrawal: 200 } },
+  );
+
+  const packageWithdrawalWithGeneralMinimum200 = await api("/api/withdrawals", {
+    method: "POST",
+    body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 50, source: "package", userPackageId: String(isolatedMinimumAccountId) },
+  });
+  ok(packageWithdrawalWithGeneralMinimum200, "package withdrawal ignores the general min and clears a stale pending flag", 201);
+  isolatedPackageWithdrawalId = String(packageWithdrawalWithGeneralMinimum200.data.withdrawal._id);
+  const reservedIsolationAccount = await db.collection("userpackages").findOne({ _id: isolatedMinimumAccountId });
+  closeTo(reservedIsolationAccount.availableEarnings, 0, "package request debits only its own package balance");
+  closeTo(reservedIsolationAccount.lockedEarnings, 50, "package request reserves funds in the package bucket");
+
+  ok(await api("/api/admin/withdrawals", {
+    as: "admin", method: "PATCH",
+    body: { id: isolatedPackageWithdrawalId, status: "rejected", adminNote: "CI scope isolation test cleanup" },
+  }), "rejected test package withdrawal releases its reservation");
+  const restoredIsolationAccount = await db.collection("userpackages").findOne({ _id: isolatedMinimumAccountId });
+  closeTo(restoredIsolationAccount.availableEarnings, 50, "reject restores the package-specific bucket");
+  closeTo(restoredIsolationAccount.lockedEarnings, 0, "reject clears the package-specific locked amount");
+} finally {
+  await db.collection("platformsettings").updateOne(
+    { key: "global" },
+    {
+      $set: { "withdrawals.minAmount": previousGlobalMinimum },
+      $unset: { ["withdrawals.withdrawalMinByPackage." + String(isolatedMinimumPlan._id)]: "" },
+    },
+  );
+  await db.collection("paymentoptions").updateOne(
+    { asset: "USDT", network: "TRC20" },
+    { $set: { minWithdrawal: previousGeneralMethodMinimum } },
+  );
+  await db.collection("userpackages").deleteOne({ _id: isolatedMinimumAccountId });
+  await db.collection("investmentpackages").deleteOne({ _id: isolatedMinimumPlanId });
+}
+
 ok(await api("/api/admin/packages/credit", {
   as: "admin", method: "POST",
   body: { userPackageId: String(package100._id), amount: 600, note: "CI realized proceeds test credit" },
@@ -345,6 +496,56 @@ closeTo(package100Doc.availableEarnings, 600, "remaining package principal and e
 closeTo(package100Doc.lockedEarnings, 0, "completed package withdrawal unlocks reserved amount");
 closeTo(package100Doc.totalWithdrawn, 100, "package withdrawal total");
 assert.equal(package100Doc.firstWithdrawalStatus, "completed", "first package withdrawal marked completed");
+
+// Regression: when a visible package balance spans two same-name package records,
+// reserve the amount from both records and restore both exactly when rejected.
+const splitPackageName = "CI grouped withdrawal balance";
+const splitAccountIds = [new mongoose.Types.ObjectId(), new mongoose.Types.ObjectId()];
+await db.collection("userpackages").insertMany(splitAccountIds.map((_id) => ({
+  _id,
+  userId: user._id,
+  packageId: plan100._id,
+  packageName: splitPackageName,
+  investedAmount: 100,
+  asset: "USDT",
+  durationDays: 0,
+  status: "cancelled",
+  availableEarnings: 50,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 0,
+  totalWithdrawn: 0,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "available",
+  withdrawalRequestPending: false,
+  cancellationRefund: 0,
+  activatedAt: new Date(),
+  lastProfitAt: new Date(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+})));
+const groupedWithdrawal = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 100, source: "package", userPackageId: String(splitAccountIds[0]) },
+});
+ok(groupedWithdrawal, "withdrawal locks a grouped 100-USDT balance split across two 50-USDT package records", 201);
+const groupedRequestId = new mongoose.Types.ObjectId(String(groupedWithdrawal.data.withdrawal._id));
+for (const accountId of splitAccountIds) {
+  const lockedAccount = await db.collection("userpackages").findOne({ _id: accountId });
+  closeTo(lockedAccount.availableEarnings, 0, "grouped withdrawal decrements each allocated available bucket");
+  closeTo(lockedAccount.lockedEarnings, 50, "grouped withdrawal reserves each allocated bucket");
+}
+ok(await api("/api/admin/withdrawals", {
+  as: "admin", method: "PATCH",
+  body: { id: String(groupedRequestId), status: "rejected", adminNote: "CI restore grouped package buckets" },
+}), "rejecting grouped withdrawal restores exact package allocations");
+for (const accountId of splitAccountIds) {
+  const restoredAccount = await db.collection("userpackages").findOne({ _id: accountId });
+  closeTo(restoredAccount.availableEarnings, 50, "rejected grouped withdrawal restores each available bucket");
+  closeTo(restoredAccount.lockedEarnings, 0, "rejected grouped withdrawal releases each locked bucket");
+}
+await db.collection("withdrawalrequests").deleteOne({ _id: groupedRequestId });
+await db.collection("packageledgers").deleteMany({ userPackageId: { $in: splitAccountIds } });
+await db.collection("userpackages").deleteMany({ _id: { $in: splitAccountIds } });
 
 const missingReferralCapacity = await api("/api/withdrawals", {
   method: "POST",
@@ -632,6 +833,7 @@ const singleRequestPackagesPage = await api("/api/packages");
 ok(singleRequestPackagesPage, "package API exposes single-request lock");
 const singleRequestPackageView = singleRequestPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
 assert.equal(singleRequestPackageView.packageWithdrawalPending, true, "package API marks unresolved package withdrawal");
+assert.equal(singleRequestPackageView.packageWithdrawalStatus, "pending", "a truly pending request is labeled as under review");
 closeTo(singleRequestPackageView.packageWithdrawalRemaining, 200, "package cap still has 200 remaining while first request is pending");
 closeTo(singleRequestPackageView.withdrawalLimit, 0, "package API prevents a second withdrawal despite remaining balance and cap");
 const secondSingleRequest = await api("/api/withdrawals", {
@@ -652,7 +854,12 @@ const blockedWhileTransferInProgress = await api("/api/withdrawals", {
   body: { asset: "USDT", network: "TRC20", address: "single-request-test-address", amount: 100, source: "package", userPackageId: String(singleRequestPackageId) },
 });
 statusIs(blockedWhileTransferInProgress, 409, "no new package withdrawal while the approved transfer is still in progress");
-assert.match(String(blockedWhileTransferInProgress.data.message || ""), /لا يُسمح بطلب جديد حتى يكتمل التحويل/, "in-progress withdrawal lock explains why the next request must wait");
+assert.match(String(blockedWhileTransferInProgress.data.message || ""), /تمت الموافقة على طلب السحب|قيد تنفيذ التحويل/, "approved transfer gets a transfer-state message rather than a review-pending message");
+const approvedPackagePage = await api("/api/packages");
+ok(approvedPackagePage, "package API loads when transfer is approved but not completed");
+const approvedPackageView = approvedPackagePage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
+assert.equal(approvedPackageView.packageWithdrawalStatus, "approved", "approved request is not mislabeled as pending review");
+closeTo(approvedPackageView.packageGroupLockedEarnings, 100, "approved payout stays reserved until completion");
 ok(await api("/api/admin/withdrawals", {
   as: "admin",
   method: "PATCH",
@@ -662,6 +869,9 @@ singleRequestPackage = await db.collection("userpackages").findOne({ _id: single
 closeTo(singleRequestPackage.availableEarnings, 200, "completed first-stage withdrawal leaves the remaining package balance");
 closeTo(singleRequestPackage.lockedEarnings, 0, "completed first-stage withdrawal releases its locked amount");
 const approvedWithdrawalPackagesPage = await api("/api/packages");
+const completedPackageView = approvedWithdrawalPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
+assert.equal(completedPackageView.packageWithdrawalStatus, null, "completed request does not show as pending review or in transfer");
+closeTo(completedPackageView.packageGroupLockedEarnings, 0, "completed request leaves no reserved amount in the package card");
 ok(approvedWithdrawalPackagesPage, "package API exposes the post-approval withdrawal phase");
 const approvedWithdrawalPackageView = approvedWithdrawalPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
 assert.equal(approvedWithdrawalPackageView.packageWithdrawalAlreadyUsed, true, "package API marks a successful first-stage withdrawal");

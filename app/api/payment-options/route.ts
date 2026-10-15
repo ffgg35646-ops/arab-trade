@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import PaymentOption from "@/models/PaymentOption";
+import PackageWithdrawalMethod from "@/models/PackageWithdrawalMethod";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import Asset from "@/models/Asset";
 import { normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
@@ -16,6 +17,9 @@ export async function GET() {
 
     const assets = await Asset.find({})
       .sort({ symbol: 1 })
+      .lean();
+    const packageWithdrawalOptions = await PackageWithdrawalMethod.find({ asset: USDT_ASSET })
+      .sort({ enabled: -1, createdAt: 1 })
       .lean();
 
     const methods: any[] = [];
@@ -128,6 +132,21 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       methods,
+      packageMethods: (packageWithdrawalOptions as any[]).map((method) => ({
+        _id: String(method._id),
+        name: String(method.name || "USDT"),
+        asset: USDT_ASSET,
+        network: normalizePaymentNetwork(method.network),
+        minWithdrawal: Number(method.minWithdrawal || 0),
+        maxWithdrawal: Number(method.maxWithdrawal || 0),
+        withdrawalFee: Number(method.withdrawalFee || 0),
+        warning: String(method.warning || ""),
+        enabled: Boolean(method.enabled),
+        depositEnabled: false,
+        withdrawalEnabled: method.withdrawalEnabled !== false,
+        withdrawalScope: "package",
+        source: "package-withdrawal-method",
+      })),
       depositsEnabled: platformSettings.deposits?.enabled !== false,
       limits: {
         minDeposit: Number(platformSettings.deposits?.minAmount || 0),

@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       ])
     );
 
-    const countedWithdrawalStatuses = ["pending", "approved", "processing", "completed"];
+    const countedWithdrawalStatuses = ["pending", "approved", "processing", "completed"] as const;
     const [activeReferralDeposits, referralWithdrawalRows, firstWithdrawalRows, packageWithdrawalRows] = await Promise.all([
       referredIds.length
         ? DepositRequest.aggregate([

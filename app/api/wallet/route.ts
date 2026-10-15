@@ -7,6 +7,7 @@ import DepositBalance from "@/models/DepositBalance";
 import UserPackage from "@/models/UserPackage";
 import LedgerEntry from "@/models/LedgerEntry";
 import { normalizeDepositBalanceRows, separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
+import { settleLegacyApprovedPackageWithdrawals } from "@/lib/settle-legacy-approved-package-withdrawals";
 
 const BINANCE_API = "https://api.binance.com";
 
@@ -67,7 +68,12 @@ export async function GET(request: NextRequest) {
 
     const requestedMode = new URL(request.url).searchParams.get("mode");
     const mode = String(requestedMode || "live").toLowerCase() === "demo" ? "demo" : "live";
-    if (mode === "live") await separateLegacyDepositsFromSpotWallet(user._id);
+    if (mode === "live") {
+      await separateLegacyDepositsFromSpotWallet(user._id);
+      // The navbar reads this endpoint directly, so repair old approved/rejected
+      // package withdrawals before calculating the current withdrawal balance.
+      await settleLegacyApprovedPackageWithdrawals(user._id);
+    }
 
     const [wallets, rawDepositBalances, packageAccounts] = await Promise.all([
       Wallet.find({

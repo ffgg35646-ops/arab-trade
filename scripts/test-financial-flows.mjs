@@ -363,7 +363,8 @@ await db.collection("userpackages").insertOne({
   totalWithdrawn: 0,
   withdrawablePrincipalCredited: true,
   firstWithdrawalStatus: "available",
-  withdrawalRequestPending: false,
+  // Simulate a legacy stale flag without any matching unresolved withdrawal.
+  withdrawalRequestPending: true,
   cancellationRefund: 0,
   activatedAt: new Date(),
   lastProfitAt: new Date(),
@@ -389,7 +390,7 @@ try {
     method: "POST",
     body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 50, source: "package", userPackageId: String(isolatedMinimumAccountId) },
   });
-  ok(packageWithdrawalWithGeneralMinimum200, "package withdrawal uses package-specific method even when general min is 200", 201);
+  ok(packageWithdrawalWithGeneralMinimum200, "package withdrawal ignores the general min and clears a stale pending flag", 201);
   isolatedPackageWithdrawalId = String(packageWithdrawalWithGeneralMinimum200.data.withdrawal._id);
   const reservedIsolationAccount = await db.collection("userpackages").findOne({ _id: isolatedMinimumAccountId });
   closeTo(reservedIsolationAccount.availableEarnings, 0, "package request debits only its own package balance");
@@ -832,6 +833,7 @@ const singleRequestPackagesPage = await api("/api/packages");
 ok(singleRequestPackagesPage, "package API exposes single-request lock");
 const singleRequestPackageView = singleRequestPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
 assert.equal(singleRequestPackageView.packageWithdrawalPending, true, "package API marks unresolved package withdrawal");
+assert.equal(singleRequestPackageView.packageWithdrawalStatus, "pending", "a truly pending request is labeled as under review");
 closeTo(singleRequestPackageView.packageWithdrawalRemaining, 200, "package cap still has 200 remaining while first request is pending");
 closeTo(singleRequestPackageView.withdrawalLimit, 0, "package API prevents a second withdrawal despite remaining balance and cap");
 const secondSingleRequest = await api("/api/withdrawals", {
@@ -852,7 +854,12 @@ const blockedWhileTransferInProgress = await api("/api/withdrawals", {
   body: { asset: "USDT", network: "TRC20", address: "single-request-test-address", amount: 100, source: "package", userPackageId: String(singleRequestPackageId) },
 });
 statusIs(blockedWhileTransferInProgress, 409, "no new package withdrawal while the approved transfer is still in progress");
-assert.match(String(blockedWhileTransferInProgress.data.message || ""), /لا يُسمح بطلب جديد حتى يكتمل التحويل/, "in-progress withdrawal lock explains why the next request must wait");
+assert.match(String(blockedWhileTransferInProgress.data.message || ""), /تمت الموافقة على طلب السحب|قيد تنفيذ التحويل/, "approved transfer gets a transfer-state message rather than a review-pending message");
+const approvedPackagePage = await api("/api/packages");
+ok(approvedPackagePage, "package API loads when transfer is approved but not completed");
+const approvedPackageView = approvedPackagePage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
+assert.equal(approvedPackageView.packageWithdrawalStatus, "approved", "approved request is not mislabeled as pending review");
+closeTo(approvedPackageView.packageGroupLockedEarnings, 100, "approved payout stays reserved until completion");
 ok(await api("/api/admin/withdrawals", {
   as: "admin",
   method: "PATCH",
@@ -862,6 +869,9 @@ singleRequestPackage = await db.collection("userpackages").findOne({ _id: single
 closeTo(singleRequestPackage.availableEarnings, 200, "completed first-stage withdrawal leaves the remaining package balance");
 closeTo(singleRequestPackage.lockedEarnings, 0, "completed first-stage withdrawal releases its locked amount");
 const approvedWithdrawalPackagesPage = await api("/api/packages");
+const completedPackageView = approvedWithdrawalPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
+assert.equal(completedPackageView.packageWithdrawalStatus, null, "completed request does not show as pending review or in transfer");
+closeTo(completedPackageView.packageGroupLockedEarnings, 0, "completed request leaves no reserved amount in the package card");
 ok(approvedWithdrawalPackagesPage, "package API exposes the post-approval withdrawal phase");
 const approvedWithdrawalPackageView = approvedWithdrawalPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
 assert.equal(approvedWithdrawalPackageView.packageWithdrawalAlreadyUsed, true, "package API marks a successful first-stage withdrawal");

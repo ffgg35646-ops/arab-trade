@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "لديك طلب سحب قيد المراجعة بالفعل. لا يمكنك تقديم طلب سحب جديد من المحفظة العامة أو أي باقة حتى تعتمد الإدارة الطلب الحالي أو ترفضه.",
+          message: "لديك طلب سحب قائم قيد المراجعة بالفعل. لا يمكنك تقديم طلب سحب جديد من المحفظة العامة أو أي باقة حتى تعتمد الإدارة الطلب الحالي أو ترفضه.",
           activeWithdrawalId: String(existingPendingWithdrawal._id),
           activeWithdrawalAmount: Number(existingPendingWithdrawal.amount || 0),
           activeWithdrawalSource: existingPendingWithdrawal.source || "wallet",
@@ -788,7 +788,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            message: "لديك طلب سحب قيد المراجعة بالفعل. انتظر قرار الإدارة بالموافقة أو الرفض قبل تقديم طلب جديد.",
+            message: "لديك طلب سحب قائم قيد المراجعة بالفعل. انتظر قرار الإدارة بالموافقة أو الرفض قبل تقديم طلب جديد.",
           },
           { status: 409 }
         );

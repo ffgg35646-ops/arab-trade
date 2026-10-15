@@ -25,6 +25,145 @@ const normalizePackageGroup = (value: unknown) =>
   String(value ?? "").normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
 
 /**
+ * Reclassify historical package refunds that an older release credited to the
+ * general spot wallet. Move only refunds with the exact legacy reference and
+ * only when the source wallet still has the funds available; never mint a
+ * second credit when the source money has already been spent.
+ */
+async function reconcileLegacyPackageRefunds(userId: mongoose.Types.ObjectId) {
+  const activeGeneralWithdrawal = await WithdrawalRequest.exists({
+    userId,
+    source: { $ne: "package" },
+    status: { $in: ["pending", "processing"] },
+  });
+  if (activeGeneralWithdrawal) return;
+
+  const legacyAccounts = await UserPackage.find({
+    userId,
+    status: "cancelled",
+    cancellationRefund: { $gt: 0 },
+    cancellationRefundPackageCredited: { $ne: true },
+  }).select("_id packageName asset cancellationRefund").sort({ cancelledAt: 1, _id: 1 }).lean();
+
+  for (const account of legacyAccounts as any[]) {
+    const refund = roundAmount(Number(account.cancellationRefund || 0));
+    if (!Number.isFinite(refund) || refund <= 1e-8) continue;
+
+    const packageId = String(account._id);
+    const asset = String(account.asset || USDT_ASSET).trim().toUpperCase();
+    const legacyReferences = ["package-cancel:" + packageId, "package-change-refund:" + packageId];
+    const legacyCredit = await LedgerEntry.findOne({
+      userId,
+      scope: "user",
+      asset,
+      mode: "live",
+      type: "adjustment",
+      amount: { $gt: 0 },
+      referenceId: { $in: legacyReferences },
+    }).sort({ createdAt: 1, _id: 1 }).lean();
+
+    // The legacy general-wallet credit is the evidence that this is an old
+    // misrouted refund. Ignore unrelated or differently valued ledger entries.
+    if (!legacyCredit || Math.abs(Number(legacyCredit.amount || 0) - refund) > 1e-7) continue;
+
+    const migrationNote = "ترحيل استرداد قديم من رصيد السحب العام إلى رصيد سحب الباقة نفسها. المرجع: " + String(legacyCredit.referenceId || "");
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const activeWithdrawal = await WithdrawalRequest.exists({
+          userId,
+          source: { $ne: "package" },
+          status: { $in: ["pending", "processing"] },
+        }).session(session);
+        if (activeWithdrawal) return;
+
+        const currentPackage = await UserPackage.findOne({
+          _id: account._id,
+          userId,
+          status: "cancelled",
+          cancellationRefund: refund,
+          cancellationRefundPackageCredited: { $ne: true },
+        }).session(session).lean();
+        if (!currentPackage) return;
+
+        const existingReclassification = await PackageLedger.exists({
+          userId,
+          userPackageId: account._id,
+          type: "refund_reclassification",
+          note: migrationNote,
+        }).session(session);
+        if (existingReclassification) {
+          await UserPackage.updateOne(
+            { _id: account._id, userId, cancellationRefundPackageCredited: { $ne: true } },
+            { $set: { cancellationRefundPackageCredited: true } },
+            { session },
+          );
+          return;
+        }
+
+        const wallet = await Wallet.findOne({
+          userId,
+          type: "spot",
+          mode: "live",
+        }).session(session);
+        if (!wallet) return;
+
+        const balance = wallet.balances.find((item: any) => String(item.asset || "").toUpperCase() === asset) as any;
+        if (!balance) return;
+        const balanceBefore = Math.max(0, Number(balance.available || 0));
+        if (balanceBefore + 1e-8 < refund) return;
+
+        const balanceAfter = roundAmount(balanceBefore - refund);
+        balance.available = balanceAfter;
+        await wallet.save({ session });
+
+        const creditedPackage = await UserPackage.findOneAndUpdate(
+          {
+            _id: account._id,
+            userId,
+            status: "cancelled",
+            cancellationRefund: refund,
+            cancellationRefundPackageCredited: { $ne: true },
+          },
+          {
+            $inc: { availableEarnings: refund },
+            $set: { cancellationRefundPackageCredited: true },
+          },
+          { new: true, session },
+        );
+        if (!creditedPackage) throw new Error("LEGACY_PACKAGE_REFUND_CHANGED");
+
+        await PackageLedger.create([{
+          userId,
+          userPackageId: account._id,
+          type: "refund_reclassification",
+          asset,
+          amount: refund,
+          note: migrationNote,
+        }], { session });
+
+        await LedgerEntry.create([{
+          userId,
+          scope: "user",
+          asset,
+          mode: "live",
+          type: "adjustment",
+          amount: -refund,
+          balanceBefore,
+          balanceAfter,
+          referenceId: "package-refund-reclassification:" + packageId,
+          note: "نقل الاسترداد القديم من رصيد السحب العام إلى رصيد سحب الباقة " + account.packageName + ".",
+        }], { session });
+      });
+    } catch (error) {
+      console.error("LEGACY PACKAGE REFUND RECLASSIFICATION:", String(account._id), error);
+    } finally {
+      await session.endSession();
+    }
+  }
+}
+
+/**
  * Repair package balances stranded by older withdrawal settlement paths.
  * The request record is the source of truth: while any withdrawal is active,
  * or the user-wide withdrawal guard is held, do not reconcile anything.
@@ -135,6 +274,7 @@ export async function GET(request: NextRequest) {
     await settleLegacyApprovedPackageWithdrawals(user._id);
     await reconcileOrphanedPackageWithdrawalLocks(user._id);
     await separateLegacyDepositsFromSpotWallet(user._id);
+    await reconcileLegacyPackageRefunds(user._id);
     await Promise.all([
       UserPackage.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
       PackageLedger.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
@@ -411,6 +551,7 @@ export async function POST(request: NextRequest) {
 
     await connectDB();
     await separateLegacyDepositsFromSpotWallet(user._id);
+    await reconcileLegacyPackageRefunds(user._id);
     const withdrawalSettings = await PlatformSettings.findOne({ key: "global" }).select("withdrawals.firstPackageWithdrawalPercent").lean();
     await ensurePackagePrincipalWithdrawalCredit(
       user._id,
@@ -635,7 +776,7 @@ export async function POST(request: NextRequest) {
 
           const cancelled = await UserPackage.findOneAndUpdate(
             { _id: current._id, userId: user._id, status: "active", lockedEarnings: 0 },
-            { $set: { status: "cancelled", cancelledAt: new Date(), cancellationRefund: refund } },
+            { $set: { status: "cancelled", cancelledAt: new Date(), cancellationRefund: refund, cancellationRefundPackageCredited: true } },
             { new: true, session }
           );
           if (!cancelled) throw new Error("CURRENT_PACKAGE_CHANGED");
@@ -771,7 +912,7 @@ export async function POST(request: NextRequest) {
         await session.withTransaction(async () => {
           const cancelled = await UserPackage.findOneAndUpdate(
             { _id: current._id, userId: user._id, status: "active", lockedEarnings: 0 },
-            { $set: { status: "cancelled", cancelledAt: new Date(), cancellationRefund: refund } },
+            { $set: { status: "cancelled", cancelledAt: new Date(), cancellationRefund: refund, cancellationRefundPackageCredited: true } },
             { new: true, session }
           );
 

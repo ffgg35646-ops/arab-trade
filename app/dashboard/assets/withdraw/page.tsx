@@ -32,7 +32,7 @@ type PackageAccount = {
   durationDays?: number;
   totalRealizedEarnings: number;
   totalWithdrawn: number;
-  firstWithdrawalStatus?: "available" | "pending" | "completed";
+  firstWithdrawalStatus?: "available" | "pending" | "approved" | "completed";
   firstPackageWithdrawalCap?: number;
   firstPackageWithdrawalUsed?: number;
   firstPackageWithdrawalRemaining?: number;

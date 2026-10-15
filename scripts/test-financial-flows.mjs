@@ -654,6 +654,66 @@ ok(afterReferralAllowanceUsed, "package API refreshes referral allowance after p
 const afterReferralAccount = afterReferralAllowanceUsed.data.userPackages.find((x) => String(x._id) === String(package100._id));
 closeTo(afterReferralAccount.withdrawalLimit, 0, "used referral allowance cannot be withdrawn a second time");
 
+// Regression: older approved package requests were left in lockedEarnings.
+// The package API must settle them once, without returning a paid amount to available.
+const legacyApprovedPackageId = new mongoose.Types.ObjectId();
+const legacyApprovedWithdrawalId = new mongoose.Types.ObjectId();
+const legacyPackageCreatedAt = new Date(Date.now() - 10 * 60 * 1000);
+await db.collection("userpackages").insertOne({
+  _id: legacyApprovedPackageId,
+  userId: user._id,
+  packageId: package100.packageId,
+  packageName: "CI legacy approved lock migration",
+  investedAmount: 100,
+  asset: "USDT",
+  durationDays: 30,
+  status: "active",
+  availableEarnings: 40,
+  lockedEarnings: 60,
+  totalRealizedEarnings: 60,
+  totalWithdrawn: 0,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "approved",
+  withdrawalRequestPending: false,
+  cancellationRefund: 0,
+  activatedAt: legacyPackageCreatedAt,
+  lastProfitAt: legacyPackageCreatedAt,
+  createdAt: legacyPackageCreatedAt,
+  updatedAt: legacyPackageCreatedAt,
+});
+await db.collection("withdrawalrequests").insertOne({
+  _id: legacyApprovedWithdrawalId,
+  userId: user._id,
+  asset: "USDT",
+  network: "TRC20",
+  amount: 60,
+  fee: 0,
+  receiveAmount: 60,
+  address: "ci-legacy-approved-address",
+  source: "package",
+  userPackageId: legacyApprovedPackageId,
+  packageAllocations: [{ userPackageId: legacyApprovedPackageId, amount: 60 }],
+  isFirstPackageWithdrawal: true,
+  status: "approved",
+  adminNote: "Legacy approved request without package settlement marker",
+  createdAt: legacyPackageCreatedAt,
+  updatedAt: legacyPackageCreatedAt,
+});
+ok(await api("/api/packages"), "package API reconciles legacy approved package withdrawal locks");
+let legacySettledAccount = await db.collection("userpackages").findOne({ _id: legacyApprovedPackageId });
+closeTo(legacySettledAccount.availableEarnings, 40, "legacy approved withdrawal does not refund already-approved amount to available");
+closeTo(legacySettledAccount.lockedEarnings, 0, "legacy approved withdrawal no longer leaves a locked balance");
+closeTo(legacySettledAccount.totalWithdrawn, 60, "legacy approved withdrawal is counted as withdrawn once");
+assert.equal(legacySettledAccount.firstWithdrawalStatus, "completed", "legacy approved first withdrawal is closed");
+let legacySettledRequest = await db.collection("withdrawalrequests").findOne({ _id: legacyApprovedWithdrawalId });
+assert.equal(legacySettledRequest.packageBalanceSettled, true, "legacy approved request receives an idempotent settlement marker");
+ok(await api("/api/packages"), "a second package refresh remains safe after legacy settlement");
+legacySettledAccount = await db.collection("userpackages").findOne({ _id: legacyApprovedPackageId });
+closeTo(legacySettledAccount.totalWithdrawn, 60, "repeated refresh never settles the approved request twice");
+await db.collection("packageledgers").deleteMany({ userPackageId: legacyApprovedPackageId });
+await db.collection("withdrawalrequests").deleteOne({ _id: legacyApprovedWithdrawalId });
+await db.collection("userpackages").deleteOne({ _id: legacyApprovedPackageId });
+
 const legacyOverCapRequestId = new mongoose.Types.ObjectId();
 const legacyOverCapCreatedAt = new Date(Date.now() + 1000);
 await db.collection("withdrawalrequests").insertOne({

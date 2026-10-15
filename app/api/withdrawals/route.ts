@@ -451,8 +451,20 @@ export async function POST(request: NextRequest) {
         userId: user._id,
         source: "package",
         userPackageId: currentPackage._id,
-        status: { $in: ["approved", "processing", "completed"] },
+        status: { $in: ["approved", "processing"] },
       }).select("_id amount status createdAt").sort({ createdAt: -1 }).lean();
+
+      if (successfulPackageWithdrawal) {
+        return NextResponse.json(
+          {
+            success: false,
+            alreadyWithdrawn: true,
+            message: "طلب السحب من باقة " + currentPackage.packageName + " تمت الموافقة عليه أو ما زال قيد التنفيذ. لا يُسمح بطلب جديد حتى يكتمل التحويل أو يُرفض الطلب.",
+            previousWithdrawalId: String(successfulPackageWithdrawal._id),
+          },
+          { status: 409 }
+        );
+      }
 
       const activePackageWithdrawal = await WithdrawalRequest.findOne({
         userId: user._id,
@@ -517,6 +529,20 @@ export async function POST(request: NextRequest) {
         0,
         firstPackageWithdrawalCap - firstPackageWithdrawalUsed
       );
+      const completedFirstStageWithdrawal = firstWithdrawalRows.some(
+        (row: any) => String(row.status) === "completed"
+      );
+      if (firstPackageWithdrawalRemaining > 1e-8 && completedFirstStageWithdrawal) {
+        return NextResponse.json(
+          {
+            success: false,
+            alreadyWithdrawn: true,
+            message: "تم تنفيذ سحب من المرحلة الأولى لهذه الباقة بالفعل. لا يُسمح بطلب سحب ثانٍ من نفس سقف المرحلة الأولى.",
+            firstPackageWithdrawalRemaining,
+          },
+          { status: 409 }
+        );
+      }
       let referralRemainingForRequest = 0;
       const firstPackageWithdrawalPending = firstWithdrawalRows.some(
         (row: any) => String(row.status) === "pending"
@@ -535,7 +561,7 @@ export async function POST(request: NextRequest) {
 
       // Phase one: cumulative withdrawals are capped by the original package amount.
       // Once used, later withdrawals require capacity from active referrals.
-      if (firstPackageWithdrawalRemaining > 0 && !successfulPackageWithdrawal) {
+      if (firstPackageWithdrawalRemaining > 0) {
         const firstStageAvailable = Math.min(packageAvailable, firstPackageWithdrawalRemaining);
         if (amount > firstStageAvailable + 1e-8) {
           return NextResponse.json(

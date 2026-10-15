@@ -583,6 +583,12 @@ await db.collection("userpackages").insertMany(splitAccountIds.map((_id, index) 
   updatedAt: new Date(),
 })));
 const siblingBeforeWithdrawal = await db.collection("userpackages").findOne({ _id: splitAccountIds[1] });
+const packageBalancesBeforeIndependentWithdrawal = await api("/api/packages");
+ok(packageBalancesBeforeIndependentWithdrawal, "package API returns independent account balances");
+const selectedBalanceBeforeWithdrawal = packageBalancesBeforeIndependentWithdrawal.data.userPackages.find((x) => String(x._id) === String(splitAccountIds[0]));
+const siblingBalanceBeforeWithdrawal = packageBalancesBeforeIndependentWithdrawal.data.userPackages.find((x) => String(x._id) === String(splitAccountIds[1]));
+closeTo(selectedBalanceBeforeWithdrawal.packageGroupAvailableEarnings, 150, "selected account API balance does not include sibling funds");
+closeTo(siblingBalanceBeforeWithdrawal.packageGroupAvailableEarnings, 50, "sibling API balance is reported independently");
 const independentWithdrawal = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 100, source: "package", userPackageId: String(splitAccountIds[0]) },
@@ -590,6 +596,10 @@ const independentWithdrawal = await api("/api/withdrawals", {
 ok(independentWithdrawal, "withdrawal uses the selected account's own 150-USDT balance", 201);
 const independentRequestId = new mongoose.Types.ObjectId(String(independentWithdrawal.data.withdrawal._id));
 const selectedLockedAccount = await db.collection("userpackages").findOne({ _id: splitAccountIds[0] });
+const independentRequestStored = await db.collection("withdrawalrequests").findOne({ _id: independentRequestId });
+assert.equal(independentRequestStored.packageAllocations.length, 1, "new package withdrawal stores a single source allocation");
+assert.equal(String(independentRequestStored.packageAllocations[0].userPackageId), String(splitAccountIds[0]), "request allocation points to the selected source account");
+closeTo(independentRequestStored.packageAllocations[0].amount, 100, "request allocation equals the requested amount");
 closeTo(selectedLockedAccount.availableEarnings, 50, "selected account alone loses the requested 100 USDT from available");
 closeTo(selectedLockedAccount.lockedEarnings, 100, "selected account alone reserves the requested 100 USDT");
 let untouchedSibling = await db.collection("userpackages").findOne({ _id: splitAccountIds[1] });

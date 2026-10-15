@@ -141,7 +141,7 @@ async function reconcileLegacyPackageRefunds(userId: mongoose.Types.ObjectId) {
         );
         if (!creditedPackage) throw new Error("LEGACY_PACKAGE_REFUND_CHANGED");
 
-        const reclassificationEntries: Array<Record<string, unknown>> = [];
+        const reclassificationEntries: any[] = [];
         if (legacyPackageRefundLedger) {
           // The old code wrote a positive package-ledger row even though the
           // money was sent to the general wallet. Reverse that misleading row.

@@ -111,7 +111,7 @@ export default function WithdrawPage() {
   const [submittingKey, setSubmittingKey] = useState("");
   const [savingAddressKey, setSavingAddressKey] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [showPreviousPackageAccounts, setShowPreviousPackageAccounts] = useState(false);
+  const [selectedPackageAccountByPlan, setSelectedPackageAccountByPlan] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -148,12 +148,10 @@ export default function WithdrawPage() {
       const planRows: PackagePlan[] = Array.isArray(packageData.packages)
         ? packageData.packages.filter((item: PackagePlan) => item && item._id && item.enabled !== false)
         : [];
-      const activePlanIds = new Set(planRows.map((item) => String(item._id)));
       const packageRows: PackageAccount[] = Array.isArray(packageData.userPackages)
         ? packageData.userPackages.filter((item: PackageAccount) =>
             ["active", "cancelled"].includes(item.status) &&
             String(item.asset || "").toUpperCase() === "USDT" &&
-            activePlanIds.has(packagePlanId(item)) &&
             (
               item.status === "active" ||
               Number(item.availableEarnings || 0) > 1e-8 ||
@@ -219,37 +217,53 @@ export default function WithdrawPage() {
     () => packageAccounts.reduce((sum, item) => sum + Number(item.lockedEarnings || 0), 0),
     [packageAccounts]
   );
+  // Build one visible card per configured package, not per historical activation record.
+  // Multiple activations of the same package stay accessible inside that package's card.
   const withdrawalPackageCards = useMemo(() => {
-    const planById = new Map(packagePlans.map((plan) => [String(plan._id), plan]));
-    return packageAccounts
-      .flatMap((item) => {
-        const plan = planById.get(packagePlanId(item));
-        return plan ? [{ key: "account-" + item._id, plan, item }] : [];
-      })
-      .sort((a, b) => {
-        const activeOrder = Number(b.item.status === "active") - Number(a.item.status === "active");
-        if (activeOrder) return activeOrder;
-        const aTime = new Date(a.item.activatedAt || a.item.createdAt || 0).getTime();
-        const bTime = new Date(b.item.activatedAt || b.item.createdAt || 0).getTime();
-        return bTime - aTime;
-      });
-  }, [packageAccounts, packagePlans]);
+    const groups = new Map<string, { plan: PackagePlan; accounts: PackageAccount[]; order: number }>();
+    packagePlans.forEach((plan, index) => {
+      groups.set(String(plan._id), { plan, accounts: [], order: index });
+    });
 
-  // Keep the page focused on the current package. Historical package balances
-  // remain separately accessible without rendering dozens of cards by default.
-  const activeWithdrawalPackageCards = withdrawalPackageCards.filter(({ item }) => item.status === "active");
-  const previousWithdrawalPackageCards = withdrawalPackageCards.filter(({ item }) => item.status !== "active");
-  // Show only the newest active package account by default. Older or duplicate
-  // records remain available below so each account's balance stays independent.
-  const featuredWithdrawalPackageCards = activeWithdrawalPackageCards.length
-    ? activeWithdrawalPackageCards.slice(0, 1)
-    : previousWithdrawalPackageCards.slice(0, 1);
-  const hiddenPreviousPackageCards = activeWithdrawalPackageCards.length
-    ? [...activeWithdrawalPackageCards.slice(1), ...previousWithdrawalPackageCards]
-    : previousWithdrawalPackageCards.slice(1);
-  const visibleWithdrawalPackageCards = showPreviousPackageAccounts
-    ? [...featuredWithdrawalPackageCards, ...hiddenPreviousPackageCards]
-    : featuredWithdrawalPackageCards;
+    for (const account of packageAccounts) {
+      const id = packagePlanId(account);
+      if (!id) continue;
+      const existing = groups.get(id);
+      if (existing) {
+        existing.accounts.push(account);
+      } else {
+        // Retain balances for a package that has since been disabled by the admin.
+        groups.set(id, {
+          plan: {
+            _id: id,
+            name: account.packageName || "باقة سابقة",
+            asset: account.asset,
+            minimumWithdrawal: account.minimumWithdrawal,
+          },
+          accounts: [account],
+          order: Number.MAX_SAFE_INTEGER,
+        });
+      }
+    }
+
+    return [...groups.values()]
+      .map(({ plan, accounts, order }) => {
+        const sortedAccounts = [...accounts].sort((a, b) => {
+          const activeOrder = Number(b.status === "active") - Number(a.status === "active");
+          if (activeOrder) return activeOrder;
+          const aTime = new Date(a.activatedAt || a.createdAt || 0).getTime();
+          const bTime = new Date(b.activatedAt || b.createdAt || 0).getTime();
+          return bTime - aTime;
+        });
+        const selectedId = selectedPackageAccountByPlan[String(plan._id)];
+        const item = sortedAccounts.find((account) => account._id === selectedId)
+          || sortedAccounts.find((account) => account.status === "active")
+          || sortedAccounts[0]
+          || null;
+        return { key: "plan-" + String(plan._id), plan, accounts: sortedAccounts, item, order };
+      })
+      .sort((a, b) => a.order - b.order);
+  }, [packageAccounts, packagePlans, selectedPackageAccountByPlan]);
   const pendingWithdrawal = history.find((item) => item.status === "pending");
   const hasPendingWithdrawal = Boolean(pendingWithdrawal);
   const openWithdrawals = history.filter((item) => ["pending", "approved", "processing"].includes(item.status)).length;
@@ -570,13 +584,13 @@ export default function WithdrawPage() {
                 <section className="mt-3 rounded-xl border border-emerald-400/20 bg-[#07101d] p-3">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <h2 className="text-sm font-black">السحب من الباقات</h2>
-                    <span className="text-[10px] text-slate-400">{activeWithdrawalPackageCards.length ? "الباقة الحالية" : featuredWithdrawalPackageCards.length ? "آخر حساب باقة لديه رصيد" : "لا يوجد حساب باقة"}</span>
+                    <span className="text-[10px] text-slate-400">{withdrawalPackageCards.length + " باقة"}</span>
                   </div>
                   {withdrawalPackageCards.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-xs text-slate-500">لا توجد باقات متاحة حاليًا.</div>
                   ) : (
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {visibleWithdrawalPackageCards.map(({ key, plan, item }) => {
+                      {withdrawalPackageCards.map(({ key, plan, accounts, item }) => {
                         const packageFormId = item?._id || String(plan._id);
                         const availableForPlan = item ? Math.max(0, Number(item.availableEarnings || 0)) : 0;
                         return (
@@ -587,13 +601,35 @@ export default function WithdrawPage() {
                                 <span className={item ? "mt-1 inline-flex rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] text-emerald-200" : "mt-1 inline-flex rounded-full bg-slate-700/50 px-2 py-0.5 text-[10px] text-slate-300"}>
                                   {item ? (item.status === "active" ? "نشطة" : "سابقة") : "لم تُفعّل بعد"}
                                 </span>
-                                {item && <div className="mt-1 text-[9px] text-slate-600">حساب …{item._id.slice(-6)}{item.activatedAt ? " · تفعيل " + new Date(item.activatedAt).toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo" }) : ""}</div>}
+                                {item?.activatedAt && <div className="mt-1 text-[9px] text-slate-600">تفعيل {new Date(item.activatedAt).toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo" })}</div>}
                               </div>
                               <div className="shrink-0 text-left">
                                 <div className="text-[10px] text-slate-500">متاح للسحب</div>
                                 <div className="text-sm font-black text-emerald-200">{money(availableForPlan)} USDT</div>
                               </div>
                             </div>
+                            {accounts.length > 1 && (
+                              <div className="mb-2">
+                                <label className="mb-1 block text-[10px] text-slate-500">حساب الرصيد المرتبط بالباقة</label>
+                                <select
+                                  aria-label={"حساب الباقة " + plan.name}
+                                  value={item?._id || ""}
+                                  onChange={(event) => setSelectedPackageAccountByPlan((current) => ({
+                                    ...current,
+                                    [String(plan._id)]: event.target.value,
+                                  }))}
+                                  className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-[10px] text-slate-200 outline-none focus:border-cyan-400/50"
+                                >
+                                  {accounts.map((account) => (
+                                    <option key={account._id} value={account._id}>
+                                      {(account.status === "active" ? "نشطة" : "سابقة") +
+                                        (account.activatedAt ? " · " + new Date(account.activatedAt).toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo" }) : "") +
+                                        " · متاح " + money(Number(account.availableEarnings || 0)) + " USDT"}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
                             <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
                               <span className="text-slate-500">محجوز: <b className="text-slate-200">{money(Number(item?.lockedEarnings || 0))} USDT</b></span>
                             </div>
@@ -613,22 +649,6 @@ export default function WithdrawPage() {
                           </article>
                         );
                       })}
-                    </div>
-                  )}
-                  {hiddenPreviousPackageCards.length > 0 && (
-                    <div className="mt-3 border-t border-white/10 pt-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowPreviousPackageAccounts((current) => !current)}
-                        className="w-full rounded-lg border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-bold text-slate-200 transition hover:bg-white/[0.06]"
-                      >
-                        {showPreviousPackageAccounts
-                          ? "إخفاء الحسابات الأخرى"
-                          : "عرض الحسابات الأخرى (" + hiddenPreviousPackageCards.length + ")"}
-                      </button>
-                      <p className="mt-2 text-[10px] leading-5 text-slate-500">
-                        أرصدة كل حساب تظل منفصلة؛ افتح القائمة للوصول إلى الحسابات السابقة أو الإضافية دون دمج أرصدتها.
-                      </p>
                     </div>
                   )}
                 </section>

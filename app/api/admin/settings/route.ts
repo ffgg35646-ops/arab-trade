@@ -96,7 +96,7 @@ export async function PATCH(request: NextRequest) {
         Promise.resolve(currentSettings.withdrawals.withdrawalMinByPackage as unknown as Record<string, number> | undefined),
       ]);
       const normalizePackageName = (value: unknown) =>
-        String(value || "").normalize("NFKC").trim().replace(/\\s+/g, " ").toLocaleLowerCase("en-US");
+        String(value || "").normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
       const groupedRows = new Map<string, any[]>();
       for (const row of catalogRows as any[]) {
         const nameKey = normalizePackageName(row.name);

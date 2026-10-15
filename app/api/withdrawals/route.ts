@@ -517,41 +517,37 @@ export async function POST(request: NextRequest) {
         userPackageId: { $in: sameNamePackageIds },
         status: { $in: ["pending", "approved", "processing"] },
       }).select("_id amount status createdAt").sort({ createdAt: -1 }).lean();
-      const familyHasPendingFlag = packageFamilyRows.some((row: any) => row.withdrawalRequestPending === true);
 
-      if (activePackageWithdrawal || familyHasPendingFlag) {
+      if (activePackageWithdrawal) {
+        const activeStatus = String(activePackageWithdrawal.status || "pending");
+        const activeMessage = activeStatus === "pending"
+          ? "لديك طلب سحب من باقة " + currentPackage.packageName + " بقيمة " + Number(activePackageWithdrawal.amount || 0) + " " + assetCode + " قيد مراجعة الإدارة. لا يمكنك إنشاء طلب آخر من نفس الباقة قبل اتخاذ قرار."
+          : activeStatus === "approved"
+            ? "تمت الموافقة على طلب السحب من باقة " + currentPackage.packageName + "، لكن التحويل لم يُسجل كمكتمل بعد. يظل المبلغ محجوزًا حتى تأكيد إتمام التحويل."
+            : "طلب السحب من باقة " + currentPackage.packageName + " قيد تنفيذ التحويل. لا يمكنك إنشاء طلب آخر حتى يكتمل.";
+
         return NextResponse.json(
           {
             success: false,
-            message: "لديك طلب سحب قائم من باقة " + currentPackage.packageName + (activePackageWithdrawal ? " بقيمة " + Number(activePackageWithdrawal.amount || 0) + " " + assetCode : "") + ". لن يُسمح بطلب جديد من نفس الباقة حتى تقرر الإدارة الموافقة على الطلب الحالي أو رفضه.",
-            activeWithdrawalId: activePackageWithdrawal ? String(activePackageWithdrawal._id) : null,
-            activeWithdrawalStatus: activePackageWithdrawal ? String(activePackageWithdrawal.status) : "pending",
+            message: activeMessage,
+            activeWithdrawalId: String(activePackageWithdrawal._id),
+            activeWithdrawalStatus: activeStatus,
           },
           { status: 409 }
         );
       }
 
-      // An approved or processing request is still in flight. Do not create
-      // another request for the same package until that transfer completes.
-      // Once completed, the next request is evaluated against active-referral capacity.
-      const successfulPackageWithdrawal = await WithdrawalRequest.findOne({
-        userId: user._id,
-        source: "package",
-        userPackageId: { $in: sameNamePackageIds },
-        status: { $in: ["approved", "processing"] },
-      }).select("_id amount status createdAt").sort({ createdAt: -1 }).lean();
-
-      if (successfulPackageWithdrawal) {
-        return NextResponse.json(
-          {
-            success: false,
-            alreadyWithdrawn: true,
-            message: "طلب السحب من باقة " + currentPackage.packageName + " تمت الموافقة عليه أو ما زال قيد التنفيذ. لا يُسمح بطلب جديد حتى يكتمل التحويل أو يُرفض الطلب.",
-            previousWithdrawalId: String(successfulPackageWithdrawal._id),
-          },
-          { status: 409 }
-        );
-      }
+      // The request status is authoritative. Clear legacy flags left behind by
+      // older approval/rejection paths only after confirming there is no open
+      // withdrawal for this package family.
+      await UserPackage.updateMany(
+        {
+          _id: { $in: sameNamePackageIds },
+          userId: user._id,
+          withdrawalRequestPending: true,
+        },
+        { $set: { withdrawalRequestPending: false } },
+      );
 
       const packageAvailable = Math.max(0, packageFamilyRows.reduce(
         (sum: number, row: any) => sum + Math.max(0, Number(row.availableEarnings || 0)),

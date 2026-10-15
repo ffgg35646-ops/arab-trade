@@ -643,7 +643,7 @@ export default function WithdrawPage() {
                                   </p>
                                 )}
                                 {item.firstWithdrawalStatus === "pending" && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب الأول قيد المراجعة.</p>}
-                                {renderWithdrawalFields("package", item, plan)}
+                                {renderWithdrawalFields("package", item || undefined, plan)}
                               </>
                             )}
                           </article>

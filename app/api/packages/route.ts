@@ -60,7 +60,8 @@ export async function GET(request: NextRequest) {
       ])
     );
 
-    const [activeReferralDeposits, referralWithdrawalRows, firstWithdrawalRows] = await Promise.all([
+    const countedWithdrawalStatuses = ["pending", "approved", "processing", "completed"];
+    const [activeReferralDeposits, referralWithdrawalRows, firstWithdrawalRows, packageWithdrawalRows] = await Promise.all([
       referredIds.length
         ? DepositRequest.aggregate([
             { $match: { userId: { $in: referredIds }, status: "approved", asset: "USDT" } },
@@ -71,14 +72,19 @@ export async function GET(request: NextRequest) {
         userId: user._id,
         source: "package",
         isFirstPackageWithdrawal: { $ne: true },
-        status: { $in: ["pending", "approved", "processing", "completed"] },
+        status: { $in: countedWithdrawalStatuses },
       }).select("userPackageId amount").lean(),
       WithdrawalRequest.find({
         userId: user._id,
         source: "package",
         isFirstPackageWithdrawal: true,
-        status: { $in: ["pending", "approved", "processing", "completed"] },
+        status: { $in: countedWithdrawalStatuses },
       }).select("userPackageId amount status").lean(),
+      WithdrawalRequest.find({
+        userId: user._id,
+        source: "package",
+        status: { $in: countedWithdrawalStatuses },
+      }).select("userPackageId amount").lean(),
     ]);
 
     const activeReferralCount = activeReferralDeposits.length;
@@ -94,6 +100,11 @@ export async function GET(request: NextRequest) {
       0
     );
     const firstWithdrawalByPackage = new Map<string, number>();
+    const totalWithdrawalByPackage = new Map<string, number>();
+    for (const row of packageWithdrawalRows as any[]) {
+      const key = String(row.userPackageId || "");
+      totalWithdrawalByPackage.set(key, (totalWithdrawalByPackage.get(key) || 0) + Number(row.amount || 0));
+    }
     const firstWithdrawalPendingPackages = new Set<string>();
     for (const row of firstWithdrawalRows as any[]) {
       const key = String(row.userPackageId || "");
@@ -120,21 +131,27 @@ export async function GET(request: NextRequest) {
       const firstPackageWithdrawalUsed = firstWithdrawalByPackage.get(packageKey) || 0;
       const firstPackageWithdrawalRemaining = Math.max(0, firstPackageWithdrawalCap - firstPackageWithdrawalUsed);
       const firstPackageWithdrawalPending = firstWithdrawalPendingPackages.has(packageKey);
-      // Phase 1 is capped by the original package purchase amount. Once exhausted,
-      // the next phase is capped by a percentage of approved active-referral deposits.
-      // Pending phase-1 requests reserve that phase until the administrator settles them.
+      const packageWithdrawalCap = Math.max(0, Number(item.investedAmount || 0));
+      const packageWithdrawalUsed = totalWithdrawalByPackage.get(packageKey) || 0;
+      const packageWithdrawalRemaining = Math.max(0, packageWithdrawalCap - packageWithdrawalUsed);
+      // Every live or completed request reserves/uses the same lifetime cap for
+      // this package account. Referral capacity never raises the package cap.
       const availableEarnings = Math.max(0, Number(item.availableEarnings || 0));
-      const withdrawalLimit = firstPackageWithdrawalPending
+      const phaseWithdrawalLimit = firstPackageWithdrawalPending
         ? 0
         : Math.min(availableEarnings, firstPackageWithdrawalRemaining > 0
           ? firstPackageWithdrawalRemaining
           : referralRemaining);
+      const withdrawalLimit = Math.min(phaseWithdrawalLimit, packageWithdrawalRemaining);
       return {
         ...item,
         firstPackageWithdrawalCap,
         firstPackageWithdrawalUsed,
         firstPackageWithdrawalRemaining,
         firstPackageWithdrawalPending,
+        packageWithdrawalCap,
+        packageWithdrawalUsed,
+        packageWithdrawalRemaining,
         dailyProfit,
         nextCollectAt: new Date(nextCollectAt).toISOString(),
         collectWindowEndsAt: new Date(collectWindowEndsAt).toISOString(),

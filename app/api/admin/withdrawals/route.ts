@@ -418,44 +418,104 @@ export async function PATCH(
           }
 
           if (nextStatus === "rejected" || nextStatus === "completed") {
+            // Rebuild the remaining lock from other live requests instead of
+            // blindly subtracting the request amount from a possibly stale field.
+            // This lets rejection/completion recover accounts left with an
+            // orphaned or under-reported lockedEarnings balance.
+            const otherActiveRequests = await WithdrawalRequest.find({
+              _id: { $ne: withdrawal._id },
+              userId: withdrawal.userId,
+              source: "package",
+              status: { $in: ["pending", "approved", "processing"] },
+            }).select("_id userPackageId packageAllocations amount").session(session).lean();
+
+            const expectedRemainingByPackage = new Map<string, number>();
+            for (const activeRequest of otherActiveRequests as any[]) {
+              const activeAllocations = Array.isArray(activeRequest.packageAllocations) && activeRequest.packageAllocations.length
+                ? activeRequest.packageAllocations
+                : [{ userPackageId: activeRequest.userPackageId, amount: activeRequest.amount }];
+              for (const activeAllocation of activeAllocations) {
+                const packageId = String(activeAllocation.userPackageId || "");
+                const allocatedAmount = Number(activeAllocation.amount);
+                if (!packageId || !Number.isFinite(allocatedAmount) || allocatedAmount < 0) {
+                  throw new Error("PACKAGE_BALANCE_INVALID");
+                }
+                expectedRemainingByPackage.set(
+                  packageId,
+                  Number(((expectedRemainingByPackage.get(packageId) || 0) + allocatedAmount).toFixed(8)),
+                );
+              }
+            }
+
             for (const allocation of allocations) {
               const primary = String(allocation.userPackageId) === String(withdrawal.userPackageId);
-              const increments = nextStatus === "rejected"
-                ? { $inc: { lockedEarnings: -allocation.amount, availableEarnings: allocation.amount } }
-                : { $inc: { lockedEarnings: -allocation.amount, totalWithdrawn: allocation.amount } };
-              const packageSet: Record<string, any> = { withdrawalRequestPending: false };
-              if (primary && withdrawal.isFirstPackageWithdrawal) {
-                packageSet.firstWithdrawalStatus = nextStatus === "rejected" ? "available" : "completed";
-              }
-              const packageAccount = await UserPackage.findOneAndUpdate(
+              const packageAccount = await UserPackage.findOne({
+                _id: allocation.userPackageId,
+                userId: withdrawal.userId,
+              }).session(session);
+              if (!packageAccount) throw new Error("PACKAGE_BALANCE_INVALID");
+
+              const expectedRemaining = expectedRemainingByPackage.get(String(allocation.userPackageId)) || 0;
+              const actualLocked = Math.max(0, Number(packageAccount.lockedEarnings || 0));
+              // Never consume funds needed by another active request. Any excess
+              // lock, however, is returned to available instead of being stranded.
+              if (actualLocked + 1e-8 < expectedRemaining) throw new Error("PACKAGE_BALANCE_INVALID");
+              const excessLock = Math.max(0, actualLocked - expectedRemaining - allocation.amount);
+              const availableCredit = (nextStatus === "rejected" ? allocation.amount : 0) + excessLock;
+              const packageSet: Record<string, any> = { lockedEarnings: expectedRemaining };
+              const increments: Record<string, any> = {};
+              if (availableCredit > 1e-8) increments.availableEarnings = availableCredit;
+              if (nextStatus === "completed") increments.totalWithdrawn = allocation.amount;
+              const updatedPackage = await UserPackage.findOneAndUpdate(
+                { _id: allocation.userPackageId, userId: withdrawal.userId },
                 {
-                  _id: allocation.userPackageId,
-                  userId: withdrawal.userId,
-                  lockedEarnings: { $gte: allocation.amount },
+                  ...(Object.keys(increments).length ? { $inc: increments } : {}),
+                  $set: packageSet,
                 },
-                { ...increments, $set: packageSet },
                 { new: true, session }
               );
-              if (!packageAccount) throw new Error("PACKAGE_BALANCE_INVALID");
+              if (!updatedPackage) throw new Error("PACKAGE_BALANCE_INVALID");
 
               await PackageLedger.create([{
                 userId: withdrawal.userId,
-                userPackageId: packageAccount._id,
+                userPackageId: updatedPackage._id,
                 type: nextStatus === "rejected" ? "withdrawal_reversal" : "withdrawal",
                 asset: withdrawal.asset,
                 amount: nextStatus === "rejected" ? allocation.amount : -allocation.amount,
                 note: adminNote || (nextStatus === "rejected"
-                  ? "تم رفض طلب السحب؛ أُعيد مبلغ " + allocation.amount + " " + withdrawal.asset + " إلى رصيد باقة " + packageAccount.packageName
-                  : "تم تنفيذ طلب سحب بقيمة " + allocation.amount + " " + withdrawal.asset + " من رصيد باقة " + packageAccount.packageName),
+                  ? "تم رفض طلب السحب؛ أُعيد مبلغ " + allocation.amount + " " + withdrawal.asset + " إلى رصيد باقة " + updatedPackage.packageName
+                  : "تم تنفيذ طلب سحب بقيمة " + allocation.amount + " " + withdrawal.asset + " من رصيد باقة " + updatedPackage.packageName),
                 createdBy: admin._id,
               }], { session });
+
+              if (excessLock > 1e-8) {
+                await PackageLedger.create([{
+                  userId: withdrawal.userId,
+                  userPackageId: updatedPackage._id,
+                  type: "withdrawal_reversal",
+                  asset: withdrawal.asset,
+                  amount: excessLock,
+                  note: "تصحيح حجز قديم زائد؛ أُعيد " + excessLock + " " + withdrawal.asset + " إلى الرصيد المتاح بعد تسوية طلب السحب " + String(withdrawal._id),
+                  createdBy: admin._id,
+                }], { session });
+              }
             }
-            // Clear the package-family request guard as part of the same atomic settlement.
-            await UserPackage.updateMany(
-              { _id: { $in: touchedPackageIds }, userId: withdrawal.userId },
-              { $set: { withdrawalRequestPending: false } },
-              { session }
-            );
+
+            // Keep the family flags aligned with any other still-open request.
+            for (const packageId of touchedPackageIds) {
+              const remainingForAccount = expectedRemainingByPackage.get(String(packageId)) || 0;
+              const flagUpdate: Record<string, any> = {
+                withdrawalRequestPending: remainingForAccount > 1e-8,
+              };
+              if (String(packageId) === String(withdrawal.userPackageId) && withdrawal.isFirstPackageWithdrawal) {
+                flagUpdate.firstWithdrawalStatus = nextStatus === "rejected" ? "available" : "completed";
+              }
+              await UserPackage.updateOne(
+                { _id: packageId, userId: withdrawal.userId },
+                { $set: flagUpdate },
+                { session }
+              );
+            }
           }
           settledWithdrawal = updatedRequest;
         });

@@ -97,7 +97,7 @@ function packagePlanId(item: PackageAccount) {
 function accountForPackagePlan(planId: string, accounts: PackageAccount[]) {
   return accounts
     .filter((item) => packagePlanId(item) === planId)
-    .sort((a, b) => packageMaximum(b) - packageMaximum(a))[0];
+    .sort((a, b) => Number(b.availableEarnings || 0) - Number(a.availableEarnings || 0))[0];
 }
 
 export default function WithdrawPage() {
@@ -464,8 +464,8 @@ export default function WithdrawPage() {
         </div>
 
         <div className="min-w-0">
-          <input aria-label="مبلغ السحب" type="text" inputMode="decimal" autoComplete="off" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", sanitizeAmountInput(event.target.value))} disabled={Boolean(source === "package" && (!packageAccount || packageMax <= 0))} required placeholder={money(minimum)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50 disabled:opacity-50" />
-          <p className="mt-1 text-[10px] leading-4 text-slate-500">أقل مبلغ للسحب: {money(minimum)} {selected?.asset || "USDT"}</p>
+          <input aria-label="مبلغ السحب" type="text" inputMode="decimal" autoComplete="off" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", sanitizeAmountInput(event.target.value))} disabled={Boolean(source === "package" && (!packageAccount || packageMax <= 0))} required placeholder={source === "package" ? "مبلغ السحب" : money(minimum)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50 disabled:opacity-50" />
+          {source === "wallet" && <p className="mt-1 text-[10px] leading-4 text-slate-500">أقل مبلغ للسحب: {money(minimum)} {selected?.asset || "USDT"}</p>}
 
         </div>
 
@@ -532,7 +532,7 @@ export default function WithdrawPage() {
                       {packagePlans.map((plan) => {
                         const item = accountForPackagePlan(String(plan._id), packageAccounts);
                         const packageFormId = item?._id || String(plan._id);
-                        const availableForPlan = item ? packageMaximum(item) : 0;
+                        const availableForPlan = item ? Math.max(0, Number(item.availableEarnings || 0)) : 0;
                         return (
                           <article key={plan._id} className="min-w-0 rounded-xl border border-white/10 bg-[#050a13] p-3">
                             <div className="mb-2 flex items-start justify-between gap-2">

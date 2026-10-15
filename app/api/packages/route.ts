@@ -126,10 +126,16 @@ export async function GET(request: NextRequest) {
     const unresolvedWithdrawalByPackage = new Map<string, any>();
     const unresolvedWithdrawalByPackageName = new Map<string, any>();
     const successfulWithdrawalPackageNames = new Set<string>();
+    const inFlightWithdrawalPackageNames = new Set<string>();
     for (const row of successfulPackageWithdrawalRows as any[]) {
       const key = String(row.userPackageId || "");
       const groupKey = packageGroupByAccountId.get(key) || key;
-      if (groupKey) successfulWithdrawalPackageNames.add(groupKey);
+      if (groupKey) {
+        successfulWithdrawalPackageNames.add(groupKey);
+        if (["approved", "processing"].includes(String(row.status))) {
+          inFlightWithdrawalPackageNames.add(groupKey);
+        }
+      }
     }
     for (const row of unresolvedPackageWithdrawalRows as any[]) {
       const key = String(row.userPackageId || "");
@@ -192,7 +198,9 @@ export async function GET(request: NextRequest) {
         unresolvedWithdrawalByPackage.get(packageKey) ||
         unresolvedWithdrawalByPackageName.get(packageGroupKey) ||
         null;
-      const packageWithdrawalPending = item.withdrawalRequestPending === true || Boolean(unresolvedPackageWithdrawal);
+      const packageWithdrawalPending = item.withdrawalRequestPending === true ||
+        Boolean(unresolvedPackageWithdrawal) ||
+        inFlightWithdrawalPackageNames.has(packageGroupKey);
       const packageWithdrawalAlreadyUsed =
         successfulWithdrawalPackageNames.has(packageGroupKey) ||
         completedFirstWithdrawalPackageNames.has(packageGroupKey);

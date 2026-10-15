@@ -28,6 +28,8 @@ type PackageAccount = {
   status: "active" | "cancelled";
   availableEarnings: number;
   lockedEarnings: number;
+  packageGroupAvailableEarnings?: number;
+  packageGroupLockedEarnings?: number;
   investedAmount: number;
   durationDays?: number;
   totalRealizedEarnings: number;
@@ -84,8 +86,8 @@ const statusLabel = (status: string) => status === "completed" ? "مكتمل" : 
 const statusClass = (status: string) => status === "completed" ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : status === "rejected" || status === "failed" ? "border-red-400/20 bg-red-400/10 text-red-200" : status === "approved" || status === "processing" ? "border-blue-400/20 bg-blue-400/10 text-blue-200" : "border-amber-400/20 bg-amber-400/10 text-amber-200";
 
 function packageMaximum(item: PackageAccount) {
-  // Show and enforce the smaller of the actual package balance and the current phase cap.
-  const available = Math.max(0, Number(item.availableEarnings || 0));
+  // A visible package card represents every activation record with this package name.
+  const available = Math.max(0, Number(item.packageGroupAvailableEarnings ?? item.availableEarnings ?? 0));
   const cap = item.withdrawalLimit === undefined
     ? available
     : Math.max(0, Number(item.withdrawalLimit || 0));
@@ -436,13 +438,13 @@ export default function WithdrawPage() {
     }
 
     const minimum = source === "package"
-      ? Math.max(Number(selectedMethod.minWithdrawal || 0), Number(packageAccount?.minimumWithdrawal || 0))
+      ? Number(packageAccount?.minimumWithdrawal ?? 100)
       : Math.max(Number(selectedMethod.minWithdrawal || 0), Number(limits.minGeneralWithdrawal ?? limits.minWithdrawal ?? 0));
     const configuredMaximums = [Number(selectedMethod.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : 0;
     const firstRemainder = Number(packageAccount?.firstPackageWithdrawalRemaining || 0);
     const referralRemainder = Number(packageAccount?.referralRemaining || 0);
-    const fullReferralAllowance = Math.min(referralRemainder, Number(packageAccount?.availableEarnings || 0));
+    const fullReferralAllowance = Math.min(referralRemainder, Number(packageAccount?.packageGroupAvailableEarnings ?? packageAccount?.availableEarnings ?? 0));
     const finalFirstAllowanceBelowMinimum =
       source === "package" &&
       Boolean(packageAccount) &&
@@ -450,7 +452,7 @@ export default function WithdrawPage() {
       firstRemainder > 0 &&
       firstRemainder < minimum &&
       Math.abs(numericAmount - firstRemainder) <= 1e-8 &&
-      Number(packageAccount?.availableEarnings || 0) >= firstRemainder;
+      Number(packageAccount?.packageGroupAvailableEarnings ?? packageAccount?.availableEarnings ?? 0) >= firstRemainder;
     const finalReferralAllowanceBelowMinimum =
       source === "package" &&
       Boolean(packageAccount) &&
@@ -544,7 +546,7 @@ export default function WithdrawPage() {
       ? packageMax
       : Number(balances.find((item) => item.asset === selected?.asset)?.available || 0);
     const minimum = source === "package"
-      ? Math.max(Number(selected?.minWithdrawal || 0), Number(packageAccount?.minimumWithdrawal ?? packagePlan?.minimumWithdrawal ?? 100))
+      ? Number(packageAccount?.minimumWithdrawal ?? packagePlan?.minimumWithdrawal ?? 100)
       : Math.max(Number(selected?.minWithdrawal || 0), Number(limits.minGeneralWithdrawal ?? limits.minWithdrawal ?? 0));
     const configuredMaximums = [Number(selected?.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : undefined;
@@ -649,10 +651,7 @@ export default function WithdrawPage() {
                         const availableForPlan = item ? packageMaximum(item) : 0;
                         const packageForm = packageForms[packageFormId] || emptyForm;
                         const selectedPackageMethod = methods.find((method) => method._id === packageForm.methodId);
-                        const minimumWithdrawalForPlan = Math.max(
-                          Number(selectedPackageMethod?.minWithdrawal || 0),
-                          Number(item?.minimumWithdrawal ?? plan.minimumWithdrawal ?? 100)
-                        );
+                        const minimumWithdrawalForPlan = Number(item?.minimumWithdrawal ?? plan.minimumWithdrawal ?? 100);
                         return (
                           <article key={key} className="min-w-0 rounded-xl border border-white/10 bg-[#050a13] p-3">
                             <div className="mb-2 flex items-start justify-between gap-2">
@@ -670,7 +669,7 @@ export default function WithdrawPage() {
                               </div>
                             </div>
                             <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
-                              <span className="text-slate-500">محجوز: <b className="text-slate-200">{money(Number(item?.lockedEarnings || 0))} USDT</b></span>
+                              <span className="text-slate-500">محجوز: <b className="text-slate-200">{money(Number(item?.packageGroupLockedEarnings ?? item?.lockedEarnings ?? 0))} USDT</b></span>
                             </div>
                             {!item ? (
                               <p className="rounded-lg bg-white/[0.025] px-2 py-2 text-[10px] text-slate-500">فعّل الباقة أولًا لتتاح عمليات السحب.</p>

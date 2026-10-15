@@ -389,7 +389,7 @@ export async function PATCH(
         await session.withTransaction(async () => {
           const updatedRequest = await WithdrawalRequest.findOneAndUpdate(
             { _id: withdrawal._id, status: currentStatus },
-            { $set: { status: nextStatus, adminNote, ...(nextStatus === "completed" ? { completedAt: new Date() } : {}), ...(withdrawal.source === "package" && nextStatus === "approved" ? { packageBalanceSettled: true } : {}) } },
+            { $set: { status: nextStatus, adminNote, ...(nextStatus === "completed" ? { completedAt: new Date() } : {}), ...(withdrawal.source === "package" && (nextStatus === "approved" || nextStatus === "rejected") ? { packageBalanceSettled: true } : {}) } },
             { new: true, session }
           );
           if (!updatedRequest) throw new Error("WITHDRAWAL_STATUS_CHANGED");

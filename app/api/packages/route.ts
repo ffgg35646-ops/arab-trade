@@ -23,12 +23,71 @@ const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8
 const normalizePackageGroup = (value: unknown) =>
   String(value ?? "").normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
 
+/**
+ * Repair package balances stranded by older withdrawal settlement paths.
+ * The request record is the source of truth: while any withdrawal is active,
+ * or the user-wide withdrawal guard is held, do not reconcile anything.
+ * Only accounts with no per-account pending flag are eligible, and the
+ * compare-and-update prevents racing a newly created lock.
+ */
+async function reconcileOrphanedPackageWithdrawalLocks(userId: mongoose.Types.ObjectId) {
+  const currentUser = await User.findById(userId).select("hasPendingWithdrawal").lean();
+  if (!currentUser || currentUser.hasPendingWithdrawal === true) return;
+
+  const activeWithdrawal = await WithdrawalRequest.exists({
+    userId,
+    status: { $in: ["pending", "approved", "processing"] },
+  });
+  if (activeWithdrawal) return;
+
+  const accounts = await UserPackage.find({
+    userId,
+    asset: USDT_ASSET,
+    lockedEarnings: { $gt: 1e-8 },
+    withdrawalRequestPending: { $ne: true },
+  }).select("_id asset packageName lockedEarnings").lean();
+
+  for (const account of accounts as any[]) {
+    const strandedAmount = Number(account.lockedEarnings || 0);
+    if (!Number.isFinite(strandedAmount) || strandedAmount <= 1e-8) continue;
+
+    const repaired = await UserPackage.findOneAndUpdate(
+      {
+        _id: account._id,
+        userId,
+        lockedEarnings: strandedAmount,
+        withdrawalRequestPending: { $ne: true },
+      },
+      {
+        $inc: { availableEarnings: strandedAmount },
+        $set: { lockedEarnings: 0 },
+      },
+      { new: true },
+    );
+
+    // Record the correction separately from ordinary earnings/withdrawals.
+    if (repaired) {
+      await PackageLedger.create({
+        userId,
+        userPackageId: repaired._id,
+        type: "withdrawal_reversal",
+        asset: USDT_ASSET,
+        amount: strandedAmount,
+        note: "تصحيح حجز سحب قديم: لا يوجد طلب سحب قائم؛ أُعيد " + strandedAmount + " USDT إلى الرصيد المتاح.",
+      }).catch((ledgerError) => {
+        console.error("PACKAGE WITHDRAWAL LOCK RECONCILIATION LEDGER:", ledgerError);
+      });
+    }
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser(request);
     if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
 
     await connectDB();
+    await reconcileOrphanedPackageWithdrawalLocks(user._id);
     await separateLegacyDepositsFromSpotWallet(user._id);
     await Promise.all([
       UserPackage.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),

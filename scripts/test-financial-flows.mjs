@@ -1108,5 +1108,39 @@ await api("/api/wallet");
 legacyDepositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(legacyDepositBalance.available, 590, "v3 repair is idempotent and does not double credit");
 
+// Regression: a terminal withdrawal must not leave historical locked earnings unavailable.
+const staleLockTemplate = await db.collection("userpackages").findOne({ userId: user._id });
+assert.ok(staleLockTemplate, "a package account is available for the stale-lock regression test");
+const staleLockReconciliationId = new mongoose.Types.ObjectId();
+await db.collection("userpackages").insertOne({
+  _id: staleLockReconciliationId,
+  userId: user._id,
+  packageId: staleLockTemplate.packageId,
+  packageName: "CI stale-lock reconciliation",
+  investedAmount: 0,
+  asset: "USDT",
+  durationDays: 30,
+  status: "cancelled",
+  availableEarnings: 0,
+  lockedEarnings: 37.5,
+  totalRealizedEarnings: 0,
+  totalWithdrawn: 0,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "available",
+  withdrawalRequestPending: false,
+  cancellationRefund: 0,
+  activatedAt: new Date(),
+  lastProfitAt: new Date(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+});
+const staleLockReconciliationPage = await api("/api/packages");
+ok(staleLockReconciliationPage, "package API repairs stale lock when no withdrawal is active");
+const repairedStaleLockAccount = await db.collection("userpackages").findOne({ _id: staleLockReconciliationId });
+closeTo(repairedStaleLockAccount.availableEarnings, 37.5, "stale package lock returns to available balance");
+closeTo(repairedStaleLockAccount.lockedEarnings, 0, "stale package lock is cleared");
+await db.collection("packageledgers").deleteMany({ userPackageId: staleLockReconciliationId });
+await db.collection("userpackages").deleteOne({ _id: staleLockReconciliationId });
+
 console.log("PASS: external deposit, idempotency, active referral, referral commission, package activation, first-withdrawal cap, admin settlement, balance rollback, package switch, cancellation, renewal, and admin/user APIs");
 await mongoose.disconnect();

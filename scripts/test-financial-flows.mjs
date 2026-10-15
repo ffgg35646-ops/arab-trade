@@ -206,7 +206,9 @@ async function databaseWithdrawalUsdtTotal() {
       .reduce((inner, balance) => inner + Number(balance.available || 0) + Number(balance.locked || 0), 0),
   0);
   const packageTotal = packages.reduce((sum, account) =>
-    sum + Number(account.availableEarnings || 0) + Number(account.lockedEarnings || 0),
+    sum + (String(account.asset || "USDT").toUpperCase() === "USDT"
+      ? Number(account.availableEarnings || 0) + Number(account.lockedEarnings || 0)
+      : 0),
   0);
   return walletTotal + packageTotal;
 }
@@ -822,6 +824,86 @@ closeTo(flaggedApprovedAccount.availableEarnings + flaggedApprovedAccount.locked
 await db.collection("packageledgers").deleteMany({ userPackageId: flaggedApprovedPackageId });
 await db.collection("withdrawalrequests").deleteOne({ _id: flaggedApprovedWithdrawalId });
 await db.collection("userpackages").deleteOne({ _id: flaggedApprovedPackageId });
+
+// Regression: if a previous lock-repair routine already credited an approved
+// payout back to availableEarnings, use its explicit reversal ledger to undo
+// that credit exactly once.
+const returnedApprovedPackageId = new mongoose.Types.ObjectId();
+const returnedApprovedWithdrawalId = new mongoose.Types.ObjectId();
+const returnedApprovedCreatedAt = new Date(Date.now() - 10 * 60 * 1000);
+const returnedOrphanCreditAt = new Date(Date.now() - 2 * 60 * 1000);
+await db.collection("userpackages").insertOne({
+  _id: returnedApprovedPackageId,
+  userId: user._id,
+  packageId: package100.packageId,
+  packageName: "CI approved payout mistakenly returned to available",
+  investedAmount: 100,
+  asset: "USDT",
+  durationDays: 0,
+  status: "active",
+  availableEarnings: 100,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 60,
+  totalWithdrawn: 25,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "completed",
+  withdrawalRequestPending: false,
+  cancellationRefund: 0,
+  activatedAt: returnedApprovedCreatedAt,
+  lastProfitAt: returnedApprovedCreatedAt,
+  createdAt: returnedApprovedCreatedAt,
+  updatedAt: returnedApprovedCreatedAt,
+});
+await db.collection("withdrawalrequests").insertOne({
+  _id: returnedApprovedWithdrawalId,
+  userId: user._id,
+  asset: "USDT",
+  network: "TRC20",
+  amount: 25,
+  fee: 0,
+  receiveAmount: 25,
+  address: "ci-approved-payout-returned-address",
+  source: "package",
+  userPackageId: returnedApprovedPackageId,
+  packageAllocations: [{ userPackageId: returnedApprovedPackageId, amount: 25 }],
+  isFirstPackageWithdrawal: false,
+  packageBalanceSettled: true,
+  status: "approved",
+  adminNote: "Legacy approved payout was incorrectly returned",
+  createdAt: returnedApprovedCreatedAt,
+  updatedAt: returnedApprovedCreatedAt,
+});
+await db.collection("packageledgers").insertMany([
+  {
+    userId: user._id,
+    userPackageId: returnedApprovedPackageId,
+    type: "withdrawal",
+    asset: "USDT",
+    amount: -25,
+    note: "Legacy approved withdrawal debit",
+    createdAt: returnedApprovedCreatedAt,
+  },
+  {
+    userId: user._id,
+    userPackageId: returnedApprovedPackageId,
+    type: "withdrawal_reversal",
+    asset: "USDT",
+    amount: 25,
+    note: "تصحيح حجز سحب قديم: لا يوجد طلب سحب قائم؛ أُعيد 25 USDT إلى الرصيد المتاح.",
+    createdAt: returnedOrphanCreditAt,
+  },
+]);
+const returnedApprovedNavbarBefore = await databaseWithdrawalUsdtTotal();
+ok(await api("/api/packages"), "package API reverses a stale orphan credit for an approved payout");
+const returnedApprovedAccount = await db.collection("userpackages").findOne({ _id: returnedApprovedPackageId });
+closeTo(returnedApprovedAccount.availableEarnings, 75, "old orphan credit is removed from the package available balance");
+closeTo(returnedApprovedAccount.lockedEarnings, 0, "stale approval repair leaves no phantom lock");
+closeTo(await navbarWithdrawalUsdtTotal("navbar after reversal of stale approved-payout credit"), returnedApprovedNavbarBefore - 25, "cumulative withdrawal balance drops by the approved payout exactly once");
+ok(await api("/api/packages"), "second refresh is safe after reversing a stale orphan credit");
+closeTo((await db.collection("userpackages").findOne({ _id: returnedApprovedPackageId })).availableEarnings, 75, "stale orphan credit is not reversed twice");
+await db.collection("packageledgers").deleteMany({ userPackageId: returnedApprovedPackageId });
+await db.collection("withdrawalrequests").deleteOne({ _id: returnedApprovedWithdrawalId });
+await db.collection("userpackages").deleteOne({ _id: returnedApprovedPackageId });
 
 // Regression: legacy rejected requests must return the held amount to the
 // package's available bucket exactly once, while preserving already-booked refunds.

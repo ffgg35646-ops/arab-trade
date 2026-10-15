@@ -549,10 +549,9 @@ export async function POST(request: NextRequest) {
         { $set: { withdrawalRequestPending: false } },
       );
 
-      const packageAvailable = Math.max(0, packageFamilyRows.reduce(
-        (sum: number, row: any) => sum + Math.max(0, Number(row.availableEarnings || 0)),
-        0,
-      ));
+      // This request draws only from the UserPackage selected by the user.
+      // Sibling activations and cancellation refunds are separate money buckets.
+      const packageAvailable = Math.max(0, Number(currentPackage.availableEarnings || 0));
       const packageInvestedAmount = packageFamilyRows.reduce(
         (sum: number, row: any) => sum + Math.max(0, Number(row.investedAmount || 0)),
         0,
@@ -706,81 +705,19 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Lock the requested amount against the entire visible package family.
-      // Prefer the record chosen by the card, then use sibling records with the same
-      // normalized package name; persist the exact allocations for admin settlement.
-      const accountsToLock = [...packageFamilyRows].sort((a: any, b: any) => {
-        const aPrimary = String(a._id) === userPackageId ? 0 : 1;
-        const bPrimary = String(b._id) === userPackageId ? 0 : 1;
-        if (aPrimary !== bPrimary) return aPrimary - bPrimary;
-        const aTime = new Date(a.activatedAt || a.createdAt || 0).getTime();
-        const bTime = new Date(b.activatedAt || b.createdAt || 0).getTime();
-        return bTime - aTime;
-      });
-      let remainingToLock = amount;
-      for (const account of accountsToLock) {
-        if (remainingToLock <= 1e-8) break;
-        const accountAvailable = Math.max(0, Number(account.availableEarnings || 0));
-        const allocationAmount = Number(Math.min(remainingToLock, accountAvailable).toFixed(8));
-        if (allocationAmount <= 1e-8) continue;
-
-        const lockedAccount = await UserPackage.findOneAndUpdate(
-          {
-            _id: account._id,
-            userId: user._id,
-            asset: assetCode,
-            status: { $in: ["active", "cancelled"] },
-            availableEarnings: { $gte: allocationAmount },
-            withdrawalRequestPending: { $ne: true },
-          },
-          {
-            $inc: { availableEarnings: -allocationAmount, lockedEarnings: allocationAmount },
-            $set: { withdrawalRequestPending: true },
-          },
-          { new: true },
-        );
-        if (!lockedAccount) continue;
-
-        lockedPackageAllocations.push({ userPackageId: lockedAccount._id, amount: allocationAmount });
-        remainingToLock = Number(Math.max(0, remainingToLock - allocationAmount).toFixed(8));
-      }
-
-      if (remainingToLock > 1e-8) {
-        for (const allocation of lockedPackageAllocations) {
-          await UserPackage.updateOne(
-            { _id: allocation.userPackageId, userId: user._id },
-            {
-              $inc: { availableEarnings: allocation.amount, lockedEarnings: -allocation.amount },
-              $set: { withdrawalRequestPending: false },
-            },
-          );
-        }
-        lockedPackageAllocations = [];
-        const latestFamily = await UserPackage.find({
-          _id: { $in: sameNamePackageIds },
-          userId: user._id,
-        }).select("availableEarnings").lean();
-        const latestAvailable = latestFamily.reduce(
-          (sum: number, row: any) => sum + Math.max(0, Number(row.availableEarnings || 0)),
-          0,
-        );
-        return NextResponse.json(
-          {
-            success: false,
-            message: `رصيد باقة ${currentPackage.packageName} المتاح للسحب هو ${latestAvailable} ${assetCode} فقط.`,
-            availableAmount: latestAvailable,
-          },
-          { status: 400 },
-        );
-      }
-
-      lockedUserPackage = await UserPackage.findOneAndUpdate(
+      // Atomically reserve the requested amount from this account only.
+      // The saved allocation points back to the same account for approval/rejection.
+      const lockedAccount = await UserPackage.findOneAndUpdate(
         {
           _id: userPackageId,
           userId: user._id,
+          asset: assetCode,
           status: { $in: ["active", "cancelled"] },
+          availableEarnings: { $gte: amount },
+          withdrawalRequestPending: { $ne: true },
         },
         {
+          $inc: { availableEarnings: -amount, lockedEarnings: amount },
           $set: {
             withdrawalRequestPending: true,
             ...(isFirstPackageWithdrawal ? { firstWithdrawalStatus: "pending" } : {}),
@@ -788,14 +725,27 @@ export async function POST(request: NextRequest) {
         },
         { new: true },
       );
-      if (!lockedUserPackage) {
-        await restoreLockedPackageAllocations(user._id, userPackageId, lockedPackageAllocations, isFirstPackageWithdrawal);
-        lockedPackageAllocations = [];
+
+      if (!lockedAccount) {
+        const latestAccount = await UserPackage.findOne({
+          _id: userPackageId,
+          userId: user._id,
+          asset: assetCode,
+          status: { $in: ["active", "cancelled"] },
+        }).select("availableEarnings").lean();
+        const latestAvailable = Math.max(0, Number(latestAccount?.availableEarnings || 0));
         return NextResponse.json(
-          { success: false, message: "تعذر تثبيت رصيد الباقة المرتبط بطلب السحب. حدّث الصفحة ثم حاول مرة أخرى." },
+          {
+            success: false,
+            message: `رصيد حساب الباقة المحدد المتاح للسحب هو ${latestAvailable} ${assetCode} فقط.`,
+            availableAmount: latestAvailable,
+          },
           { status: 409 },
         );
       }
+
+      lockedPackageAllocations = [{ userPackageId: lockedAccount._id, amount }];
+      lockedUserPackage = lockedAccount;
     } else {
       // Lock from spot first, then funding; internally earned money in either
       // wallet is withdrawable. The deposit balance is a separate model and is never queried here.

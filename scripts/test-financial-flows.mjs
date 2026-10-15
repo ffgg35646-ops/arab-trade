@@ -179,6 +179,15 @@ function closeTo(actual, expected, label) {
     label + ": expected " + expected + ", got " + actual);
 }
 
+async function navbarWithdrawalUsdtTotal(label) {
+  const response = await api("/api/wallet");
+  ok(response, label);
+  const rows = Array.isArray(response.data.withdrawalBalances) ? response.data.withdrawalBalances : [];
+  return rows
+    .filter((row) => String(row.asset || "").toUpperCase() === "USDT")
+    .reduce((sum, row) => sum + Number(row.available || 0) + Number(row.locked || 0), 0);
+}
+
 if (mode === "prepare") {
   try {
     await prepare();
@@ -445,11 +454,13 @@ statusIs(tooLargeFirst, 400, "first package withdrawal cannot exceed activation 
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
 closeTo(package100Doc.availableEarnings, 700, "rejected over-limit first withdrawal preserves bucket");
 
+const navbarBeforeRejectedPackageRequest = await navbarWithdrawalUsdtTotal("navbar total before package withdrawal");
 const firstWithdrawal = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 100, source: "package", userPackageId: String(package100._id) },
 });
 ok(firstWithdrawal, "first package withdrawal in activation limit", 201);
+closeTo(await navbarWithdrawalUsdtTotal("navbar total while package withdrawal is pending"), navbarBeforeRejectedPackageRequest, "pending package reservation remains included in total funds");
 const rejectedPackageWithdrawalId = String(firstWithdrawal.data.withdrawal._id);
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
 closeTo(package100Doc.availableEarnings, 600, "package available earnings decrease by the requested amount while pending");
@@ -477,6 +488,7 @@ package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.
 closeTo(package100Doc.availableEarnings, 700, "rejected package withdrawal restores available earnings");
 closeTo(package100Doc.lockedEarnings, 0, "rejected package withdrawal unlocks funds");
 assert.equal(package100Doc.firstWithdrawalStatus, "available", "rejected first package withdrawal can be retried");
+closeTo(await navbarWithdrawalUsdtTotal("navbar total after package rejection"), navbarBeforeRejectedPackageRequest, "rejected package withdrawal restores the exact prior total without double credit");
 
 const retryFirstWithdrawal = await api("/api/withdrawals", {
   method: "POST",
@@ -494,10 +506,12 @@ statusIs(await api("/api/withdrawals", {
   body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 10, source: "package", userPackageId: String(package100._id) },
 }), 409, "second package withdrawal blocked while first request is pending");
 
+const navbarBeforePackageApproval = await navbarWithdrawalUsdtTotal("navbar total before package approval");
 ok(await api("/api/admin/withdrawals", {
   as: "admin", method: "PATCH",
   body: { id: packageWithdrawalId, status: "approved", adminNote: "CI approval" },
 }), "admin approves and settles package withdrawal in one decision");
+closeTo(await navbarWithdrawalUsdtTotal("navbar total after package approval"), navbarBeforePackageApproval - 100, "approved package withdrawal is removed from navbar total exactly once");
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
 closeTo(package100Doc.availableEarnings, 600, "remaining package principal and earnings after approval");
 closeTo(package100Doc.lockedEarnings, 0, "approved package withdrawal immediately clears the locked amount");
@@ -1108,6 +1122,7 @@ const laterStageSettledAccount = await db.collection("userpackages").findOne({ _
 closeTo(laterStageSettledAccount.lockedEarnings, 0, "later-stage approval clears reserved funds immediately");
 closeTo(laterStageSettledAccount.totalWithdrawn, 200, "both approved stages are counted in the withdrawn total");
 
+const navbarBeforeGeneralWithdrawal = await navbarWithdrawalUsdtTotal("navbar total before general withdrawal");
 const generalWithdrawal = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "general-test-address", amount: 10, source: "wallet" },
@@ -1115,15 +1130,44 @@ const generalWithdrawal = await api("/api/withdrawals", {
 ok(generalWithdrawal, "user requests general-wallet withdrawal", 201);
 const generalWithdrawalId = String(generalWithdrawal.data.withdrawal._id);
 let userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 40, "general withdrawal reduces general spot balance only");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 40, "general withdrawal reduces general spot available balance");
 closeTo(userWallet.balances.find((x) => x.asset === "USDT").locked, 10, "general withdrawal locks request amount");
+closeTo(await navbarWithdrawalUsdtTotal("navbar total while general withdrawal is pending"), navbarBeforeGeneralWithdrawal, "pending general withdrawal remains in navbar total while reserved");
 ok(await api("/api/admin/withdrawals", {
   as: "admin", method: "PATCH",
-  body: { id: generalWithdrawalId, status: "rejected", adminNote: "CI balance restoration" },
-}), "admin rejects general-wallet withdrawal");
+  body: { id: generalWithdrawalId, status: "approved", adminNote: "CI general-wallet approval" },
+}), "admin approval consumes reserved general-wallet funds");
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 50, "rejected withdrawal restores general spot balance");
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").locked, 0, "rejected withdrawal releases locked balance");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 40, "approval leaves available balance unchanged");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").locked, 0, "approval consumes general-wallet locked balance");
+closeTo(await navbarWithdrawalUsdtTotal("navbar total after general approval"), navbarBeforeGeneralWithdrawal - 10, "approved general withdrawal reduces navbar total exactly once");
+ok(await api("/api/admin/withdrawals", {
+  as: "admin", method: "PATCH",
+  body: { id: generalWithdrawalId, status: "completed", adminNote: "CI general-wallet completion" },
+}), "completion after approval does not debit general-wallet balance twice");
+closeTo(await navbarWithdrawalUsdtTotal("navbar total after general completion"), navbarBeforeGeneralWithdrawal - 10, "completion is idempotent after approval debit");
+
+const navbarBeforeApprovedThenRejected = await navbarWithdrawalUsdtTotal("navbar total before post-approval rejection test");
+const generalRejectionWithdrawal = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "general-reject-test-address", amount: 10, source: "wallet" },
+});
+ok(generalRejectionWithdrawal, "user requests second general-wallet withdrawal", 201);
+const generalRejectionWithdrawalId = String(generalRejectionWithdrawal.data.withdrawal._id);
+closeTo(await navbarWithdrawalUsdtTotal("navbar total while second general withdrawal is pending"), navbarBeforeApprovedThenRejected, "second pending withdrawal remains reserved in navbar total");
+ok(await api("/api/admin/withdrawals", {
+  as: "admin", method: "PATCH",
+  body: { id: generalRejectionWithdrawalId, status: "approved", adminNote: "CI approve before rejection" },
+}), "admin approves second general-wallet withdrawal before rejecting it");
+closeTo(await navbarWithdrawalUsdtTotal("navbar total before reversing approved general withdrawal"), navbarBeforeApprovedThenRejected - 10, "approved second general withdrawal is removed from total");
+ok(await api("/api/admin/withdrawals", {
+  as: "admin", method: "PATCH",
+  body: { id: generalRejectionWithdrawalId, status: "rejected", adminNote: "CI rejection after approval" },
+}), "rejection after approval restores general-wallet balance");
+userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 30, "rejection after approval returns the approved amount to available");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").locked, 0, "rejection after approval does not subtract the same lock twice");
+closeTo(await navbarWithdrawalUsdtTotal("navbar total after reversing approved general withdrawal"), navbarBeforeApprovedThenRejected, "rejection after approval restores the exact prior navbar total");
 
 const changed = await api("/api/packages", {
   method: "POST",
@@ -1155,7 +1199,9 @@ depositBalance = await db.collection("depositbalances").findOne({ userId: user._
 closeTo(depositBalance && depositBalance.available, 99, "failed package change leaves deposit balance unchanged");
 await db.collection("depositbalances").updateOne({ userId: user._id, asset: "USDT" }, { $set: { available: 700 } });
 
+const navbarBeforePackageCancellation = await navbarWithdrawalUsdtTotal("navbar total before package cancellation refund");
 ok(await api("/api/packages", { method: "POST", body: { action: "cancel", userPackageId: String(package200._id) } }), "user cancels package");
+closeTo(await navbarWithdrawalUsdtTotal("navbar total after package cancellation refund"), navbarBeforePackageCancellation + 100, "package cancellation refund is added to navbar total exactly once");
 const cancelledPackage = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package200._id)) });
 closeTo(cancelledPackage.cancellationRefund, 100, "cancel package refunds half its activation price");
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });

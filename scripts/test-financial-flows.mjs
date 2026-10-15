@@ -345,6 +345,45 @@ closeTo(package100Doc.lockedEarnings, 0, "completed package withdrawal unlocks r
 closeTo(package100Doc.totalWithdrawn, 100, "package withdrawal total");
 assert.equal(package100Doc.firstWithdrawalStatus, "completed", "first package withdrawal marked completed");
 
+const capTestReferralId = new mongoose.Types.ObjectId();
+const capTestCreatedAt = new Date();
+await db.collection("users").insertOne({
+  _id: capTestReferralId,
+  name: "CI Package Cap Referral",
+  username: "ci_package_cap_referral",
+  email: "ci-package-cap-referral@arabtrade.invalid",
+  password: "unused",
+  role: "user",
+  referralCode: "CIPACKAGECAPREF",
+  referredBy: user._id,
+  isVerified: true,
+  isActive: true,
+  createdAt: capTestCreatedAt,
+  updatedAt: capTestCreatedAt,
+});
+await db.collection("depositrequests").insertOne({
+  _id: new mongoose.Types.ObjectId(),
+  userId: capTestReferralId,
+  asset: "USDT",
+  amount: 1000,
+  status: "approved",
+  createdAt: capTestCreatedAt,
+  updatedAt: capTestCreatedAt,
+});
+const cappedPackagePage = await api("/api/packages");
+ok(cappedPackagePage, "package page includes lifetime withdrawal cap");
+const cappedPackageAccount = cappedPackagePage.data.userPackages.find((x) => String(x._id) === String(package100._id));
+assert.ok(cappedPackageAccount, "capped package account is visible");
+closeTo(cappedPackageAccount.packageWithdrawalUsed, 100, "completed withdrawal counts toward lifetime package cap");
+closeTo(cappedPackageAccount.withdrawalLimit, 0, "lifetime package cap blocks withdrawal beyond package activation value");
+
+const overLifetimeCap = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 1, source: "package", userPackageId: String(package100._id) },
+});
+statusIs(overLifetimeCap, 400, "package withdrawals cannot exceed activation amount even when referral deposits would unlock more");
+assert.match(String(overLifetimeCap.data.message || ""), /سقف السحب الإجمالي/, "over-cap withdrawal explains lifetime package cap");
+
 const generalWithdrawal = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "general-test-address", amount: 10, source: "wallet" },

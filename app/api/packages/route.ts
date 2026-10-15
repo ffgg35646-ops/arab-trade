@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       Number(settings?.withdrawals?.firstPackageWithdrawalPercent ?? 100)
     );
     const [rawUserPackages, packageLedger] = await Promise.all([
-      UserPackage.find({ userId: user._id }).sort({ createdAt: -1 }).limit(100).lean(),
+      UserPackage.find({ userId: user._id }).sort({ createdAt: -1 }).lean(),
       PackageLedger.find({ userId: user._id })
         .populate("userPackageId", "packageName")
         .sort({ createdAt: -1 })

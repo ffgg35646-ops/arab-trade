@@ -619,6 +619,20 @@ ok(await api("/api/admin/withdrawals", {
 }), "admin approval releases the review lock");
 singleRequestPackage = await db.collection("userpackages").findOne({ _id: singleRequestPackageId });
 assert.equal(singleRequestPackage.withdrawalRequestPending, false, "package request lock clears after approval");
+const blockedWhileTransferInProgress = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "single-request-test-address", amount: 100, source: "package", userPackageId: String(singleRequestPackageId) },
+});
+statusIs(blockedWhileTransferInProgress, 409, "no new package withdrawal while the approved transfer is still in progress");
+assert.match(String(blockedWhileTransferInProgress.data.message || ""), /لا يُسمح بطلب جديد حتى يكتمل التحويل/, "in-progress withdrawal lock explains why the next request must wait");
+ok(await api("/api/admin/withdrawals", {
+  as: "admin",
+  method: "PATCH",
+  body: { id: firstSingleRequestId, status: "completed", adminNote: "CI complete the first-stage payout before testing the referral stage" },
+}), "admin completes the first-stage withdrawal");
+singleRequestPackage = await db.collection("userpackages").findOne({ _id: singleRequestPackageId });
+closeTo(singleRequestPackage.availableEarnings, 200, "completed first-stage withdrawal leaves the remaining package balance");
+closeTo(singleRequestPackage.lockedEarnings, 0, "completed first-stage withdrawal releases its locked amount");
 const approvedWithdrawalPackagesPage = await api("/api/packages");
 ok(approvedWithdrawalPackagesPage, "package API exposes the post-approval withdrawal phase");
 const approvedWithdrawalPackageView = approvedWithdrawalPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
@@ -669,11 +683,6 @@ const laterStageWithdrawal = await api("/api/withdrawals", {
 ok(laterStageWithdrawal, "later package withdrawal is allowed within the active-referral cap after first approval", 201);
 assert.equal(laterStageWithdrawal.data.withdrawal.isFirstPackageWithdrawal, false, "later package withdrawal is classified as referral-based");
 const laterStageWithdrawalId = String(laterStageWithdrawal.data.withdrawal._id);
-ok(await api("/api/admin/withdrawals", {
-  as: "admin",
-  method: "PATCH",
-  body: { id: firstSingleRequestId, status: "completed", adminNote: "CI complete first-stage withdrawal after the later-stage request is placed" },
-}), "admin completes the first-stage withdrawal");
 ok(await api("/api/admin/withdrawals", {
   as: "admin",
   method: "PATCH",

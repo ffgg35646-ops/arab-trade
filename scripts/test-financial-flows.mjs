@@ -23,7 +23,7 @@ async function prepare() {
     "users", "platformsettings", "depositrequests", "depositbalances",
     "investmentpackages", "userpackages", "packageledgers", "withdrawalrequests",
     "wallets", "ledgerentries", "referralcommissions", "blockchaindepositclaims",
-    "notifications", "paymentoptions", "kycrequests", "assets",
+    "notifications", "paymentoptions", "packagewithdrawalmethods", "kycrequests", "assets",
   ];
   for (const name of names) {
     try {
@@ -88,6 +88,14 @@ async function prepare() {
     name: "CI Test Network", asset: "USDT", network: "TRC20",
     address: "test-deposit-address", minDeposit: 1, minWithdrawal: 1,
     enabled: true, depositEnabled: true, withdrawalEnabled: true,
+    createdAt, updatedAt: createdAt,
+  });
+
+  // The package withdrawal path has its own method registry, independent of general withdrawals.
+  await db.collection("packagewithdrawalmethods").insertOne({
+    name: "CI Package Test Network", asset: "USDT", network: "TRC20",
+    minWithdrawal: 1, maxWithdrawal: 0, withdrawalFee: 0, warning: "",
+    enabled: true, withdrawalEnabled: true,
     createdAt, updatedAt: createdAt,
   });
 
@@ -323,19 +331,28 @@ await db.collection("platformsettings").updateOne(
   { $unset: { ["withdrawals.withdrawalMinByPackage." + String(minimumTestPlan._id)]: "" } },
 );
 
-// Also verify the global minimum set in admin settings is applied to package requests.
-const globalMinimumTestResult = await api("/api/admin/packages", {
+// General withdrawal minimums and general PaymentOption settings must not restrict package withdrawals.
+const isolatedMinimumTestResult = await api("/api/admin/packages", {
   as: "admin", method: "POST",
-  body: { name: "CI Bronze Global Minimum", description: "global minimum regression", price: 200, durationDays: 30, enabled: true },
+  body: { name: "CI Package Ignores General Minimum", description: "withdrawal scope isolation regression", price: 200, durationDays: 30, enabled: true },
 });
-ok(globalMinimumTestResult, "admin creates package for global-minimum regression", 201);
-const globalMinimumPlan = globalMinimumTestResult.data.package;
-const globalMinimumAccountId = new mongoose.Types.ObjectId();
+ok(isolatedMinimumTestResult, "admin creates package for general/package isolation regression", 201);
+const isolatedMinimumPlan = isolatedMinimumTestResult.data.package;
+const isolatedMinimumPlanId = new mongoose.Types.ObjectId(String(isolatedMinimumPlan._id));
+await db.collection("investmentpackages").updateOne(
+  { _id: isolatedMinimumPlanId },
+  { $set: { minimumWithdrawal: 1 } },
+);
+await db.collection("platformsettings").updateOne(
+  { key: "global" },
+  { $set: { ["withdrawals.withdrawalMinByPackage." + String(isolatedMinimumPlan._id)]: 1 } },
+);
+const isolatedMinimumAccountId = new mongoose.Types.ObjectId();
 await db.collection("userpackages").insertOne({
-  _id: globalMinimumAccountId,
+  _id: isolatedMinimumAccountId,
   userId: user._id,
-  packageId: new mongoose.Types.ObjectId(String(globalMinimumPlan._id)),
-  packageName: globalMinimumPlan.name,
+  packageId: isolatedMinimumPlanId,
+  packageName: isolatedMinimumPlan.name,
   investedAmount: 50,
   asset: "USDT",
   durationDays: 0,
@@ -355,27 +372,50 @@ await db.collection("userpackages").insertOne({
 });
 const globalSettingsBefore = await db.collection("platformsettings").findOne({ key: "global" });
 const previousGlobalMinimum = Number(globalSettingsBefore?.withdrawals?.minAmount ?? 1);
-await db.collection("platformsettings").updateOne(
-  { key: "global" },
-  { $set: { "withdrawals.minAmount": 200 } },
-);
+const generalMethodBefore = await db.collection("paymentoptions").findOne({ asset: "USDT", network: "TRC20" });
+const previousGeneralMethodMinimum = Number(generalMethodBefore?.minWithdrawal ?? 1);
+let isolatedPackageWithdrawalId = "";
 try {
-  const belowGlobalMinimum = await api("/api/withdrawals", {
+  await db.collection("platformsettings").updateOne(
+    { key: "global" },
+    { $set: { "withdrawals.minAmount": 200 } },
+  );
+  await db.collection("paymentoptions").updateOne(
+    { asset: "USDT", network: "TRC20" },
+    { $set: { minWithdrawal: 200 } },
+  );
+
+  const packageWithdrawalWithGeneralMinimum200 = await api("/api/withdrawals", {
     method: "POST",
-    body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 50, source: "package", userPackageId: String(globalMinimumAccountId) },
+    body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 50, source: "package", userPackageId: String(isolatedMinimumAccountId) },
   });
-  statusIs(belowGlobalMinimum, 400, "global admin minimum of 200 rejects a 50-USDT package request");
-  assert.match(String(belowGlobalMinimum.data.message || ""), /200/, "global-minimum error shows 200 USDT");
-  const unchangedGlobalMinimumAccount = await db.collection("userpackages").findOne({ _id: globalMinimumAccountId });
-  closeTo(unchangedGlobalMinimumAccount.availableEarnings, 50, "global below-minimum attempt preserves package balance");
-  closeTo(unchangedGlobalMinimumAccount.lockedEarnings, 0, "global below-minimum attempt does not lock funds");
+  ok(packageWithdrawalWithGeneralMinimum200, "package withdrawal uses package-specific method even when general min is 200", 201);
+  isolatedPackageWithdrawalId = String(packageWithdrawalWithGeneralMinimum200.data.withdrawal._id);
+  const reservedIsolationAccount = await db.collection("userpackages").findOne({ _id: isolatedMinimumAccountId });
+  closeTo(reservedIsolationAccount.availableEarnings, 0, "package request debits only its own package balance");
+  closeTo(reservedIsolationAccount.lockedEarnings, 50, "package request reserves funds in the package bucket");
+
+  ok(await api("/api/admin/withdrawals", {
+    as: "admin", method: "PATCH",
+    body: { id: isolatedPackageWithdrawalId, status: "rejected", adminNote: "CI scope isolation test cleanup" },
+  }), "rejected test package withdrawal releases its reservation");
+  const restoredIsolationAccount = await db.collection("userpackages").findOne({ _id: isolatedMinimumAccountId });
+  closeTo(restoredIsolationAccount.availableEarnings, 50, "reject restores the package-specific bucket");
+  closeTo(restoredIsolationAccount.lockedEarnings, 0, "reject clears the package-specific locked amount");
 } finally {
   await db.collection("platformsettings").updateOne(
     { key: "global" },
-    { $set: { "withdrawals.minAmount": previousGlobalMinimum } },
+    {
+      $set: { "withdrawals.minAmount": previousGlobalMinimum },
+      $unset: { ["withdrawals.withdrawalMinByPackage." + String(isolatedMinimumPlan._id)]: "" },
+    },
   );
-  await db.collection("userpackages").deleteOne({ _id: globalMinimumAccountId });
-  await db.collection("investmentpackages").deleteOne({ _id: new mongoose.Types.ObjectId(String(globalMinimumPlan._id)) });
+  await db.collection("paymentoptions").updateOne(
+    { asset: "USDT", network: "TRC20" },
+    { $set: { minWithdrawal: previousGeneralMethodMinimum } },
+  );
+  await db.collection("userpackages").deleteOne({ _id: isolatedMinimumAccountId });
+  await db.collection("investmentpackages").deleteOne({ _id: isolatedMinimumPlanId });
 }
 
 ok(await api("/api/admin/packages/credit", {

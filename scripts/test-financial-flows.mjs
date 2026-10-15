@@ -470,9 +470,9 @@ await db.collection("userpackages").insertOne({
   createdAt: legacyPackageCreatedAt,
   updatedAt: legacyPackageCreatedAt,
 });
-const legacyWithdrawalId = new mongoose.Types.ObjectId();
+const legacyPrincipalWithdrawalId = new mongoose.Types.ObjectId();
 await db.collection("withdrawalrequests").insertOne({
-  _id: legacyWithdrawalId,
+  _id: legacyPrincipalWithdrawalId,
   userId: user._id,
   asset: "USDT",
   network: "TRC20",
@@ -497,10 +497,72 @@ assert.ok(migratedLegacyAccount, "legacy package account remains visible");
 closeTo(migratedLegacyAccount.availableEarnings, 0, "legacy 500-USDT withdrawal does not restore another 500 to the card balance");
 closeTo(migratedLegacyAccount.firstPackageWithdrawalRemaining, 0, "legacy withdrawal consumes the first-stage package allowance");
 assert.equal((await db.collection("userpackages").findOne({ _id: legacyPackageId })).withdrawablePrincipalCredited, true, "legacy principal migration is marked once");
-assert.equal((await db.collection("withdrawalrequests").findOne({ _id: legacyWithdrawalId })).isFirstPackageWithdrawal, true, "legacy withdrawal is classified against the package principal cap");
+assert.equal((await db.collection("withdrawalrequests").findOne({ _id: legacyPrincipalWithdrawalId })).isFirstPackageWithdrawal, true, "legacy withdrawal is classified against the package principal cap");
 const migratedLegacyPageAgain = await api("/api/packages");
 ok(migratedLegacyPageAgain, "reloading package balances keeps the legacy migration idempotent");
 closeTo(migratedLegacyPageAgain.data.userPackages.find((x) => String(x._id) === String(legacyPackageId)).availableEarnings, 0, "reloading does not put the withdrawn 500 back");
+
+// Repair an account already marked migrated by the previous buggy helper: it credited
+// 500 again even though a 500-USDT legacy withdrawal was already completed.
+const previouslyMigratedPackageId = new mongoose.Types.ObjectId();
+const previouslyMigratedCreatedAt = new Date(Date.now() - 4000);
+await db.collection("userpackages").insertOne({
+  _id: previouslyMigratedPackageId,
+  userId: user._id,
+  packageId: plan200._id,
+  packageName: "CI previously-migrated 500 package",
+  investedAmount: 500,
+  asset: "USDT",
+  durationDays: 30,
+  status: "cancelled",
+  availableEarnings: 500,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 0,
+  totalWithdrawn: 500,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "completed",
+  withdrawalRequestPending: false,
+  cancellationRefund: 0,
+  activatedAt: previouslyMigratedCreatedAt,
+  lastProfitAt: previouslyMigratedCreatedAt,
+  createdAt: previouslyMigratedCreatedAt,
+  updatedAt: previouslyMigratedCreatedAt,
+});
+const previouslyMigratedWithdrawalId = new mongoose.Types.ObjectId();
+await db.collection("withdrawalrequests").insertOne({
+  _id: previouslyMigratedWithdrawalId,
+  userId: user._id,
+  asset: "USDT",
+  network: "TRC20",
+  amount: 500,
+  fee: 0,
+  receiveAmount: 500,
+  address: "previously-migrated-withdrawal-address",
+  source: "package",
+  walletType: "spot",
+  walletAllocations: [],
+  userPackageId: previouslyMigratedPackageId,
+  isFirstPackageWithdrawal: false,
+  status: "completed",
+  adminNote: "",
+  createdAt: previouslyMigratedCreatedAt,
+  updatedAt: previouslyMigratedCreatedAt,
+});
+await db.collection("packageledgers").insertOne({
+  userId: user._id,
+  userPackageId: previouslyMigratedPackageId,
+  type: "activation_withdrawable",
+  asset: "USDT",
+  amount: 500,
+  note: "إتاحة المتبقي من قيمة تفعيل الباقة ضمن حد السحب الأول.",
+  createdAt: previouslyMigratedCreatedAt,
+});
+const repairedLegacyPage = await api("/api/packages");
+ok(repairedLegacyPage, "previously migrated legacy account is repaired");
+const repairedLegacyAccount = repairedLegacyPage.data.userPackages.find((x) => String(x._id) === String(previouslyMigratedPackageId));
+closeTo(repairedLegacyAccount.availableEarnings, 0, "old duplicate principal top-up is removed from the visible package balance");
+closeTo(repairedLegacyAccount.firstPackageWithdrawalRemaining, 0, "old 500 withdrawal consumes the first-stage allowance after repair");
+assert.equal((await db.collection("withdrawalrequests").findOne({ _id: previouslyMigratedWithdrawalId })).isFirstPackageWithdrawal, true, "old completed withdrawal is classified on an already-migrated account");
 
 // One open withdrawal per package: a 300-USDT package has 200 left after a 100-USDT request,
 // but a second request remains blocked until the first is rejected or completed.

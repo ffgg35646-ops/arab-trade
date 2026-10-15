@@ -671,11 +671,6 @@ export default function WithdrawPage() {
                               <p className="rounded-lg bg-white/[0.025] px-2 py-2 text-[10px] text-slate-500">فعّل الباقة أولًا لتتاح عمليات السحب.</p>
                             ) : (
                               <>
-                                {item.packageWithdrawalAlreadyUsed && (
-                                  <p className="mb-2 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-2 text-[10px] leading-5 text-amber-200">
-                                    تمت الموافقة على السحب الأول من هذه الباقة. أي سحب لاحق يخضع لحد الإحالات النشطة؛ المتاح منها الآن {money(Number(item.referralRemaining || 0))} USDT.
-                                  </p>
-                                )}
                                 {item.firstWithdrawalStatus === "pending" && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب الأول قيد المراجعة.</p>}
                                 {renderWithdrawalFields("package", item || undefined, plan)}
                               </>

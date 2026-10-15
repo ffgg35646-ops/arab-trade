@@ -41,6 +41,7 @@ type PackageAccount = {
   firstPackageWithdrawalRemaining?: number;
   firstPackageWithdrawalPending?: boolean;
   packageWithdrawalPending?: boolean;
+  packageWithdrawalStatus?: "pending" | "approved" | "processing" | null;
   packageWithdrawalAlreadyUsed?: boolean;
   unresolvedWithdrawalAmount?: number | null;
   unresolvedWithdrawalStatus?: string | null;
@@ -665,7 +666,9 @@ export default function WithdrawPage() {
                               <p className="rounded-lg bg-white/[0.025] px-2 py-2 text-[10px] text-slate-500">فعّل الباقة أولًا لتتاح عمليات السحب.</p>
                             ) : (
                               <>
-                                {(item.firstPackageWithdrawalPending === true || item.packageWithdrawalPending === true) && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب قيد المراجعة.</p>}
+                                {item.packageWithdrawalStatus === "pending" && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب قيد المراجعة.</p>}
+                                {item.packageWithdrawalStatus === "approved" && <p className="mb-2 rounded-lg bg-blue-400/[0.06] p-2 text-[10px] text-blue-200">تمت الموافقة على السحب؛ المبلغ محجوز حتى تأكيد إتمام التحويل.</p>}
+                                {item.packageWithdrawalStatus === "processing" && <p className="mb-2 rounded-lg bg-blue-400/[0.06] p-2 text-[10px] text-blue-200">السحب قيد التنفيذ.</p>}
                                 {renderWithdrawalFields("package", item || undefined, plan)}
                                 {packageCardErrors[String(item._id)] && (
                                   <p role="alert" className="mt-2 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-2 text-xs leading-5 text-amber-200">

@@ -22,14 +22,29 @@ type Payment = {
   withdrawalEnabled: boolean;
 };
 
+type PackagePayment = {
+  _id: string;
+  name: string;
+  asset: string;
+  network: string;
+  minWithdrawal: number;
+  maxWithdrawal: number;
+  withdrawalFee: number;
+  warning: string;
+  enabled: boolean;
+  withdrawalEnabled: boolean;
+};
+
 export default function PaymentsAdminPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [packagePayments, setPackagePayments] = useState<PackagePayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState("");
   const [deleting, setDeleting] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [addingKind, setAddingKind] = useState<"deposit" | "withdrawal" | "">("");
+  const [addingScope, setAddingScope] = useState<"general" | "package">("general");
   const [newCurrency, setNewCurrency] = useState("USDT");
   const [newNetwork, setNewNetwork] = useState("");
   const [newMinimum, setNewMinimum] = useState("0");
@@ -43,7 +58,7 @@ export default function PaymentsAdminPage() {
   const load = useCallback(async () => {
 
     try {
-      const [res, settingsRes, packagesRes] = await Promise.all([
+      const [res, settingsRes, packagesRes, packageMethodsRes] = await Promise.all([
         fetch("/api/admin/payment", {
           credentials: "include",
           cache: "no-store",
@@ -56,12 +71,15 @@ export default function PaymentsAdminPage() {
           credentials: "include",
           cache: "no-store",
         }),
+        fetch("/api/admin/package-withdrawal-methods", {
+          credentials: "include",
+          cache: "no-store",
+        }),
       ]);
 
       const settingsJson = await settingsRes.json().catch(() => ({}));
       const packagesJson = await packagesRes.json().catch(() => ({}));
-
-
+      const packageMethodsJson = await packageMethodsRes.json().catch(() => ({}));
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
@@ -91,6 +109,23 @@ export default function PaymentsAdminPage() {
 
       setPayments(rows.filter((item) => item.withdrawalEnabled));
 
+      if (!packageMethodsRes.ok || !packageMethodsJson.success || !Array.isArray(packageMethodsJson.methods)) {
+        throw new Error(packageMethodsJson.message || "تعذر تحميل وسائل سحب الباقات");
+      }
+      const packageMethodRows: PackagePayment[] = packageMethodsJson.methods.map((item: PackagePayment) => ({
+        _id: String(item._id),
+        name: String(item.name || item.asset || "USDT"),
+        asset: String(item.asset || "USDT"),
+        network: String(item.network || ""),
+        minWithdrawal: Number(item.minWithdrawal || 0),
+        maxWithdrawal: Number(item.maxWithdrawal || 0),
+        withdrawalFee: Number(item.withdrawalFee || 0),
+        warning: String(item.warning || ""),
+        enabled: item.enabled !== false,
+        withdrawalEnabled: item.withdrawalEnabled !== false,
+      }));
+      setPackagePayments(packageMethodRows);
+
       if (!packagesRes.ok || !packagesJson.success || !Array.isArray(packagesJson.packages)) {
         throw new Error(packagesJson.message || "تعذر تحميل الباقات لإعداد السحب منها");
       }
@@ -98,7 +133,7 @@ export default function PaymentsAdminPage() {
         _id: String(item._id),
         name: String(item.name || "باقة"),
         price: Number(item.price || 0),
-        minimumWithdrawal: Number(item.minimumWithdrawal ?? settingsJson.settings?.withdrawals?.minAmount ?? 0),
+        minimumWithdrawal: Number(item.minimumWithdrawal ?? 100),
         enabled: item.enabled !== false,
       }));
       const rawConfigured = settingsJson.settings?.withdrawals?.withdrawalMinByPackage;
@@ -139,8 +174,9 @@ export default function PaymentsAdminPage() {
     );
   }
 
-  function addPayment(kind: "deposit" | "withdrawal") {
+  function addPayment(kind: "deposit" | "withdrawal", scope: "general" | "package" = "general") {
     setAddingKind(kind);
+    setAddingScope(scope);
     setNewCurrency("USDT");
     setNewNetwork("");
     setNewMinimum("0");
@@ -171,11 +207,21 @@ export default function PaymentsAdminPage() {
     setError("");
     setMessage("");
     try {
-      const res = await fetch("/api/admin/payment", {
+      const packageOnlyWithdrawal = addingKind === "withdrawal" && addingScope === "package";
+      const res = await fetch(packageOnlyWithdrawal ? "/api/admin/package-withdrawal-methods" : "/api/admin/payment", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(packageOnlyWithdrawal ? {
+          name: asset,
+          asset,
+          network,
+          minWithdrawal: minimum,
+          maxWithdrawal: 0,
+          withdrawalFee: 0,
+          enabled: true,
+          withdrawalEnabled: true,
+        } : {
           kind: addingKind,
           name: asset,
           asset,
@@ -192,7 +238,7 @@ export default function PaymentsAdminPage() {
       if (!res.ok || !json.success) {
         throw new Error(json.message || "تعذر إضافة الوسيلة");
       }
-      setMessage(addingKind === "deposit" ? "تمت إضافة وسيلة الإيداع بنجاح." : "تمت إضافة وسيلة السحب بنجاح.");
+      setMessage(addingKind === "deposit" ? "تمت إضافة وسيلة الإيداع بنجاح." : packageOnlyWithdrawal ? "تمت إضافة وسيلة سحب الباقات فقط." : "تمت إضافة وسيلة السحب العام فقط.");
       setAddingKind("");
       setNewCurrency("USDT");
       setNewNetwork("");
@@ -226,8 +272,8 @@ export default function PaymentsAdminPage() {
       return;
     }
 
-    if (!payment.address.trim()) {
-      setError("عنوان أو بيانات التحويل مطلوبة");
+    if (payment.depositEnabled && !payment.address.trim()) {
+      setError("عنوان أو بيانات الإيداع مطلوب");
       return;
     }
 
@@ -343,6 +389,68 @@ export default function PaymentsAdminPage() {
   }
 
 
+  function updatePackagePayment(index: number, patch: Partial<PackagePayment>) {
+    setPackagePayments((current) => current.map((item, i) => i === index ? { ...item, ...patch } : item));
+  }
+
+  async function savePackagePayment(index: number) {
+    const payment = packagePayments[index];
+    if (!payment) return;
+    if (!payment.name.trim() || !payment.network.trim()) {
+      setError("اسم وسيلة سحب الباقات والشبكة مطلوبان");
+      return;
+    }
+    const minimum = Number(payment.minWithdrawal);
+    const maximum = Number(payment.maxWithdrawal);
+    const fee = Number(payment.withdrawalFee);
+    if (![minimum, maximum, fee].every((value) => Number.isFinite(value) && value >= 0) || (maximum > 0 && minimum > maximum)) {
+      setError("راجع الحد الأدنى والأقصى ورسوم سحب الباقات");
+      return;
+    }
+
+    setSaving(payment._id);
+    setMessage("");
+    setError("");
+    try {
+      const res = await fetch("/api/admin/package-withdrawal-methods", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payment, minWithdrawal: minimum, maxWithdrawal: maximum, withdrawalFee: fee }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) throw new Error(json.message || "تعذر حفظ وسيلة سحب الباقات");
+      setMessage("تم تحديث وسيلة سحب الباقات دون تغيير وسائل السحب العام.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تعذر حفظ وسيلة سحب الباقات");
+    } finally {
+      setSaving("");
+    }
+  }
+
+  async function removePackagePayment(payment: PackagePayment) {
+    const confirmed = window.confirm(`هل أنت متأكد من حذف وسيلة سحب الباقات "${payment.name}"؟`);
+    if (!confirmed) return;
+    setDeleting(payment._id);
+    setMessage("");
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/package-withdrawal-methods?id=${encodeURIComponent(payment._id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) throw new Error(json.message || "تعذر حذف وسيلة سحب الباقات");
+      setMessage("تم حذف وسيلة سحب الباقات فقط.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تعذر حذف وسيلة سحب الباقات");
+    } finally {
+      setDeleting("");
+    }
+  }
+
   async function removePayment(payment: Payment) {
     if (!payment._id) {
       setPayments((current) =>
@@ -408,12 +516,12 @@ export default function PaymentsAdminPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-<button type="button" onClick={() => addPayment("withdrawal")} className="rounded-xl bg-violet-600 px-5 py-3 font-black transition hover:bg-violet-500">
+<button type="button" onClick={() => addPayment("withdrawal", "general")} className="rounded-xl bg-violet-600 px-5 py-3 font-black transition hover:bg-violet-500">
               + إضافة وسيلة سحب عام
             </button>
-            <a href="#package-withdrawal-settings" className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-3 font-black text-emerald-200 transition hover:bg-emerald-400/15">
+            <button type="button" onClick={() => addPayment("withdrawal", "package")} className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-5 py-3 font-black text-emerald-200 transition hover:bg-emerald-400/15">
               + إضافة وسيلة سحب من الباقات
-            </a>
+            </button>
           </div>
         </div>
 
@@ -422,7 +530,7 @@ export default function PaymentsAdminPage() {
         {addingKind ? (
           <section className="rounded-2xl border border-slate-700 bg-[#08111e] p-5 md:p-6">
             <div className="mb-5 flex items-center justify-between gap-3">
-              <h2 className="text-xl font-black">{addingKind === "deposit" ? "إضافة وسيلة إيداع" : "إضافة وسيلة سحب"}</h2>
+              <h2 className="text-xl font-black">{addingKind === "deposit" ? "إضافة وسيلة إيداع" : addingScope === "package" ? "إضافة وسيلة سحب للباقات فقط" : "إضافة وسيلة سحب عام فقط"}</h2>
               <button type="button" onClick={() => setAddingKind("")} className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-bold text-slate-300">إلغاء</button>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
@@ -447,9 +555,9 @@ export default function PaymentsAdminPage() {
                 </label>
               ) : null}
             </div>
-            <p className="mt-4 text-xs leading-5 text-slate-500">يتم حفظ وسيلة الإيداع والسحب في قاعدة البيانات، مع الحفاظ على إعدادات الوسيلة الأخرى عند استخدام العملة والشبكة نفسيهما.</p>
+            <p className="mt-4 text-xs leading-5 text-slate-500">يتم حفظ وسيلة السحب ضمن القسم المحدد فقط؛ وسيلة السحب العام لا تغيّر إعدادات سحب الباقات، والعكس صحيح.</p>
             <div className="mt-5 flex flex-wrap gap-3">
-              <button type="button" disabled={savingNew} onClick={() => void saveNewPayment()} className="rounded-xl bg-emerald-500 px-5 py-3 font-black text-slate-950 disabled:opacity-50">{savingNew ? "جاري الحفظ..." : addingKind === "deposit" ? "حفظ وسيلة الإيداع" : "حفظ وسيلة السحب"}</button>
+              <button type="button" disabled={savingNew} onClick={() => void saveNewPayment()} className="rounded-xl bg-emerald-500 px-5 py-3 font-black text-slate-950 disabled:opacity-50">{savingNew ? "جاري الحفظ..." : addingKind === "deposit" ? "حفظ وسيلة الإيداع" : addingScope === "package" ? "حفظ وسيلة سحب الباقات" : "حفظ وسيلة السحب العام"}</button>
               <button type="button" disabled={savingNew} onClick={() => setAddingKind("")} className="rounded-xl border border-slate-700 px-5 py-3 font-bold disabled:opacity-50">إلغاء</button>
             </div>
           </section>
@@ -780,6 +888,65 @@ export default function PaymentsAdminPage() {
             })}
           </div>
         )}
+        <section className="rounded-2xl border border-emerald-400/20 bg-[#08111e] p-5 md:p-6">
+          <div className="mb-5">
+            <h2 className="text-lg font-black">وسائل سحب الباقات</h2>
+            <p className="mt-2 text-sm text-slate-500">هذه الوسائل وإعداداتها تُستخدم لسحب أرباح الباقات فقط، ولا تتأثر بوسائل السحب العام.</p>
+          </div>
+          {packagePayments.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-400">
+              لا توجد وسائل سحب مضافة للباقات. استخدم زر «إضافة وسيلة سحب من الباقات».
+            </div>
+          ) : (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {packagePayments.map((payment, index) => {
+                const savingKey = payment._id;
+                const isSaving = saving === savingKey;
+                return (
+                  <div key={payment._id} className="rounded-2xl border border-slate-800 bg-[#08111e] p-5">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="font-black">{payment.name}</h3>
+                        <p className="mt-1 text-xs text-slate-500">{payment.asset} • {payment.network}</p>
+                      </div>
+                      <label className="flex items-center gap-2 text-sm font-bold">
+                        <input type="checkbox" checked={payment.enabled && payment.withdrawalEnabled} onChange={(event) => updatePackagePayment(index, { enabled: event.target.checked, withdrawalEnabled: event.target.checked })} className="h-4 w-4 accent-emerald-400" />
+                        مفعلة
+                      </label>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="text-sm font-bold">اسم الوسيلة
+                        <input value={payment.name} onChange={(event) => updatePackagePayment(index, { name: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-3 py-2" />
+                      </label>
+                      <label className="text-sm font-bold">الشبكة
+                        <select value={payment.network} onChange={(event) => updatePackagePayment(index, { network: event.target.value })} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-3 py-2">
+                          <option value="TRC20">TRC (TRC20)</option>
+                          <option value="BEP20">BNB Smart Chain (BEP20)</option>
+                        </select>
+                      </label>
+                      <label className="text-sm font-bold">الحد الأدنى لسحب الباقات
+                        <input type="number" min="0" step="any" value={payment.minWithdrawal} onChange={(event) => updatePackagePayment(index, { minWithdrawal: Number(event.target.value) || 0 })} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-3 py-2" />
+                      </label>
+                      <label className="text-sm font-bold">الحد الأقصى (0 = بلا حد)
+                        <input type="number" min="0" step="any" value={payment.maxWithdrawal} onChange={(event) => updatePackagePayment(index, { maxWithdrawal: Number(event.target.value) || 0 })} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-3 py-2" />
+                      </label>
+                      <label className="text-sm font-bold">رسوم سحب الباقات
+                        <input type="number" min="0" step="any" value={payment.withdrawalFee} onChange={(event) => updatePackagePayment(index, { withdrawalFee: Number(event.target.value) || 0 })} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-3 py-2" />
+                      </label>
+                      <label className="text-sm font-bold sm:col-span-2">تنبيه سحب الباقات
+                        <textarea value={payment.warning} onChange={(event) => updatePackagePayment(index, { warning: event.target.value })} rows={2} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-3 py-2" />
+                      </label>
+                    </div>
+                    <div className="mt-4 flex gap-3">
+                      <button type="button" disabled={isSaving} onClick={() => void savePackagePayment(index)} className="flex-1 rounded-xl bg-emerald-500 px-4 py-3 font-black text-slate-950 disabled:opacity-50">{isSaving ? "جاري الحفظ..." : "حفظ وسيلة سحب الباقات"}</button>
+                      <button type="button" disabled={Boolean(deleting)} onClick={() => void removePackagePayment(payment)} className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 font-black text-red-300 disabled:opacity-50">{deleting === payment._id ? "جاري الحذف..." : "حذف"}</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </div>
     </AdminPageFrame>
   );

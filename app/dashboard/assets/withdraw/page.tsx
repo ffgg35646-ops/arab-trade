@@ -438,30 +438,11 @@ export default function WithdrawPage() {
     }
 
     const minimum = source === "package"
-      ? Number(packageAccount?.minimumWithdrawal ?? 100)
+      ? Math.max(Number(selectedMethod.minWithdrawal || 0), Number(packageAccount?.minimumWithdrawal ?? 100))
       : Math.max(Number(selectedMethod.minWithdrawal || 0), Number(limits.minGeneralWithdrawal ?? limits.minWithdrawal ?? 0));
     const configuredMaximums = [Number(selectedMethod.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : 0;
-    const firstRemainder = Number(packageAccount?.firstPackageWithdrawalRemaining || 0);
-    const referralRemainder = Number(packageAccount?.referralRemaining || 0);
-    const fullReferralAllowance = Math.min(referralRemainder, Number(packageAccount?.packageGroupAvailableEarnings ?? packageAccount?.availableEarnings ?? 0));
-    const finalFirstAllowanceBelowMinimum =
-      source === "package" &&
-      Boolean(packageAccount) &&
-      packageAccount?.firstPackageWithdrawalPending !== true &&
-      firstRemainder > 0 &&
-      firstRemainder < minimum &&
-      Math.abs(numericAmount - firstRemainder) <= 1e-8 &&
-      Number(packageAccount?.packageGroupAvailableEarnings ?? packageAccount?.availableEarnings ?? 0) >= firstRemainder;
-    const finalReferralAllowanceBelowMinimum =
-      source === "package" &&
-      Boolean(packageAccount) &&
-      (packageAccount?.packageWithdrawalAlreadyUsed === true || firstRemainder <= 1e-8) &&
-      referralRemainder > 0 &&
-      fullReferralAllowance > 0 &&
-      fullReferralAllowance < minimum &&
-      Math.abs(numericAmount - fullReferralAllowance) <= 1e-8;
-    if (numericAmount < minimum && !finalFirstAllowanceBelowMinimum && !finalReferralAllowanceBelowMinimum) {
+    if (numericAmount < minimum) {
       setError((source === "package" ? "أقل مبلغ يمكن سحبه من باقة " + (packageAccount?.packageName || "") : "أقل مبلغ يمكن سحبه") + " هو " + money(minimum) + " " + selectedMethod.asset + ". أدخل مبلغًا مساويًا للحد الأدنى أو أكبر، مع عدم تجاوز الرصيد المتاح.");
       return;
     }
@@ -546,7 +527,7 @@ export default function WithdrawPage() {
       ? packageMax
       : Number(balances.find((item) => item.asset === selected?.asset)?.available || 0);
     const minimum = source === "package"
-      ? Number(packageAccount?.minimumWithdrawal ?? packagePlan?.minimumWithdrawal ?? 100)
+      ? Math.max(Number(selected?.minWithdrawal || 0), Number(packageAccount?.minimumWithdrawal ?? packagePlan?.minimumWithdrawal ?? 100))
       : Math.max(Number(selected?.minWithdrawal || 0), Number(limits.minGeneralWithdrawal ?? limits.minWithdrawal ?? 0));
     const configuredMaximums = [Number(selected?.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : undefined;
@@ -651,7 +632,10 @@ export default function WithdrawPage() {
                         const availableForPlan = item ? packageMaximum(item) : 0;
                         const packageForm = packageForms[packageFormId] || emptyForm;
                         const selectedPackageMethod = methods.find((method) => method._id === packageForm.methodId);
-                        const minimumWithdrawalForPlan = Number(item?.minimumWithdrawal ?? plan.minimumWithdrawal ?? 100);
+                        const minimumWithdrawalForPlan = Math.max(
+                          Number(selectedPackageMethod?.minWithdrawal || 0),
+                          Number(item?.minimumWithdrawal ?? plan.minimumWithdrawal ?? 100)
+                        );
                         return (
                           <article key={key} className="min-w-0 rounded-xl border border-white/10 bg-[#050a13] p-3">
                             <div className="mb-2 flex items-start justify-between gap-2">

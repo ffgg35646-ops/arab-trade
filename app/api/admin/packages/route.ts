@@ -176,9 +176,31 @@ export async function PATCH(request: NextRequest) {
     const item = await InvestmentPackage.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true });
     if (!item) return NextResponse.json({ success: false, message: "الباقة غير موجودة" }, { status: 404 });
     if (update.minimumWithdrawal !== undefined) {
+      // Duplicate catalog rows with the same visible name are rendered as one
+      // logical package on the withdrawal page. Keep their withdrawal minimums
+      // synchronized so older account IDs do not retain a stale limit.
+      const normalizePackageName = (value: unknown) =>
+        String(value || "").normalize("NFKC").trim().replace(/\\s+/g, " ").toLocaleLowerCase("en-US");
+      const catalogRows = await InvestmentPackage.find({}).select("_id name").lean();
+      const targetName = normalizePackageName(item.name);
+      const siblingIds = catalogRows
+        .filter((row: any) => normalizePackageName(row.name) === targetName)
+        .map((row: any) => String(row._id));
+      if (!siblingIds.includes(id)) siblingIds.push(id);
+
+      const minimum = Number(update.minimumWithdrawal);
+      await InvestmentPackage.updateMany(
+        { _id: { $in: siblingIds } },
+        { $set: { minimumWithdrawal: minimum } }
+      );
+
+      const settingsUpdate: Record<string, unknown> = { key: "global" };
+      for (const siblingId of siblingIds) {
+        settingsUpdate[`withdrawals.withdrawalMinByPackage.${siblingId}`] = minimum;
+      }
       await PlatformSettings.updateOne(
         { key: "global" },
-        { $set: { key: "global", [`withdrawals.withdrawalMinByPackage.${id}`]: Number(update.minimumWithdrawal) } },
+        { $set: settingsUpdate },
         { upsert: true }
       );
     }

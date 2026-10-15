@@ -1108,10 +1108,11 @@ await api("/api/wallet");
 legacyDepositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(legacyDepositBalance.available, 590, "v3 repair is idempotent and does not double credit");
 
-// Regression: a terminal withdrawal must not leave historical locked earnings unavailable.
+// Regression: old account-level and user-level guards must not strand a rejected payout.
 const staleLockTemplate = await db.collection("userpackages").findOne({ userId: user._id });
 assert.ok(staleLockTemplate, "a package account is available for the stale-lock regression test");
 const staleLockReconciliationId = new mongoose.Types.ObjectId();
+const staleGuardTimestamp = new Date(Date.now() - 5 * 60 * 1000);
 await db.collection("userpackages").insertOne({
   _id: staleLockReconciliationId,
   userId: user._id,
@@ -1126,19 +1127,27 @@ await db.collection("userpackages").insertOne({
   totalRealizedEarnings: 0,
   totalWithdrawn: 0,
   withdrawablePrincipalCredited: true,
-  firstWithdrawalStatus: "available",
-  withdrawalRequestPending: false,
+  firstWithdrawalStatus: "pending",
+  withdrawalRequestPending: true,
   cancellationRefund: 0,
-  activatedAt: new Date(),
-  lastProfitAt: new Date(),
-  createdAt: new Date(),
-  updatedAt: new Date(),
+  activatedAt: staleGuardTimestamp,
+  lastProfitAt: staleGuardTimestamp,
+  createdAt: staleGuardTimestamp,
+  updatedAt: staleGuardTimestamp,
 });
+await db.collection("users").updateOne(
+  { _id: user._id },
+  { $set: { hasPendingWithdrawal: true, updatedAt: staleGuardTimestamp } },
+);
 const staleLockReconciliationPage = await api("/api/packages");
-ok(staleLockReconciliationPage, "package API repairs stale lock when no withdrawal is active");
+ok(staleLockReconciliationPage, "package API repairs stale withdrawal flags when no request is active");
 const repairedStaleLockAccount = await db.collection("userpackages").findOne({ _id: staleLockReconciliationId });
 closeTo(repairedStaleLockAccount.availableEarnings, 37.5, "stale package lock returns to available balance");
 closeTo(repairedStaleLockAccount.lockedEarnings, 0, "stale package lock is cleared");
+assert.equal(repairedStaleLockAccount.withdrawalRequestPending, false, "stale package pending flag is cleared");
+assert.equal(repairedStaleLockAccount.firstWithdrawalStatus, "available", "stale first-withdrawal pending status is reset");
+const repairedUserGuard = await db.collection("users").findOne({ _id: user._id });
+assert.equal(repairedUserGuard.hasPendingWithdrawal, false, "stale user-level withdrawal guard is cleared");
 await db.collection("packageledgers").deleteMany({ userPackageId: staleLockReconciliationId });
 await db.collection("userpackages").deleteOne({ _id: staleLockReconciliationId });
 

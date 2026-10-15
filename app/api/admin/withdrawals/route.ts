@@ -296,6 +296,17 @@ export async function PATCH(
           );
           if (!updatedRequest) throw new Error("WITHDRAWAL_STATUS_CHANGED");
 
+          if (nextStatus === "approved") {
+            const approvalSet: Record<string, any> = { withdrawalRequestPending: false };
+            if (withdrawal.isFirstPackageWithdrawal) approvalSet.firstWithdrawalStatus = "approved";
+            const packageAccount = await UserPackage.findOneAndUpdate(
+              { _id: withdrawal.userPackageId, userId: withdrawal.userId },
+              { $set: approvalSet },
+              { new: true, session }
+            );
+            if (!packageAccount) throw new Error("PACKAGE_BALANCE_INVALID");
+          }
+
           if (nextStatus === "rejected" || nextStatus === "completed") {
             const increments = nextStatus === "rejected"
               ? { $inc: { lockedEarnings: -amount, availableEarnings: amount } }

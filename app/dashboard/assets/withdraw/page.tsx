@@ -52,6 +52,8 @@ type PackageAccount = {
   referralRemaining?: number;
   withdrawalLimit?: number;
   minimumWithdrawal?: number;
+  activatedAt?: string;
+  createdAt?: string;
 };
 type Withdrawal = {
   _id: string;
@@ -92,12 +94,6 @@ function packageMaximum(item: PackageAccount) {
 function packagePlanId(item: PackageAccount) {
   const id = item.packageId;
   return typeof id === "object" && id ? String(id._id || "") : String(id || "");
-}
-
-function accountForPackagePlan(planId: string, accounts: PackageAccount[]) {
-  return accounts
-    .filter((item) => packagePlanId(item) === planId)
-    .sort((a, b) => Number(b.availableEarnings || 0) - Number(a.availableEarnings || 0))[0];
 }
 
 export default function WithdrawPage() {
@@ -177,15 +173,15 @@ export default function WithdrawPage() {
       });
       setPackageForms((current) => {
         const next: Record<string, WithdrawalForm> = { ...current };
-        for (const plan of planRows) {
-          const account = accountForPackagePlan(String(plan._id), packageRows);
-          const formId = account?._id || String(plan._id);
-          const old = next[formId] || next[String(plan._id)] || emptyForm;
+        for (const account of packageRows) {
+          const formId = account._id;
+          const planId = packagePlanId(account);
+          const old = next[formId] || next[planId] || emptyForm;
           const methodId = packageMethods.some((item) => item._id === old.methodId) ? old.methodId : (packageMethods[0]?._id || "");
           const selected = packageMethods.find((item) => item._id === methodId);
           const stored = selected && loadedAddresses.find((item) => item.asset === selected.asset && item.network === selected.network && item.source === "package");
           next[formId] = { ...old, methodId, address: old.address || stored?.address || "" };
-          if (account && formId !== String(plan._id)) delete next[String(plan._id)];
+          if (planId !== formId) delete next[planId];
         }
         return next;
       });
@@ -214,6 +210,26 @@ export default function WithdrawPage() {
     () => packageAccounts.reduce((sum, item) => sum + Number(item.lockedEarnings || 0), 0),
     [packageAccounts]
   );
+  const withdrawalPackageCards = useMemo(() => {
+    const planById = new Map(packagePlans.map((plan) => [String(plan._id), plan]));
+    const accountCards = packageAccounts
+      .flatMap((item) => {
+        const plan = planById.get(packagePlanId(item));
+        return plan ? [{ key: "account-" + item._id, plan, item }] : [];
+      })
+      .sort((a, b) => {
+        const activeOrder = Number(b.item.status === "active") - Number(a.item.status === "active");
+        if (activeOrder) return activeOrder;
+        const aTime = new Date(a.item.activatedAt || a.item.createdAt || 0).getTime();
+        const bTime = new Date(b.item.activatedAt || b.item.createdAt || 0).getTime();
+        return bTime - aTime;
+      });
+    const plansWithAccounts = new Set(accountCards.map((card) => String(card.plan._id)));
+    const unopenedCards = packagePlans
+      .filter((plan) => !plansWithAccounts.has(String(plan._id)))
+      .map((plan) => ({ key: "plan-" + plan._id, plan, item: null as PackageAccount | null }));
+    return [...accountCards, ...unopenedCards];
+  }, [packageAccounts, packagePlans]);
   const pendingWithdrawal = history.find((item) => item.status === "pending");
   const hasPendingWithdrawal = Boolean(pendingWithdrawal);
   const openWithdrawals = history.filter((item) => ["pending", "approved", "processing"].includes(item.status)).length;
@@ -533,24 +549,24 @@ export default function WithdrawPage() {
                 <section className="mt-3 rounded-xl border border-emerald-400/20 bg-[#07101d] p-3">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <h2 className="text-sm font-black">السحب من الباقات</h2>
-                    <span className="rounded-full border border-emerald-300/20 px-2 py-1 text-[10px] text-emerald-200">{packagePlans.length} باقات</span>
+                    <span className="rounded-full border border-emerald-300/20 px-2 py-1 text-[10px] text-emerald-200">{withdrawalPackageCards.length} حساب/باقة</span>
                   </div>
-                  {packagePlans.length === 0 ? (
+                  {withdrawalPackageCards.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-xs text-slate-500">لا توجد باقات متاحة حاليًا.</div>
                   ) : (
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {packagePlans.map((plan) => {
-                        const item = accountForPackagePlan(String(plan._id), packageAccounts);
+                      {withdrawalPackageCards.map(({ key, plan, item }) => {
                         const packageFormId = item?._id || String(plan._id);
                         const availableForPlan = item ? Math.max(0, Number(item.availableEarnings || 0)) : 0;
                         return (
-                          <article key={plan._id} className="min-w-0 rounded-xl border border-white/10 bg-[#050a13] p-3">
+                          <article key={key} className="min-w-0 rounded-xl border border-white/10 bg-[#050a13] p-3">
                             <div className="mb-2 flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <h3 className="break-words text-sm font-black">{plan.name}</h3>
                                 <span className={item ? "mt-1 inline-flex rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] text-emerald-200" : "mt-1 inline-flex rounded-full bg-slate-700/50 px-2 py-0.5 text-[10px] text-slate-300"}>
                                   {item ? (item.status === "active" ? "نشطة" : "سابقة") : "لم تُفعّل بعد"}
                                 </span>
+                                {item && <div className="mt-1 text-[9px] text-slate-600">حساب …{item._id.slice(-6)}{item.activatedAt ? " · تفعيل " + new Date(item.activatedAt).toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo" }) : ""}</div>}
                               </div>
                               <div className="shrink-0 text-left">
                                 <div className="text-[10px] text-slate-500">متاح للسحب</div>

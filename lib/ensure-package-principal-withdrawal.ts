@@ -22,15 +22,22 @@ export async function ensurePackagePrincipalWithdrawalCredit(
   const percent = Math.max(0, Math.min(100, Number(firstWithdrawalPercent ?? 100)));
 
   for (const account of accounts as any[]) {
-    const firstRows = await WithdrawalRequest.find({
+    const packageRows = await WithdrawalRequest.find({
       userId,
       source: "package",
       userPackageId: account._id,
-      isFirstPackageWithdrawal: true,
       status: { $in: countedStatuses },
-    }).select("amount").lean();
-    const alreadyUsed = firstRows.reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0);
+    }).select("_id amount isFirstPackageWithdrawal createdAt").sort({ createdAt: 1, _id: 1 }).lean();
     const firstCap = Math.max(0, Number(account.investedAmount || 0) * percent / 100);
+    let alreadyUsed = packageRows
+      .filter((row: any) => row.isFirstPackageWithdrawal === true)
+      .reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0);
+    const legacyRowsToClassify: mongoose.Types.ObjectId[] = [];
+    for (const row of packageRows as any[]) {
+      if (row.isFirstPackageWithdrawal === true || alreadyUsed >= firstCap - 1e-8) continue;
+      legacyRowsToClassify.push(row._id);
+      alreadyUsed += Number(row.amount || 0);
+    }
     const remainingFirstAmount = Math.max(0, firstCap - alreadyUsed);
     const credit = Math.round((remainingFirstAmount + Number.EPSILON) * 1e8) / 1e8;
 
@@ -45,6 +52,13 @@ export async function ensurePackagePrincipalWithdrawalCredit(
           { new: true, session }
         );
         if (!migrated) return;
+        if (legacyRowsToClassify.length) {
+          await WithdrawalRequest.updateMany(
+            { _id: { $in: legacyRowsToClassify }, userId, userPackageId: account._id, isFirstPackageWithdrawal: { $ne: true } },
+            { $set: { isFirstPackageWithdrawal: true } },
+            { session }
+          );
+        }
         if (credit > 1e-8) {
           await PackageLedger.create([{
             userId,

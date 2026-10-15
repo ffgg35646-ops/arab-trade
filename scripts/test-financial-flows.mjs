@@ -445,6 +445,63 @@ const blockedLegacyApproval = await api("/api/admin/withdrawals", {
 statusIs(blockedLegacyApproval, 409, "admin cannot approve a legacy second-stage request beyond the active referral cap");
 await db.collection("withdrawalrequests").deleteOne({ _id: legacyOverCapRequestId });
 
+// Legacy accounts must not receive the same package principal twice when an older withdrawal
+// predates the isFirstPackageWithdrawal marker.
+const legacyPackageId = new mongoose.Types.ObjectId();
+const legacyPackageCreatedAt = new Date(Date.now() - 5000);
+await db.collection("userpackages").insertOne({
+  _id: legacyPackageId,
+  userId: user._id,
+  packageId: plan200._id,
+  packageName: "CI legacy 500 package",
+  investedAmount: 500,
+  asset: "USDT",
+  durationDays: 30,
+  status: "cancelled",
+  availableEarnings: 0,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 0,
+  totalWithdrawn: 500,
+  firstWithdrawalStatus: "completed",
+  withdrawalRequestPending: false,
+  cancellationRefund: 0,
+  activatedAt: legacyPackageCreatedAt,
+  lastProfitAt: legacyPackageCreatedAt,
+  createdAt: legacyPackageCreatedAt,
+  updatedAt: legacyPackageCreatedAt,
+});
+const legacyWithdrawalId = new mongoose.Types.ObjectId();
+await db.collection("withdrawalrequests").insertOne({
+  _id: legacyWithdrawalId,
+  userId: user._id,
+  asset: "USDT",
+  network: "TRC20",
+  amount: 500,
+  fee: 0,
+  receiveAmount: 500,
+  address: "legacy-package-withdrawal-address",
+  source: "package",
+  walletType: "spot",
+  walletAllocations: [],
+  userPackageId: legacyPackageId,
+  isFirstPackageWithdrawal: false,
+  status: "completed",
+  adminNote: "",
+  createdAt: legacyPackageCreatedAt,
+  updatedAt: legacyPackageCreatedAt,
+});
+const migratedLegacyPage = await api("/api/packages");
+ok(migratedLegacyPage, "legacy package migration does not re-credit a completed withdrawal");
+const migratedLegacyAccount = migratedLegacyPage.data.userPackages.find((x) => String(x._id) === String(legacyPackageId));
+assert.ok(migratedLegacyAccount, "legacy package account remains visible");
+closeTo(migratedLegacyAccount.availableEarnings, 0, "legacy 500-USDT withdrawal does not restore another 500 to the card balance");
+closeTo(migratedLegacyAccount.firstPackageWithdrawalRemaining, 0, "legacy withdrawal consumes the first-stage package allowance");
+assert.equal((await db.collection("userpackages").findOne({ _id: legacyPackageId })).withdrawablePrincipalCredited, true, "legacy principal migration is marked once");
+assert.equal((await db.collection("withdrawalrequests").findOne({ _id: legacyWithdrawalId })).isFirstPackageWithdrawal, true, "legacy withdrawal is classified against the package principal cap");
+const migratedLegacyPageAgain = await api("/api/packages");
+ok(migratedLegacyPageAgain, "reloading package balances keeps the legacy migration idempotent");
+closeTo(migratedLegacyPageAgain.data.userPackages.find((x) => String(x._id) === String(legacyPackageId)).availableEarnings, 0, "reloading does not put the withdrawn 500 back");
+
 // One open withdrawal per package: a 300-USDT package has 200 left after a 100-USDT request,
 // but a second request remains blocked until the first is rejected or completed.
 const singleRequestPackageId = new mongoose.Types.ObjectId();
@@ -462,6 +519,7 @@ await db.collection("userpackages").insertOne({
   lockedEarnings: 0,
   totalRealizedEarnings: 300,
   totalWithdrawn: 0,
+  withdrawablePrincipalCredited: true,
   firstWithdrawalStatus: "available",
   withdrawalRequestPending: false,
   cancellationRefund: 0,

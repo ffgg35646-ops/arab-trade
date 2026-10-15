@@ -16,6 +16,7 @@ export interface IUserPackage {
   firstWithdrawalStatus: "available" | "pending" | "approved" | "completed";
   withdrawalRequestPending: boolean;
   cancellationRefund: number;
+  cancellationRefundPackageCredited?: boolean;
   activatedAt: Date;
   lastProfitAt?: Date | null;
   cancelledAt?: Date | null;
@@ -40,6 +41,7 @@ const UserPackageSchema = new Schema<IUserPackage>(
     firstWithdrawalStatus: { type: String, enum: ["available", "pending", "approved", "completed"], default: "available", index: true },
     withdrawalRequestPending: { type: Boolean, default: false, index: true },
     cancellationRefund: { type: Number, default: 0, min: 0 },
+    cancellationRefundPackageCredited: { type: Boolean, default: false, index: true },
     activatedAt: { type: Date, default: Date.now },
     lastProfitAt: { type: Date, default: Date.now },
     cancelledAt: { type: Date, default: null },

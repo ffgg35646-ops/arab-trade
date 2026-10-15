@@ -113,7 +113,7 @@ export async function ensurePackagePrincipalWithdrawalCredit(
           // the principal migration ran. Keep those credits protected too.
           if (
             amount > 1e-8 &&
-            ["cancellation_refund", "daily_earning", "realized_earning", "reward", "withdrawal_reversal"].includes(type)
+            ["cancellation_refund", "refund_reclassification", "daily_earning", "realized_earning", "reward", "withdrawal_reversal"].includes(type)
           ) {
             protectedPackageCredits += amount;
           }
@@ -133,7 +133,7 @@ export async function ensurePackagePrincipalWithdrawalCredit(
 
         if (
           amount > 1e-8 &&
-          ["cancellation_refund", "daily_earning", "realized_earning", "reward", "withdrawal_reversal"].includes(type)
+          ["cancellation_refund", "refund_reclassification", "daily_earning", "realized_earning", "reward", "withdrawal_reversal"].includes(type)
         ) {
           protectedPackageCredits += amount;
         }

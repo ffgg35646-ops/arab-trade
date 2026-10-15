@@ -202,7 +202,7 @@ export default function AdminRequestDetail({
             {(() => {
               const currentStatus = String(item.status || "").toLowerCase();
               const pending = ["pending", "review", "processing"].includes(currentStatus);
-              const approvedWithdrawal = kind === "withdrawal" && currentStatus === "approved";
+              const approvedWithdrawal = kind === "withdrawal" && currentStatus === "approved" && item.source !== "package";
               if (!pending && !approvedWithdrawal) return null;
               return (
                 <div className="flex flex-wrap gap-3 rounded-2xl border border-slate-800 bg-[#08111e] p-5">
@@ -212,7 +212,7 @@ export default function AdminRequestDetail({
                       onClick={() => void action("approve")}
                       className="rounded-xl bg-emerald-600 px-6 py-3 font-black disabled:opacity-50"
                     >
-                      اعتماد
+                      {kind === "withdrawal" && item.source === "package" ? "موافقة نهائية وتسوية الرصيد" : "اعتماد"}
                     </button>
                   )}
 

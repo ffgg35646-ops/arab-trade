@@ -38,6 +38,7 @@ type PackageAccount = {
   firstPackageWithdrawalRemaining?: number;
   firstPackageWithdrawalPending?: boolean;
   packageWithdrawalPending?: boolean;
+  packageWithdrawalAlreadyUsed?: boolean;
   unresolvedWithdrawalAmount?: number | null;
   unresolvedWithdrawalStatus?: string | null;
   packageWithdrawalCap?: number;
@@ -151,7 +152,14 @@ export default function WithdrawPage() {
         ? packageData.userPackages.filter((item: PackageAccount) =>
             ["active", "cancelled"].includes(item.status) &&
             String(item.asset || "").toUpperCase() === "USDT" &&
-            activePlanIds.has(packagePlanId(item))
+            activePlanIds.has(packagePlanId(item)) &&
+            (
+              item.status === "active" ||
+              Number(item.availableEarnings || 0) > 1e-8 ||
+              Number(item.lockedEarnings || 0) > 1e-8 ||
+              item.packageWithdrawalPending === true ||
+              item.unresolvedWithdrawalStatus === "pending"
+            )
           )
         : [];
       const loadedAddresses: SavedAddress[] = Array.isArray(addressesData.addresses) ? addressesData.addresses : [];
@@ -212,7 +220,7 @@ export default function WithdrawPage() {
   );
   const withdrawalPackageCards = useMemo(() => {
     const planById = new Map(packagePlans.map((plan) => [String(plan._id), plan]));
-    const accountCards = packageAccounts
+    return packageAccounts
       .flatMap((item) => {
         const plan = planById.get(packagePlanId(item));
         return plan ? [{ key: "account-" + item._id, plan, item }] : [];
@@ -224,11 +232,6 @@ export default function WithdrawPage() {
         const bTime = new Date(b.item.activatedAt || b.item.createdAt || 0).getTime();
         return bTime - aTime;
       });
-    const plansWithAccounts = new Set(accountCards.map((card) => String(card.plan._id)));
-    const unopenedCards = packagePlans
-      .filter((plan) => !plansWithAccounts.has(String(plan._id)))
-      .map((plan) => ({ key: "plan-" + plan._id, plan, item: null as PackageAccount | null }));
-    return [...accountCards, ...unopenedCards];
   }, [packageAccounts, packagePlans]);
   const pendingWithdrawal = history.find((item) => item.status === "pending");
   const hasPendingWithdrawal = Boolean(pendingWithdrawal);
@@ -580,8 +583,16 @@ export default function WithdrawPage() {
                               <p className="rounded-lg bg-white/[0.025] px-2 py-2 text-[10px] text-slate-500">فعّل الباقة أولًا لتتاح عمليات السحب.</p>
                             ) : (
                               <>
-                                {item.firstWithdrawalStatus === "pending" && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب الأول قيد المراجعة.</p>}
-                                {renderWithdrawalFields("package", item, plan)}
+                                {item.packageWithdrawalAlreadyUsed ? (
+                                  <p className="mb-2 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-2 text-[10px] leading-5 text-amber-200">
+                                    تمت الموافقة على طلب سحب من هذه الباقة بالفعل. لا يُسمح بطلب سحب ثانٍ من نفس الباقة.
+                                  </p>
+                                ) : (
+                                  <>
+                                    {item.firstWithdrawalStatus === "pending" && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب الأول قيد المراجعة.</p>}
+                                    {renderWithdrawalFields("package", item, plan)}
+                                  </>
+                                )}
                               </>
                             )}
                           </article>

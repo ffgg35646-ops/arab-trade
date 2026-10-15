@@ -989,6 +989,82 @@ closeTo(repairedLegacyAccount.availableEarnings, 0, "old duplicate principal top
 closeTo(repairedLegacyAccount.firstPackageWithdrawalRemaining, 0, "old 500 withdrawal consumes the first-stage allowance after repair");
 assert.equal((await db.collection("withdrawalrequests").findOne({ _id: previouslyMigratedWithdrawalId })).isFirstPackageWithdrawal, true, "old completed withdrawal is classified on an already-migrated account");
 
+// Regression: an old duplicated principal migration must not consume a later package refund.
+const refundRetainedPackageId = new mongoose.Types.ObjectId();
+const refundRetainedWithdrawalId = new mongoose.Types.ObjectId();
+const refundRetainedCreatedAt = new Date(Date.now() - 10 * 60 * 1000);
+await db.collection("userpackages").insertOne({
+  _id: refundRetainedPackageId,
+  userId: user._id,
+  packageId: plan200._id,
+  packageName: "CI retain package cancellation refund",
+  investedAmount: 500,
+  asset: "USDT",
+  durationDays: 0,
+  status: "cancelled",
+  availableEarnings: 550,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 0,
+  totalWithdrawn: 500,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "completed",
+  withdrawalRequestPending: false,
+  cancellationRefund: 50,
+  activatedAt: refundRetainedCreatedAt,
+  lastProfitAt: refundRetainedCreatedAt,
+  createdAt: refundRetainedCreatedAt,
+  updatedAt: refundRetainedCreatedAt,
+});
+await db.collection("withdrawalrequests").insertOne({
+  _id: refundRetainedWithdrawalId,
+  userId: user._id,
+  asset: "USDT",
+  network: "TRC20",
+  amount: 500,
+  fee: 0,
+  receiveAmount: 500,
+  address: "ci-package-refund-retention-address",
+  source: "package",
+  userPackageId: refundRetainedPackageId,
+  packageAllocations: [{ userPackageId: refundRetainedPackageId, amount: 500 }],
+  isFirstPackageWithdrawal: false,
+  status: "completed",
+  adminNote: "Legacy paid package withdrawal whose duplicate migration must be corrected",
+  createdAt: refundRetainedCreatedAt,
+  updatedAt: refundRetainedCreatedAt,
+});
+await db.collection("packageledgers").insertMany([
+  {
+    userId: user._id,
+    userPackageId: refundRetainedPackageId,
+    type: "activation_withdrawable",
+    asset: "USDT",
+    amount: 500,
+    note: "إتاحة المتبقي من قيمة تفعيل الباقة ضمن حد السحب الأول.",
+    createdAt: new Date(refundRetainedCreatedAt.getTime() + 1000),
+  },
+  {
+    userId: user._id,
+    userPackageId: refundRetainedPackageId,
+    type: "cancellation_refund",
+    asset: "USDT",
+    amount: 50,
+    note: "استرداد 50% من قيمة تفعيل الباقة إلى رصيد سحب الباقة نفسها.",
+    createdAt: new Date(refundRetainedCreatedAt.getTime() + 2000),
+  },
+]);
+const refundRetainedPage = await api("/api/packages");
+ok(refundRetainedPage, "package API reconciles legacy migration without consuming a refund");
+const refundRetainedAccount = refundRetainedPage.data.userPackages.find((x) => String(x._id) === String(refundRetainedPackageId));
+assert.ok(refundRetainedAccount, "cancelled package remains visible after reconciliation");
+closeTo(refundRetainedAccount.availableEarnings, 50, "legacy duplicate principal is removed but the 50-USDT cancellation refund remains available");
+ok(await api("/api/packages"), "reloading package data remains safe after refund reconciliation");
+const refundRetainedAccountAfterReload = await db.collection("userpackages").findOne({ _id: refundRetainedPackageId });
+closeTo(refundRetainedAccountAfterReload.availableEarnings, 50, "repeated package refresh never removes the retained cancellation refund");
+await db.collection("packageledgers").deleteMany({ userPackageId: refundRetainedPackageId });
+await db.collection("withdrawalrequests").deleteOne({ _id: refundRetainedWithdrawalId });
+await db.collection("userpackages").deleteOne({ _id: refundRetainedPackageId });
+
 // One open withdrawal per package: a 300-USDT package has 200 left after a 100-USDT request,
 // but a second request remains blocked until the first is rejected or completed.
 const singleRequestPackageId = new mongoose.Types.ObjectId();

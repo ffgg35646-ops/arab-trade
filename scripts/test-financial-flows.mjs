@@ -497,16 +497,15 @@ statusIs(await api("/api/withdrawals", {
 ok(await api("/api/admin/withdrawals", {
   as: "admin", method: "PATCH",
   body: { id: packageWithdrawalId, status: "approved", adminNote: "CI approval" },
-}), "admin approves package withdrawal");
-ok(await api("/api/admin/withdrawals", {
-  as: "admin", method: "PATCH",
-  body: { id: packageWithdrawalId, status: "completed", adminNote: "CI completed payout" },
-}), "admin completes package withdrawal");
+}), "admin approves and settles package withdrawal in one decision");
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 600, "remaining package principal and earnings after completed withdrawal");
-closeTo(package100Doc.lockedEarnings, 0, "completed package withdrawal unlocks reserved amount");
-closeTo(package100Doc.totalWithdrawn, 100, "package withdrawal total");
-assert.equal(package100Doc.firstWithdrawalStatus, "completed", "first package withdrawal marked completed");
+closeTo(package100Doc.availableEarnings, 600, "remaining package principal and earnings after approval");
+closeTo(package100Doc.lockedEarnings, 0, "approved package withdrawal immediately clears the locked amount");
+closeTo(package100Doc.totalWithdrawn, 100, "approved package withdrawal is counted once as withdrawn");
+assert.equal(package100Doc.firstWithdrawalStatus, "completed", "approved first package withdrawal closes the first stage");
+const approvedPackageRequest = await db.collection("withdrawalrequests").findOne({ _id: new mongoose.Types.ObjectId(packageWithdrawalId) });
+assert.equal(approvedPackageRequest.status, "approved", "withdrawal history retains the approved status");
+assert.equal(approvedPackageRequest.packageBalanceSettled, true, "approved package request is marked settled");
 
 // Regression: when a visible package balance spans two same-name package records,
 // reserve the amount from both records and restore both exactly when rejected.
@@ -645,11 +644,10 @@ closeTo(package100Doc.lockedEarnings, 50, "second-stage withdrawal locks its req
 ok(await api("/api/admin/withdrawals", {
   as: "admin", method: "PATCH",
   body: { id: secondStageWithdrawalId, status: "approved", adminNote: "CI approval within active referral cap" },
-}), "admin approves phase-two referral-cap withdrawal");
-ok(await api("/api/admin/withdrawals", {
-  as: "admin", method: "PATCH",
-  body: { id: secondStageWithdrawalId, status: "completed", adminNote: "CI completes phase-two referral-cap withdrawal" },
-}), "admin completes phase-two referral-cap withdrawal");
+}), "admin approves and settles phase-two referral-cap withdrawal");
+package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
+closeTo(package100Doc.lockedEarnings, 0, "approved phase-two package withdrawal also clears the locked amount");
+closeTo(package100Doc.totalWithdrawn, 150, "first and second approved package withdrawals are counted exactly once");
 
 const afterReferralAllowanceUsed = await api("/api/packages");
 ok(afterReferralAllowanceUsed, "package API refreshes referral allowance after payout");

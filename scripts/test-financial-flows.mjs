@@ -346,6 +346,13 @@ closeTo(package100Doc.lockedEarnings, 0, "completed package withdrawal unlocks r
 closeTo(package100Doc.totalWithdrawn, 100, "package withdrawal total");
 assert.equal(package100Doc.firstWithdrawalStatus, "completed", "first package withdrawal marked completed");
 
+const missingReferralCapacity = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 1, source: "package", userPackageId: String(package100._id) },
+});
+statusIs(missingReferralCapacity, 400, "phase-two package withdrawal is blocked when no active referrals exist");
+assert.match(String(missingReferralCapacity.data.message || ""), /الطاقة منخفضة الآن، يُرجى جلب إحالات نشطة/, "empty phase two asks the user to bring active referrals");
+
 const capTestReferralId = new mongoose.Types.ObjectId();
 const capTestCreatedAt = new Date();
 await db.collection("users").insertOne({

@@ -620,16 +620,70 @@ ok(await api("/api/admin/withdrawals", {
 singleRequestPackage = await db.collection("userpackages").findOne({ _id: singleRequestPackageId });
 assert.equal(singleRequestPackage.withdrawalRequestPending, false, "package request lock clears after approval");
 const approvedWithdrawalPackagesPage = await api("/api/packages");
-ok(approvedWithdrawalPackagesPage, "package API exposes the approved-withdrawal lock");
+ok(approvedWithdrawalPackagesPage, "package API exposes the post-approval withdrawal phase");
 const approvedWithdrawalPackageView = approvedWithdrawalPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
-assert.equal(approvedWithdrawalPackageView.packageWithdrawalAlreadyUsed, true, "package API marks an approved withdrawal as already used");
-closeTo(approvedWithdrawalPackageView.withdrawalLimit, 0, "approved package withdrawal disables any second withdrawal even with remaining balance");
-const retrySingleRequest = await api("/api/withdrawals", {
+assert.equal(approvedWithdrawalPackageView.packageWithdrawalAlreadyUsed, true, "package API marks a successful first-stage withdrawal");
+closeTo(approvedWithdrawalPackageView.firstPackageWithdrawalRemaining, 200, "first-stage principal remains visible after a partial first request");
+closeTo(approvedWithdrawalPackageView.withdrawalLimit, 0, "later withdrawal limit is referral-based when the available referral capacity has already been used");
+const blockedSecondStageWithoutCapacity = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "single-request-test-address", amount: 100, source: "package", userPackageId: String(singleRequestPackageId) },
 });
-statusIs(retrySingleRequest, 409, "second withdrawal remains blocked after admin approval");
-assert.match(String(retrySingleRequest.data.message || ""), /لا يُسمح بطلب سحب ثانٍ/, "approved-withdrawal rejection explains the one-time package rule");
+statusIs(blockedSecondStageWithoutCapacity, 400, "later package withdrawal requires referral capacity after the first approval");
+assert.match(String(blockedSecondStageWithoutCapacity.data.message || ""), /المتاح للسحب مقابل الإحالات النشطة/, "second-stage rejection explains the active-referral limit");
+
+const laterStageReferralId = new mongoose.Types.ObjectId();
+const laterStageReferralCreatedAt = new Date();
+await db.collection("users").insertOne({
+  _id: laterStageReferralId,
+  name: "CI Later Stage Referral",
+  username: "ci_later_stage_referral",
+  email: "ci-later-stage-referral@arabtrade.invalid",
+  password: "unused",
+  role: "user",
+  referralCode: "CILATERSTAGEREF",
+  referredBy: user._id,
+  isVerified: true,
+  isActive: true,
+  createdAt: laterStageReferralCreatedAt,
+  updatedAt: laterStageReferralCreatedAt,
+});
+await db.collection("depositrequests").insertOne({
+  _id: new mongoose.Types.ObjectId(),
+  userId: laterStageReferralId,
+  asset: "USDT",
+  amount: 200,
+  status: "approved",
+  createdAt: laterStageReferralCreatedAt,
+  updatedAt: laterStageReferralCreatedAt,
+});
+const referralUnlockedPackagesPage = await api("/api/packages");
+ok(referralUnlockedPackagesPage, "package API refreshes the later-stage referral allowance");
+const referralUnlockedPackageView = referralUnlockedPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
+closeTo(referralUnlockedPackageView.withdrawalLimit, 100, "additional active referral deposits unlock the configured 50-percent second-stage amount");
+
+const laterStageWithdrawal = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "single-request-test-address", amount: 100, source: "package", userPackageId: String(singleRequestPackageId) },
+});
+ok(laterStageWithdrawal, "later package withdrawal is allowed within the active-referral cap after first approval", 201);
+assert.equal(laterStageWithdrawal.data.withdrawal.isFirstPackageWithdrawal, false, "later package withdrawal is classified as referral-based");
+const laterStageWithdrawalId = String(laterStageWithdrawal.data.withdrawal._id);
+ok(await api("/api/admin/withdrawals", {
+  as: "admin",
+  method: "PATCH",
+  body: { id: firstSingleRequestId, status: "completed", adminNote: "CI complete first-stage withdrawal after the later-stage request is placed" },
+}), "admin completes the first-stage withdrawal");
+ok(await api("/api/admin/withdrawals", {
+  as: "admin",
+  method: "PATCH",
+  body: { id: laterStageWithdrawalId, status: "approved", adminNote: "CI approval within the active-referral cap" },
+}), "admin approves later-stage withdrawal within referral capacity");
+ok(await api("/api/admin/withdrawals", {
+  as: "admin",
+  method: "PATCH",
+  body: { id: laterStageWithdrawalId, status: "completed", adminNote: "CI complete later-stage referral withdrawal" },
+}), "admin completes later-stage referral withdrawal");
 
 const generalWithdrawal = await api("/api/withdrawals", {
   method: "POST",

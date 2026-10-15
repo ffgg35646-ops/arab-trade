@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     const countedWithdrawalStatuses = ["pending", "approved", "processing", "completed"] as const;
     const unresolvedWithdrawalStatuses = ["pending"] as const;
-    const [activeReferralDeposits, referralWithdrawalRows, firstWithdrawalRows, unresolvedPackageWithdrawalRows] = await Promise.all([
+    const [activeReferralDeposits, referralWithdrawalRows, firstWithdrawalRows, unresolvedPackageWithdrawalRows, successfulPackageWithdrawalRows] = await Promise.all([
       referredIds.length
         ? DepositRequest.aggregate([
             { $match: { userId: { $in: referredIds }, status: "approved", asset: "USDT" } },
@@ -93,6 +93,11 @@ export async function GET(request: NextRequest) {
         source: "package",
         status: { $in: unresolvedWithdrawalStatuses },
       }).select("userPackageId status amount createdAt").sort({ createdAt: -1 }).lean(),
+      WithdrawalRequest.find({
+        userId: user._id,
+        source: "package",
+        status: { $in: ["approved", "processing", "completed"] },
+      }).select("userPackageId status createdAt").sort({ createdAt: -1 }).lean(),
     ]);
 
     const activeReferralCount = activeReferralDeposits.length;
@@ -110,6 +115,11 @@ export async function GET(request: NextRequest) {
     const firstWithdrawalByPackage = new Map<string, number>();
     const firstWithdrawalPendingPackages = new Set<string>();
     const unresolvedWithdrawalByPackage = new Map<string, any>();
+    const successfulWithdrawalPackages = new Set<string>();
+    for (const row of successfulPackageWithdrawalRows as any[]) {
+      const key = String(row.userPackageId || "");
+      if (key) successfulWithdrawalPackages.add(key);
+    }
     for (const row of unresolvedPackageWithdrawalRows as any[]) {
       const key = String(row.userPackageId || "");
       if (key && !unresolvedWithdrawalByPackage.has(key)) unresolvedWithdrawalByPackage.set(key, row);
@@ -141,13 +151,14 @@ export async function GET(request: NextRequest) {
       const firstPackageWithdrawalPending = firstWithdrawalPendingPackages.has(packageKey);
       const unresolvedPackageWithdrawal = unresolvedWithdrawalByPackage.get(packageKey) || null;
       const packageWithdrawalPending = item.withdrawalRequestPending === true || Boolean(unresolvedPackageWithdrawal);
+      const packageWithdrawalAlreadyUsed = successfulWithdrawalPackages.has(packageKey);
       // Package principal caps only phase one. After it is fully withdrawn,
       // the remaining allowance comes from 50% of active referral deposits.
       const packageWithdrawalCap = firstPackageWithdrawalCap;
       const packageWithdrawalUsed = firstPackageWithdrawalUsed;
       const packageWithdrawalRemaining = firstPackageWithdrawalRemaining;
       const availableEarnings = Math.max(0, Number(item.availableEarnings || 0));
-      const phaseWithdrawalLimit = packageWithdrawalPending || firstPackageWithdrawalPending
+      const phaseWithdrawalLimit = packageWithdrawalAlreadyUsed || packageWithdrawalPending || firstPackageWithdrawalPending
         ? 0
         : Math.min(availableEarnings, firstPackageWithdrawalRemaining > 0
           ? firstPackageWithdrawalRemaining
@@ -160,6 +171,7 @@ export async function GET(request: NextRequest) {
         firstPackageWithdrawalRemaining,
         firstPackageWithdrawalPending,
         packageWithdrawalPending,
+        packageWithdrawalAlreadyUsed,
         unresolvedWithdrawalAmount: unresolvedPackageWithdrawal ? Number(unresolvedPackageWithdrawal.amount || 0) : null,
         unresolvedWithdrawalStatus: unresolvedPackageWithdrawal ? String(unresolvedPackageWithdrawal.status) : null,
         packageWithdrawalCap,

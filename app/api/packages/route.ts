@@ -243,7 +243,7 @@ export async function GET(request: NextRequest) {
         nextCollectAt: new Date(nextCollectAt).toISOString(),
         collectWindowEndsAt: new Date(collectWindowEndsAt).toISOString(),
         collectWindowOpen,
-        minimumWithdrawal: minimumWithdrawalByPlan.get(String(item.packageId)) ?? Number(settings?.withdrawals?.minAmount ?? 0),
+        minimumWithdrawal: minimumWithdrawalByPlan.get(String(item.packageId)) ?? 100,
         activeReferralCount,
         activeReferralDepositTotal,
         firstPackageWithdrawalPercent,

@@ -587,8 +587,8 @@ const packageBalancesBeforeIndependentWithdrawal = await api("/api/packages");
 ok(packageBalancesBeforeIndependentWithdrawal, "package API returns independent account balances");
 const selectedBalanceBeforeWithdrawal = packageBalancesBeforeIndependentWithdrawal.data.userPackages.find((x) => String(x._id) === String(splitAccountIds[0]));
 const siblingBalanceBeforeWithdrawal = packageBalancesBeforeIndependentWithdrawal.data.userPackages.find((x) => String(x._id) === String(splitAccountIds[1]));
-closeTo(selectedBalanceBeforeWithdrawal.packageGroupAvailableEarnings, 150, "selected account API balance does not include sibling funds");
-closeTo(siblingBalanceBeforeWithdrawal.packageGroupAvailableEarnings, 50, "sibling API balance is reported independently");
+closeTo(selectedBalanceBeforeWithdrawal.availableEarnings, 150, "selected account API balance does not include sibling funds");
+closeTo(siblingBalanceBeforeWithdrawal.availableEarnings, 50, "sibling API balance is reported independently");
 const independentWithdrawal = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 100, source: "package", userPackageId: String(splitAccountIds[0]) },

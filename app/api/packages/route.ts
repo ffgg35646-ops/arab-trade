@@ -65,10 +65,7 @@ export async function GET(request: NextRequest) {
     const minimumWithdrawalByPlan = new Map(
       (packageMinimumRows as any[]).map((plan) => [
         String(plan._id),
-        Math.max(
-          Number(configuredMinimums?.[String(plan._id)] ?? plan.minimumWithdrawal ?? 100),
-          Number(settings?.withdrawals?.minAmount ?? 0),
-        ),
+        Number(configuredMinimums?.[String(plan._id)] ?? plan.minimumWithdrawal ?? 100),
       ])
     );
 
@@ -262,10 +259,7 @@ export async function GET(request: NextRequest) {
       success: true,
       packages: packages.map((plan: any) => ({
         ...plan,
-        minimumWithdrawal: Math.max(
-          Number(configuredMinimums?.[String(plan._id)] ?? plan.minimumWithdrawal ?? 100),
-          Number(settings?.withdrawals?.minAmount ?? 0),
-        ),
+        minimumWithdrawal: Number(configuredMinimums?.[String(plan._id)] ?? plan.minimumWithdrawal ?? 100),
         asset: USDT_ASSET,
         durationDays: 0,
         dailyProfit: Number(plan.dailyProfit || 0),

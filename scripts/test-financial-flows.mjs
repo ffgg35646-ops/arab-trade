@@ -658,7 +658,7 @@ closeTo(afterReferralAccount.withdrawalLimit, 0, "used referral allowance cannot
 // The package API must settle them once, without returning a paid amount to available.
 const legacyApprovedPackageId = new mongoose.Types.ObjectId();
 const legacyApprovedWithdrawalId = new mongoose.Types.ObjectId();
-const legacyPackageCreatedAt = new Date(Date.now() - 10 * 60 * 1000);
+const legacyApprovedMigrationCreatedAt = new Date(Date.now() - 10 * 60 * 1000);
 await db.collection("userpackages").insertOne({
   _id: legacyApprovedPackageId,
   userId: user._id,
@@ -676,10 +676,10 @@ await db.collection("userpackages").insertOne({
   firstWithdrawalStatus: "approved",
   withdrawalRequestPending: false,
   cancellationRefund: 0,
-  activatedAt: legacyPackageCreatedAt,
-  lastProfitAt: legacyPackageCreatedAt,
-  createdAt: legacyPackageCreatedAt,
-  updatedAt: legacyPackageCreatedAt,
+  activatedAt: legacyApprovedMigrationCreatedAt,
+  lastProfitAt: legacyApprovedMigrationCreatedAt,
+  createdAt: legacyApprovedMigrationCreatedAt,
+  updatedAt: legacyApprovedMigrationCreatedAt,
 });
 await db.collection("withdrawalrequests").insertOne({
   _id: legacyApprovedWithdrawalId,
@@ -696,8 +696,8 @@ await db.collection("withdrawalrequests").insertOne({
   isFirstPackageWithdrawal: true,
   status: "approved",
   adminNote: "Legacy approved request without package settlement marker",
-  createdAt: legacyPackageCreatedAt,
-  updatedAt: legacyPackageCreatedAt,
+  createdAt: legacyApprovedMigrationCreatedAt,
+  updatedAt: legacyApprovedMigrationCreatedAt,
 });
 ok(await api("/api/packages"), "package API reconciles legacy approved package withdrawal locks");
 let legacySettledAccount = await db.collection("userpackages").findOne({ _id: legacyApprovedPackageId });

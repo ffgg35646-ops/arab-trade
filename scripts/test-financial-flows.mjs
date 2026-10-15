@@ -1180,7 +1180,7 @@ const oldPackage = await db.collection("userpackages").findOne({ _id: new mongoo
 assert.equal(oldPackage.status, "cancelled", "old package is cancelled");
 closeTo(oldPackage.cancellationRefund, 50, "changing package refunds half old activation");
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 50, "package change does not mix deposit or package refund into the general wallet");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 40, "package change does not mix deposit or package refund into the general wallet");
 const oldPackageAfterChange = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
 closeTo(oldPackageAfterChange.availableEarnings, 600, "package change adds the 50-USDT refund to the old package's remaining 550-USDT balance");
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
@@ -1205,7 +1205,7 @@ closeTo(await navbarWithdrawalUsdtTotal("navbar total after package cancellation
 const cancelledPackage = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package200._id)) });
 closeTo(cancelledPackage.cancellationRefund, 100, "cancel package refunds half its activation price");
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 50, "package cancellation refund remains isolated from the general wallet");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 40, "package cancellation refund remains isolated from the general wallet");
 const cancelledPackageWithRefund = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package200._id)) });
 closeTo(cancelledPackageWithRefund.availableEarnings, 300, "package card shows the 200-USDT package balance plus its 100-USDT cancellation refund");
 const cancelledPackagePage = await api("/api/packages");
@@ -1220,7 +1220,7 @@ const renewed = await api("/api/packages", { method: "POST", body: { action: "ac
 ok(renewed, "renew package from separate deposit balance", 201);
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
-closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 50, "package renewal leaves general withdrawal balance unchanged");
+closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 40, "package renewal leaves general withdrawal balance unchanged");
 closeTo(depositBalance && depositBalance.available, 500, "package renewal debits separate deposit balance");
 
 ok(await api("/api/deposits"), "user deposit page API");

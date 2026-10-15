@@ -29,8 +29,6 @@ type PackageAccount = {
   status: "active" | "cancelled";
   availableEarnings: number;
   lockedEarnings: number;
-  packageGroupAvailableEarnings?: number;
-  packageGroupLockedEarnings?: number;
   investedAmount: number;
   durationDays?: number;
   totalRealizedEarnings: number;

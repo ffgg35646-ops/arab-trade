@@ -158,8 +158,8 @@ export async function GET(request: NextRequest) {
       const packageWithdrawalAlreadyUsed =
         successfulWithdrawalPackages.has(packageKey) ||
         completedFirstWithdrawalPackages.has(packageKey);
-      // Package principal caps only phase one. After it is fully withdrawn,
-      // the remaining allowance comes from 50% of active referral deposits.
+      // The package principal cap applies to the first completed payout only.
+      // Every later payout uses the configured active-referral withdrawal cap.
       const packageWithdrawalCap = firstPackageWithdrawalCap;
       const packageWithdrawalUsed = firstPackageWithdrawalUsed;
       const packageWithdrawalRemaining = firstPackageWithdrawalRemaining;

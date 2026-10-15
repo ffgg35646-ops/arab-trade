@@ -162,7 +162,7 @@ async function reconcileLegacyPackageRefunds(userId: mongoose.Types.ObjectId) {
           amount: refund,
           note: migrationNote,
         });
-        await PackageLedger.create(reclassificationEntries, { session });
+        await PackageLedger.create(reclassificationEntries, { session, ordered: true });
 
         await LedgerEntry.create([{
           userId,

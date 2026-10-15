@@ -241,11 +241,26 @@ export async function POST(request: NextRequest) {
       payment = packageCandidates.find(
         (item: any) => normalizePaymentNetwork(item.network) === networkCode,
       ) || null;
+
+      // Prefer an explicit package method. If none exists for this network,
+      // reuse the admin-enabled USDT withdrawal method already shown as the
+      // package fallback in /api/payment-options. This keeps the submit API
+      // aligned with the options the card actually displays.
       if (!payment) {
-        return NextResponse.json(
-          { success: false, message: "وسيلة السحب هذه غير مضافة لسحب الباقات من لوحة الإدارة." },
-          { status: 400 },
-        );
+        const paymentCandidates = await PaymentOption.find({
+          asset: USDT_ASSET,
+          $or: [
+            { kind: "withdrawal" },
+            { kind: "both" },
+            { kind: { $exists: false } },
+          ],
+        }).lean();
+        payment = paymentCandidates.find(
+          (item: any) =>
+            normalizePaymentNetwork(item.network) === networkCode &&
+            item.enabled === true &&
+            item.withdrawalEnabled !== false,
+        ) || null;
       }
     } else {
       const paymentCandidates = await PaymentOption.find({

@@ -142,7 +142,7 @@ export default function PaymentsAdminPage() {
         : {};
       const minima: Record<string, number> = {};
       for (const plan of plans) {
-        minima[plan._id] = Number(configured[plan._id] ?? plan.minimumWithdrawal ?? settingsJson.settings?.withdrawals?.minAmount ?? 0);
+        minima[plan._id] = Number(configured[plan._id] ?? plan.minimumWithdrawal ?? 100);
       }
       setPackagePlans(plans);
       setPackageWithdrawalMinimums(minima);

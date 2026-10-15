@@ -479,7 +479,7 @@ export async function POST(request: NextRequest) {
           {
             success: false,
             alreadyWithdrawn: true,
-            message: "طلب السحب من باقة " + currentPackage.packageName + " ما زال معتمدًا أو قيد التنفيذ. انتظر اكتماله قبل تقديم طلب جديد.",
+            message: "طلب السحب من باقة " + currentPackage.packageName + " تمت الموافقة عليه أو ما زال قيد التنفيذ. لا يُسمح بطلب جديد حتى يكتمل التحويل أو يُرفض الطلب.",
             previousWithdrawalId: String(successfulPackageWithdrawal._id),
           },
           { status: 409 }

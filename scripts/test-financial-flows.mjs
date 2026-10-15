@@ -619,16 +619,17 @@ ok(await api("/api/admin/withdrawals", {
 }), "admin approval releases the review lock");
 singleRequestPackage = await db.collection("userpackages").findOne({ _id: singleRequestPackageId });
 assert.equal(singleRequestPackage.withdrawalRequestPending, false, "package request lock clears after approval");
+const approvedWithdrawalPackagesPage = await api("/api/packages");
+ok(approvedWithdrawalPackagesPage, "package API exposes the approved-withdrawal lock");
+const approvedWithdrawalPackageView = approvedWithdrawalPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
+assert.equal(approvedWithdrawalPackageView.packageWithdrawalAlreadyUsed, true, "package API marks an approved withdrawal as already used");
+closeTo(approvedWithdrawalPackageView.withdrawalLimit, 0, "approved package withdrawal disables any second withdrawal even with remaining balance");
 const retrySingleRequest = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "single-request-test-address", amount: 100, source: "package", userPackageId: String(singleRequestPackageId) },
 });
-ok(retrySingleRequest, "a new withdrawal is allowed after the prior request is approved and the remaining 200-USDT cap remains", 201);
-ok(await api("/api/admin/withdrawals", {
-  as: "admin",
-  method: "PATCH",
-  body: { id: String(retrySingleRequest.data.withdrawal._id), status: "rejected", adminNote: "CI cleanup single-request lock test" },
-}), "test retry is rejected to release its reservation");
+statusIs(retrySingleRequest, 409, "second withdrawal remains blocked after admin approval");
+assert.match(String(retrySingleRequest.data.message || ""), /لا يُسمح بطلب سحب ثانٍ/, "approved-withdrawal rejection explains the one-time package rule");
 
 const generalWithdrawal = await api("/api/withdrawals", {
   method: "POST",

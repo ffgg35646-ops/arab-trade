@@ -513,8 +513,9 @@ export default function WithdrawPage() {
       updateForm(source, accountId, "amount", "");
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "تعذر إرسال طلب السحب");
+      const submitError = cause instanceof Error ? cause.message : "تعذر إرسال طلب السحب";
       await load();
+      setError(submitError);
     } finally {
       setSubmittingKey("");
     }

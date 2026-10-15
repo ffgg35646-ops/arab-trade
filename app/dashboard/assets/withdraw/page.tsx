@@ -66,6 +66,11 @@ type WithdrawalForm = { methodId: string; amount: string; address: string };
 
 const emptyForm: WithdrawalForm = { methodId: "", amount: "", address: "" };
 const money = (value: number) => Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 });
+function sanitizeAmountInput(value: string) {
+  const cleaned = value.replace(/[^0-9.]/g, "");
+  const dot = cleaned.indexOf(".");
+  return dot < 0 ? cleaned : cleaned.slice(0, dot + 1) + cleaned.slice(dot + 1).replace(/\./g, "");
+}
 const statusLabel = (status: string) => status === "completed" ? "مكتمل" : status === "approved" ? "تمت الموافقة" : status === "processing" ? "قيد التنفيذ" : status === "rejected" ? "مرفوض" : status === "failed" ? "فشل التنفيذ" : "قيد المراجعة";
 const statusClass = (status: string) => status === "completed" ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : status === "rejected" || status === "failed" ? "border-red-400/20 bg-red-400/10 text-red-200" : status === "approved" || status === "processing" ? "border-blue-400/20 bg-blue-400/10 text-blue-200" : "border-amber-400/20 bg-amber-400/10 text-amber-200";
 
@@ -301,14 +306,14 @@ export default function WithdrawPage() {
       const max = packageMaximum(packageAccount);
       if (numericAmount > max) {
         setError(max > 0
-          ? "الحد المتاح للسحب من باقة " + packageAccount.packageName + " هو " + money(max) + " USDT."
-          : "لا يوجد حد سحب متاح حاليًا من باقة " + packageAccount.packageName + ".");
+          ? "رصيد باقة " + packageAccount.packageName + " المتاح للسحب هو " + money(max) + " USDT فقط. أدخل مبلغًا لا يتجاوز الرصيد المتاح."
+          : "لا يوجد رصيد متاح للسحب من باقة " + packageAccount.packageName + " حاليًا.");
         return;
       }
     } else {
       const currentBalance = Number(balances.find((item) => item.asset === selectedMethod.asset)?.available || 0);
       if (numericAmount > currentBalance) {
-        setError("رصيد السحب العام غير كافٍ. المتاح هو " + money(currentBalance) + " " + selectedMethod.asset + ".");
+        setError("رصيد السحب العام المتاح هو " + money(currentBalance) + " " + selectedMethod.asset + " فقط. أدخل مبلغًا لا يتجاوز الرصيد المتاح.");
         return;
       }
     }
@@ -328,7 +333,7 @@ export default function WithdrawPage() {
       Math.abs(numericAmount - firstRemainder) <= 1e-8 &&
       Number(packageAccount?.availableEarnings || 0) >= firstRemainder;
     if (numericAmount < minimum && !finalFirstAllowanceBelowMinimum) {
-      setError("الحد الأدنى للسحب هو " + money(minimum) + " " + selectedMethod.asset);
+      setError((source === "package" ? "أقل مبلغ يمكن سحبه من باقة " + (packageAccount?.packageName || "") : "أقل مبلغ يمكن سحبه") + " هو " + money(minimum) + " " + selectedMethod.asset + ". أدخل مبلغًا مساويًا للحد الأدنى أو أكبر، مع عدم تجاوز الرصيد المتاح.");
       return;
     }
     if (maximum > 0 && numericAmount > maximum) {
@@ -447,7 +452,8 @@ export default function WithdrawPage() {
         </div>
 
         <div className="min-w-0">
-          <input aria-label="مبلغ السحب" type="number" min={inputMinimum} max={source === "package" ? Math.min(packageMax, maximum || packageMax) : maximum} step="any" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", event.target.value)} disabled={Boolean(source === "package" && (!packageAccount || packageMax <= 0))} required placeholder={money(minimum)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50 disabled:opacity-50" />
+          <input aria-label="مبلغ السحب" type="text" inputMode="decimal" autoComplete="off" value={form.amount} onChange={(event) => updateForm(source, packageId, "amount", sanitizeAmountInput(event.target.value))} disabled={Boolean(source === "package" && (!packageAccount || packageMax <= 0))} required placeholder={money(minimum)} className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-xs outline-none focus:border-cyan-400/50 disabled:opacity-50" />
+          <p className="mt-1 text-[10px] leading-4 text-slate-500">أقل مبلغ للسحب: {money(minimum)} {selected?.asset || "USDT"}</p>
           {source === "package" && <p className="mt-1 text-[10px] leading-4 text-slate-500">الأقصى حسب مرحلة السحب الحالية: {money(Math.min(packageMax, maximum || packageMax))} USDT</p>}
         </div>
         {source === "package" && packageAccount && (

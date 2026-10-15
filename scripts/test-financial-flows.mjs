@@ -304,7 +304,7 @@ closeTo(stillActivePackage.cancellationRefund, 0, "blocked cancellation does not
 statusIs(await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 10, source: "package", userPackageId: String(package100._id) },
-}), 409, "another package withdrawal is blocked until the first is resolved");
+}), 400, "another package withdrawal is blocked by the package lifetime cap while the first is unresolved");
 
 ok(await api("/api/admin/withdrawals", {
   as: "admin", method: "PATCH",
@@ -329,7 +329,7 @@ assert.equal(package100Doc.firstWithdrawalStatus, "pending", "retried first pack
 statusIs(await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 10, source: "package", userPackageId: String(package100._id) },
-}), 409, "second package withdrawal blocked while first request is pending");
+}), 400, "second package withdrawal blocked by package lifetime cap while first request is pending");
 
 ok(await api("/api/admin/withdrawals", {
   as: "admin", method: "PATCH",
@@ -383,6 +383,35 @@ const overLifetimeCap = await api("/api/withdrawals", {
 });
 statusIs(overLifetimeCap, 400, "package withdrawals cannot exceed activation amount even when referral deposits would unlock more");
 assert.match(String(overLifetimeCap.data.message || ""), /سقف السحب الإجمالي/, "over-cap withdrawal explains lifetime package cap");
+
+const legacyOverCapRequestId = new mongoose.Types.ObjectId();
+const legacyOverCapCreatedAt = new Date(Date.now() + 1000);
+await db.collection("withdrawalrequests").insertOne({
+  _id: legacyOverCapRequestId,
+  userId: user._id,
+  asset: "USDT",
+  network: "TRC20",
+  amount: 1,
+  fee: 0,
+  receiveAmount: 1,
+  address: "legacy-over-cap-test-address",
+  source: "package",
+  walletType: "spot",
+  walletAllocations: [],
+  userPackageId: new mongoose.Types.ObjectId(String(package100._id)),
+  isFirstPackageWithdrawal: false,
+  status: "pending",
+  adminNote: "",
+  createdAt: legacyOverCapCreatedAt,
+  updatedAt: legacyOverCapCreatedAt,
+});
+const blockedLegacyApproval = await api("/api/admin/withdrawals", {
+  as: "admin",
+  method: "PATCH",
+  body: { id: String(legacyOverCapRequestId), status: "approved", adminNote: "CI ensure legacy package cap is enforced" },
+});
+statusIs(blockedLegacyApproval, 409, "admin cannot approve a legacy withdrawal request that pushes the package past its lifetime cap");
+await db.collection("withdrawalrequests").deleteOne({ _id: legacyOverCapRequestId });
 
 const generalWithdrawal = await api("/api/withdrawals", {
   method: "POST",

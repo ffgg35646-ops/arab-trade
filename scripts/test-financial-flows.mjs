@@ -714,6 +714,118 @@ await db.collection("packageledgers").deleteMany({ userPackageId: legacyApproved
 await db.collection("withdrawalrequests").deleteOne({ _id: legacyApprovedWithdrawalId });
 await db.collection("userpackages").deleteOne({ _id: legacyApprovedPackageId });
 
+// Regression: legacy rejected requests must return the held amount to the
+// package's available bucket exactly once, while preserving already-booked refunds.
+const legacyRejectedPackageId = new mongoose.Types.ObjectId();
+const legacyRejectedWithdrawalId = new mongoose.Types.ObjectId();
+const legacyRejectedCreatedAt = new Date(Date.now() - 10 * 60 * 1000);
+await db.collection("userpackages").insertOne({
+  _id: legacyRejectedPackageId,
+  userId: user._id,
+  packageId: package100.packageId,
+  packageName: "CI legacy rejected refund",
+  investedAmount: 100,
+  asset: "USDT",
+  durationDays: 0,
+  status: "cancelled",
+  availableEarnings: 75,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 75,
+  totalWithdrawn: 0,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "available",
+  withdrawalRequestPending: false,
+  createdAt: legacyRejectedCreatedAt,
+  updatedAt: legacyRejectedCreatedAt,
+});
+await db.collection("withdrawalrequests").insertOne({
+  _id: legacyRejectedWithdrawalId,
+  userId: user._id,
+  asset: "USDT",
+  network: "TRC20",
+  amount: 50,
+  fee: 0,
+  receiveAmount: 50,
+  address: "ci-legacy-rejected-refund-address",
+  source: "package",
+  userPackageId: legacyRejectedPackageId,
+  packageAllocations: [{ userPackageId: legacyRejectedPackageId, amount: 50 }],
+  isFirstPackageWithdrawal: false,
+  status: "rejected",
+  adminNote: "Legacy rejected request missing refund credit",
+  createdAt: legacyRejectedCreatedAt,
+  updatedAt: legacyRejectedCreatedAt,
+});
+ok(await api("/api/packages"), "package API restores an older rejected package withdrawal");
+let legacyRejectedAccount = await db.collection("userpackages").findOne({ _id: legacyRejectedPackageId });
+closeTo(legacyRejectedAccount.availableEarnings, 125, "legacy rejected amount is restored to package available earnings");
+closeTo(legacyRejectedAccount.lockedEarnings, 0, "legacy rejected amount leaves no locked balance");
+closeTo(legacyRejectedAccount.totalWithdrawn, 0, "rejected amount is not counted as withdrawn");
+let legacyRejectedRequest = await db.collection("withdrawalrequests").findOne({ _id: legacyRejectedWithdrawalId });
+assert.equal(legacyRejectedRequest.packageBalanceSettled, true, "legacy rejected request receives an idempotent settlement marker");
+ok(await api("/api/packages"), "refresh is safe after rejected-package refund migration");
+legacyRejectedAccount = await db.collection("userpackages").findOne({ _id: legacyRejectedPackageId });
+closeTo(legacyRejectedAccount.availableEarnings, 125, "repeated refresh does not refund the rejected request twice");
+
+// A previous rejection ledger entry means the credit already happened; do not duplicate it.
+const alreadyRefundedPackageId = new mongoose.Types.ObjectId();
+const alreadyRefundedWithdrawalId = new mongoose.Types.ObjectId();
+const alreadyRefundedAt = new Date(Date.now() - 5 * 60 * 1000);
+await db.collection("userpackages").insertOne({
+  _id: alreadyRefundedPackageId,
+  userId: user._id,
+  packageId: package100.packageId,
+  packageName: "CI legacy rejected already refunded",
+  investedAmount: 100,
+  asset: "USDT",
+  durationDays: 0,
+  status: "cancelled",
+  availableEarnings: 75,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 75,
+  totalWithdrawn: 0,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "available",
+  withdrawalRequestPending: false,
+  createdAt: alreadyRefundedAt,
+  updatedAt: alreadyRefundedAt,
+});
+await db.collection("withdrawalrequests").insertOne({
+  _id: alreadyRefundedWithdrawalId,
+  userId: user._id,
+  asset: "USDT",
+  network: "TRC20",
+  amount: 50,
+  fee: 0,
+  receiveAmount: 50,
+  address: "ci-already-refunded-address",
+  source: "package",
+  userPackageId: alreadyRefundedPackageId,
+  packageAllocations: [{ userPackageId: alreadyRefundedPackageId, amount: 50 }],
+  isFirstPackageWithdrawal: false,
+  status: "rejected",
+  adminNote: "Legacy rejected request already credited",
+  createdAt: alreadyRefundedAt,
+  updatedAt: alreadyRefundedAt,
+});
+await db.collection("packageledgers").insertOne({
+  userId: user._id,
+  userPackageId: alreadyRefundedPackageId,
+  type: "withdrawal_reversal",
+  asset: "USDT",
+  amount: 50,
+  note: "Legacy rejection refund already booked",
+  createdAt: alreadyRefundedAt,
+});
+ok(await api("/api/packages"), "package API recognizes a previously booked rejection refund");
+const alreadyRefundedAccount = await db.collection("userpackages").findOne({ _id: alreadyRefundedPackageId });
+closeTo(alreadyRefundedAccount.availableEarnings, 75, "existing rejection credit is not duplicated");
+const alreadyRefundedRequest = await db.collection("withdrawalrequests").findOne({ _id: alreadyRefundedWithdrawalId });
+assert.equal(alreadyRefundedRequest.packageBalanceSettled, true, "already-refunded rejection is marked settled");
+await db.collection("packageledgers").deleteMany({ userPackageId: { $in: [legacyRejectedPackageId, alreadyRefundedPackageId] } });
+await db.collection("withdrawalrequests").deleteMany({ _id: { $in: [legacyRejectedWithdrawalId, alreadyRefundedWithdrawalId] } });
+await db.collection("userpackages").deleteMany({ _id: { $in: [legacyRejectedPackageId, alreadyRefundedPackageId] } });
+
 const legacyOverCapRequestId = new mongoose.Types.ObjectId();
 const legacyOverCapCreatedAt = new Date(Date.now() + 1000);
 await db.collection("withdrawalrequests").insertOne({

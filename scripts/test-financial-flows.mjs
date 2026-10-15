@@ -1015,6 +1015,7 @@ await db.collection("userpackages").insertOne({
   createdAt: singleRequestPackageCreatedAt,
   updatedAt: singleRequestPackageCreatedAt,
 });
+const navbarBeforeFirstPackageWithdrawal = await navbarWithdrawalUsdtTotal("navbar total before package withdrawal");
 const firstSingleRequest = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "single-request-test-address", amount: 100, source: "package", userPackageId: String(singleRequestPackageId) },
@@ -1031,6 +1032,11 @@ assert.equal(singleRequestPackageView.packageWithdrawalPending, true, "package A
 assert.equal(singleRequestPackageView.packageWithdrawalStatus, "pending", "a truly pending request is labeled as under review");
 closeTo(singleRequestPackageView.packageWithdrawalRemaining, 200, "package cap still has 200 remaining while first request is pending");
 closeTo(singleRequestPackageView.withdrawalLimit, 0, "package API prevents a second withdrawal despite remaining balance and cap");
+closeTo(
+  await navbarWithdrawalUsdtTotal("navbar total while package withdrawal is pending"),
+  navbarBeforeFirstPackageWithdrawal,
+  "pending package withdrawal remains reserved in navbar total"
+);
 const secondSingleRequest = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "single-request-test-address", amount: 100, source: "package", userPackageId: String(singleRequestPackageId) },
@@ -1044,6 +1050,11 @@ ok(await api("/api/admin/withdrawals", {
 }), "admin approval releases the review lock");
 singleRequestPackage = await db.collection("userpackages").findOne({ _id: singleRequestPackageId });
 assert.equal(singleRequestPackage.withdrawalRequestPending, false, "package request lock clears after approval");
+closeTo(
+  await navbarWithdrawalUsdtTotal("navbar total after package approval"),
+  navbarBeforeFirstPackageWithdrawal - 100,
+  "approved package withdrawal reduces navbar total exactly once"
+);
 const blockedWhileTransferInProgress = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "single-request-test-address", amount: 100, source: "package", userPackageId: String(singleRequestPackageId) },
@@ -1121,6 +1132,66 @@ ok(await api("/api/admin/withdrawals", {
 const laterStageSettledAccount = await db.collection("userpackages").findOne({ _id: singleRequestPackageId });
 closeTo(laterStageSettledAccount.lockedEarnings, 0, "later-stage approval clears reserved funds immediately");
 closeTo(laterStageSettledAccount.totalWithdrawn, 200, "both approved stages are counted in the withdrawn total");
+
+
+const navbarBeforeLegacyApprovedRepair = await navbarWithdrawalUsdtTotal("navbar total before legacy approved package repair");
+const legacyApprovedRepairPackageId = new mongoose.Types.ObjectId();
+const legacyApprovedRepairAt = new Date(Date.now() - 60_000);
+await db.collection("userpackages").insertOne({
+  _id: legacyApprovedRepairPackageId,
+  userId: user._id,
+  packageId: plan200._id,
+  packageName: "CI legacy approved balance repair",
+  investedAmount: 100,
+  asset: "USDT",
+  durationDays: 0,
+  status: "cancelled",
+  availableEarnings: 0,
+  lockedEarnings: 25,
+  totalRealizedEarnings: 25,
+  totalWithdrawn: 0,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "completed",
+  withdrawalRequestPending: false,
+  cancellationRefund: 0,
+  activatedAt: legacyApprovedRepairAt,
+  lastProfitAt: legacyApprovedRepairAt,
+  createdAt: legacyApprovedRepairAt,
+  updatedAt: legacyApprovedRepairAt,
+});
+const legacyApprovedRepairWithdrawalId = new mongoose.Types.ObjectId();
+await db.collection("withdrawalrequests").insertOne({
+  _id: legacyApprovedRepairWithdrawalId,
+  userId: user._id,
+  asset: "USDT",
+  network: "TRC20",
+  amount: 25,
+  fee: 0,
+  receiveAmount: 25,
+  address: "legacy-approved-balance-repair-address",
+  source: "package",
+  userPackageId: legacyApprovedRepairPackageId,
+  packageAllocations: [{ userPackageId: legacyApprovedRepairPackageId, amount: 25 }],
+  isFirstPackageWithdrawal: false,
+  packageBalanceSettled: false,
+  status: "approved",
+  adminNote: "",
+  createdAt: legacyApprovedRepairAt,
+  updatedAt: legacyApprovedRepairAt,
+});
+closeTo(
+  await navbarWithdrawalUsdtTotal("navbar total after legacy approved package repair"),
+  navbarBeforeLegacyApprovedRepair,
+  "wallet endpoint settles an old approved package lock before returning the navbar total"
+);
+const legacyApprovedRepairAccount = await db.collection("userpackages").findOne({ _id: legacyApprovedRepairPackageId });
+closeTo(legacyApprovedRepairAccount.lockedEarnings, 0, "legacy approved package lock is cleared");
+closeTo(legacyApprovedRepairAccount.totalWithdrawn, 25, "legacy approved package withdrawal is counted once");
+assert.equal(
+  (await db.collection("withdrawalrequests").findOne({ _id: legacyApprovedRepairWithdrawalId })).packageBalanceSettled,
+  true,
+  "legacy approved package withdrawal is marked settled"
+);
 
 const navbarBeforeGeneralWithdrawal = await navbarWithdrawalUsdtTotal("navbar total before general withdrawal");
 const generalWithdrawal = await api("/api/withdrawals", {

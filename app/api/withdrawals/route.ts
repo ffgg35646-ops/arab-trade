@@ -445,24 +445,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // A settled first-stage withdrawal moves later requests to the referral-cap
+      // phase. It must not permanently block the package from being used again.
       const successfulPackageWithdrawal = await WithdrawalRequest.findOne({
         userId: user._id,
         source: "package",
         userPackageId: currentPackage._id,
         status: { $in: ["approved", "processing", "completed"] },
       }).select("_id amount status createdAt").sort({ createdAt: -1 }).lean();
-
-      if (successfulPackageWithdrawal) {
-        return NextResponse.json(
-          {
-            success: false,
-            alreadyWithdrawn: true,
-            message: "تمت الموافقة على طلب سحب من باقة " + currentPackage.packageName + " بالفعل. لا يُسمح بطلب سحب ثانٍ من نفس حساب الباقة.",
-            previousWithdrawalId: String(successfulPackageWithdrawal._id),
-          },
-          { status: 409 }
-        );
-      }
 
       const activePackageWithdrawal = await WithdrawalRequest.findOne({
         userId: user._id,
@@ -545,7 +535,7 @@ export async function POST(request: NextRequest) {
 
       // Phase one: cumulative withdrawals are capped by the original package amount.
       // Once used, later withdrawals require capacity from active referrals.
-      if (firstPackageWithdrawalRemaining > 0) {
+      if (firstPackageWithdrawalRemaining > 0 && !successfulPackageWithdrawal) {
         const firstStageAvailable = Math.min(packageAvailable, firstPackageWithdrawalRemaining);
         if (amount > firstStageAvailable + 1e-8) {
           return NextResponse.json(
@@ -627,7 +617,7 @@ export async function POST(request: NextRequest) {
         Number(currentPackage.availableEarnings || 0) >= firstPackageWithdrawalRemaining;
       const finalReferralAllowanceBelowMinimum =
         !isFirstPackageWithdrawal &&
-        firstPackageWithdrawalRemaining <= 1e-8 &&
+        (firstPackageWithdrawalRemaining <= 1e-8 || Boolean(successfulPackageWithdrawal)) &&
         referralRemainingForRequest > 0 &&
         Math.min(referralRemainingForRequest, packageAvailable) < packageMinimum &&
         Math.abs(amount - Math.min(referralRemainingForRequest, packageAvailable)) <= 1e-8;

@@ -419,6 +419,25 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const activePackageWithdrawal = await WithdrawalRequest.findOne({
+        userId: user._id,
+        source: "package",
+        userPackageId: currentPackage._id,
+        status: { $in: ["pending", "approved", "processing"] },
+      }).select("_id amount status createdAt").sort({ createdAt: -1 }).lean();
+
+      if (activePackageWithdrawal || currentPackage.withdrawalRequestPending === true) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "لديك طلب سحب قائم من باقة " + currentPackage.packageName + (activePackageWithdrawal ? " بقيمة " + Number(activePackageWithdrawal.amount || 0) + " " + assetCode : "") + ". لن يُسمح بطلب جديد من نفس الباقة حتى يُرفض الطلب الحالي أو يكتمل تنفيذه.",
+            activeWithdrawalId: activePackageWithdrawal ? String(activePackageWithdrawal._id) : null,
+            activeWithdrawalStatus: activePackageWithdrawal ? String(activePackageWithdrawal.status) : "pending",
+          },
+          { status: 409 }
+        );
+      }
+
       const packageAvailable = Math.max(0, Number(currentPackage.availableEarnings || 0));
       if (amount > packageAvailable) {
         return NextResponse.json(
@@ -593,6 +612,7 @@ export async function POST(request: NextRequest) {
         asset: assetCode,
         status: { $in: ["active", "cancelled"] },
         availableEarnings: { $gte: amount },
+        withdrawalRequestPending: { $ne: true },
         $expr: {
           $lte: [
             {
@@ -617,7 +637,10 @@ export async function POST(request: NextRequest) {
         packageFilter,
         {
           $inc: { availableEarnings: -amount, lockedEarnings: amount },
-          ...(isFirstPackageWithdrawal ? { $set: { firstWithdrawalStatus: "pending" } } : {}),
+          $set: {
+            withdrawalRequestPending: true,
+            ...(isFirstPackageWithdrawal ? { firstWithdrawalStatus: "pending" } : {}),
+          },
         },
         { new: true }
       );
@@ -626,7 +649,13 @@ export async function POST(request: NextRequest) {
         const latestPackage = await UserPackage.findOne({
           _id: userPackageId,
           userId: user._id,
-        }).select("investedAmount totalWithdrawn lockedEarnings availableEarnings packageName").lean();
+        }).select("investedAmount totalWithdrawn lockedEarnings availableEarnings packageName withdrawalRequestPending").lean();
+        if (latestPackage?.withdrawalRequestPending === true) {
+          return NextResponse.json(
+            { success: false, message: "يوجد طلب سحب آخر لهذه الباقة قيد المراجعة أو التنفيذ. انتظر حسمه قبل تقديم طلب جديد." },
+            { status: 409 }
+          );
+        }
         const latestCapRemaining = Math.max(
           0,
           Number(latestPackage?.investedAmount || 0) -
@@ -766,7 +795,10 @@ export async function POST(request: NextRequest) {
           { _id: lockedUserPackage._id, userId: user._id },
           {
             $inc: { availableEarnings: amount, lockedEarnings: -amount },
-            ...(isFirstPackageWithdrawal ? { $set: { firstWithdrawalStatus: "available" } } : {}),
+            $set: {
+              withdrawalRequestPending: false,
+              ...(isFirstPackageWithdrawal ? { firstWithdrawalStatus: "available" } : {}),
+            },
           }
         );
       } else if (lockedWalletAllocations.length) {

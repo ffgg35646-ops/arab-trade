@@ -82,6 +82,55 @@ export async function PATCH(request: NextRequest) {
     }
 
     const currentSettings = await getPlatformSettings();
+
+    // Withdrawal cards group duplicate catalog entries by visible package name.
+    // Keep the configured minimum synchronized for every matching package ID,
+    // including requests from an older admin page that submits only one changed ID.
+    let synchronizedPackageMinima: Record<string, number> | undefined;
+    if (packageMinima !== undefined) {
+      synchronizedPackageMinima = Object.fromEntries(
+        Object.entries(packageMinima).map(([id, value]) => [id, Number(value)])
+      );
+      const [catalogRows, configuredRaw] = await Promise.all([
+        InvestmentPackage.find({}).select("_id name minimumWithdrawal").lean(),
+        Promise.resolve(currentSettings.withdrawals.withdrawalMinByPackage as unknown as Record<string, number> | undefined),
+      ]);
+      const normalizePackageName = (value: unknown) =>
+        String(value || "").normalize("NFKC").trim().replace(/\\s+/g, " ").toLocaleLowerCase("en-US");
+      const groupedRows = new Map<string, any[]>();
+      for (const row of catalogRows as any[]) {
+        const nameKey = normalizePackageName(row.name);
+        if (!nameKey) continue;
+        const list = groupedRows.get(nameKey) || [];
+        list.push(row);
+        groupedRows.set(nameKey, list);
+      }
+
+      for (const rows of groupedRows.values()) {
+        if (rows.length < 2) continue;
+        const submittedRows = rows.filter((row) =>
+          Object.prototype.hasOwnProperty.call(packageMinima, String(row._id))
+        );
+        if (!submittedRows.length) continue;
+
+        const submittedValues = [...new Set(submittedRows.map((row) => Number(packageMinima[String(row._id)])))];
+        let chosenValue = submittedValues[0];
+        if (submittedValues.length > 1) {
+          const changedRows = submittedRows.filter((row) => {
+            const id = String(row._id);
+            const previous = Number(configuredRaw?.[id] ?? row.minimumWithdrawal ?? currentSettings.withdrawals.minAmount ?? 0);
+            return Math.abs(Number(packageMinima[id]) - previous) > 1e-8;
+          });
+          const changedValues = [...new Set(changedRows.map((row) => Number(packageMinima[String(row._id)])))];
+          if (changedValues.length === 1) chosenValue = changedValues[0];
+          else if (changedValues.length > 1) chosenValue = changedValues[changedValues.length - 1];
+        }
+
+        for (const row of rows) {
+          synchronizedPackageMinima[String(row._id)] = chosenValue;
+        }
+      }
+    }
     const numericFields: Record<string, string[]> = {
       deposits: ["minAmount", "maxAmount"],
       withdrawals: ["minAmount", "minGeneralWithdrawal", "maxAmount", "dailyLimit"],
@@ -122,7 +171,10 @@ export async function PATCH(request: NextRequest) {
     for (const section of allowedSections) {
       if (body?.[section] && typeof body[section] === "object") {
         for (const [key, value] of Object.entries(body[section])) {
-          update[`${section}.${key}`] = value;
+          const effectiveValue = section === "withdrawals" && key === "withdrawalMinByPackage" && synchronizedPackageMinima
+            ? synchronizedPackageMinima
+            : value;
+          update[`${section}.${key}`] = effectiveValue;
         }
       }
     }
@@ -142,8 +194,8 @@ export async function PATCH(request: NextRequest) {
 
     // Keep the package document and the legacy settings map synchronized:
     // both the admin package editor and all withdrawal flows then read the same minimum.
-    if (packageMinima !== undefined) {
-      const writes = Object.entries(packageMinima)
+    if (synchronizedPackageMinima !== undefined) {
+      const writes = Object.entries(synchronizedPackageMinima)
         .filter(([packageId]) => mongoose.Types.ObjectId.isValid(packageId))
         .map(([packageId, rawValue]) => InvestmentPackage.updateOne(
           { _id: packageId },

@@ -189,13 +189,16 @@ export async function PATCH(
     const currentStatus =
       withdrawal.status;
     const walletBalanceWasSettled = (withdrawal as any).walletBalanceSettled === true;
+    const packageBalanceWasSettled = (withdrawal as any).packageBalanceSettled === true;
+    const alreadySettledPackageCompletion =
+      withdrawal.source === "package" &&
+      nextStatus === "completed" &&
+      currentStatus === "approved" &&
+      packageBalanceWasSettled;
 
     if (
       currentStatus === "completed" ||
-      currentStatus === "rejected" ||
-      (withdrawal.source === "package" &&
-        currentStatus === "approved" &&
-        (withdrawal as any).packageBalanceSettled === true)
+      currentStatus === "rejected"
     ) {
       return NextResponse.json(
         {
@@ -390,7 +393,7 @@ export async function PATCH(
         await session.withTransaction(async () => {
           const updatedRequest = await WithdrawalRequest.findOneAndUpdate(
             { _id: withdrawal._id, status: currentStatus },
-            { $set: { status: nextStatus, adminNote, ...(nextStatus === "completed" ? { completedAt: new Date() } : {}), ...(withdrawal.source === "package" && (nextStatus === "approved" || nextStatus === "rejected") ? { packageBalanceSettled: true } : {}), ...(withdrawal.source !== "package" && ["approved", "rejected", "completed"].includes(nextStatus) ? { walletBalanceSettled: true } : {}) } },
+            { $set: { status: nextStatus, adminNote, ...(nextStatus === "completed" ? { completedAt: new Date() } : {}), ...(withdrawal.source === "package" && ["approved", "rejected", "completed"].includes(nextStatus) ? { packageBalanceSettled: true } : {}), ...(withdrawal.source !== "package" && ["approved", "rejected", "completed"].includes(nextStatus) ? { walletBalanceSettled: true } : {}) } },
             { new: true, session }
           );
           if (!updatedRequest) throw new Error("WITHDRAWAL_STATUS_CHANGED");
@@ -419,7 +422,8 @@ export async function PATCH(
             }
           }
 
-          if (nextStatus === "rejected" || nextStatus === "completed" || nextStatus === "approved") {
+          if (!alreadySettledPackageCompletion &&
+            (nextStatus === "rejected" || nextStatus === "completed" || nextStatus === "approved")) {
             // Rebuild the remaining lock from other live requests instead of
             // blindly subtracting the request amount from a possibly stale field.
             // This lets rejection/completion recover accounts left with an
@@ -484,11 +488,12 @@ export async function PATCH(
                 type: nextStatus === "rejected" ? "withdrawal_reversal" : "withdrawal",
                 asset: withdrawal.asset,
                 amount: nextStatus === "rejected" ? allocation.amount : -allocation.amount,
-                note: adminNote || (nextStatus === "rejected"
+                note: (adminNote || (nextStatus === "rejected"
                   ? "تم رفض طلب السحب؛ أُعيد مبلغ " + allocation.amount + " " + withdrawal.asset + " إلى رصيد باقة " + updatedPackage.packageName
                   : nextStatus === "approved"
                     ? "تم اعتماد سحب بقيمة " + allocation.amount + " " + withdrawal.asset + " وخصمه من رصيد باقة " + updatedPackage.packageName
-                    : "تم تنفيذ طلب سحب بقيمة " + allocation.amount + " " + withdrawal.asset + " من رصيد باقة " + updatedPackage.packageName),
+                    : "تم تنفيذ طلب سحب بقيمة " + allocation.amount + " " + withdrawal.asset + " من رصيد باقة " + updatedPackage.packageName)) +
+                  " مرجع طلب السحب: " + String(withdrawal._id),
                 createdBy: admin._id,
               }], { session });
 

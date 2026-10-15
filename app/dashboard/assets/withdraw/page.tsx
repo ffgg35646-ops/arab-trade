@@ -463,7 +463,7 @@ export default function WithdrawPage() {
         {source === "package" && packageAccount && (
           <p className="col-span-2 rounded-lg border border-white/10 bg-white/[0.025] p-2 text-[10px] leading-4 text-slate-400">
             {packagePending
-              ? "يوجد طلب سحب قائم لهذه الباقة بقيمة " + money(Number(packageAccount.unresolvedWithdrawalAmount || 0)) + " USDT. السحب الجديد متوقف حتى يُرفض الطلب أو يكتمل تنفيذه."
+              ? "يوجد طلب سحب قائم لهذه الباقة بقيمة " + money(Number(packageAccount.unresolvedWithdrawalAmount || 0)) + " USDT. السحب الجديد متوقف حتى تقرر الإدارة الموافقة عليه أو رفضه."
               : Number(packageAccount.packageWithdrawalRemaining ?? packageMax) <= 0
                 ? "تم استخدام أو حجز سقف الباقة الإجمالي (" + money(Number(packageAccount.packageWithdrawalCap ?? packageAccount.investedAmount ?? 0)) + " USDT). تُحتسب الطلبات المعلقة والموافق عليها والمكتملة، ولا يسمح بطلبات تتجاوز هذا السقف."
                 : Number(packageAccount.firstPackageWithdrawalRemaining || 0) > 0

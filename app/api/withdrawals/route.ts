@@ -430,7 +430,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            message: "لديك طلب سحب قائم من باقة " + currentPackage.packageName + (activePackageWithdrawal ? " بقيمة " + Number(activePackageWithdrawal.amount || 0) + " " + assetCode : "") + ". لن يُسمح بطلب جديد من نفس الباقة حتى يُرفض الطلب الحالي أو يكتمل تنفيذه.",
+            message: "لديك طلب سحب قائم من باقة " + currentPackage.packageName + (activePackageWithdrawal ? " بقيمة " + Number(activePackageWithdrawal.amount || 0) + " " + assetCode : "") + ". لن يُسمح بطلب جديد من نفس الباقة حتى تقرر الإدارة الموافقة على الطلب الحالي أو رفضه.",
             activeWithdrawalId: activePackageWithdrawal ? String(activePackageWithdrawal._id) : null,
             activeWithdrawalStatus: activePackageWithdrawal ? String(activePackageWithdrawal.status) : "pending",
           },
@@ -628,8 +628,8 @@ export async function POST(request: NextRequest) {
       };
 
       if (isFirstPackageWithdrawal) {
-        // Allow repeat requests against the remaining first-stage allowance only
-        // after the previous first-stage request has been settled.
+        // Allow another first-stage request only after the prior request is no longer
+        // awaiting an admin decision and the remaining cumulative cap still permits it.
         packageFilter.firstWithdrawalStatus = { $in: ["available", "approved", "completed", null] };
       }
 

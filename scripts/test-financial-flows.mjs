@@ -366,24 +366,48 @@ await db.collection("depositrequests").insertOne({
   _id: new mongoose.Types.ObjectId(),
   userId: capTestReferralId,
   asset: "USDT",
-  amount: 1000,
+  amount: 100,
   status: "approved",
   createdAt: capTestCreatedAt,
   updatedAt: capTestCreatedAt,
 });
 const cappedPackagePage = await api("/api/packages");
-ok(cappedPackagePage, "package page includes lifetime withdrawal cap");
+ok(cappedPackagePage, "package page calculates phase-two referral capacity");
 const cappedPackageAccount = cappedPackagePage.data.userPackages.find((x) => String(x._id) === String(package100._id));
 assert.ok(cappedPackageAccount, "capped package account is visible");
-closeTo(cappedPackageAccount.packageWithdrawalUsed, 100, "completed withdrawal counts toward lifetime package cap");
-closeTo(cappedPackageAccount.withdrawalLimit, 0, "lifetime package cap blocks withdrawal beyond package activation value");
+closeTo(cappedPackageAccount.packageWithdrawalUsed, 100, "completed first-stage withdrawal counts toward the package principal amount");
+closeTo(cappedPackageAccount.withdrawalLimit, 50, "100 USDT of active referral deposits unlocks exactly 50 USDT after the first stage");
 
-const overLifetimeCap = await api("/api/withdrawals", {
+const overReferralCap = await api("/api/withdrawals", {
   method: "POST",
-  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 1, source: "package", userPackageId: String(package100._id) },
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 51, source: "package", userPackageId: String(package100._id) },
 });
-statusIs(overLifetimeCap, 400, "package withdrawals cannot exceed activation amount even when referral deposits would unlock more");
-assert.match(String(overLifetimeCap.data.message || ""), /سقف السحب الإجمالي/, "over-cap withdrawal explains lifetime package cap");
+statusIs(overReferralCap, 400, "phase-two withdrawal cannot exceed half of the active referral deposits");
+assert.match(String(overReferralCap.data.message || ""), /المتاح للسحب مقابل الإحالات النشطة/, "over-cap referral withdrawal explains the remaining referral allowance");
+
+const secondStageWithdrawal = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 50, source: "package", userPackageId: String(package100._id) },
+});
+ok(secondStageWithdrawal, "user can withdraw 50 USDT against a 100-USDT active referral deposit", 201);
+const secondStageWithdrawalId = String(secondStageWithdrawal.data.withdrawal._id);
+package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
+closeTo(package100Doc.availableEarnings, 550, "second-stage withdrawal reduces the package's available bucket");
+closeTo(package100Doc.lockedEarnings, 50, "second-stage withdrawal locks its requested amount");
+
+ok(await api("/api/admin/withdrawals", {
+  as: "admin", method: "PATCH",
+  body: { id: secondStageWithdrawalId, status: "approved", adminNote: "CI approval within active referral cap" },
+}), "admin approves phase-two referral-cap withdrawal");
+ok(await api("/api/admin/withdrawals", {
+  as: "admin", method: "PATCH",
+  body: { id: secondStageWithdrawalId, status: "completed", adminNote: "CI completes phase-two referral-cap withdrawal" },
+}), "admin completes phase-two referral-cap withdrawal");
+
+const afterReferralAllowanceUsed = await api("/api/packages");
+ok(afterReferralAllowanceUsed, "package API refreshes referral allowance after payout");
+const afterReferralAccount = afterReferralAllowanceUsed.data.userPackages.find((x) => String(x._id) === String(package100._id));
+closeTo(afterReferralAccount.withdrawalLimit, 0, "used referral allowance cannot be withdrawn a second time");
 
 const legacyOverCapRequestId = new mongoose.Types.ObjectId();
 const legacyOverCapCreatedAt = new Date(Date.now() + 1000);
@@ -409,9 +433,9 @@ await db.collection("withdrawalrequests").insertOne({
 const blockedLegacyApproval = await api("/api/admin/withdrawals", {
   as: "admin",
   method: "PATCH",
-  body: { id: String(legacyOverCapRequestId), status: "approved", adminNote: "CI ensure legacy package cap is enforced" },
+  body: { id: String(legacyOverCapRequestId), status: "approved", adminNote: "CI ensure legacy request cannot exceed active referral allowance" },
 });
-statusIs(blockedLegacyApproval, 409, "admin cannot approve a legacy withdrawal request that pushes the package past its lifetime cap");
+statusIs(blockedLegacyApproval, 409, "admin cannot approve a legacy second-stage request beyond the active referral cap");
 await db.collection("withdrawalrequests").deleteOne({ _id: legacyOverCapRequestId });
 
 // One open withdrawal per package: a 300-USDT package has 200 left after a 100-USDT request,

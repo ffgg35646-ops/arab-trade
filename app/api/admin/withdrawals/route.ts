@@ -215,6 +215,63 @@ export async function PATCH(
       });
     }
 
+    if (
+      withdrawal.source === "package" &&
+      ["approved", "completed"].includes(nextStatus) &&
+      withdrawal.userPackageId
+    ) {
+      const packageAccount = await UserPackage.findOne({
+        _id: withdrawal.userPackageId,
+        userId: withdrawal.userId,
+      }).select("investedAmount packageName").lean();
+
+      if (!packageAccount) {
+        return NextResponse.json(
+          { success: false, message: "حساب الباقة المرتبط بطلب السحب غير موجود." },
+          { status: 409 }
+        );
+      }
+
+      const packageCap = Math.max(0, Number(packageAccount.investedAmount || 0));
+      const eligibleRequests = await WithdrawalRequest.find({
+        userId: withdrawal.userId,
+        source: "package",
+        userPackageId: withdrawal.userPackageId,
+        status: { $in: ["pending", "approved", "processing", "completed"] },
+      }).select("_id amount createdAt").sort({ createdAt: 1, _id: 1 }).lean();
+
+      let cumulativeBefore = 0;
+      let foundTarget = false;
+      for (const row of eligibleRequests as any[]) {
+        if (String(row._id) === String(withdrawal._id)) {
+          foundTarget = true;
+          const targetTotal = cumulativeBefore + Number(row.amount || 0);
+          if (targetTotal > packageCap + 1e-8) {
+            const allowedForThisRequest = Math.max(0, packageCap - cumulativeBefore);
+            return NextResponse.json(
+              {
+                success: false,
+                message: `لا يمكن اعتماد هذا الطلب لأنه يتجاوز سقف باقة ${packageAccount.packageName} البالغ ${packageCap} USDT. الطلبات الأقدم تحتسب أولًا؛ المتبقي لهذا الطلب ${allowedForThisRequest} USDT. ارفض الطلب الزائد ثم أعد إرساله بمبلغ لا يتجاوز المتبقي.`,
+                packageCap,
+                cumulativeBefore,
+                allowedForThisRequest,
+              },
+              { status: 409 }
+            );
+          }
+          break;
+        }
+        cumulativeBefore += Number(row.amount || 0);
+      }
+
+      if (!foundTarget) {
+        return NextResponse.json(
+          { success: false, message: "تعذر التحقق من ترتيب طلب السحب ضمن سقف الباقة." },
+          { status: 409 }
+        );
+      }
+    }
+
     if (withdrawal.source === "package") {
       if (!withdrawal.userPackageId) {
         return NextResponse.json({ success: false, message: "طلب السحب لا يحتوي على حساب الباقة" }, { status: 409 });

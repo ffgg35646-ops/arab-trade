@@ -508,6 +508,30 @@ export async function POST(request: NextRequest) {
         0,
         firstPackageWithdrawalCap - firstPackageWithdrawalUsed
       );
+      const packageWithdrawalRows = await WithdrawalRequest.find({
+        userId: user._id,
+        source: "package",
+        userPackageId: currentPackage._id,
+        status: { $in: countedStatuses },
+      }).select("amount").lean();
+      const packageWithdrawalCap = Math.max(0, Number(currentPackage.investedAmount || 0));
+      const packageWithdrawalUsed = packageWithdrawalRows.reduce(
+        (sum: number, row: any) => sum + Number(row.amount || 0),
+        0
+      );
+      const packageWithdrawalRemaining = Math.max(0, packageWithdrawalCap - packageWithdrawalUsed);
+      if (amount > packageWithdrawalRemaining + 1e-8) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "عفوًا، تجاوزت سقف السحب الإجمالي لباقة " + currentPackage.packageName + "، إجمالي المسموح " + packageWithdrawalCap + " " + assetCode + ".",
+            packageWithdrawalCap,
+            packageWithdrawalUsed,
+            packageWithdrawalRemaining,
+          },
+          { status: 400 }
+        );
+      }
       const firstPackageWithdrawalPending = firstWithdrawalRows.some(
         (row: any) => String(row.status) === "pending"
       );

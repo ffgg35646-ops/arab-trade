@@ -315,6 +315,61 @@ closeTo(unchangedMinimumTestAccount.lockedEarnings, 0, "below-minimum attempt do
 await db.collection("userpackages").deleteOne({ _id: minimumTestAccountId });
 await db.collection("investmentpackages").deleteOne({ _id: new mongoose.Types.ObjectId(String(minimumTestPlan._id)) });
 
+// Also verify the global minimum set in admin settings is applied to package requests.
+const globalMinimumTestResult = await api("/api/admin/packages", {
+  as: "admin", method: "POST",
+  body: { name: "CI Bronze Global Minimum", description: "global minimum regression", price: 200, durationDays: 30, enabled: true },
+});
+ok(globalMinimumTestResult, "admin creates package for global-minimum regression", 201);
+const globalMinimumPlan = globalMinimumTestResult.data.package;
+const globalMinimumAccountId = new mongoose.Types.ObjectId();
+await db.collection("userpackages").insertOne({
+  _id: globalMinimumAccountId,
+  userId: user._id,
+  packageId: new mongoose.Types.ObjectId(String(globalMinimumPlan._id)),
+  packageName: globalMinimumPlan.name,
+  investedAmount: 50,
+  asset: "USDT",
+  durationDays: 0,
+  status: "cancelled",
+  availableEarnings: 50,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 0,
+  totalWithdrawn: 0,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "available",
+  withdrawalRequestPending: false,
+  cancellationRefund: 0,
+  activatedAt: new Date(),
+  lastProfitAt: new Date(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+});
+const globalSettingsBefore = await db.collection("platformsettings").findOne({ key: "global" });
+const previousGlobalMinimum = Number(globalSettingsBefore?.withdrawals?.minAmount ?? 1);
+await db.collection("platformsettings").updateOne(
+  { key: "global" },
+  { $set: { "withdrawals.minAmount": 200 } },
+);
+try {
+  const belowGlobalMinimum = await api("/api/withdrawals", {
+    method: "POST",
+    body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 50, source: "package", userPackageId: String(globalMinimumAccountId) },
+  });
+  statusIs(belowGlobalMinimum, 400, "global admin minimum of 200 rejects a 50-USDT package request");
+  assert.match(String(belowGlobalMinimum.data.message || ""), /200/, "global-minimum error shows 200 USDT");
+  const unchangedGlobalMinimumAccount = await db.collection("userpackages").findOne({ _id: globalMinimumAccountId });
+  closeTo(unchangedGlobalMinimumAccount.availableEarnings, 50, "global below-minimum attempt preserves package balance");
+  closeTo(unchangedGlobalMinimumAccount.lockedEarnings, 0, "global below-minimum attempt does not lock funds");
+} finally {
+  await db.collection("platformsettings").updateOne(
+    { key: "global" },
+    { $set: { "withdrawals.minAmount": previousGlobalMinimum } },
+  );
+  await db.collection("userpackages").deleteOne({ _id: globalMinimumAccountId });
+  await db.collection("investmentpackages").deleteOne({ _id: new mongoose.Types.ObjectId(String(globalMinimumPlan._id)) });
+}
+
 ok(await api("/api/admin/packages/credit", {
   as: "admin", method: "POST",
   body: { userPackageId: String(package100._id), amount: 600, note: "CI realized proceeds test credit" },

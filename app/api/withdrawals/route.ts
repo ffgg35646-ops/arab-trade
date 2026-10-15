@@ -684,23 +684,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // If the last remainder of phase one is below the normal minimum, allow
-      // exactly that full remainder when the package balance can cover it.
-      // This avoids stranding a small first-stage remainder (for example $50).
-      const finalFirstAllowanceBelowMinimum =
-        isFirstPackageWithdrawal &&
-        firstPackageWithdrawalRemaining > 0 &&
-        firstPackageWithdrawalRemaining < packageMinimum &&
-        Math.abs(amount - firstPackageWithdrawalRemaining) <= 1e-8 &&
-        Number(currentPackage.availableEarnings || 0) >= firstPackageWithdrawalRemaining;
-      const finalReferralAllowanceBelowMinimum =
-        !isFirstPackageWithdrawal &&
-        (firstPackageWithdrawalRemaining <= 1e-8 || firstStageWithdrawalApproved) &&
-        referralRemainingForRequest > 0 &&
-        Math.min(referralRemainingForRequest, packageAvailable) < packageMinimum &&
-        Math.abs(amount - Math.min(referralRemainingForRequest, packageAvailable)) <= 1e-8;
-
-      if (amount < packageMinimum && !finalFirstAllowanceBelowMinimum && !finalReferralAllowanceBelowMinimum) {
+      // The administrator-configured minimum is mandatory for every package
+      // request. A small remaining balance/referral allowance must never bypass it.
+      if (amount < packageMinimum) {
         return NextResponse.json(
           { success: false, message: "الحد الأدنى للسحب من باقة " + currentPackage.packageName + " هو " + packageMinimum + " " + assetCode, minAmount: packageMinimum },
           { status: 400 }

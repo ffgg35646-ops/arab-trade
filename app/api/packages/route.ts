@@ -65,7 +65,10 @@ export async function GET(request: NextRequest) {
     const minimumWithdrawalByPlan = new Map(
       (packageMinimumRows as any[]).map((plan) => [
         String(plan._id),
-        Number(configuredMinimums?.[String(plan._id)] ?? plan.minimumWithdrawal ?? 100),
+        Math.max(
+          Number(configuredMinimums?.[String(plan._id)] ?? plan.minimumWithdrawal ?? 100),
+          Number(settings?.withdrawals?.minAmount ?? 0),
+        ),
       ])
     );
 

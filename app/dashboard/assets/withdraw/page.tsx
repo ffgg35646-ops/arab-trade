@@ -252,6 +252,7 @@ export default function WithdrawPage() {
       planIds: Set<string>;
     }>();
     const groupKeyByPlanId = new Map<string, string>();
+    const groupKeyByPackageName = new Map<string, string>();
 
     packagePlans.forEach((plan, index) => {
       const id = String(plan._id);
@@ -264,22 +265,31 @@ export default function WithdrawPage() {
         groups.set(groupKey, { plan, accounts: [], order: index, planIds: new Set([id]) });
       }
       groupKeyByPlanId.set(id, groupKey);
+      const normalizedName = normalizePackageName(plan.name);
+      if (normalizedName) groupKeyByPackageName.set(normalizedName, groupKey);
     });
 
     for (const account of packageAccounts) {
       const id = packagePlanId(account);
       if (!id) continue;
-      const groupKey = groupKeyByPlanId.get(id) || groupKeyFor(account.packageName || "", id);
+
+      // The packages API calculates family balances by normalized package name.
+      // Use the same key here; grouping by catalog ID first can hide a cancelled
+      // account's refund on the original package card after the catalog is edited.
+      const normalizedName = normalizePackageName(account.packageName || "");
+      const groupKey = normalizedName
+        ? (groupKeyByPackageName.get(normalizedName) || groupKeyFor(account.packageName || "", id))
+        : (groupKeyByPlanId.get(id) || groupKeyFor("", id));
       const existing = groups.get(groupKey);
       if (existing) {
         if (!existing.accounts.some((row) => row._id === account._id)) {
           existing.accounts.push(account);
         }
         existing.planIds.add(id);
-        groupKeyByPlanId.set(id, groupKey);
+        if (!normalizedName) groupKeyByPlanId.set(id, groupKey);
       } else {
-        // Retain balances for disabled/legacy catalog entries, grouped with a
-        // same-named package where possible. Account IDs and balances stay separate.
+        // Keep a historical package under its own name when its catalog entry
+        // was renamed or removed. Its refund remains withdrawable from that account.
         groups.set(groupKey, {
           plan: {
             _id: id,
@@ -291,7 +301,7 @@ export default function WithdrawPage() {
           order: Number.MAX_SAFE_INTEGER,
           planIds: new Set([id]),
         });
-        groupKeyByPlanId.set(id, groupKey);
+        if (!normalizedName) groupKeyByPlanId.set(id, groupKey);
       }
     }
 

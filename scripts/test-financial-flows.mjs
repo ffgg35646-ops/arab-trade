@@ -1211,6 +1211,22 @@ closeTo(laterStageSettledAccount.totalWithdrawn, 200, "both approved stages are 
 
 
 const navbarBeforeLegacyApprovedRepair = await navbarWithdrawalUsdtTotal("navbar total before legacy approved package repair");
+// An unrelated general-wallet request must not block the package repair.
+const unrelatedPendingWalletWithdrawalId = new mongoose.Types.ObjectId();
+await db.collection("withdrawalrequests").insertOne({
+  _id: unrelatedPendingWalletWithdrawalId,
+  userId: user._id,
+  asset: "USDT",
+  network: "TRC20",
+  amount: 1,
+  fee: 0,
+  receiveAmount: 1,
+  address: "unrelated-pending-wallet-withdrawal",
+  source: "wallet",
+  status: "pending",
+  createdAt: new Date(),
+  updatedAt: new Date(),
+});
 const legacyApprovedRepairPackageId = new mongoose.Types.ObjectId();
 const legacyApprovedRepairAt = new Date(Date.now() - 60_000);
 await db.collection("userpackages").insertOne({
@@ -1255,10 +1271,12 @@ await db.collection("withdrawalrequests").insertOne({
   createdAt: legacyApprovedRepairAt,
   updatedAt: legacyApprovedRepairAt,
 });
+const navbarAfterLegacyApprovedRepair = await navbarWithdrawalUsdtTotal("navbar total after legacy approved package repair");
+await db.collection("withdrawalrequests").deleteOne({ _id: unrelatedPendingWalletWithdrawalId });
 closeTo(
-  await navbarWithdrawalUsdtTotal("navbar total after legacy approved package repair"),
+  navbarAfterLegacyApprovedRepair,
   navbarBeforeLegacyApprovedRepair,
-  "wallet endpoint settles an old approved package lock before returning the navbar total"
+  "wallet endpoint settles an old approved package lock even while an unrelated general withdrawal is pending"
 );
 const legacyApprovedRepairAccount = await db.collection("userpackages").findOne({ _id: legacyApprovedRepairPackageId });
 closeTo(legacyApprovedRepairAccount.lockedEarnings, 0, "legacy approved package lock is cleared");

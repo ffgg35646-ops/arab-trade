@@ -18,6 +18,7 @@ import { normalizeMissedPackageCollectionWindows } from "@/lib/package-collectio
 import { USDT_ASSET } from "@/lib/unified-usdt-wallet";
 import { debitDepositBalance, normalizeDepositBalanceRows, separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
 import { ensurePackagePrincipalWithdrawalCredit } from "@/lib/ensure-package-principal-withdrawal";
+import { settleLegacyApprovedPackageWithdrawals } from "@/lib/settle-legacy-approved-package-withdrawals";
 
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8) / 1e8;
 const normalizePackageGroup = (value: unknown) =>
@@ -36,9 +37,22 @@ async function reconcileOrphanedPackageWithdrawalLocks(userId: mongoose.Types.Ob
 
   const activeWithdrawal = await WithdrawalRequest.exists({
     userId,
-    status: { $in: ["pending", "approved", "processing"] },
+    $or: [
+      { source: "package", status: { $in: ["pending", "processing"] } },
+      { source: { $ne: "package" }, status: { $in: ["pending", "approved", "processing"] } },
+    ],
   });
   if (activeWithdrawal) return;
+
+  // If an approved legacy request could not be reconciled against its locked
+  // allocation, preserve the lock for inspection instead of refunding it.
+  const unsettledApprovedPackage = await WithdrawalRequest.exists({
+    userId,
+    source: "package",
+    status: "approved",
+    packageBalanceSettled: { $ne: true },
+  });
+  if (unsettledApprovedPackage) return;
 
   // The submit endpoint briefly owns these guards while it moves a balance
   // and creates the withdrawal document. Avoid racing that short critical
@@ -118,6 +132,7 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
 
     await connectDB();
+    await settleLegacyApprovedPackageWithdrawals(user._id);
     await reconcileOrphanedPackageWithdrawalLocks(user._id);
     await separateLegacyDepositsFromSpotWallet(user._id);
     await Promise.all([
@@ -223,7 +238,7 @@ export async function GET(request: NextRequest) {
       const groupKey = packageGroupByAccountId.get(key) || key;
       if (groupKey) {
         successfulWithdrawalPackageNames.add(groupKey);
-        if (["approved", "processing"].includes(String(row.status))) {
+        if (String(row.status) === "processing") {
           inFlightWithdrawalPackageNames.add(groupKey);
           // Query results are newest-first; keep the latest unresolved transfer status.
           if (!inFlightWithdrawalStatusByPackageName.has(groupKey)) {

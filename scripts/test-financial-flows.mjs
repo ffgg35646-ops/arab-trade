@@ -544,6 +544,16 @@ const approvedPackageRequest = await db.collection("withdrawalrequests").findOne
 assert.equal(approvedPackageRequest.status, "approved", "withdrawal history retains the approved status");
 assert.equal(approvedPackageRequest.packageBalanceSettled, true, "approved package request is marked settled");
 
+const navbarAtPackageApproval = await navbarWithdrawalUsdtTotal("navbar total after approved package payout");
+ok(await api("/api/admin/withdrawals", {
+  as: "admin", method: "PATCH",
+  body: { id: packageWithdrawalId, status: "completed", adminNote: "CI mark settled package payout complete" },
+}), "admin can mark an already-settled package payout completed");
+closeTo(await navbarWithdrawalUsdtTotal("navbar total after package completion"), navbarAtPackageApproval, "completion does not deduct the package payout a second time");
+package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
+closeTo(package100Doc.totalWithdrawn, 100, "completion does not count the same approved payout twice");
+closeTo(package100Doc.availableEarnings + package100Doc.lockedEarnings, 600, "completion leaves the package balance unchanged after approval");
+
 // Regression: when a visible package balance spans two same-name package records,
 // reserve the amount from both records and restore both exactly when rejected.
 const splitPackageName = "CI grouped withdrawal balance";

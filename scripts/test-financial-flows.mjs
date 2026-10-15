@@ -556,11 +556,11 @@ package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.
 closeTo(package100Doc.totalWithdrawn, 100, "completion does not count the same approved payout twice");
 closeTo(package100Doc.availableEarnings + package100Doc.lockedEarnings, 600, "completion leaves the package balance unchanged after approval");
 
-// Regression: when a visible package balance spans two same-name package records,
-// reserve the amount from both records and restore both exactly when rejected.
-const splitPackageName = "CI grouped withdrawal balance";
+// Regression: same-name activation records own independent balances. A payout
+// must reserve and later reverse the selected account only.
+const splitPackageName = "CI independent package accounts";
 const splitAccountIds = [new mongoose.Types.ObjectId(), new mongoose.Types.ObjectId()];
-await db.collection("userpackages").insertMany(splitAccountIds.map((_id) => ({
+await db.collection("userpackages").insertMany(splitAccountIds.map((_id, index) => ({
   _id,
   userId: user._id,
   packageId: plan100._id,
@@ -569,7 +569,7 @@ await db.collection("userpackages").insertMany(splitAccountIds.map((_id) => ({
   asset: "USDT",
   durationDays: 0,
   status: "cancelled",
-  availableEarnings: 50,
+  availableEarnings: index === 0 ? 150 : 50,
   lockedEarnings: 0,
   totalRealizedEarnings: 0,
   totalWithdrawn: 0,
@@ -582,27 +582,31 @@ await db.collection("userpackages").insertMany(splitAccountIds.map((_id) => ({
   createdAt: new Date(),
   updatedAt: new Date(),
 })));
-const groupedWithdrawal = await api("/api/withdrawals", {
+const siblingBeforeWithdrawal = await db.collection("userpackages").findOne({ _id: splitAccountIds[1] });
+const independentWithdrawal = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 100, source: "package", userPackageId: String(splitAccountIds[0]) },
 });
-ok(groupedWithdrawal, "withdrawal locks a grouped 100-USDT balance split across two 50-USDT package records", 201);
-const groupedRequestId = new mongoose.Types.ObjectId(String(groupedWithdrawal.data.withdrawal._id));
-for (const accountId of splitAccountIds) {
-  const lockedAccount = await db.collection("userpackages").findOne({ _id: accountId });
-  closeTo(lockedAccount.availableEarnings, 0, "grouped withdrawal decrements each allocated available bucket");
-  closeTo(lockedAccount.lockedEarnings, 50, "grouped withdrawal reserves each allocated bucket");
-}
+ok(independentWithdrawal, "withdrawal uses the selected account's own 150-USDT balance", 201);
+const independentRequestId = new mongoose.Types.ObjectId(String(independentWithdrawal.data.withdrawal._id));
+const selectedLockedAccount = await db.collection("userpackages").findOne({ _id: splitAccountIds[0] });
+closeTo(selectedLockedAccount.availableEarnings, 50, "selected account alone loses the requested 100 USDT from available");
+closeTo(selectedLockedAccount.lockedEarnings, 100, "selected account alone reserves the requested 100 USDT");
+let untouchedSibling = await db.collection("userpackages").findOne({ _id: splitAccountIds[1] });
+closeTo(untouchedSibling.availableEarnings, siblingBeforeWithdrawal.availableEarnings, "same-name sibling balance is never borrowed");
+closeTo(untouchedSibling.lockedEarnings, 0, "same-name sibling balance is never locked");
+
 ok(await api("/api/admin/withdrawals", {
   as: "admin", method: "PATCH",
-  body: { id: String(groupedRequestId), status: "rejected", adminNote: "CI restore grouped package buckets" },
-}), "rejecting grouped withdrawal restores exact package allocations");
-for (const accountId of splitAccountIds) {
-  const restoredAccount = await db.collection("userpackages").findOne({ _id: accountId });
-  closeTo(restoredAccount.availableEarnings, 50, "rejected grouped withdrawal restores each available bucket");
-  closeTo(restoredAccount.lockedEarnings, 0, "rejected grouped withdrawal releases each locked bucket");
-}
-await db.collection("withdrawalrequests").deleteOne({ _id: groupedRequestId });
+  body: { id: String(independentRequestId), status: "rejected", adminNote: "CI independent package account test" },
+}), "rejecting payout releases the exact selected account only");
+const selectedRestoredAccount = await db.collection("userpackages").findOne({ _id: splitAccountIds[0] });
+closeTo(selectedRestoredAccount.availableEarnings, 150, "rejected payout restores the selected bucket exactly");
+closeTo(selectedRestoredAccount.lockedEarnings, 0, "rejected payout releases selected lock");
+untouchedSibling = await db.collection("userpackages").findOne({ _id: splitAccountIds[1] });
+closeTo(untouchedSibling.availableEarnings, 50, "reject does not alter sibling balance");
+closeTo(untouchedSibling.lockedEarnings, 0, "reject does not create a sibling lock");
+await db.collection("withdrawalrequests").deleteOne({ _id: independentRequestId });
 await db.collection("packageledgers").deleteMany({ userPackageId: { $in: splitAccountIds } });
 await db.collection("userpackages").deleteMany({ _id: { $in: splitAccountIds } });
 

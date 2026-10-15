@@ -296,8 +296,18 @@ export async function PATCH(
           );
           if (!updatedRequest) throw new Error("WITHDRAWAL_STATUS_CHANGED");
 
+          const anotherPendingWithdrawal = await WithdrawalRequest.findOne({
+            _id: { $ne: withdrawal._id },
+            userId: withdrawal.userId,
+            source: "package",
+            userPackageId: withdrawal.userPackageId,
+            status: "pending",
+          }).select("_id").session(session).lean();
+
           if (nextStatus === "approved") {
-            const approvalSet: Record<string, any> = { withdrawalRequestPending: false };
+            const approvalSet: Record<string, any> = {
+              withdrawalRequestPending: Boolean(anotherPendingWithdrawal),
+            };
             if (withdrawal.isFirstPackageWithdrawal) approvalSet.firstWithdrawalStatus = "approved";
             const packageAccount = await UserPackage.findOneAndUpdate(
               { _id: withdrawal.userPackageId, userId: withdrawal.userId },
@@ -312,7 +322,7 @@ export async function PATCH(
               ? { $inc: { lockedEarnings: -amount, availableEarnings: amount } }
               : { $inc: { lockedEarnings: -amount, totalWithdrawn: amount } };
             const packageSet: Record<string, any> = {
-              withdrawalRequestPending: false,
+              withdrawalRequestPending: Boolean(anotherPendingWithdrawal),
             };
             if (withdrawal.isFirstPackageWithdrawal) {
               packageSet.firstWithdrawalStatus = nextStatus === "rejected" ? "available" : "completed";

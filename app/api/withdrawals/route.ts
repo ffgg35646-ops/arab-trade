@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
-import { requireVerifiedIdentity } from "@/lib/require-kyc";
 import { connectDB } from "@/lib/mongodb";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
 import Asset from "@/models/Asset";
@@ -114,19 +113,6 @@ export async function POST(request: NextRequest) {
           message: "غير مسجل الدخول",
         },
         { status: 401 }
-      );
-    }
-
-    const kycGuard =
-      await requireVerifiedIdentity(request);
-
-    if (!kycGuard.ok) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: kycGuard.message,
-        },
-        { status: kycGuard.status }
       );
     }
 
@@ -301,17 +287,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (
-      amount < minAmount ||
-      (maxAmount > 0 && amount > maxAmount)
-    ) {
+    if (amount < minAmount) {
       return NextResponse.json(
         {
           success: false,
-          message:
-            maxAmount > 0
-              ? `المبلغ يجب أن يكون بين ${minAmount} و ${maxAmount}`
-              : `الحد الأدنى للسحب هو ${minAmount}`,
+          message: `أقل مبلغ يمكن سحبه هو ${minAmount} ${assetCode}. أدخل مبلغًا مساويًا للحد الأدنى أو أكبر.`,
+          minAmount,
+          maxAmount,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (maxAmount > 0 && amount > maxAmount) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: `أقصى مبلغ مسموح بسحبه حاليًا هو ${maxAmount} ${assetCode}. خفّض المبلغ ثم حاول مرة أخرى.`,
           minAmount,
           maxAmount,
         },
@@ -424,6 +416,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { success: false, message: "حساب الباقة غير موجود أو لا يخص هذا المستخدم" },
           { status: 404 }
+        );
+      }
+
+      const packageAvailable = Math.max(0, Number(currentPackage.availableEarnings || 0));
+      if (amount > packageAvailable) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `رصيد باقة ${currentPackage.packageName} المتاح للسحب هو ${packageAvailable} ${assetCode} فقط. أدخل مبلغًا لا يتجاوز الرصيد المتاح.`,
+            availableAmount: packageAvailable,
+          },
+          { status: 400 }
         );
       }
 
@@ -629,8 +633,21 @@ export async function POST(request: NextRequest) {
           );
         }
         lockedWalletAllocations = [];
+        const refreshedWallets = await Wallet.find({
+          userId: user._id,
+          type: { $in: ["spot", "funding"] },
+          mode: "live",
+        }).select("balances").lean();
+        const availableTotal = refreshedWallets.reduce((sum: number, wallet: any) => {
+          const balance = (wallet.balances || []).find((item: any) => normalizeAsset(item.asset) === assetCode);
+          return sum + Number(balance?.available || 0);
+        }, 0);
         return NextResponse.json(
-          { success: false, message: "رصيد السحب العام غير كافٍ. يشمل الرصيد المتاح أرباح المنصة والمكافآت والإحالات، ولا يشمل الإيداعات الخارجية المخصصة لتفعيل الباقات." },
+          {
+            success: false,
+            message: `رصيد السحب العام المتاح هو ${availableTotal} ${assetCode} فقط. أدخل مبلغًا لا يتجاوز الرصيد المتاح. رصيد الإيداع الخارجي غير متاح للسحب العام.`,
+            availableAmount: availableTotal,
+          },
           { status: 400 }
         );
       }

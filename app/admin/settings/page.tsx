@@ -313,7 +313,18 @@ export default function Page() {
                 <label key={plan._id} className="block rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm font-bold">
                   <span className="flex items-center justify-between gap-3"><span>{plan.name}</span><span className="text-xs text-slate-500">{Number(plan.price || 0).toLocaleString("en-US")} USDT</span></span>
                   <span className="mt-3 block text-xs text-slate-400">الحد الأدنى للسحب (USDT)</span>
-                  <input type="number" min="0" step="any" value={packageWithdrawalMinimums[plan._id] ?? 0} onChange={(event) => setPackageWithdrawalMinimums((current) => ({ ...current, [plan._id]: Number(event.target.value) }))} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 text-white outline-none"/>
+                  <input type="number" min="0" step="any" value={packageWithdrawalMinimums[plan._id] ?? 0} onChange={(event) => {
+                    const value = Number(event.target.value);
+                    const normalizeName = (name: string) => name.normalize("NFKC").trim().replace(/\\s+/g, " ").toLocaleLowerCase("en-US");
+                    const siblingIds = packagePlans
+                      .filter((candidate) => normalizeName(candidate.name) === normalizeName(plan.name))
+                      .map((candidate) => candidate._id);
+                    setPackageWithdrawalMinimums((current) => {
+                      const next = { ...current };
+                      for (const siblingId of siblingIds) next[siblingId] = value;
+                      return next;
+                    });
+                  }} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 text-white outline-none"/>
                 </label>
               ))}
             </div>

@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
       WithdrawalRequest.find({
         userId: user._id,
         source: "package",
-        status: { $in: ["approved", "processing", "completed"] },
+        status: { $in: ["approved", "processing"] },
       }).select("userPackageId status createdAt").sort({ createdAt: -1 }).lean(),
     ]);
 
@@ -114,6 +114,7 @@ export async function GET(request: NextRequest) {
     );
     const firstWithdrawalByPackage = new Map<string, number>();
     const firstWithdrawalPendingPackages = new Set<string>();
+    const completedFirstWithdrawalPackages = new Set<string>();
     const unresolvedWithdrawalByPackage = new Map<string, any>();
     const successfulWithdrawalPackages = new Set<string>();
     for (const row of successfulPackageWithdrawalRows as any[]) {
@@ -129,6 +130,9 @@ export async function GET(request: NextRequest) {
       firstWithdrawalByPackage.set(key, (firstWithdrawalByPackage.get(key) || 0) + Number(row.amount || 0));
       if (String(row.status) === "pending") {
         firstWithdrawalPendingPackages.add(key);
+      }
+      if (String(row.status) === "completed") {
+        completedFirstWithdrawalPackages.add(key);
       }
     }
     const dailyProfitByPackage = new Map(
@@ -151,7 +155,9 @@ export async function GET(request: NextRequest) {
       const firstPackageWithdrawalPending = firstWithdrawalPendingPackages.has(packageKey);
       const unresolvedPackageWithdrawal = unresolvedWithdrawalByPackage.get(packageKey) || null;
       const packageWithdrawalPending = item.withdrawalRequestPending === true || Boolean(unresolvedPackageWithdrawal);
-      const packageWithdrawalAlreadyUsed = successfulWithdrawalPackages.has(packageKey);
+      const packageWithdrawalAlreadyUsed =
+        successfulWithdrawalPackages.has(packageKey) ||
+        (firstPackageWithdrawalRemaining > 1e-8 && completedFirstWithdrawalPackages.has(packageKey));
       // Package principal caps only phase one. After it is fully withdrawn,
       // the remaining allowance comes from 50% of active referral deposits.
       const packageWithdrawalCap = firstPackageWithdrawalCap;
@@ -160,11 +166,11 @@ export async function GET(request: NextRequest) {
       const availableEarnings = Math.max(0, Number(item.availableEarnings || 0));
       // The first approved withdrawal changes the phase: any later request is
       // limited by active-referral capacity, even if part of the package principal remains.
-      const phaseWithdrawalLimit = packageWithdrawalPending || firstPackageWithdrawalPending
+      const phaseWithdrawalLimit = packageWithdrawalAlreadyUsed || packageWithdrawalPending || firstPackageWithdrawalPending
         ? 0
-        : Math.min(availableEarnings, packageWithdrawalAlreadyUsed || firstPackageWithdrawalRemaining <= 1e-8
-          ? referralRemaining
-          : firstPackageWithdrawalRemaining);
+        : Math.min(availableEarnings, firstPackageWithdrawalRemaining > 1e-8
+          ? firstPackageWithdrawalRemaining
+          : referralRemaining);
       const withdrawalLimit = phaseWithdrawalLimit;
       return {
         ...item,

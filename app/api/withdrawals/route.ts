@@ -508,6 +508,7 @@ export async function POST(request: NextRequest) {
         0,
         firstPackageWithdrawalCap - firstPackageWithdrawalUsed
       );
+      let referralRemainingForRequest = 0;
       const firstPackageWithdrawalPending = firstWithdrawalRows.some(
         (row: any) => String(row.status) === "pending"
       );
@@ -564,6 +565,7 @@ export async function POST(request: NextRequest) {
           0
         );
         const referralRemaining = Math.max(0, referralCap - referralUsed);
+        referralRemainingForRequest = referralRemaining;
 
         if (amount > referralRemaining + 1e-8) {
           const noActiveReferrals = activeReferralDeposits.length === 0 || activeReferralDepositTotal <= 1e-8;
@@ -604,8 +606,14 @@ export async function POST(request: NextRequest) {
         firstPackageWithdrawalRemaining < packageMinimum &&
         Math.abs(amount - firstPackageWithdrawalRemaining) <= 1e-8 &&
         Number(currentPackage.availableEarnings || 0) >= firstPackageWithdrawalRemaining;
+      const finalReferralAllowanceBelowMinimum =
+        !isFirstPackageWithdrawal &&
+        firstPackageWithdrawalRemaining <= 1e-8 &&
+        referralRemainingForRequest > 0 &&
+        Math.min(referralRemainingForRequest, packageAvailable) < packageMinimum &&
+        Math.abs(amount - Math.min(referralRemainingForRequest, packageAvailable)) <= 1e-8;
 
-      if (amount < packageMinimum && !finalFirstAllowanceBelowMinimum) {
+      if (amount < packageMinimum && !finalFirstAllowanceBelowMinimum && !finalReferralAllowanceBelowMinimum) {
         return NextResponse.json(
           { success: false, message: "الحد الأدنى للسحب من باقة " + currentPackage.packageName + " هو " + packageMinimum + " " + assetCode, minAmount: packageMinimum },
           { status: 400 }

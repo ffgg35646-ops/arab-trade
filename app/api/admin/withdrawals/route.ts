@@ -24,6 +24,10 @@ function normalizeAsset(
     .toUpperCase();
 }
 
+function normalizePackageName(value: unknown) {
+  return String(value ?? "").normalize("NFKC").trim().replace(/\\s+/g, " ").toLocaleLowerCase("en-US");
+}
+
 export async function GET(
   request: NextRequest
 ) {
@@ -236,11 +240,25 @@ export async function PATCH(
         );
       }
 
-      const packageCap = Math.max(0, Number(packageAccount.investedAmount || 0));
+      const familyAccounts = await UserPackage.find({ userId: withdrawal.userId })
+        .select("_id packageName investedAmount")
+        .lean();
+      const familyIds = familyAccounts
+        .filter((item: any) => normalizePackageName(item.packageName) === normalizePackageName(packageAccount.packageName))
+        .map((item: any) => item._id);
+      if (!familyIds.some((item: any) => String(item) === String(withdrawal.userPackageId))) {
+        familyIds.push(withdrawal.userPackageId);
+      }
+      const familyInvestedAmount = familyAccounts
+        .filter((item: any) => familyIds.some((familyId: any) => String(familyId) === String(item._id)))
+        .reduce((sum: number, item: any) => sum + Math.max(0, Number(item.investedAmount || 0)), 0);
+      const packageSettings = await PlatformSettings.findOne({ key: "global" }).select("withdrawals.firstPackageWithdrawalPercent").lean();
+      const firstPackageWithdrawalPercent = Math.max(0, Math.min(100, Number(packageSettings?.withdrawals?.firstPackageWithdrawalPercent ?? 100)));
+      const packageCap = Math.max(0, familyInvestedAmount * firstPackageWithdrawalPercent / 100);
       const eligibleRequests = await WithdrawalRequest.find({
         userId: withdrawal.userId,
         source: "package",
-        userPackageId: withdrawal.userPackageId,
+        userPackageId: { $in: familyIds },
         isFirstPackageWithdrawal: true,
         status: { $in: ["pending", "approved", "processing", "completed"] },
       }).select("_id amount createdAt").sort({ createdAt: 1, _id: 1 }).lean();
@@ -345,6 +363,25 @@ export async function PATCH(
         return NextResponse.json({ success: false, message: "يجب الموافقة على طلب السحب قبل تنفيذ التحويل." }, { status: 409 });
       }
 
+      const rawAllocations = Array.isArray((withdrawal as any).packageAllocations) && (withdrawal as any).packageAllocations.length
+        ? (withdrawal as any).packageAllocations
+        : [{ userPackageId: withdrawal.userPackageId, amount }];
+      const allocations: Array<{ userPackageId: mongoose.Types.ObjectId; amount: number }> = rawAllocations.map((item: any) => ({
+        userPackageId: item.userPackageId as mongoose.Types.ObjectId,
+        amount: Number(item.amount),
+      }));
+      const allocatedTotal = allocations.reduce((sum, item) => sum + item.amount, 0);
+      if (
+        allocations.some((item) => !mongoose.Types.ObjectId.isValid(String(item.userPackageId)) || !Number.isFinite(item.amount) || item.amount <= 0) ||
+        Math.abs(allocatedTotal - amount) > 1e-7
+      ) {
+        return NextResponse.json({ success: false, message: "توزيع رصيد الباقة في الطلب غير صحيح؛ لم يتم تغيير أي رصيد." }, { status: 409 });
+      }
+      const touchedPackageIds = Array.from(new Set([
+        String(withdrawal.userPackageId),
+        ...allocations.map((item) => String(item.userPackageId)),
+      ])).map((value) => new mongoose.Types.ObjectId(value));
+
       const session = await mongoose.startSession();
       let settledWithdrawal: any = null;
       try {
@@ -356,63 +393,69 @@ export async function PATCH(
           );
           if (!updatedRequest) throw new Error("WITHDRAWAL_STATUS_CHANGED");
 
-        if (nextStatus === "approved" || nextStatus === "rejected") {
-          await User.updateOne(
-            { _id: withdrawal.userId },
-            { $set: { hasPendingWithdrawal: false } },
-            { session }
-          );
-        }
-
-          const anotherPendingWithdrawal = await WithdrawalRequest.findOne({
-            _id: { $ne: withdrawal._id },
-            userId: withdrawal.userId,
-            source: "package",
-            userPackageId: withdrawal.userPackageId,
-            status: "pending",
-          }).select("_id").session(session).lean();
+          if (nextStatus === "approved" || nextStatus === "rejected") {
+            await User.updateOne(
+              { _id: withdrawal.userId },
+              { $set: { hasPendingWithdrawal: false } },
+              { session }
+            );
+          }
 
           if (nextStatus === "approved") {
-            const approvalSet: Record<string, any> = {
-              withdrawalRequestPending: Boolean(anotherPendingWithdrawal),
-            };
-            if (withdrawal.isFirstPackageWithdrawal) approvalSet.firstWithdrawalStatus = "approved";
-            const packageAccount = await UserPackage.findOneAndUpdate(
-              { _id: withdrawal.userPackageId, userId: withdrawal.userId },
-              { $set: approvalSet },
-              { new: true, session }
+            await UserPackage.updateMany(
+              { _id: { $in: touchedPackageIds }, userId: withdrawal.userId },
+              { $set: { withdrawalRequestPending: false } },
+              { session }
             );
-            if (!packageAccount) throw new Error("PACKAGE_BALANCE_INVALID");
+            if (withdrawal.isFirstPackageWithdrawal) {
+              const primaryUpdated = await UserPackage.updateOne(
+                { _id: withdrawal.userPackageId, userId: withdrawal.userId },
+                { $set: { firstWithdrawalStatus: "approved" } },
+                { session }
+              );
+              if (primaryUpdated.matchedCount !== 1) throw new Error("PACKAGE_BALANCE_INVALID");
+            }
           }
 
           if (nextStatus === "rejected" || nextStatus === "completed") {
-            const increments = nextStatus === "rejected"
-              ? { $inc: { lockedEarnings: -amount, availableEarnings: amount } }
-              : { $inc: { lockedEarnings: -amount, totalWithdrawn: amount } };
-            const packageSet: Record<string, any> = {
-              withdrawalRequestPending: Boolean(anotherPendingWithdrawal),
-            };
-            if (withdrawal.isFirstPackageWithdrawal) {
-              packageSet.firstWithdrawalStatus = nextStatus === "rejected" ? "available" : "completed";
-            }
-            const packageAccount = await UserPackage.findOneAndUpdate(
-              { _id: withdrawal.userPackageId, userId: withdrawal.userId, lockedEarnings: { $gte: amount } },
-              { ...increments, $set: packageSet },
-              { new: true, session }
-            );
-            if (!packageAccount) throw new Error("PACKAGE_BALANCE_INVALID");
+            for (const allocation of allocations) {
+              const primary = String(allocation.userPackageId) === String(withdrawal.userPackageId);
+              const increments = nextStatus === "rejected"
+                ? { $inc: { lockedEarnings: -allocation.amount, availableEarnings: allocation.amount } }
+                : { $inc: { lockedEarnings: -allocation.amount, totalWithdrawn: allocation.amount } };
+              const packageSet: Record<string, any> = { withdrawalRequestPending: false };
+              if (primary && withdrawal.isFirstPackageWithdrawal) {
+                packageSet.firstWithdrawalStatus = nextStatus === "rejected" ? "available" : "completed";
+              }
+              const packageAccount = await UserPackage.findOneAndUpdate(
+                {
+                  _id: allocation.userPackageId,
+                  userId: withdrawal.userId,
+                  lockedEarnings: { $gte: allocation.amount },
+                },
+                { ...increments, $set: packageSet },
+                { new: true, session }
+              );
+              if (!packageAccount) throw new Error("PACKAGE_BALANCE_INVALID");
 
-            await PackageLedger.create([{
-              userId: withdrawal.userId,
-              userPackageId: packageAccount._id,
-              type: nextStatus === "rejected" ? "withdrawal_reversal" : "withdrawal",
-              asset: withdrawal.asset,
-              amount: nextStatus === "rejected" ? amount : -amount,
-              note: adminNote || (nextStatus === "rejected"
-                ? "تم رفض طلب السحب؛ أُعيد مبلغ الطلب " + amount + " " + withdrawal.asset + " إلى الرصيد المتاح للباقة"
-                : "تم تنفيذ طلب سحب من رصيد أرباح الباقة بقيمة " + amount + " " + withdrawal.asset),
-              createdBy: admin._id,
-            }], { session });
+              await PackageLedger.create([{
+                userId: withdrawal.userId,
+                userPackageId: packageAccount._id,
+                type: nextStatus === "rejected" ? "withdrawal_reversal" : "withdrawal",
+                asset: withdrawal.asset,
+                amount: nextStatus === "rejected" ? allocation.amount : -allocation.amount,
+                note: adminNote || (nextStatus === "rejected"
+                  ? "تم رفض طلب السحب؛ أُعيد مبلغ " + allocation.amount + " " + withdrawal.asset + " إلى رصيد باقة " + packageAccount.packageName
+                  : "تم تنفيذ طلب سحب بقيمة " + allocation.amount + " " + withdrawal.asset + " من رصيد باقة " + packageAccount.packageName),
+                createdBy: admin._id,
+              }], { session });
+            }
+            // Clear the package-family request guard as part of the same atomic settlement.
+            await UserPackage.updateMany(
+              { _id: { $in: touchedPackageIds }, userId: withdrawal.userId },
+              { $set: { withdrawalRequestPending: false } },
+              { session }
+            );
           }
           settledWithdrawal = updatedRequest;
         });

@@ -560,6 +560,7 @@ await db.collection("packageledgers").insertOne({
 const repairedLegacyPage = await api("/api/packages");
 ok(repairedLegacyPage, "previously migrated legacy account is repaired");
 const repairedLegacyAccount = repairedLegacyPage.data.userPackages.find((x) => String(x._id) === String(previouslyMigratedPackageId));
+assert.ok(repairedLegacyAccount, "previously migrated account is visible after repair");
 closeTo(repairedLegacyAccount.availableEarnings, 0, "old duplicate principal top-up is removed from the visible package balance");
 closeTo(repairedLegacyAccount.firstPackageWithdrawalRemaining, 0, "old 500 withdrawal consumes the first-stage allowance after repair");
 assert.equal((await db.collection("withdrawalrequests").findOne({ _id: previouslyMigratedWithdrawalId })).isFirstPackageWithdrawal, true, "old completed withdrawal is classified on an already-migrated account");
@@ -659,7 +660,7 @@ closeTo(oldPackage.cancellationRefund, 50, "changing package refunds half old ac
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
 closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 50, "package change does not mix deposit or package refund into the general wallet");
 const oldPackageAfterChange = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(oldPackageAfterChange.availableEarnings, 550, "package change refund stays inside the old package withdrawal balance");
+closeTo(oldPackageAfterChange.availableEarnings, 600, "package change adds the 50-USDT refund to the old package's remaining 550-USDT balance");
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(depositBalance && depositBalance.available, 700, "package change debits the new plan from deposit balance");
 

@@ -123,6 +123,159 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
   });
   if (stillUnsettledApproved) return;
 
+  // Some older deployments set packageBalanceSettled before the locked amount
+  // was actually consumed. Repair only when the request is approved and either
+  // its allocation is still locked or the old orphan-lock repair credited the
+  // same amount back into availableEarnings. A request-specific marker makes
+  // this repair idempotent.
+  const previouslySettledApproved = await WithdrawalRequest.find({
+    userId,
+    source: "package",
+    status: "approved",
+    packageBalanceSettled: true,
+  }).sort({ createdAt: 1, _id: 1 }).lean();
+
+  for (const request of previouslySettledApproved as any[]) {
+    const requestId = String(request._id);
+    const amount = Number(request.amount);
+    const rawAllocations = Array.isArray(request.packageAllocations) && request.packageAllocations.length
+      ? request.packageAllocations
+      : [{ userPackageId: request.userPackageId, amount }];
+    const allocations = rawAllocations.map((row: any) => ({
+      userPackageId: String(row.userPackageId || ""),
+      amount: Number(row.amount),
+    }));
+    const allocationTotal = allocations.reduce((sum: number, row: any) => sum + row.amount, 0);
+
+    if (
+      !Number.isFinite(amount) || amount <= 0 ||
+      allocations.some((row: any) => !mongoose.Types.ObjectId.isValid(row.userPackageId) || !Number.isFinite(row.amount) || row.amount <= 0) ||
+      Math.abs(allocationTotal - amount) > 1e-7
+    ) {
+      console.error("PACKAGE APPROVAL BALANCE REPAIR: invalid allocation; left unchanged", requestId);
+      continue;
+    }
+
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const stillApproved = await WithdrawalRequest.findOne({
+          _id: request._id,
+          userId,
+          source: "package",
+          status: "approved",
+          packageBalanceSettled: true,
+        }).session(session).lean();
+        if (!stillApproved) return;
+
+        for (const allocation of allocations) {
+          const packageId = new mongoose.Types.ObjectId(allocation.userPackageId);
+          const repairNote = "تصحيح خصم سحب معتمد قديم؛ رقم الطلب: " + requestId + "؛ حساب الباقة: " + allocation.userPackageId;
+          const alreadyRepaired = await PackageLedger.exists({
+            userId,
+            userPackageId: packageId,
+            type: "withdrawal",
+            note: { $regex: "تصحيح خصم سحب معتمد قديم؛ رقم الطلب: " + requestId + "؛ حساب الباقة: " + allocation.userPackageId },
+          }).session(session);
+          if (alreadyRepaired) continue;
+
+          const account = await UserPackage.findOne({
+            _id: packageId,
+            userId,
+          }).select("lockedEarnings availableEarnings").session(session).lean();
+          if (!account) throw new Error("APPROVED_PACKAGE_ACCOUNT_MISSING");
+
+          const actualLocked = Math.max(0, Number(account.lockedEarnings || 0));
+          let updatedPackage: any = null;
+          let sourceReversalId = "";
+
+          if (actualLocked + 1e-8 >= allocation.amount) {
+            updatedPackage = await UserPackage.findOneAndUpdate(
+              {
+                _id: packageId,
+                userId,
+                lockedEarnings: { $gte: allocation.amount },
+              },
+              {
+                $inc: { lockedEarnings: -allocation.amount },
+                $set: {
+                  withdrawalRequestPending: false,
+                  ...(request.isFirstPackageWithdrawal === true && allocation.userPackageId === String(request.userPackageId)
+                    ? { firstWithdrawalStatus: "completed" }
+                    : {}),
+                },
+              },
+              { new: true, session },
+            );
+          } else {
+            const decisionAt = new Date(request.updatedAt || request.createdAt || Date.now());
+            const possibleReturns = await PackageLedger.find({
+              userId,
+              userPackageId: packageId,
+              type: "withdrawal_reversal",
+              amount: { $gte: allocation.amount - 1e-7 },
+              note: { $regex: "تصحيح حجز سحب قديم: لا يوجد طلب سحب قائم" },
+              createdAt: { $gte: new Date(decisionAt.getTime() - 30_000) },
+            }).sort({ createdAt: 1, _id: 1 }).session(session).lean();
+
+            for (const returned of possibleReturns as any[]) {
+              const priorCorrections = await PackageLedger.find({
+                userId,
+                userPackageId: packageId,
+                type: "withdrawal",
+                note: { $regex: "مصدر قيد الإرجاع: " + String(returned._id) },
+              }).select("amount").session(session).lean();
+              const alreadyConsumed = priorCorrections.reduce(
+                (sum: number, row: any) => sum + Math.abs(Number(row.amount || 0)),
+                0,
+              );
+              if (Number(returned.amount || 0) - alreadyConsumed + 1e-8 < allocation.amount) continue;
+
+              updatedPackage = await UserPackage.findOneAndUpdate(
+                {
+                  _id: packageId,
+                  userId,
+                  availableEarnings: { $gte: allocation.amount },
+                },
+                {
+                  $inc: { availableEarnings: -allocation.amount },
+                  $set: {
+                    withdrawalRequestPending: false,
+                    ...(request.isFirstPackageWithdrawal === true && allocation.userPackageId === String(request.userPackageId)
+                      ? { firstWithdrawalStatus: "completed" }
+                      : {}),
+                  },
+                },
+                { new: true, session },
+              );
+              if (updatedPackage) {
+                sourceReversalId = String(returned._id);
+                break;
+              }
+            }
+          }
+
+          // No matching locked amount or orphan-return credit: preserve the
+          // balance for inspection rather than inventing a deduction.
+          if (!updatedPackage) continue;
+
+          await PackageLedger.create([{
+            userId,
+            userPackageId: packageId,
+            type: "withdrawal",
+            asset: request.asset || "USDT",
+            amount: -allocation.amount,
+            note: repairNote + (sourceReversalId ? "؛ مصدر قيد الإرجاع: " + sourceReversalId : ""),
+          }], { session });
+        }
+      });
+    } catch (error) {
+      console.error("PACKAGE APPROVAL BALANCE REPAIR: request left unchanged", requestId, error);
+    } finally {
+      await session.endSession();
+    }
+  }
+
   const rejectedRequests = await WithdrawalRequest.find({
     userId,
     source: "package",

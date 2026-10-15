@@ -260,7 +260,9 @@ export default function WithdrawPage() {
   }, []);
 
   useEffect(() => {
-    void load();
+    void Promise.resolve().then(() => {
+      void load();
+    });
   }, [load]);
 
   const totalGeneralAvailable = useMemo(
@@ -270,10 +272,6 @@ export default function WithdrawPage() {
   );
   const totalPackageAvailable = useMemo(
     () => packageAccounts.reduce((sum, row) => sum + Math.max(0, Number(row.availableEarnings || 0)), 0),
-    [packageAccounts],
-  );
-  const totalPackageLocked = useMemo(
-    () => packageAccounts.reduce((sum, row) => sum + Math.max(0, Number(row.lockedEarnings || 0)), 0),
     [packageAccounts],
   );
   const totalAllAvailable = useMemo(

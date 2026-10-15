@@ -446,18 +446,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // The page intentionally renders one card per package name. Sum all of that
-    // package family's actual buckets so the card cannot show only one activation
-    // record while the page total includes the others.
-    const packageBalancesByName = new Map<string, { available: number; locked: number }>();
+    // Balance buckets belong to one UserPackage activation record. Only the
+    // first-withdrawal policy cap is grouped by package family; money itself is not.
     const packageInvestedByName = new Map<string, number>();
     for (const account of rawUserPackages as any[]) {
       const key = String(account._id);
       const groupKey = packageGroupByAccountId.get(key) || "account:" + key;
-      const balance = packageBalancesByName.get(groupKey) || { available: 0, locked: 0 };
-      balance.available = roundAmount(balance.available + Math.max(0, Number(account.availableEarnings || 0)));
-      balance.locked = roundAmount(balance.locked + Math.max(0, Number(account.lockedEarnings || 0)));
-      packageBalancesByName.set(groupKey, balance);
       packageInvestedByName.set(
         groupKey,
         roundAmount((packageInvestedByName.get(groupKey) || 0) + Math.max(0, Number(account.investedAmount || 0))),
@@ -503,15 +497,12 @@ export async function GET(request: NextRequest) {
       const packageWithdrawalCap = firstPackageWithdrawalCap;
       const packageWithdrawalUsed = firstWithdrawalByPackageName.get(packageGroupKey) || 0;
       const packageWithdrawalRemaining = firstPackageWithdrawalRemaining;
-      const packageGroupBalance = packageBalancesByName.get(packageGroupKey) || {
-        available: Math.max(0, Number(item.availableEarnings || 0)),
-        locked: Math.max(0, Number(item.lockedEarnings || 0)),
-      };
-      const packageGroupAvailableEarnings = packageGroupBalance.available;
-      const packageGroupLockedEarnings = packageGroupBalance.locked;
+      // Return only this activation's real bucket. Family totals are policy
+      // metadata, never a substitute for the balance owned by this account.
+      const packageGroupAvailableEarnings = Math.max(0, Number(item.availableEarnings || 0));
+      const packageGroupLockedEarnings = Math.max(0, Number(item.lockedEarnings || 0));
       // The first approved withdrawal changes the phase: any later request is
-      // limited by active-referral capacity, even if package balance remains.
-      // Use the family balance consistently for both display and server limits.
+      // limited by active-referral capacity, but can never exceed this account's money.
       const phaseWithdrawalLimit = packageWithdrawalPending || firstPackageWithdrawalPending
         ? 0
         : Math.min(packageGroupAvailableEarnings, packageWithdrawalAlreadyUsed || firstPackageWithdrawalRemaining <= 1e-8

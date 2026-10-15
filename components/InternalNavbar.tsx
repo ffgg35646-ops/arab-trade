@@ -159,7 +159,7 @@ export default function InternalNavbar() {
           .join(" · ");
         const withdrawalUsdt = withdrawalBalances
           .filter((item: { asset?: string }) => String(item.asset || "").toUpperCase() === "USDT")
-          .reduce((sum: number, item: { available?: number }) => sum + Number(item.available || 0), 0);
+          .reduce((sum: number, item: { available?: number; locked?: number }) => sum + Number(item.available || 0) + Number(item.locked || 0), 0);
 
         setDepositBalanceSummary(depositSummary || "0 USDT");
         setWithdrawUsdtBalance(withdrawalUsdt);

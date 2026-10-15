@@ -15,6 +15,7 @@ type Method = {
   withdrawalFee?: number;
   enabled: boolean;
   withdrawalEnabled?: boolean;
+  withdrawalScope?: "general" | "package";
   warning?: string;
 };
 type Balance = { asset: string; available: number; locked: number };
@@ -101,6 +102,7 @@ function packagePlanId(item: PackageAccount) {
 
 export default function WithdrawPage() {
   const [methods, setMethods] = useState<Method[]>([]);
+  const [packageMethods, setPackageMethods] = useState<Method[]>([]);
   const [limits, setLimits] = useState<PaymentLimits>({ minDeposit: 0, maxDeposit: 0, minWithdrawal: 0, minGeneralWithdrawal: 0, maxWithdrawal: 0, dailyWithdrawalLimit: 0 });
   const [balances, setBalances] = useState<Balance[]>([]);
   const [packageAccounts, setPackageAccounts] = useState<PackageAccount[]>([]);
@@ -145,7 +147,10 @@ export default function WithdrawPage() {
         });
       }
       const methodRows: Method[] = Array.isArray(methodsData.methods)
-        ? methodsData.methods.filter((item: Method) => item.enabled !== false && item.withdrawalEnabled !== false)
+        ? methodsData.methods.filter((item: Method) => item.enabled !== false && item.withdrawalEnabled !== false && item.withdrawalScope !== "package")
+        : [];
+      const packageMethodRows: Method[] = Array.isArray(methodsData.packageMethods)
+        ? methodsData.packageMethods.filter((item: Method) => item.enabled !== false && item.withdrawalEnabled !== false)
         : [];
       const planRows: PackagePlan[] = Array.isArray(packageData.packages)
         ? packageData.packages.filter((item: PackagePlan) => item && item._id && item.enabled !== false)
@@ -165,9 +170,10 @@ export default function WithdrawPage() {
         : [];
       const loadedAddresses: SavedAddress[] = Array.isArray(addressesData.addresses) ? addressesData.addresses : [];
       const generalMethods = methodRows;
-      const packageMethods = methodRows.filter((item) => item.asset === "USDT");
+      const selectedPackageMethods = packageMethodRows.filter((item) => item.asset === "USDT");
 
-      setMethods(methodRows);
+      setMethods(generalMethods);
+      setPackageMethods(selectedPackageMethods);
       setBalances(Array.isArray(walletData.generalWithdrawalBalances) ? walletData.generalWithdrawalBalances : (walletData.spot?.balances || walletData.wallet?.balances || []));
       setHistory(Array.isArray(historyData.withdrawals) ? historyData.withdrawals : []);
       setSavedAddresses(loadedAddresses);
@@ -186,8 +192,8 @@ export default function WithdrawPage() {
           const formId = account._id;
           const planId = packagePlanId(account);
           const old = next[formId] || next[planId] || emptyForm;
-          const methodId = packageMethods.some((item) => item._id === old.methodId) ? old.methodId : (packageMethods[0]?._id || "");
-          const selected = packageMethods.find((item) => item._id === methodId);
+          const methodId = selectedPackageMethods.some((item) => item._id === old.methodId) ? old.methodId : (selectedPackageMethods[0]?._id || "");
+          const selected = selectedPackageMethods.find((item) => item._id === methodId);
           const stored = selected && loadedAddresses.find((item) => item.asset === selected.asset && item.network === selected.network && item.source === "package");
           next[formId] = { ...old, methodId, address: old.address || stored?.address || "" };
           if (planId !== formId) delete next[planId];
@@ -309,7 +315,7 @@ export default function WithdrawPage() {
   const generalHistory = history.filter((item) => item.source !== "package");
 
   function changeMethod(source: "wallet" | "package", packageId: string | undefined, methodId: string) {
-    const selected = methods.find((item) => item._id === methodId);
+    const selected = (source === "wallet" ? methods : packageMethods).find((item) => item._id === methodId);
     const stored = selected && savedAddresses.find((item) =>
       item.asset === selected.asset && item.network === selected.network && item.source === source
     );
@@ -338,7 +344,7 @@ export default function WithdrawPage() {
 
   async function saveAddress(source: "wallet" | "package", packageId?: string) {
     const form = source === "wallet" ? generalForm : (packageForms[packageId || ""] || emptyForm);
-    const selected = methods.find((item) => item._id === form.methodId);
+    const selected = (source === "wallet" ? methods : packageMethods).find((item) => item._id === form.methodId);
     if (!selected) {
       setError("اختر وسيلة السحب أولًا");
       return;
@@ -376,7 +382,7 @@ export default function WithdrawPage() {
     const packageKey = packageFormId || packageAccount?._id || "";
     const key = source === "wallet" ? "general" : String(packageKey);
     const form = source === "wallet" ? generalForm : (packageForms[packageKey] || emptyForm);
-    const selectedMethod = methods.find((item) => item._id === form.methodId);
+    const selectedMethod = (source === "wallet" ? methods : packageMethods).find((item) => item._id === form.methodId);
     setError("");
     setMessage("");
     if (source === "package") {
@@ -440,7 +446,7 @@ export default function WithdrawPage() {
     const minimum = source === "package"
       ? Math.max(Number(selectedMethod.minWithdrawal || 0), Number(packageAccount?.minimumWithdrawal ?? 100))
       : Math.max(Number(selectedMethod.minWithdrawal || 0), Number(limits.minGeneralWithdrawal ?? limits.minWithdrawal ?? 0));
-    const configuredMaximums = [Number(selectedMethod.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
+    const configuredMaximums = [Number(selectedMethod.maxWithdrawal || 0), ...(source === "wallet" ? [Number(limits.maxWithdrawal || 0)] : [])].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : 0;
     if (numericAmount < minimum) {
       setError((source === "package" ? "أقل مبلغ يمكن سحبه من باقة " + (packageAccount?.packageName || "") : "أقل مبلغ يمكن سحبه") + " هو " + money(minimum) + " " + selectedMethod.asset + ". أدخل مبلغًا مساويًا للحد الأدنى أو أكبر، مع عدم تجاوز الرصيد المتاح.");
@@ -521,7 +527,7 @@ export default function WithdrawPage() {
     const packageId = packageAccount?._id || packagePlan?._id;
     const key = source === "wallet" ? "general" : String(packageId || "");
     const form = source === "wallet" ? generalForm : (packageForms[packageId || ""] || emptyForm);
-    const selected = methods.find((item) => item._id === form.methodId) || null;
+    const selected = (source === "wallet" ? methods : packageMethods).find((item) => item._id === form.methodId) || null;
     const packageMax = packageAccount ? packageMaximum(packageAccount) : 0;
     const available = source === "package"
       ? packageMax
@@ -529,7 +535,7 @@ export default function WithdrawPage() {
     const minimum = source === "package"
       ? Math.max(Number(selected?.minWithdrawal || 0), Number(packageAccount?.minimumWithdrawal ?? packagePlan?.minimumWithdrawal ?? 100))
       : Math.max(Number(selected?.minWithdrawal || 0), Number(limits.minGeneralWithdrawal ?? limits.minWithdrawal ?? 0));
-    const configuredMaximums = [Number(selected?.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
+    const configuredMaximums = [Number(selected?.maxWithdrawal || 0), ...(source === "wallet" ? [Number(limits.maxWithdrawal || 0)] : [])].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : undefined;
     const savedAddress = selected && savedAddresses.some((item) =>
       item.asset === selected.asset && item.network === selected.network && item.source === source
@@ -631,7 +637,7 @@ export default function WithdrawPage() {
                         const packageFormId = item?._id || String(plan._id);
                         const availableForPlan = item ? packageMaximum(item) : 0;
                         const packageForm = packageForms[packageFormId] || emptyForm;
-                        const selectedPackageMethod = methods.find((method) => method._id === packageForm.methodId);
+                        const selectedPackageMethod = packageMethods.find((method) => method._id === packageForm.methodId);
                         const minimumWithdrawalForPlan = Math.max(
                           Number(selectedPackageMethod?.minWithdrawal || 0),
                           Number(item?.minimumWithdrawal ?? plan.minimumWithdrawal ?? 100)

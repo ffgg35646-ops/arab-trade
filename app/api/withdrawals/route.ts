@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
 import Asset from "@/models/Asset";
 import PaymentOption from "@/models/PaymentOption";
+import PackageWithdrawalMethod from "@/models/PackageWithdrawalMethod";
 import Wallet from "@/models/Wallet";
 import Notification from "@/models/Notification";
 import { getCurrentUser } from "@/lib/current-user";
@@ -230,25 +231,41 @@ export async function POST(request: NextRequest) {
     /*
      * نبحث أولًا عن وسيلة الدفع التي أنشأها الأدمن.
      */
-    const paymentCandidates = await PaymentOption.find({
-      asset: USDT_ASSET,
-      $or: [
-        { kind: "withdrawal" },
-        { kind: "both" },
-        { kind: { $exists: false } },
-      ],
-    }).lean();
-    const payment = paymentCandidates.find(
-      (item: any) => normalizePaymentNetwork(item.network) === networkCode,
-    );
+    // General-wallet withdrawals and package withdrawals read different method records.
+    // A general method must never satisfy or configure a package withdrawal.
+    let payment: any = null;
+    if (source === "package") {
+      const packageCandidates = await PackageWithdrawalMethod.find({ asset: USDT_ASSET }).lean();
+      payment = packageCandidates.find(
+        (item: any) => normalizePaymentNetwork(item.network) === networkCode,
+      ) || null;
+      if (!payment) {
+        return NextResponse.json(
+          { success: false, message: "وسيلة السحب هذه غير مضافة لسحب الباقات من لوحة الإدارة." },
+          { status: 400 },
+        );
+      }
+    } else {
+      const paymentCandidates = await PaymentOption.find({
+        asset: USDT_ASSET,
+        $or: [
+          { kind: "withdrawal" },
+          { kind: "both" },
+          { kind: { $exists: false } },
+        ],
+      }).lean();
+      payment = paymentCandidates.find(
+        (item: any) => normalizePaymentNetwork(item.network) === networkCode,
+      ) || null;
+    }
 
     let minAmount = source === "wallet"
       ? Number(settings.withdrawals.minGeneralWithdrawal ?? settings.withdrawals.minAmount ?? 0)
       : 0;
 
-    let maxAmount = Number(
-      settings.withdrawals.maxAmount || 0
-    );
+    let maxAmount = source === "wallet"
+      ? Number(settings.withdrawals.maxAmount || 0)
+      : 0;
 
     let fee = 0;
     let networkName = networkCode;
@@ -422,9 +439,9 @@ export async function POST(request: NextRequest) {
       dailyAggregate[0]?.total || 0
     );
 
-    const dailyLimit = Number(
-      settings.withdrawals.dailyLimit || 0
-    );
+    const dailyLimit = source === "wallet"
+      ? Number(settings.withdrawals.dailyLimit || 0)
+      : 0;
 
     if (
       dailyLimit > 0 &&
@@ -550,11 +567,10 @@ export async function POST(request: NextRequest) {
         .lean();
       const configuredMinimums = settings.withdrawals.withdrawalMinByPackage as unknown as Record<string, number> | undefined;
       const configuredPackageMinimum = configuredMinimums?.[String(currentPackage.packageId)];
-      // The effective minimum is at least the administrator's global withdrawal
-      // minimum, while allowing a package-specific setting to override the plan default.
+      // Package requests use the package plan minimum and the package-only method.
+      // Global-wallet minimums are intentionally excluded from this calculation.
       const packageMinimum = Math.max(
         Number(configuredPackageMinimum ?? packagePlan?.minimumWithdrawal ?? 100),
-        Number(settings.withdrawals.minAmount ?? 0),
         Number(minAmount || 0),
       );
       const [firstWithdrawalRows, referralWithdrawalRows, referredUsers] = await Promise.all([

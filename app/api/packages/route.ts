@@ -31,18 +31,10 @@ const normalizePackageGroup = (value: unknown) =>
  * second credit when the source money has already been spent.
  */
 async function reconcileLegacyPackageRefunds(userId: mongoose.Types.ObjectId) {
-  const activeGeneralWithdrawal = await WithdrawalRequest.exists({
-    userId,
-    source: { $ne: "package" },
-    status: { $in: ["pending", "processing"] },
-  });
-  if (activeGeneralWithdrawal) return;
-
   const legacyAccounts = await UserPackage.find({
     userId,
     status: "cancelled",
     cancellationRefund: { $gt: 0 },
-    cancellationRefundPackageCredited: { $ne: true },
   }).select("_id packageName asset cancellationRefund").sort({ cancelledAt: 1, _id: 1 }).lean();
 
   for (const account of legacyAccounts as any[]) {
@@ -70,19 +62,11 @@ async function reconcileLegacyPackageRefunds(userId: mongoose.Types.ObjectId) {
     const session = await mongoose.startSession();
     try {
       await session.withTransaction(async () => {
-        const activeWithdrawal = await WithdrawalRequest.exists({
-          userId,
-          source: { $ne: "package" },
-          status: { $in: ["pending", "processing"] },
-        }).session(session);
-        if (activeWithdrawal) return;
-
         const currentPackage = await UserPackage.findOne({
           _id: account._id,
           userId,
           status: "cancelled",
           cancellationRefund: refund,
-          cancellationRefundPackageCredited: { $ne: true },
         }).session(session).lean();
         if (!currentPackage) return;
 
@@ -94,7 +78,7 @@ async function reconcileLegacyPackageRefunds(userId: mongoose.Types.ObjectId) {
         }).session(session);
         if (existingReclassification) {
           await UserPackage.updateOne(
-            { _id: account._id, userId, cancellationRefundPackageCredited: { $ne: true } },
+            { _id: account._id, userId },
             { $set: { cancellationRefundPackageCredited: true } },
             { session },
           );
@@ -131,7 +115,6 @@ async function reconcileLegacyPackageRefunds(userId: mongoose.Types.ObjectId) {
             userId,
             status: "cancelled",
             cancellationRefund: refund,
-            cancellationRefundPackageCredited: { $ne: true },
           },
           {
             $inc: { availableEarnings: refund },

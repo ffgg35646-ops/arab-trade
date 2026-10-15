@@ -315,7 +315,7 @@ export default function Page() {
                   <span className="mt-3 block text-xs text-slate-400">الحد الأدنى للسحب (USDT)</span>
                   <input type="number" min="0" step="any" value={packageWithdrawalMinimums[plan._id] ?? 0} onChange={(event) => {
                     const value = Number(event.target.value);
-                    const normalizeName = (name: string) => name.normalize("NFKC").trim().replace(/\\s+/g, " ").toLocaleLowerCase("en-US");
+                    const normalizeName = (name: string) => name.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
                     const siblingIds = packagePlans
                       .filter((candidate) => normalizeName(candidate.name) === normalizeName(plan.name))
                       .map((candidate) => candidate._id);

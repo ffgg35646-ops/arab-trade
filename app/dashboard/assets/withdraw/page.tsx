@@ -230,63 +230,88 @@ export default function WithdrawPage() {
     () => packageAccounts.reduce((sum, item) => sum + Number(item.lockedEarnings || 0), 0),
     [packageAccounts]
   );
-  // Every UserPackage activation is its own withdrawal account. A cancelled
-  // package keeps its refund on its own card instead of being merged into a newer
-  // activation that happens to have the same displayed package name.
+  // Render one outer card per configured package. Multiple historical/active
+  // UserPackage activations are shown as accounts inside that card, preserving
+  // each account's independent balance and withdrawal source.
   const withdrawalPackageCards = useMemo(() => {
     const normalizePackageName = (value: string) =>
       value.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
     const planById = new Map(packagePlans.map((plan) => [String(plan._id), plan]));
-    const accountPlanIds = new Set(packageAccounts.map((account) => packagePlanId(account)).filter(Boolean));
-    const accountNames = new Set(packageAccounts.map((account) => normalizePackageName(account.packageName || "")).filter(Boolean));
+    const usedAccountIds = new Set<string>();
 
-    const accountCards = packageAccounts.map((account, index) => {
-      const planId = packagePlanId(account);
-      const configuredPlan = planById.get(planId);
-      const plan: PackagePlan = {
-        _id: planId || account._id,
-        name: account.packageName || configuredPlan?.name || "باقة سابقة",
-        asset: account.asset,
-        minimumWithdrawal: account.minimumWithdrawal ?? configuredPlan?.minimumWithdrawal,
-        enabled: configuredPlan?.enabled,
-      };
-      const time = new Date(account.activatedAt || account.createdAt || 0).getTime();
+    const sortedAccounts = (accounts: PackageAccount[]) => accounts.sort((a, b) => {
+      const activeOrder = Number(b.status === "active") - Number(a.status === "active");
+      if (activeOrder) return activeOrder;
+      const aTime = new Date(a.activatedAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.activatedAt || b.createdAt || 0).getTime();
+      return bTime - aTime;
+    });
+
+    const configuredCards = packagePlans.map((plan, index) => {
+      const normalizedName = normalizePackageName(plan.name);
+      const accounts = sortedAccounts(packageAccounts.filter((account) => {
+        if (usedAccountIds.has(account._id)) return false;
+        const accountName = normalizePackageName(account.packageName || "");
+        const matches = packagePlanId(account) === String(plan._id) ||
+          (Boolean(normalizedName) && accountName === normalizedName);
+        if (matches) usedAccountIds.add(account._id);
+        return matches;
+      }));
+      const accountTime = accounts.reduce((latest, account) => {
+        const time = new Date(account.activatedAt || account.createdAt || 0).getTime();
+        return Number.isFinite(time) ? Math.max(latest, time) : latest;
+      }, 0);
       return {
-        key: "account-" + account._id,
-        groupKey: account._id,
+        key: "plan-" + String(plan._id),
+        groupKey: String(plan._id),
         plan,
-        accounts: [account],
-        item: account,
-        order: planId && packagePlans.findIndex((row) => String(row._id) === planId) >= 0
-          ? packagePlans.findIndex((row) => String(row._id) === planId)
-          : Number.MAX_SAFE_INTEGER,
-        accountTime: Number.isFinite(time) ? time : 0,
+        accounts,
+        order: index,
+        accountTime,
         accountIndex: index,
       };
     });
 
-    // Keep an inactive catalogue card only when there is no existing account for
-    // that plan/name. Historical balances always take precedence over placeholders.
-    const placeholders = packagePlans
-      .filter((plan) =>
-        !accountPlanIds.has(String(plan._id)) &&
-        !accountNames.has(normalizePackageName(plan.name))
-      )
-      .map((plan, index) => ({
-        key: "plan-" + String(plan._id),
-        groupKey: String(plan._id),
-        plan,
-        accounts: [] as PackageAccount[],
-        item: null as PackageAccount | null,
-        order: packagePlans.findIndex((row) => String(row._id) === String(plan._id)),
+    // Keep legacy plans that no longer exist in the enabled catalogue, but group
+    // their activations by normalized package name so old records cannot multiply cards.
+    const legacyGroups = new Map<string, { plan: PackagePlan; accounts: PackageAccount[]; accountTime: number }>();
+    for (const account of packageAccounts) {
+      if (usedAccountIds.has(account._id)) continue;
+      const planId = packagePlanId(account);
+      const normalizedName = normalizePackageName(account.packageName || "");
+      const groupId = normalizedName || planId || account._id;
+      const groupKey = "legacy:" + groupId;
+      const configuredPlan = planById.get(planId);
+      const existing = legacyGroups.get(groupKey) || {
+        plan: {
+          _id: planId || account._id,
+          name: account.packageName || configuredPlan?.name || "باقة سابقة",
+          asset: account.asset,
+          minimumWithdrawal: account.minimumWithdrawal ?? configuredPlan?.minimumWithdrawal,
+          enabled: configuredPlan?.enabled,
+        },
+        accounts: [],
         accountTime: 0,
-        accountIndex: index,
-      }));
+      };
+      existing.accounts.push(account);
+      const time = new Date(account.activatedAt || account.createdAt || 0).getTime();
+      if (Number.isFinite(time)) existing.accountTime = Math.max(existing.accountTime, time);
+      legacyGroups.set(groupKey, existing);
+      usedAccountIds.add(account._id);
+    }
 
-    return [...accountCards, ...placeholders].sort((a, b) => {
+    const legacyCards = Array.from(legacyGroups.entries()).map(([groupKey, group], index) => ({
+      key: groupKey,
+      groupKey,
+      plan: group.plan,
+      accounts: sortedAccounts(group.accounts),
+      order: Number.MAX_SAFE_INTEGER,
+      accountTime: group.accountTime,
+      accountIndex: index,
+    }));
+
+    return [...configuredCards, ...legacyCards].sort((a, b) => {
       if (a.order !== b.order) return a.order - b.order;
-      const statusOrder = Number(b.item?.status === "active") - Number(a.item?.status === "active");
-      if (statusOrder) return statusOrder;
       if (a.accountTime !== b.accountTime) return b.accountTime - a.accountTime;
       return a.accountIndex - b.accountIndex;
     });
@@ -616,53 +641,83 @@ export default function WithdrawPage() {
                     <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-xs text-slate-500">لا توجد باقات متاحة حاليًا.</div>
                   ) : (
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {withdrawalPackageCards.map(({ key, groupKey, plan, accounts, item }) => {
-                        const packageFormId = item?._id || String(plan._id);
-                        const packageBalanceForPlan = item
-                          ? Math.max(0, Number(item.availableEarnings || 0))
-                          : 0;
-                        // packageMaximum is the current policy limit, not the real money recorded in the bucket.
-                        const availableForPlan = item ? packageMaximum(item) : 0;
-                        const packageForm = packageForms[packageFormId] || emptyForm;
-                        const selectedPackageMethod = packageMethods.find((method) => method._id === packageForm.methodId);
-                        const minimumWithdrawalForPlan = Math.max(
-                          Number(selectedPackageMethod?.minWithdrawal || 0),
-                          Number(item?.minimumWithdrawal ?? plan.minimumWithdrawal ?? 100)
+                      {withdrawalPackageCards.map(({ key, plan, accounts }) => {
+                        const packageBalanceForPlan = accounts.reduce(
+                          (sum, account) => sum + Math.max(0, Number(account.availableEarnings || 0)),
+                          0,
                         );
+                        const availableForPlan = accounts.reduce(
+                          (sum, account) => sum + packageMaximum(account),
+                          0,
+                        );
+                        const lockedForPlan = accounts.reduce(
+                          (sum, account) => sum + Math.max(0, Number(account.lockedEarnings || 0)),
+                          0,
+                        );
+                        const hasActiveAccount = accounts.some((account) => account.status === "active");
                         return (
                           <article key={key} className="min-w-0 rounded-xl border border-white/10 bg-[#050a13] p-3">
-                            <div className="mb-2 flex items-start justify-between gap-2">
+                            <div className="mb-3 flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <h3 className="break-words text-sm font-black">{plan.name}</h3>
-                                <span className={item ? "mt-1 inline-flex rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] text-emerald-200" : "mt-1 inline-flex rounded-full bg-slate-700/50 px-2 py-0.5 text-[10px] text-slate-300"}>
-                                  {item ? (item.status === "active" ? "نشطة" : "سابقة") : "لم تُفعّل بعد"}
+                                <span className={hasActiveAccount ? "mt-1 inline-flex rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] text-emerald-200" : accounts.length ? "mt-1 inline-flex rounded-full bg-slate-700/50 px-2 py-0.5 text-[10px] text-slate-300" : "mt-1 inline-flex rounded-full bg-slate-700/50 px-2 py-0.5 text-[10px] text-slate-300"}>
+                                  {hasActiveAccount ? "نشطة" : accounts.length ? "سابقة" : "لم تُفعّل بعد"}
                                 </span>
-                                {item?.activatedAt && <div className="mt-1 text-[9px] text-slate-600">تفعيل {new Date(item.activatedAt).toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo" })}</div>}
+                                {accounts.length > 1 && <div className="mt-1 text-[10px] text-slate-500">{accounts.length} حساب تفعيل</div>}
                               </div>
                               <div className="shrink-0 text-left">
-                                <div className="text-[10px] text-slate-500">رصيد الباقة المتاح</div>
+                                <div className="text-[10px] text-slate-500">إجمالي رصيد الباقة المتاح</div>
                                 <div className="text-sm font-black text-emerald-200">{money(packageBalanceForPlan)} USDT</div>
-                                <div className="mt-1 text-[10px] text-slate-500">المسموح سحبه الآن: <b className="text-slate-300">{money(availableForPlan)} USDT</b></div>
-                                <div className="mt-1 text-[10px] text-slate-500">أقل طلب: <b className="text-slate-300">{money(minimumWithdrawalForPlan)} USDT</b></div>
+                                <div className="mt-1 text-[10px] text-slate-500">إجمالي المسموح سحبه: <b className="text-slate-300">{money(availableForPlan)} USDT</b></div>
+                                <div className="mt-1 text-[10px] text-slate-500">إجمالي المحجوز: <b className="text-slate-300">{money(lockedForPlan)} USDT</b></div>
                               </div>
                             </div>
-                            <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
-                              <span className="text-slate-500">محجوز: <b className="text-slate-200">{money(Number(item?.lockedEarnings || 0))} USDT</b></span>
-                            </div>
-                            {!item ? (
+
+                            {!accounts.length ? (
                               <p className="rounded-lg bg-white/[0.025] px-2 py-2 text-[10px] text-slate-500">فعّل الباقة أولًا لتتاح عمليات السحب.</p>
                             ) : (
-                              <>
-                                {item.packageWithdrawalStatus === "pending" && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب قيد المراجعة.</p>}
-                                {item.packageWithdrawalStatus === "approved" && <p className="mb-2 rounded-lg bg-blue-400/[0.06] p-2 text-[10px] text-blue-200">تمت الموافقة النهائية على السحب وتسوية رصيد الباقة.</p>}
-                                {item.packageWithdrawalStatus === "processing" && <p className="mb-2 rounded-lg bg-blue-400/[0.06] p-2 text-[10px] text-blue-200">السحب قيد التنفيذ.</p>}
-                                {renderWithdrawalFields("package", item || undefined, plan)}
-                                {packageCardErrors[String(item._id)] && (
-                                  <p role="alert" className="mt-2 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-2 text-xs leading-5 text-amber-200">
-                                    {packageCardErrors[String(item._id)]}
-                                  </p>
-                                )}
-                              </>
+                              <div className="space-y-2">
+                                {accounts.map((item) => {
+                                  const packageFormId = item._id;
+                                  const packageForm = packageForms[packageFormId] || emptyForm;
+                                  const selectedPackageMethod = packageMethods.find((method) => method._id === packageForm.methodId);
+                                  const accountAvailable = Math.max(0, Number(item.availableEarnings || 0));
+                                  const accountWithdrawable = packageMaximum(item);
+                                  const minimumWithdrawalForAccount = Math.max(
+                                    Number(selectedPackageMethod?.minWithdrawal || 0),
+                                    Number(item.minimumWithdrawal ?? plan.minimumWithdrawal ?? 100),
+                                  );
+                                  return (
+                                    <div key={item._id} className="rounded-lg border border-white/10 bg-[#07101d] p-2.5">
+                                      <div className="mb-2 flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                          <div className="text-[11px] font-bold text-slate-200">حساب التفعيل</div>
+                                          <span className={item.status === "active" ? "mt-1 inline-flex rounded-full bg-emerald-400/10 px-2 py-0.5 text-[9px] text-emerald-200" : "mt-1 inline-flex rounded-full bg-slate-700/50 px-2 py-0.5 text-[9px] text-slate-300"}>
+                                            {item.status === "active" ? "نشط" : "سابق"}
+                                          </span>
+                                          {item.activatedAt && <div className="mt-1 text-[9px] text-slate-600">تاريخ التفعيل {new Date(item.activatedAt).toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo" })}</div>}
+                                        </div>
+                                        <div className="shrink-0 text-left">
+                                          <div className="text-[10px] text-slate-500">المتاح في هذا الحساب</div>
+                                          <div className="text-xs font-black text-emerald-200">{money(accountAvailable)} USDT</div>
+                                          <div className="mt-1 text-[10px] text-slate-500">المسموح: <b className="text-slate-300">{money(accountWithdrawable)} USDT</b></div>
+                                          <div className="mt-1 text-[10px] text-slate-500">الحد الأدنى: <b className="text-slate-300">{money(minimumWithdrawalForAccount)} USDT</b></div>
+                                          <div className="mt-1 text-[10px] text-slate-500">المحجوز: <b className="text-slate-300">{money(Number(item.lockedEarnings || 0))} USDT</b></div>
+                                        </div>
+                                      </div>
+                                      {item.packageWithdrawalStatus === "pending" && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب قيد المراجعة.</p>}
+                                      {item.packageWithdrawalStatus === "approved" && <p className="mb-2 rounded-lg bg-blue-400/[0.06] p-2 text-[10px] text-blue-200">تمت الموافقة النهائية على السحب وتسوية رصيد الباقة.</p>}
+                                      {item.packageWithdrawalStatus === "processing" && <p className="mb-2 rounded-lg bg-blue-400/[0.06] p-2 text-[10px] text-blue-200">السحب قيد التنفيذ.</p>}
+                                      {renderWithdrawalFields("package", item, plan)}
+                                      {packageCardErrors[String(item._id)] && (
+                                        <p role="alert" className="mt-2 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-2 text-xs leading-5 text-amber-200">
+                                          {packageCardErrors[String(item._id)]}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             )}
                           </article>
                         );

@@ -524,9 +524,7 @@ export async function POST(request: NextRequest) {
         const activeStatus = String(activePackageWithdrawal.status || "pending");
         const activeMessage = activeStatus === "pending"
           ? "لديك طلب سحب من باقة " + currentPackage.packageName + " بقيمة " + Number(activePackageWithdrawal.amount || 0) + " " + assetCode + " قيد مراجعة الإدارة. لا يمكنك إنشاء طلب آخر من نفس الباقة قبل اتخاذ قرار."
-          : activeStatus === "approved"
-            ? "تمت الموافقة على طلب السحب من باقة " + currentPackage.packageName + "، لكن التحويل لم يُسجل كمكتمل بعد. يظل المبلغ محجوزًا حتى تأكيد إتمام التحويل."
-            : "طلب السحب من باقة " + currentPackage.packageName + " قيد تنفيذ التحويل. لا يمكنك إنشاء طلب آخر حتى يكتمل.";
+          : "طلب السحب من باقة " + currentPackage.packageName + " قيد التنفيذ. لا يمكنك إنشاء طلب آخر من نفس الباقة حتى ينتهي الطلب الجاري.";
 
         return NextResponse.json(
           {

@@ -180,7 +180,7 @@ export async function PATCH(request: NextRequest) {
       // logical package on the withdrawal page. Keep their withdrawal minimums
       // synchronized so older account IDs do not retain a stale limit.
       const normalizePackageName = (value: unknown) =>
-        String(value || "").normalize("NFKC").trim().replace(/\\s+/g, " ").toLocaleLowerCase("en-US");
+        String(value || "").normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
       const catalogRows = await InvestmentPackage.find({}).select("_id name").lean();
       const targetName = normalizePackageName(item.name);
       const siblingIds = catalogRows

@@ -15,6 +15,7 @@ export interface IWithdrawalRequest {
   userPackageId?: mongoose.Types.ObjectId | null;
   packageAllocations?: Array<{ userPackageId: mongoose.Types.ObjectId; amount: number }>;
   isFirstPackageWithdrawal?: boolean;
+  packageBalanceSettled?: boolean;
   adminNote: string;
   txHash?: string;
   broadcastedAt?: Date;
@@ -46,6 +47,7 @@ const WithdrawalRequestSchema = new Schema<IWithdrawalRequest>(
       default: [],
     },
     isFirstPackageWithdrawal: { type: Boolean, default: false, index: true },
+    packageBalanceSettled: { type: Boolean, default: false, index: true },
     status: {
       type: String,
       enum: ["pending", "approved", "rejected", "completed"],

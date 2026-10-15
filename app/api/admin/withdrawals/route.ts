@@ -300,12 +300,15 @@ export async function PATCH(
             const increments = nextStatus === "rejected"
               ? { $inc: { lockedEarnings: -amount, availableEarnings: amount } }
               : { $inc: { lockedEarnings: -amount, totalWithdrawn: amount } };
-            const firstWithdrawalUpdate = withdrawal.isFirstPackageWithdrawal
-              ? { $set: { firstWithdrawalStatus: nextStatus === "rejected" ? "available" : "completed" } }
-              : {};
+            const packageSet: Record<string, any> = {
+              withdrawalRequestPending: false,
+            };
+            if (withdrawal.isFirstPackageWithdrawal) {
+              packageSet.firstWithdrawalStatus = nextStatus === "rejected" ? "available" : "completed";
+            }
             const packageAccount = await UserPackage.findOneAndUpdate(
               { _id: withdrawal.userPackageId, userId: withdrawal.userId, lockedEarnings: { $gte: amount } },
-              { ...increments, ...firstWithdrawalUpdate },
+              { ...increments, $set: packageSet },
               { new: true, session }
             );
             if (!packageAccount) throw new Error("PACKAGE_BALANCE_INVALID");

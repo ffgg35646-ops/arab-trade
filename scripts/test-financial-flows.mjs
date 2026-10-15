@@ -280,6 +280,10 @@ await db.collection("investmentpackages").updateOne(
   { _id: new mongoose.Types.ObjectId(String(minimumTestPlan._id)) },
   { $set: { minimumWithdrawal: 200 } },
 );
+await db.collection("platformsettings").updateOne(
+  { key: "global" },
+  { $set: { ["withdrawals.withdrawalMinByPackage." + String(minimumTestPlan._id)]: 200 } },
+);
 const minimumTestAccountId = new mongoose.Types.ObjectId();
 await db.collection("userpackages").insertOne({
   _id: minimumTestAccountId,
@@ -314,6 +318,10 @@ closeTo(unchangedMinimumTestAccount.availableEarnings, 50, "below-minimum attemp
 closeTo(unchangedMinimumTestAccount.lockedEarnings, 0, "below-minimum attempt does not lock funds");
 await db.collection("userpackages").deleteOne({ _id: minimumTestAccountId });
 await db.collection("investmentpackages").deleteOne({ _id: new mongoose.Types.ObjectId(String(minimumTestPlan._id)) });
+await db.collection("platformsettings").updateOne(
+  { key: "global" },
+  { $unset: { ["withdrawals.withdrawalMinByPackage." + String(minimumTestPlan._id)]: "" } },
+);
 
 // Also verify the global minimum set in admin settings is applied to package requests.
 const globalMinimumTestResult = await api("/api/admin/packages", {

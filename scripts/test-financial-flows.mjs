@@ -922,25 +922,22 @@ const blockedWhileTransferInProgress = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "single-request-test-address", amount: 100, source: "package", userPackageId: String(singleRequestPackageId) },
 });
-statusIs(blockedWhileTransferInProgress, 409, "no new package withdrawal while the approved transfer is still in progress");
-assert.match(String(blockedWhileTransferInProgress.data.message || ""), /تمت الموافقة على طلب السحب|قيد تنفيذ التحويل/, "approved transfer gets a transfer-state message rather than a review-pending message");
+statusIs(blockedWhileTransferInProgress, 400, "approved package withdrawal no longer blocks another request as an in-progress transfer");
+assert.match(String(blockedWhileTransferInProgress.data.message || ""), /الطاقة منخفضة الآن|المتاح للسحب مقابل الإحالات النشطة/, "new request is checked against referral capacity rather than a false reserved-withdrawal state");
 const approvedPackagePage = await api("/api/packages");
-ok(approvedPackagePage, "package API loads when transfer is approved but not completed");
+ok(approvedPackagePage, "package API loads after a package withdrawal is approved");
 const approvedPackageView = approvedPackagePage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
-assert.equal(approvedPackageView.packageWithdrawalStatus, "approved", "approved request is not mislabeled as pending review");
-closeTo(approvedPackageView.packageGroupLockedEarnings, 100, "approved payout stays reserved until completion");
-ok(await api("/api/admin/withdrawals", {
-  as: "admin",
-  method: "PATCH",
-  body: { id: firstSingleRequestId, status: "completed", adminNote: "CI complete the first-stage payout before testing the referral stage" },
-}), "admin completes the first-stage withdrawal");
+assert.equal(approvedPackageView.packageWithdrawalStatus, null, "approved package request is terminal rather than in transfer");
+assert.equal(approvedPackageView.packageWithdrawalPending, false, "approval leaves no open package-withdrawal flag");
+closeTo(approvedPackageView.packageGroupLockedEarnings, 0, "approved payout clears the reserved amount immediately");
 singleRequestPackage = await db.collection("userpackages").findOne({ _id: singleRequestPackageId });
-closeTo(singleRequestPackage.availableEarnings, 200, "completed first-stage withdrawal leaves the remaining package balance");
-closeTo(singleRequestPackage.lockedEarnings, 0, "completed first-stage withdrawal releases its locked amount");
-const approvedWithdrawalPackagesPage = await api("/api/packages");
+closeTo(singleRequestPackage.availableEarnings, 200, "approval consumes the first payout without refunding it to available");
+closeTo(singleRequestPackage.lockedEarnings, 0, "approved first-stage request leaves no locked amount");
+closeTo(singleRequestPackage.totalWithdrawn, 100, "approved first-stage request increments withdrawn total");
+const approvedWithdrawalPackagesPage = approvedPackagePage;
 const completedPackageView = approvedWithdrawalPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
-assert.equal(completedPackageView.packageWithdrawalStatus, null, "completed request does not show as pending review or in transfer");
-closeTo(completedPackageView.packageGroupLockedEarnings, 0, "completed request leaves no reserved amount in the package card");
+assert.equal(completedPackageView.packageWithdrawalStatus, null, "accepted request does not show as pending review or in transfer");
+closeTo(completedPackageView.packageGroupLockedEarnings, 0, "accepted request leaves no reserved amount in the package card");
 ok(approvedWithdrawalPackagesPage, "package API exposes the post-approval withdrawal phase");
 const approvedWithdrawalPackageView = approvedWithdrawalPackagesPage.data.userPackages.find((x) => String(x._id) === String(singleRequestPackageId));
 assert.equal(approvedWithdrawalPackageView.packageWithdrawalAlreadyUsed, true, "package API marks a successful first-stage withdrawal");
@@ -994,12 +991,10 @@ ok(await api("/api/admin/withdrawals", {
   as: "admin",
   method: "PATCH",
   body: { id: laterStageWithdrawalId, status: "approved", adminNote: "CI approval within the active-referral cap" },
-}), "admin approves later-stage withdrawal within referral capacity");
-ok(await api("/api/admin/withdrawals", {
-  as: "admin",
-  method: "PATCH",
-  body: { id: laterStageWithdrawalId, status: "completed", adminNote: "CI complete later-stage referral withdrawal" },
-}), "admin completes later-stage referral withdrawal");
+}), "admin approves and settles later-stage withdrawal within referral capacity");
+const laterStageSettledAccount = await db.collection("userpackages").findOne({ _id: singleRequestPackageId });
+closeTo(laterStageSettledAccount.lockedEarnings, 0, "later-stage approval clears reserved funds immediately");
+closeTo(laterStageSettledAccount.totalWithdrawn, 200, "both approved stages are counted in the withdrawn total");
 
 const generalWithdrawal = await api("/api/withdrawals", {
   method: "POST",

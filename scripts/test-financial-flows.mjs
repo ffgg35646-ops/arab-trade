@@ -448,6 +448,56 @@ closeTo(package100Doc.lockedEarnings, 0, "completed package withdrawal unlocks r
 closeTo(package100Doc.totalWithdrawn, 100, "package withdrawal total");
 assert.equal(package100Doc.firstWithdrawalStatus, "completed", "first package withdrawal marked completed");
 
+// Regression: when a visible package balance spans two same-name package records,
+// reserve the amount from both records and restore both exactly when rejected.
+const splitPackageName = "CI grouped withdrawal balance";
+const splitAccountIds = [new mongoose.Types.ObjectId(), new mongoose.Types.ObjectId()];
+await db.collection("userpackages").insertMany(splitAccountIds.map((_id) => ({
+  _id,
+  userId: user._id,
+  packageId: plan100._id,
+  packageName: splitPackageName,
+  investedAmount: 100,
+  asset: "USDT",
+  durationDays: 0,
+  status: "cancelled",
+  availableEarnings: 50,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 0,
+  totalWithdrawn: 0,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "available",
+  withdrawalRequestPending: false,
+  cancellationRefund: 0,
+  activatedAt: new Date(),
+  lastProfitAt: new Date(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+})));
+const groupedWithdrawal = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 100, source: "package", userPackageId: String(splitAccountIds[0]) },
+});
+ok(groupedWithdrawal, "withdrawal locks a grouped 100-USDT balance split across two 50-USDT package records", 201);
+const groupedRequestId = new mongoose.Types.ObjectId(String(groupedWithdrawal.data.withdrawal._id));
+for (const accountId of splitAccountIds) {
+  const lockedAccount = await db.collection("userpackages").findOne({ _id: accountId });
+  closeTo(lockedAccount.availableEarnings, 0, "grouped withdrawal decrements each allocated available bucket");
+  closeTo(lockedAccount.lockedEarnings, 50, "grouped withdrawal reserves each allocated bucket");
+}
+ok(await api("/api/admin/withdrawals", {
+  as: "admin", method: "PATCH",
+  body: { id: String(groupedRequestId), status: "rejected", adminNote: "CI restore grouped package buckets" },
+}), "rejecting grouped withdrawal restores exact package allocations");
+for (const accountId of splitAccountIds) {
+  const restoredAccount = await db.collection("userpackages").findOne({ _id: accountId });
+  closeTo(restoredAccount.availableEarnings, 50, "rejected grouped withdrawal restores each available bucket");
+  closeTo(restoredAccount.lockedEarnings, 0, "rejected grouped withdrawal releases each locked bucket");
+}
+await db.collection("withdrawalrequests").deleteOne({ _id: groupedRequestId });
+await db.collection("packageledgers").deleteMany({ userPackageId: { $in: splitAccountIds } });
+await db.collection("userpackages").deleteMany({ _id: { $in: splitAccountIds } });
+
 const missingReferralCapacity = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 1, source: "package", userPackageId: String(package100._id) },

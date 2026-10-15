@@ -198,6 +198,41 @@ async function reconcileOrphanedPackageWithdrawalLocks(userId: mongoose.Types.Ob
   });
   if (unsettledApprovedPackage) return;
 
+  // Never move a remaining lock back to availableEarnings if an approved request
+  // has not yet been reconciled. That old fallback made an approved withdrawal
+  // appear to have no effect on the cumulative balance.
+  const settledApprovals = await WithdrawalRequest.find({
+    userId,
+    source: "package",
+    status: "approved",
+    packageBalanceSettled: true,
+  }).select("_id userPackageId packageAllocations amount").lean();
+  for (const request of settledApprovals as any[]) {
+    const requestId = String(request._id);
+    const amount = Number(request.amount || 0);
+    const allocations = Array.isArray(request.packageAllocations) && request.packageAllocations.length
+      ? request.packageAllocations
+      : [{ userPackageId: request.userPackageId, amount }];
+    for (const allocation of allocations as any[]) {
+      const packageId = String(allocation.userPackageId || "");
+      if (!mongoose.Types.ObjectId.isValid(packageId)) continue;
+      const repaired = await PackageLedger.exists({
+        userId,
+        userPackageId: new mongoose.Types.ObjectId(packageId),
+        type: "withdrawal",
+        note: {
+          $regex: "تصحيح خصم سحب معتمد قديم؛ رقم الطلب: " + requestId + "؛ حساب الباقة: " + packageId,
+        },
+      });
+      if (repaired) continue;
+
+      const account = await UserPackage.findOne({ _id: packageId, userId })
+        .select("lockedEarnings")
+        .lean();
+      if (Number(account?.lockedEarnings || 0) > 1e-8) return;
+    }
+  }
+
   // The submit endpoint briefly owns these guards while it moves a balance
   // and creates the withdrawal document. Avoid racing that short critical
   // section, but recover guards older than the grace window when no live

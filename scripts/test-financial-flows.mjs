@@ -270,6 +270,17 @@ closeTo(packagePage.data.depositBalances.find((x) => x.asset === "USDT").availab
 const activated = await api("/api/packages", { method: "POST", body: { action: "activate", packageId: String(plan100._id) } });
 ok(activated, "user activates package from separate deposit balance", 201);
 const package100 = activated.data.userPackage;
+// This fixture tests a 50-USDT referral-cap withdrawal, so set this package's
+// own minimum to 1 USDT. The separate regression above tests that a configured
+// 200-USDT package minimum rejects a 50-USDT request.
+await db.collection("investmentpackages").updateOne(
+  { _id: new mongoose.Types.ObjectId(String(plan100._id)) },
+  { $set: { minimumWithdrawal: 1 } },
+);
+await db.collection("platformsettings").updateOne(
+  { key: "global" },
+  { $set: { ["withdrawals.withdrawalMinByPackage." + String(plan100._id)]: 1 } },
+);
 spotWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(spotWallet.balances.find((x) => x.asset === "USDT").available, 50, "package activation does not debit the general spot balance");

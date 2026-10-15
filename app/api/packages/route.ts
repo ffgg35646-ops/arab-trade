@@ -157,7 +157,7 @@ export async function GET(request: NextRequest) {
       const packageWithdrawalPending = item.withdrawalRequestPending === true || Boolean(unresolvedPackageWithdrawal);
       const packageWithdrawalAlreadyUsed =
         successfulWithdrawalPackages.has(packageKey) ||
-        (firstPackageWithdrawalRemaining > 1e-8 && completedFirstWithdrawalPackages.has(packageKey));
+        completedFirstWithdrawalPackages.has(packageKey);
       // Package principal caps only phase one. After it is fully withdrawn,
       // the remaining allowance comes from 50% of active referral deposits.
       const packageWithdrawalCap = firstPackageWithdrawalCap;

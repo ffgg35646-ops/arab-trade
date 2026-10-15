@@ -239,11 +239,13 @@ export default function WithdrawPage() {
   // remain separately accessible without rendering dozens of cards by default.
   const activeWithdrawalPackageCards = withdrawalPackageCards.filter(({ item }) => item.status === "active");
   const previousWithdrawalPackageCards = withdrawalPackageCards.filter(({ item }) => item.status !== "active");
+  // Show only the newest active package account by default. Older or duplicate
+  // records remain available below so each account's balance stays independent.
   const featuredWithdrawalPackageCards = activeWithdrawalPackageCards.length
-    ? activeWithdrawalPackageCards
+    ? activeWithdrawalPackageCards.slice(0, 1)
     : previousWithdrawalPackageCards.slice(0, 1);
   const hiddenPreviousPackageCards = activeWithdrawalPackageCards.length
-    ? previousWithdrawalPackageCards
+    ? [...activeWithdrawalPackageCards.slice(1), ...previousWithdrawalPackageCards]
     : previousWithdrawalPackageCards.slice(1);
   const visibleWithdrawalPackageCards = showPreviousPackageAccounts
     ? [...featuredWithdrawalPackageCards, ...hiddenPreviousPackageCards]
@@ -621,11 +623,11 @@ export default function WithdrawPage() {
                         className="w-full rounded-lg border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-bold text-slate-200 transition hover:bg-white/[0.06]"
                       >
                         {showPreviousPackageAccounts
-                          ? "إخفاء حسابات الباقات السابقة"
-                          : "عرض حسابات الباقات السابقة (" + hiddenPreviousPackageCards.length + ")"}
+                          ? "إخفاء الحسابات الأخرى"
+                          : "عرض الحسابات الأخرى (" + hiddenPreviousPackageCards.length + ")"}
                       </button>
                       <p className="mt-2 text-[10px] leading-5 text-slate-500">
-                        أرصدة الباقات السابقة تظل منفصلة؛ افتح القائمة للوصول إلى أي رصيد قديم.
+                        أرصدة كل حساب تظل منفصلة؛ افتح القائمة للوصول إلى الحسابات السابقة أو الإضافية دون دمج أرصدتها.
                       </p>
                     </div>
                   )}

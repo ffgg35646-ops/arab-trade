@@ -111,6 +111,7 @@ export default function WithdrawPage() {
   const [submittingKey, setSubmittingKey] = useState("");
   const [savingAddressKey, setSavingAddressKey] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [showPreviousPackageAccounts, setShowPreviousPackageAccounts] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -233,6 +234,20 @@ export default function WithdrawPage() {
         return bTime - aTime;
       });
   }, [packageAccounts, packagePlans]);
+
+  // Keep the page focused on the current package. Historical package balances
+  // remain separately accessible without rendering dozens of cards by default.
+  const activeWithdrawalPackageCards = withdrawalPackageCards.filter(({ item }) => item.status === "active");
+  const previousWithdrawalPackageCards = withdrawalPackageCards.filter(({ item }) => item.status !== "active");
+  const featuredWithdrawalPackageCards = activeWithdrawalPackageCards.length
+    ? activeWithdrawalPackageCards
+    : previousWithdrawalPackageCards.slice(0, 1);
+  const hiddenPreviousPackageCards = activeWithdrawalPackageCards.length
+    ? previousWithdrawalPackageCards
+    : previousWithdrawalPackageCards.slice(1);
+  const visibleWithdrawalPackageCards = showPreviousPackageAccounts
+    ? [...featuredWithdrawalPackageCards, ...hiddenPreviousPackageCards]
+    : featuredWithdrawalPackageCards;
   const pendingWithdrawal = history.find((item) => item.status === "pending");
   const hasPendingWithdrawal = Boolean(pendingWithdrawal);
   const openWithdrawals = history.filter((item) => ["pending", "approved", "processing"].includes(item.status)).length;
@@ -553,13 +568,13 @@ export default function WithdrawPage() {
                 <section className="mt-3 rounded-xl border border-emerald-400/20 bg-[#07101d] p-3">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <h2 className="text-sm font-black">السحب من الباقات</h2>
-                    <span className="rounded-full border border-emerald-300/20 px-2 py-1 text-[10px] text-emerald-200">{withdrawalPackageCards.length} حساب/باقة</span>
+                    <span className="text-[10px] text-slate-400">{activeWithdrawalPackageCards.length ? "الباقة الحالية" : featuredWithdrawalPackageCards.length ? "آخر حساب باقة لديه رصيد" : "لا يوجد حساب باقة"}</span>
                   </div>
                   {withdrawalPackageCards.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-xs text-slate-500">لا توجد باقات متاحة حاليًا.</div>
                   ) : (
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {withdrawalPackageCards.map(({ key, plan, item }) => {
+                      {visibleWithdrawalPackageCards.map(({ key, plan, item }) => {
                         const packageFormId = item?._id || String(plan._id);
                         const availableForPlan = item ? Math.max(0, Number(item.availableEarnings || 0)) : 0;
                         return (
@@ -596,6 +611,22 @@ export default function WithdrawPage() {
                           </article>
                         );
                       })}
+                    </div>
+                  )}
+                  {hiddenPreviousPackageCards.length > 0 && (
+                    <div className="mt-3 border-t border-white/10 pt-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowPreviousPackageAccounts((current) => !current)}
+                        className="w-full rounded-lg border border-white/10 bg-white/[0.025] px-3 py-2 text-xs font-bold text-slate-200 transition hover:bg-white/[0.06]"
+                      >
+                        {showPreviousPackageAccounts
+                          ? "إخفاء حسابات الباقات السابقة"
+                          : "عرض حسابات الباقات السابقة (" + hiddenPreviousPackageCards.length + ")"}
+                      </button>
+                      <p className="mt-2 text-[10px] leading-5 text-slate-500">
+                        أرصدة الباقات السابقة تظل منفصلة؛ افتح القائمة للوصول إلى أي رصيد قديم.
+                      </p>
                     </div>
                   )}
                 </section>

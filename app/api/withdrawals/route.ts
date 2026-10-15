@@ -19,6 +19,7 @@ import { accrueDuePackageEarnings } from "@/lib/accrue-package-earnings";
 import { normalizePaymentNetwork, USDT_ASSET } from "@/lib/unified-usdt-wallet";
 import { separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
 import { ensurePackagePrincipalWithdrawalCredit } from "@/lib/ensure-package-principal-withdrawal";
+import { settleLegacyApprovedPackageWithdrawals } from "@/lib/settle-legacy-approved-package-withdrawals";
 
 function normalizeAsset(value: unknown) {
   return String(value || "").trim().toUpperCase();
@@ -146,6 +147,7 @@ export async function POST(request: NextRequest) {
     }
 
     await connectDB();
+    await settleLegacyApprovedPackageWithdrawals(user._id);
 
     const existingPendingWithdrawal = await WithdrawalRequest.findOne({
       userId: user._id,
@@ -515,7 +517,7 @@ export async function POST(request: NextRequest) {
         userId: user._id,
         source: "package",
         userPackageId: { $in: sameNamePackageIds },
-        status: { $in: ["pending", "approved", "processing"] },
+        status: { $in: ["pending", "processing"] },
       }).select("_id amount status createdAt").sort({ createdAt: -1 }).lean();
 
       if (activePackageWithdrawal) {

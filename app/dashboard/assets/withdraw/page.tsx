@@ -237,7 +237,7 @@ export default function WithdrawPage() {
   // activation that happens to have the same displayed package name.
   const withdrawalPackageCards = useMemo(() => {
     const normalizePackageName = (value: string) =>
-      value.normalize("NFKC").trim().replace(/\\s+/g, " ").toLocaleLowerCase("en-US");
+      value.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
     const planById = new Map(packagePlans.map((plan) => [String(plan._id), plan]));
     const accountPlanIds = new Set(packageAccounts.map((account) => packagePlanId(account)).filter(Boolean));
     const accountNames = new Set(packageAccounts.map((account) => normalizePackageName(account.packageName || "")).filter(Boolean));

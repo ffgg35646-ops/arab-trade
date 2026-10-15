@@ -117,6 +117,25 @@ export async function POST(request: NextRequest) {
     }
 
     await connectDB();
+
+    const existingPendingWithdrawal = await WithdrawalRequest.findOne({
+      userId: user._id,
+      status: "pending",
+    }).select("_id amount asset source createdAt").sort({ createdAt: -1 }).lean();
+
+    if (existingPendingWithdrawal) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "لديك طلب سحب قيد المراجعة بالفعل. لا يمكنك تقديم طلب سحب جديد من المحفظة العامة أو أي باقة حتى تعتمد الإدارة الطلب الحالي أو ترفضه.",
+          activeWithdrawalId: String(existingPendingWithdrawal._id),
+          activeWithdrawalAmount: Number(existingPendingWithdrawal.amount || 0),
+          activeWithdrawalSource: existingPendingWithdrawal.source || "wallet",
+        },
+        { status: 409 }
+      );
+    }
+
     await separateLegacyDepositsFromSpotWallet(user._id);
     await accrueDuePackageEarnings({ userId: user._id });
 
@@ -735,7 +754,46 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    let hasWithdrawalLock = false;
     try {
+      const claimedWithdrawalLock = await User.findOneAndUpdate(
+        { _id: user._id, hasPendingWithdrawal: { $ne: true } },
+        { $set: { hasPendingWithdrawal: true } },
+        { new: true }
+      ).select("_id").lean();
+
+      if (claimedWithdrawalLock) hasWithdrawalLock = true;
+
+      if (!claimedWithdrawalLock) {
+        if (source === "package" && lockedUserPackage) {
+          await UserPackage.updateOne(
+            { _id: lockedUserPackage._id, userId: user._id },
+            {
+              $inc: { availableEarnings: amount, lockedEarnings: -amount },
+              $set: {
+                withdrawalRequestPending: false,
+                ...(isFirstPackageWithdrawal ? { firstWithdrawalStatus: "available" } : {}),
+              },
+            }
+          );
+        } else if (lockedWalletAllocations.length) {
+          for (const allocation of lockedWalletAllocations) {
+            await Wallet.updateOne(
+              { userId: user._id, type: allocation.walletType, mode: "live", "balances.asset": assetCode },
+              { $inc: { "balances.$.available": allocation.amount, "balances.$.locked": -allocation.amount } }
+            );
+          }
+        }
+
+        return NextResponse.json(
+          {
+            success: false,
+            message: "لديك طلب سحب قيد المراجعة بالفعل. انتظر قرار الإدارة بالموافقة أو الرفض قبل تقديم طلب جديد.",
+          },
+          { status: 409 }
+        );
+      }
+
       const withdrawal =
         await WithdrawalRequest.create({
           userId: user._id,
@@ -808,6 +866,13 @@ export async function POST(request: NextRequest) {
             { $inc: { "balances.$.available": allocation.amount, "balances.$.locked": -allocation.amount } }
           );
         }
+      }
+
+      if (hasWithdrawalLock) {
+        await User.updateOne(
+          { _id: user._id },
+          { $set: { hasPendingWithdrawal: false } }
+        ).catch((unlockError) => console.error("WITHDRAWAL LOCK RELEASE:", unlockError));
       }
 
       throw error;

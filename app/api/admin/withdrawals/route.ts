@@ -10,6 +10,7 @@ import LedgerEntry from "@/models/LedgerEntry";
 import Notification from "@/models/Notification";
 import UserPackage from "@/models/UserPackage";
 import PackageLedger from "@/models/PackageLedger";
+import User from "@/models/User";
 
 function normalizeAsset(
   value: unknown
@@ -296,6 +297,14 @@ export async function PATCH(
           );
           if (!updatedRequest) throw new Error("WITHDRAWAL_STATUS_CHANGED");
 
+        if (nextStatus === "approved" || nextStatus === "rejected") {
+          await User.updateOne(
+            { _id: withdrawal.userId },
+            { $set: { hasPendingWithdrawal: false } },
+            { session }
+          );
+        }
+
           const anotherPendingWithdrawal = await WithdrawalRequest.findOne({
             _id: { $ne: withdrawal._id },
             userId: withdrawal.userId,
@@ -402,6 +411,14 @@ export async function PATCH(
           { new: true, session }
         );
         if (!updatedRequest) throw new Error("WITHDRAWAL_STATUS_CHANGED");
+
+        if (nextStatus === "approved" || nextStatus === "rejected") {
+          await User.updateOne(
+            { _id: withdrawal.userId },
+            { $set: { hasPendingWithdrawal: false } },
+            { session }
+          );
+        }
 
         if (nextStatus === "rejected" || nextStatus === "completed") {
           const asset = normalizeAsset(withdrawal.asset);

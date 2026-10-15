@@ -11,6 +11,7 @@ export interface IUser {
   referredBy?: mongoose.Types.ObjectId | null;
   isVerified: boolean;
   isActive: boolean;
+  hasPendingWithdrawal?: boolean;
   createdAt: Date;
 }
 
@@ -84,6 +85,11 @@ const UserSchema = new Schema<IUser>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+
+    hasPendingWithdrawal: {
+      type: Boolean,
+      default: false,
     },
   },
   {

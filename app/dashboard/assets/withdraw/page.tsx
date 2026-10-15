@@ -214,6 +214,8 @@ export default function WithdrawPage() {
     () => packageAccounts.reduce((sum, item) => sum + Number(item.lockedEarnings || 0), 0),
     [packageAccounts]
   );
+  const pendingWithdrawal = history.find((item) => item.status === "pending");
+  const hasPendingWithdrawal = Boolean(pendingWithdrawal);
   const openWithdrawals = history.filter((item) => ["pending", "approved", "processing"].includes(item.status)).length;
   const packageHistory = history.filter((item) => item.source === "package");
   const generalHistory = history.filter((item) => item.source !== "package");
@@ -289,6 +291,11 @@ export default function WithdrawPage() {
     const selectedMethod = methods.find((item) => item._id === form.methodId);
     setError("");
     setMessage("");
+
+    if (hasPendingWithdrawal) {
+      setError("لديك طلب سحب قيد المراجعة بالفعل. لا يمكنك تقديم طلب آخر حتى تقرر الإدارة الموافقة على الطلب الحالي أو رفضه.");
+      return;
+    }
 
     if (!selectedMethod) {
       setError("لا توجد وسيلة سحب مفعلة من الإدارة. أضف وسيلة سحب من لوحة الأدمن أولًا.");
@@ -473,8 +480,8 @@ export default function WithdrawPage() {
         )}
         {selected?.warning && <div className="rounded-lg border border-amber-400/20 bg-amber-400/[0.05] p-2 text-xs text-amber-200">{selected.warning}</div>}
 
-        <button type="submit" disabled={isSubmitting || !selected || (source === "package" && (!packageAccount || packageMax <= 0))} className="col-span-2 w-full rounded-lg bg-cyan-300 px-3 py-1.5 text-xs font-black text-[#03111c] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40">
-          {isSubmitting ? "جارٍ الإرسال…" : "تأكيد السحب"}
+        <button type="submit" disabled={isSubmitting || hasPendingWithdrawal || !selected || (source === "package" && (!packageAccount || packageMax <= 0))} className="col-span-2 w-full rounded-lg bg-cyan-300 px-3 py-1.5 text-xs font-black text-[#03111c] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-40">
+          {isSubmitting ? "جارٍ الإرسال…" : hasPendingWithdrawal ? "يوجد طلب قيد المراجعة" : "تأكيد السحب"}
         </button>
       </form>
     );
@@ -505,6 +512,13 @@ export default function WithdrawPage() {
 
             {error && <div role="alert" className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-4 text-sm text-red-300">{error}</div>}
             {message && <div role="status" className="mb-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.06] p-4 text-sm text-emerald-200">{message}</div>}
+            {pendingWithdrawal && (
+              <div role="alert" className="mb-4 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-4 text-sm text-amber-100">
+                لديك طلب سحب بقيمة <strong>{money(Number(pendingWithdrawal.amount || 0))} {pendingWithdrawal.asset || "USDT"}</strong> قيد المراجعة
+                {pendingWithdrawal.source === "package" ? " من أرباح الباقة" : " من المحفظة العامة"}.
+                تم إيقاف إرسال أي طلب سحب جديد حتى تعتمد الإدارة الطلب الحالي أو ترفضه.
+              </div>
+            )}
 
             {loading ? (
               <div className="rounded-2xl border border-white/10 bg-[#07101d] p-12 text-center text-slate-400">جاري تحميل الأرصدة وبيانات السحب...</div>

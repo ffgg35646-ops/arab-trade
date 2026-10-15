@@ -105,7 +105,7 @@ export default function AdminWithdrawalsPage() {
   const stats = useMemo(() => ({
     total: rows.length,
     pending: rows.filter((r) => r.status === "pending").length,
-    approved: rows.filter((r) => r.status === "processing" || (r.status === "approved" && r.source !== "package")).length,
+    approved: rows.filter((r) => r.status === "approved" || r.status === "processing").length,
     completed: rows.filter((r) => r.status === "completed").length,
     rejected: rows.filter((r) => r.status === "rejected" || r.status === "failed").length,
     packagePending: rows.filter((r) => r.status === "pending" && r.source === "package").length,

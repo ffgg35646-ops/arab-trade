@@ -445,6 +445,19 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const normalizePackageName = (value: unknown) =>
+        String(value ?? "").normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
+      const normalizedPackageName = normalizePackageName(currentPackage.packageName);
+      const sameNamePackageRows = normalizedPackageName
+        ? await UserPackage.find({ userId: user._id }).select("_id packageName").lean()
+        : [];
+      const sameNamePackageIds = sameNamePackageRows
+        .filter((row: any) => normalizePackageName(row.packageName) === normalizedPackageName)
+        .map((row: any) => row._id);
+      if (!sameNamePackageIds.some((id: any) => String(id) === String(currentPackage._id))) {
+        sameNamePackageIds.push(currentPackage._id);
+      }
+
       const activePackageWithdrawal = await WithdrawalRequest.findOne({
         userId: user._id,
         source: "package",
@@ -470,7 +483,7 @@ export async function POST(request: NextRequest) {
       const successfulPackageWithdrawal = await WithdrawalRequest.findOne({
         userId: user._id,
         source: "package",
-        userPackageId: currentPackage._id,
+        userPackageId: { $in: sameNamePackageIds },
         status: { $in: ["approved", "processing"] },
       }).select("_id amount status createdAt").sort({ createdAt: -1 }).lean();
 
@@ -501,7 +514,7 @@ export async function POST(request: NextRequest) {
         WithdrawalRequest.find({
           userId: user._id,
           source: "package",
-          userPackageId: currentPackage._id,
+          userPackageId: { $in: sameNamePackageIds },
           isFirstPackageWithdrawal: true,
           status: { $in: countedStatuses },
         }).select("amount status").lean(),

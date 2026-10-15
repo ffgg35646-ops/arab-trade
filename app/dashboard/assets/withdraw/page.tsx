@@ -111,7 +111,6 @@ export default function WithdrawPage() {
   const [submittingKey, setSubmittingKey] = useState("");
   const [savingAddressKey, setSavingAddressKey] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedPackageAccountByPlan, setSelectedPackageAccountByPlan] = useState<Record<string, string>>({});
   const [packageCardErrors, setPackageCardErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -290,15 +289,17 @@ export default function WithdrawPage() {
           const bTime = new Date(b.activatedAt || b.createdAt || 0).getTime();
           return bTime - aTime;
         });
-        const selectedId = selectedPackageAccountByPlan[groupKey];
-        const item = sortedAccounts.find((account) => account._id === selectedId)
+        // One visible card per package name. Pick an eligible account automatically;
+        // never let the user switch account records to reopen a first-withdrawal allowance.
+        const item = sortedAccounts.find((account) => account.status === "active" && packageMaximum(account) > 1e-8)
+          || sortedAccounts.find((account) => packageMaximum(account) > 1e-8)
           || sortedAccounts.find((account) => account.status === "active")
           || sortedAccounts[0]
           || null;
         return { key: "plan-" + groupKey, groupKey, plan, accounts: sortedAccounts, item, order };
       })
       .sort((a, b) => a.order - b.order);
-  }, [packageAccounts, packagePlans, selectedPackageAccountByPlan]);
+  }, [packageAccounts, packagePlans]);
   const pendingWithdrawal = history.find((item) => item.status === "pending");
   const hasPendingWithdrawal = Boolean(pendingWithdrawal);
   const openWithdrawals = history.filter((item) => ["pending", "approved", "processing"].includes(item.status)).length;
@@ -645,7 +646,7 @@ export default function WithdrawPage() {
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                       {withdrawalPackageCards.map(({ key, groupKey, plan, accounts, item }) => {
                         const packageFormId = item?._id || String(plan._id);
-                        const availableForPlan = item ? Math.max(0, Number(item.availableEarnings || 0)) : 0;
+                        const availableForPlan = item ? packageMaximum(item) : 0;
                         const packageForm = packageForms[packageFormId] || emptyForm;
                         const selectedPackageMethod = methods.find((method) => method._id === packageForm.methodId);
                         const minimumWithdrawalForPlan = Math.max(
@@ -668,28 +669,6 @@ export default function WithdrawPage() {
                                 <div className="mt-1 text-[10px] text-slate-500">أقل طلب: <b className="text-slate-300">{money(minimumWithdrawalForPlan)} USDT</b></div>
                               </div>
                             </div>
-                            {accounts.length > 1 && (
-                              <div className="mb-2">
-                                <label className="mb-1 block text-[10px] text-slate-500">حساب الرصيد المرتبط بالباقة</label>
-                                <select
-                                  aria-label={"حساب الباقة " + plan.name}
-                                  value={item?._id || ""}
-                                  onChange={(event) => setSelectedPackageAccountByPlan((current) => ({
-                                    ...current,
-                                    [groupKey]: event.target.value,
-                                  }))}
-                                  className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-[10px] text-slate-200 outline-none focus:border-cyan-400/50"
-                                >
-                                  {accounts.map((account) => (
-                                    <option key={account._id} value={account._id}>
-                                      {(account.status === "active" ? "نشطة" : "سابقة") +
-                                        (account.activatedAt ? " · " + new Date(account.activatedAt).toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo" }) : "") +
-                                        " · متاح " + money(Number(account.availableEarnings || 0)) + " USDT"}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            )}
                             <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px]">
                               <span className="text-slate-500">محجوز: <b className="text-slate-200">{money(Number(item?.lockedEarnings || 0))} USDT</b></span>
                             </div>
@@ -697,7 +676,7 @@ export default function WithdrawPage() {
                               <p className="rounded-lg bg-white/[0.025] px-2 py-2 text-[10px] text-slate-500">فعّل الباقة أولًا لتتاح عمليات السحب.</p>
                             ) : (
                               <>
-                                {item.firstWithdrawalStatus === "pending" && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب الأول قيد المراجعة.</p>}
+                                {(item.firstPackageWithdrawalPending === true || item.packageWithdrawalPending === true) && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب قيد المراجعة.</p>}
                                 {renderWithdrawalFields("package", item || undefined, plan)}
                                 {packageCardErrors[String(item._id)] && (
                                   <p role="alert" className="mt-2 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] p-2 text-xs leading-5 text-amber-200">

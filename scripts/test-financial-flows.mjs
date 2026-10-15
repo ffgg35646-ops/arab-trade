@@ -353,6 +353,34 @@ const missingReferralCapacity = await api("/api/withdrawals", {
 statusIs(missingReferralCapacity, 400, "phase-two package withdrawal is blocked when no active referrals exist");
 assert.match(String(missingReferralCapacity.data.message || ""), /الطاقة منخفضة الآن، يُرجى جلب إحالات نشطة/, "empty phase two asks the user to bring active referrals");
 
+const siblingPackageAccountId = new mongoose.Types.ObjectId();
+await db.collection("userpackages").insertOne({
+  _id: siblingPackageAccountId,
+  userId: user._id,
+  packageId: plan100._id,
+  packageName: package100.packageName,
+  investedAmount: 100,
+  asset: "USDT",
+  durationDays: 0,
+  status: "cancelled",
+  availableEarnings: 100,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 0,
+  totalWithdrawn: 0,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "available",
+  cancellationRefund: 0,
+  activatedAt: new Date(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+});
+const siblingFirstStageBypass = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 50, source: "package", userPackageId: String(siblingPackageAccountId) },
+});
+statusIs(siblingFirstStageBypass, 400, "another account with the same package name cannot reopen the first-stage allowance");
+assert.match(String(siblingFirstStageBypass.data.message || ""), /الطاقة منخفضة الآن، يُرجى جلب إحالات نشطة/, "same-name duplicate account follows the referral phase");
+
 const capTestReferralId = new mongoose.Types.ObjectId();
 const capTestCreatedAt = new Date();
 await db.collection("users").insertOne({

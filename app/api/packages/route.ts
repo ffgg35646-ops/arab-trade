@@ -20,6 +20,8 @@ import { debitDepositBalance, normalizeDepositBalanceRows, separateLegacyDeposit
 import { ensurePackagePrincipalWithdrawalCredit } from "@/lib/ensure-package-principal-withdrawal";
 
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8) / 1e8;
+const normalizePackageGroup = (value: unknown) =>
+  String(value ?? "").normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
 
 export async function GET(request: NextRequest) {
   try {
@@ -112,27 +114,39 @@ export async function GET(request: NextRequest) {
       (sum: number, row: any) => sum + Number(row.amount || 0),
       0
     );
-    const firstWithdrawalByPackage = new Map<string, number>();
-    const firstWithdrawalPendingPackages = new Set<string>();
-    const completedFirstWithdrawalPackages = new Set<string>();
+    const packageGroupByAccountId = new Map<string, string>();
+    for (const account of rawUserPackages as any[]) {
+      const id = String(account._id);
+      const normalizedName = normalizePackageGroup(account.packageName);
+      packageGroupByAccountId.set(id, normalizedName || "account:" + id);
+    }
+    const firstWithdrawalByPackageName = new Map<string, number>();
+    const firstWithdrawalPendingPackageNames = new Set<string>();
+    const completedFirstWithdrawalPackageNames = new Set<string>();
     const unresolvedWithdrawalByPackage = new Map<string, any>();
-    const successfulWithdrawalPackages = new Set<string>();
+    const unresolvedWithdrawalByPackageName = new Map<string, any>();
+    const successfulWithdrawalPackageNames = new Set<string>();
     for (const row of successfulPackageWithdrawalRows as any[]) {
       const key = String(row.userPackageId || "");
-      if (key) successfulWithdrawalPackages.add(key);
+      const groupKey = packageGroupByAccountId.get(key) || key;
+      if (groupKey) successfulWithdrawalPackageNames.add(groupKey);
     }
     for (const row of unresolvedPackageWithdrawalRows as any[]) {
       const key = String(row.userPackageId || "");
+      const groupKey = packageGroupByAccountId.get(key) || key;
       if (key && !unresolvedWithdrawalByPackage.has(key)) unresolvedWithdrawalByPackage.set(key, row);
+      if (groupKey && !unresolvedWithdrawalByPackageName.has(groupKey)) unresolvedWithdrawalByPackageName.set(groupKey, row);
     }
     for (const row of firstWithdrawalRows as any[]) {
       const key = String(row.userPackageId || "");
-      firstWithdrawalByPackage.set(key, (firstWithdrawalByPackage.get(key) || 0) + Number(row.amount || 0));
+      const groupKey = packageGroupByAccountId.get(key) || key;
+      if (!groupKey) continue;
+      firstWithdrawalByPackageName.set(groupKey, (firstWithdrawalByPackageName.get(groupKey) || 0) + Number(row.amount || 0));
       if (String(row.status) === "pending") {
-        firstWithdrawalPendingPackages.add(key);
+        firstWithdrawalPendingPackageNames.add(groupKey);
       }
       if (String(row.status) === "completed") {
-        completedFirstWithdrawalPackages.add(key);
+        completedFirstWithdrawalPackageNames.add(groupKey);
       }
     }
     const dailyProfitByPackage = new Map(
@@ -146,18 +160,22 @@ export async function GET(request: NextRequest) {
       const dailyProfit = dailyProfitByPackage.get(String(item.packageId)) || 0;
       const collectWindowOpen = item.status === "active" && collectionNow >= nextCollectAt && collectionNow <= collectWindowEndsAt;
       const packageKey = String(item._id);
+      const packageGroupKey = packageGroupByAccountId.get(packageKey) || "account:" + packageKey;
       const referralCap = activeReferralDepositTotal * referralPackageWithdrawalPercent / 100;
       const referralAlreadyWithdrawn = referralAlreadyWithdrawnTotal;
       const referralRemaining = Math.max(0, referralCap - referralAlreadyWithdrawn);
       const firstPackageWithdrawalCap = Math.max(0, Number(item.investedAmount || 0) * firstPackageWithdrawalPercent / 100);
-      const firstPackageWithdrawalUsed = firstWithdrawalByPackage.get(packageKey) || 0;
+      const firstPackageWithdrawalUsed = firstWithdrawalByPackageName.get(packageGroupKey) || 0;
       const firstPackageWithdrawalRemaining = Math.max(0, firstPackageWithdrawalCap - firstPackageWithdrawalUsed);
-      const firstPackageWithdrawalPending = firstWithdrawalPendingPackages.has(packageKey);
-      const unresolvedPackageWithdrawal = unresolvedWithdrawalByPackage.get(packageKey) || null;
+      const firstPackageWithdrawalPending = firstWithdrawalPendingPackageNames.has(packageGroupKey);
+      const unresolvedPackageWithdrawal =
+        unresolvedWithdrawalByPackage.get(packageKey) ||
+        unresolvedWithdrawalByPackageName.get(packageGroupKey) ||
+        null;
       const packageWithdrawalPending = item.withdrawalRequestPending === true || Boolean(unresolvedPackageWithdrawal);
       const packageWithdrawalAlreadyUsed =
-        successfulWithdrawalPackages.has(packageKey) ||
-        completedFirstWithdrawalPackages.has(packageKey);
+        successfulWithdrawalPackageNames.has(packageGroupKey) ||
+        completedFirstWithdrawalPackageNames.has(packageGroupKey);
       // The package principal cap applies to the first completed payout only.
       // Every later payout uses the configured active-referral withdrawal cap.
       const packageWithdrawalCap = firstPackageWithdrawalCap;

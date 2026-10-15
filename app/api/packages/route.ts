@@ -166,11 +166,13 @@ export async function GET(request: NextRequest) {
       const availableEarnings = Math.max(0, Number(item.availableEarnings || 0));
       // The first approved withdrawal changes the phase: any later request is
       // limited by active-referral capacity, even if part of the package principal remains.
-      const phaseWithdrawalLimit = packageWithdrawalAlreadyUsed || packageWithdrawalPending || firstPackageWithdrawalPending
+      // Once a first-stage payout is complete, later requests use referral capacity,
+      // even when some of the original package principal remains unwithdrawn.
+      const phaseWithdrawalLimit = packageWithdrawalPending || firstPackageWithdrawalPending
         ? 0
-        : Math.min(availableEarnings, firstPackageWithdrawalRemaining > 1e-8
-          ? firstPackageWithdrawalRemaining
-          : referralRemaining);
+        : Math.min(availableEarnings, packageWithdrawalAlreadyUsed || firstPackageWithdrawalRemaining <= 1e-8
+          ? referralRemaining
+          : firstPackageWithdrawalRemaining);
       const withdrawalLimit = phaseWithdrawalLimit;
       return {
         ...item,

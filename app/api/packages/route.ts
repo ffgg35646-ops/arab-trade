@@ -501,7 +501,7 @@ export async function GET(request: NextRequest) {
       // limited by active-referral capacity, but can never exceed this account's money.
       const phaseWithdrawalLimit = packageWithdrawalPending || firstPackageWithdrawalPending
         ? 0
-        : Math.min(packageGroupAvailableEarnings, packageWithdrawalAlreadyUsed || firstPackageWithdrawalRemaining <= 1e-8
+        : Math.min(Math.max(0, Number(item.availableEarnings || 0)), packageWithdrawalAlreadyUsed || firstPackageWithdrawalRemaining <= 1e-8
           ? referralRemaining
           : firstPackageWithdrawalRemaining);
       const withdrawalLimit = phaseWithdrawalLimit;

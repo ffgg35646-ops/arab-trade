@@ -220,20 +220,52 @@ export default function WithdrawPage() {
   // Build one visible card per configured package, not per historical activation record.
   // Multiple activations of the same package stay accessible inside that package's card.
   const withdrawalPackageCards = useMemo(() => {
-    const groups = new Map<string, { plan: PackagePlan; accounts: PackageAccount[]; order: number }>();
+    // Package records can contain duplicate catalog entries with the same visible
+    // name but different database IDs. Group by normalized visible name so the
+    // withdrawal page renders one card per package name while keeping every
+    // individual account and its balance selectable inside that card.
+    const normalizePackageName = (value: string) =>
+      value.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
+    const groupKeyFor = (name: string, id: string) => {
+      const normalizedName = normalizePackageName(name);
+      return normalizedName ? "name:" + normalizedName : "plan:" + id;
+    };
+    const groups = new Map<string, {
+      plan: PackagePlan;
+      accounts: PackageAccount[];
+      order: number;
+      planIds: Set<string>;
+    }>();
+    const groupKeyByPlanId = new Map<string, string>();
+
     packagePlans.forEach((plan, index) => {
-      groups.set(String(plan._id), { plan, accounts: [], order: index });
+      const id = String(plan._id);
+      const groupKey = groupKeyFor(plan.name, id);
+      const existing = groups.get(groupKey);
+      if (existing) {
+        existing.planIds.add(id);
+        existing.order = Math.min(existing.order, index);
+      } else {
+        groups.set(groupKey, { plan, accounts: [], order: index, planIds: new Set([id]) });
+      }
+      groupKeyByPlanId.set(id, groupKey);
     });
 
     for (const account of packageAccounts) {
       const id = packagePlanId(account);
       if (!id) continue;
-      const existing = groups.get(id);
+      const groupKey = groupKeyByPlanId.get(id) || groupKeyFor(account.packageName || "", id);
+      const existing = groups.get(groupKey);
       if (existing) {
-        existing.accounts.push(account);
+        if (!existing.accounts.some((row) => row._id === account._id)) {
+          existing.accounts.push(account);
+        }
+        existing.planIds.add(id);
+        groupKeyByPlanId.set(id, groupKey);
       } else {
-        // Retain balances for a package that has since been disabled by the admin.
-        groups.set(id, {
+        // Retain balances for disabled/legacy catalog entries, grouped with a
+        // same-named package where possible. Account IDs and balances stay separate.
+        groups.set(groupKey, {
           plan: {
             _id: id,
             name: account.packageName || "باقة سابقة",
@@ -242,12 +274,14 @@ export default function WithdrawPage() {
           },
           accounts: [account],
           order: Number.MAX_SAFE_INTEGER,
+          planIds: new Set([id]),
         });
+        groupKeyByPlanId.set(id, groupKey);
       }
     }
 
-    return [...groups.values()]
-      .map(({ plan, accounts, order }) => {
+    return [...groups.entries()]
+      .map(([groupKey, { plan, accounts, order }]) => {
         const sortedAccounts = [...accounts].sort((a, b) => {
           const activeOrder = Number(b.status === "active") - Number(a.status === "active");
           if (activeOrder) return activeOrder;
@@ -255,12 +289,12 @@ export default function WithdrawPage() {
           const bTime = new Date(b.activatedAt || b.createdAt || 0).getTime();
           return bTime - aTime;
         });
-        const selectedId = selectedPackageAccountByPlan[String(plan._id)];
+        const selectedId = selectedPackageAccountByPlan[groupKey];
         const item = sortedAccounts.find((account) => account._id === selectedId)
           || sortedAccounts.find((account) => account.status === "active")
           || sortedAccounts[0]
           || null;
-        return { key: "plan-" + String(plan._id), plan, accounts: sortedAccounts, item, order };
+        return { key: "plan-" + groupKey, groupKey, plan, accounts: sortedAccounts, item, order };
       })
       .sort((a, b) => a.order - b.order);
   }, [packageAccounts, packagePlans, selectedPackageAccountByPlan]);
@@ -590,7 +624,7 @@ export default function WithdrawPage() {
                     <div className="rounded-xl border border-dashed border-white/10 p-5 text-center text-xs text-slate-500">لا توجد باقات متاحة حاليًا.</div>
                   ) : (
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {withdrawalPackageCards.map(({ key, plan, accounts, item }) => {
+                      {withdrawalPackageCards.map(({ key, groupKey, plan, accounts, item }) => {
                         const packageFormId = item?._id || String(plan._id);
                         const availableForPlan = item ? Math.max(0, Number(item.availableEarnings || 0)) : 0;
                         return (
@@ -616,7 +650,7 @@ export default function WithdrawPage() {
                                   value={item?._id || ""}
                                   onChange={(event) => setSelectedPackageAccountByPlan((current) => ({
                                     ...current,
-                                    [String(plan._id)]: event.target.value,
+                                    [groupKey]: event.target.value,
                                   }))}
                                   className="w-full rounded-lg border border-white/10 bg-[#050a13] px-2 py-1.5 text-[10px] text-slate-200 outline-none focus:border-cyan-400/50"
                                 >

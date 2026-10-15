@@ -188,6 +188,7 @@ export async function PATCH(
 
     const currentStatus =
       withdrawal.status;
+    const walletBalanceWasSettled = (withdrawal as any).walletBalanceSettled === true;
 
     if (
       currentStatus === "completed" ||
@@ -389,7 +390,7 @@ export async function PATCH(
         await session.withTransaction(async () => {
           const updatedRequest = await WithdrawalRequest.findOneAndUpdate(
             { _id: withdrawal._id, status: currentStatus },
-            { $set: { status: nextStatus, adminNote, ...(nextStatus === "completed" ? { completedAt: new Date() } : {}), ...(withdrawal.source === "package" && (nextStatus === "approved" || nextStatus === "rejected") ? { packageBalanceSettled: true } : {}) } },
+            { $set: { status: nextStatus, adminNote, ...(nextStatus === "completed" ? { completedAt: new Date() } : {}), ...(withdrawal.source === "package" && (nextStatus === "approved" || nextStatus === "rejected") ? { packageBalanceSettled: true } : {}), ...(withdrawal.source !== "package" && ["approved", "rejected", "completed"].includes(nextStatus) ? { walletBalanceSettled: true } : {}) } },
             { new: true, session }
           );
           if (!updatedRequest) throw new Error("WITHDRAWAL_STATUS_CHANGED");
@@ -585,7 +586,7 @@ export async function PATCH(
           );
         }
 
-        if (nextStatus === "rejected" || nextStatus === "completed") {
+        if (nextStatus === "approved" || nextStatus === "rejected" || nextStatus === "completed") {
           const asset = normalizeAsset(withdrawal.asset);
           const amount = Number(withdrawal.amount);
           if (!Number.isFinite(amount) || amount <= 0) throw new Error("WALLET_BALANCE_INVALID");
@@ -609,28 +610,55 @@ export async function PATCH(
             if (!wallet) throw new Error("WALLET_NOT_FOUND");
 
             const balance = wallet.balances.find((item: any) => normalizeAsset(item.asset) === asset);
-            if (!balance || Number(balance.locked || 0) + 1e-12 < allocatedAmount) {
-              throw new Error("WALLET_BALANCE_INVALID");
-            }
+            if (!balance) throw new Error("WALLET_BALANCE_INVALID");
 
             const availableBefore = Number(balance.available || 0);
-            balance.locked = Number(balance.locked || 0) - allocatedAmount;
-            if (nextStatus === "rejected") balance.available = availableBefore + allocatedAmount;
+            const lockedBefore = Number(balance.locked || 0);
+            const totalBefore = availableBefore + lockedBefore;
+
+            if (nextStatus === "approved" || (nextStatus === "completed" && !walletBalanceWasSettled)) {
+              // Consume the reserved funds as soon as the admin approves. The navbar
+              // includes locked funds, so this is the point the total must decrease.
+              if (lockedBefore + 1e-12 < allocatedAmount) throw new Error("WALLET_BALANCE_INVALID");
+              balance.locked = lockedBefore - allocatedAmount;
+            } else if (nextStatus === "rejected") {
+              if (walletBalanceWasSettled && currentStatus === "approved") {
+                // An approved withdrawal was already removed from locked funds.
+                // Rejection after approval restores the amount to available exactly once.
+                balance.available = availableBefore + allocatedAmount;
+              } else {
+                // A still-pending/legacy unsettled request returns its reservation.
+                if (lockedBefore + 1e-12 < allocatedAmount) throw new Error("WALLET_BALANCE_INVALID");
+                balance.locked = lockedBefore - allocatedAmount;
+                balance.available = availableBefore + allocatedAmount;
+              }
+            }
+
             const availableAfter = Number(balance.available || 0);
+            const lockedAfter = Number(balance.locked || 0);
             await wallet.save({ session });
 
-            await LedgerEntry.create([{
-              userId: withdrawal.userId,
-              asset,
-              type: "withdrawal",
-              amount: nextStatus === "rejected" ? allocatedAmount : -allocatedAmount,
-              balanceBefore: availableBefore,
-              balanceAfter: availableAfter,
-              referenceId: String(withdrawal._id),
-              note: adminNote || (nextStatus === "rejected"
-                ? "تم رفض طلب السحب وإرجاع المبلغ إلى " + (walletType === "funding" ? "محفظة التمويل" : "المحفظة العامة")
-                : "تم تنفيذ السحب من " + (walletType === "funding" ? "محفظة التمويل" : "المحفظة العامة")),
-            }], { session });
+            const didChangeBalance = nextStatus === "approved" ||
+              nextStatus === "rejected" ||
+              (nextStatus === "completed" && !walletBalanceWasSettled);
+            if (didChangeBalance) {
+              const ledgerAmount = nextStatus === "rejected" ? allocatedAmount : -allocatedAmount;
+              const totalAfter = availableAfter + lockedAfter;
+              await LedgerEntry.create([{
+                userId: withdrawal.userId,
+                asset,
+                type: "withdrawal",
+                amount: ledgerAmount,
+                balanceBefore: totalBefore,
+                balanceAfter: totalAfter,
+                referenceId: String(withdrawal._id),
+                note: adminNote || (nextStatus === "rejected"
+                  ? "تم رفض طلب السحب وإرجاع المبلغ إلى " + (walletType === "funding" ? "محفظة التمويل" : "المحفظة العامة")
+                  : nextStatus === "approved"
+                    ? "تمت الموافقة على السحب وخصم المبلغ من إجمالي رصيد السحب."
+                    : "تم تنفيذ السحب من " + (walletType === "funding" ? "محفظة التمويل" : "المحفظة العامة")),
+              }], { session });
+            }
           }
         }
         settledWithdrawal = updatedRequest;

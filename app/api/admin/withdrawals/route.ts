@@ -190,10 +190,11 @@ export async function PATCH(
       withdrawal.status;
 
     if (
-      currentStatus ===
-        "completed" ||
-      currentStatus ===
-        "rejected"
+      currentStatus === "completed" ||
+      currentStatus === "rejected" ||
+      (withdrawal.source === "package" &&
+        currentStatus === "approved" &&
+        (withdrawal as any).packageBalanceSettled === true)
     ) {
       return NextResponse.json(
         {
@@ -388,7 +389,7 @@ export async function PATCH(
         await session.withTransaction(async () => {
           const updatedRequest = await WithdrawalRequest.findOneAndUpdate(
             { _id: withdrawal._id, status: currentStatus },
-            { $set: { status: nextStatus, adminNote, ...(nextStatus === "completed" ? { completedAt: new Date() } : {}) } },
+            { $set: { status: nextStatus, adminNote, ...(nextStatus === "completed" ? { completedAt: new Date() } : {}), ...(withdrawal.source === "package" && nextStatus === "approved" ? { packageBalanceSettled: true } : {}) } },
             { new: true, session }
           );
           if (!updatedRequest) throw new Error("WITHDRAWAL_STATUS_CHANGED");
@@ -417,7 +418,7 @@ export async function PATCH(
             }
           }
 
-          if (nextStatus === "rejected" || nextStatus === "completed") {
+          if (nextStatus === "rejected" || nextStatus === "completed" || nextStatus === "approved") {
             // Rebuild the remaining lock from other live requests instead of
             // blindly subtracting the request amount from a possibly stale field.
             // This lets rejection/completion recover accounts left with an
@@ -426,7 +427,7 @@ export async function PATCH(
               _id: { $ne: withdrawal._id },
               userId: withdrawal.userId,
               source: "package",
-              status: { $in: ["pending", "approved", "processing"] },
+              status: { $in: ["pending", "processing"] },
             }).select("_id userPackageId packageAllocations amount").session(session).lean();
 
             const expectedRemainingByPackage = new Map<string, number>();
@@ -465,7 +466,7 @@ export async function PATCH(
               const packageSet: Record<string, any> = { lockedEarnings: expectedRemaining };
               const increments: Record<string, any> = {};
               if (availableCredit > 1e-8) increments.availableEarnings = availableCredit;
-              if (nextStatus === "completed") increments.totalWithdrawn = allocation.amount;
+              if (nextStatus === "completed" || nextStatus === "approved") increments.totalWithdrawn = allocation.amount;
               const updatedPackage = await UserPackage.findOneAndUpdate(
                 { _id: allocation.userPackageId, userId: withdrawal.userId },
                 {
@@ -484,7 +485,9 @@ export async function PATCH(
                 amount: nextStatus === "rejected" ? allocation.amount : -allocation.amount,
                 note: adminNote || (nextStatus === "rejected"
                   ? "تم رفض طلب السحب؛ أُعيد مبلغ " + allocation.amount + " " + withdrawal.asset + " إلى رصيد باقة " + updatedPackage.packageName
-                  : "تم تنفيذ طلب سحب بقيمة " + allocation.amount + " " + withdrawal.asset + " من رصيد باقة " + updatedPackage.packageName),
+                  : nextStatus === "approved"
+                    ? "تم اعتماد سحب بقيمة " + allocation.amount + " " + withdrawal.asset + " وخصمه من رصيد باقة " + updatedPackage.packageName
+                    : "تم تنفيذ طلب سحب بقيمة " + allocation.amount + " " + withdrawal.asset + " من رصيد باقة " + updatedPackage.packageName),
                 createdBy: admin._id,
               }], { session });
 
@@ -543,7 +546,7 @@ export async function PATCH(
           ? "تم إرجاع المبلغ إلى رصيد السحب المتاح للباقة."
           : nextStatus === "completed"
             ? "تم تنفيذ طلب السحب من رصيد الباقة."
-            : "تمت الموافقة على طلب السحب وهو قيد التنفيذ."
+            : "تمت الموافقة النهائية على طلب السحب وتسوية رصيد الباقة."
       );
 
       await Notification.create({

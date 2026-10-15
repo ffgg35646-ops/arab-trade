@@ -260,7 +260,16 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      packages: packages.map((plan: any) => ({ ...plan, minimumWithdrawal: Number(configuredMinimums?.[String(plan._id)] ?? plan.minimumWithdrawal ?? 100), asset: USDT_ASSET, durationDays: 0, dailyProfit: Number(plan.dailyProfit || 0) })),
+      packages: packages.map((plan: any) => ({
+        ...plan,
+        minimumWithdrawal: Math.max(
+          Number(configuredMinimums?.[String(plan._id)] ?? plan.minimumWithdrawal ?? 100),
+          Number(settings?.withdrawals?.minAmount ?? 0),
+        ),
+        asset: USDT_ASSET,
+        durationDays: 0,
+        dailyProfit: Number(plan.dailyProfit || 0),
+      })),
       depositBalances,
       userPackages,
       packageLedger: packageLedger.map((row: any) => ({

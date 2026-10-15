@@ -410,15 +410,6 @@ export default function WithdrawPage() {
     const minimum = source === "package"
       ? Math.max(Number(selected?.minWithdrawal || 0), Number(packageAccount?.minimumWithdrawal ?? packagePlan?.minimumWithdrawal ?? 100))
       : Math.max(Number(selected?.minWithdrawal || 0), Number(limits.minGeneralWithdrawal ?? limits.minWithdrawal ?? 0));
-    const firstRemainder = Number(packageAccount?.firstPackageWithdrawalRemaining || 0);
-    const inputMinimum = source === "package" &&
-      packageAccount &&
-      packageAccount.firstPackageWithdrawalPending !== true &&
-      firstRemainder > 0 &&
-      firstRemainder < minimum &&
-      available >= firstRemainder
-        ? firstRemainder
-        : minimum;
     const configuredMaximums = [Number(selected?.maxWithdrawal || 0), Number(limits.maxWithdrawal || 0)].filter((value) => value > 0);
     const maximum = configuredMaximums.length ? Math.min(...configuredMaximums) : undefined;
     const packageMax = packageAccount ? packageMaximum(packageAccount) : 0;

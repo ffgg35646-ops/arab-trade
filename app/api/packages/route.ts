@@ -149,6 +149,20 @@ export async function GET(request: NextRequest) {
         completedFirstWithdrawalPackageNames.add(groupKey);
       }
     }
+
+    // The page intentionally renders one card per package name. Sum all of that
+    // package family's actual buckets so the card cannot show only one activation
+    // record while the page total includes the others.
+    const packageBalancesByName = new Map<string, { available: number; locked: number }>();
+    for (const account of rawUserPackages as any[]) {
+      const key = String(account._id);
+      const groupKey = packageGroupByAccountId.get(key) || "account:" + key;
+      const balance = packageBalancesByName.get(groupKey) || { available: 0, locked: 0 };
+      balance.available = roundAmount(balance.available + Math.max(0, Number(account.availableEarnings || 0)));
+      balance.locked = roundAmount(balance.locked + Math.max(0, Number(account.lockedEarnings || 0)));
+      packageBalancesByName.set(groupKey, balance);
+    }
+
     const dailyProfitByPackage = new Map(
       (allPlansForProfit as any[]).map((plan) => [String(plan._id), Math.max(0, Number(plan.dailyProfit || 0))])
     );
@@ -179,21 +193,27 @@ export async function GET(request: NextRequest) {
       // The package principal cap applies to the first completed payout only.
       // Every later payout uses the configured active-referral withdrawal cap.
       const packageWithdrawalCap = firstPackageWithdrawalCap;
-      const packageWithdrawalUsed = firstPackageWithdrawalUsed;
+      const packageWithdrawalUsed = firstWithdrawalByPackageName.get(packageGroupKey) || 0;
       const packageWithdrawalRemaining = firstPackageWithdrawalRemaining;
-      const availableEarnings = Math.max(0, Number(item.availableEarnings || 0));
+      const packageGroupBalance = packageBalancesByName.get(packageGroupKey) || {
+        available: Math.max(0, Number(item.availableEarnings || 0)),
+        locked: Math.max(0, Number(item.lockedEarnings || 0)),
+      };
+      const packageGroupAvailableEarnings = packageGroupBalance.available;
+      const packageGroupLockedEarnings = packageGroupBalance.locked;
       // The first approved withdrawal changes the phase: any later request is
-      // limited by active-referral capacity, even if part of the package principal remains.
-      // Once a first-stage payout is complete, later requests use referral capacity,
-      // even when some of the original package principal remains unwithdrawn.
+      // limited by active-referral capacity, even if package balance remains.
+      // Use the family balance consistently for both display and server limits.
       const phaseWithdrawalLimit = packageWithdrawalPending || firstPackageWithdrawalPending
         ? 0
-        : Math.min(availableEarnings, packageWithdrawalAlreadyUsed || firstPackageWithdrawalRemaining <= 1e-8
+        : Math.min(packageGroupAvailableEarnings, packageWithdrawalAlreadyUsed || firstPackageWithdrawalRemaining <= 1e-8
           ? referralRemaining
           : firstPackageWithdrawalRemaining);
       const withdrawalLimit = phaseWithdrawalLimit;
       return {
         ...item,
+        packageGroupAvailableEarnings,
+        packageGroupLockedEarnings,
         firstPackageWithdrawalCap,
         firstPackageWithdrawalUsed,
         firstPackageWithdrawalRemaining,

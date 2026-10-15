@@ -1334,6 +1334,88 @@ closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 40, "reje
 closeTo(userWallet.balances.find((x) => x.asset === "USDT").locked, 0, "rejection after approval does not subtract the same lock twice");
 closeTo(await navbarWithdrawalUsdtTotal("navbar total after reversing approved general withdrawal"), navbarBeforeApprovedThenRejected, "rejection after approval restores the exact prior navbar total");
 
+// Regression: transfer an old package refund from the general withdrawal wallet
+// into that cancelled package's own bucket exactly once.
+const legacyRefundPackageId = new mongoose.Types.ObjectId();
+const legacyRefundAmount = 20;
+const legacyRefundReference = "package-cancel:" + String(legacyRefundPackageId);
+const legacyRefundCreatedAt = new Date(Date.now() - 60 * 1000);
+let legacyRefundWallet = await db.collection("wallets").findOne({
+  userId: user._id,
+  type: "spot",
+  mode: "live",
+});
+assert.ok(legacyRefundWallet, "general wallet exists for legacy refund migration test");
+const legacyRefundWalletBalance = legacyRefundWallet.balances.find((x) => x.asset === "USDT");
+assert.ok(legacyRefundWalletBalance && Number(legacyRefundWalletBalance.available || 0) >= legacyRefundAmount, "general wallet has the legacy refund available to reclassify");
+const legacyRefundWalletBefore = Number(legacyRefundWalletBalance.available || 0);
+await db.collection("userpackages").insertOne({
+  _id: legacyRefundPackageId,
+  userId: user._id,
+  packageId: plan100._id,
+  packageName: "CI legacy general-wallet refund",
+  investedAmount: 100,
+  asset: "USDT",
+  durationDays: 0,
+  status: "cancelled",
+  availableEarnings: 0,
+  lockedEarnings: 0,
+  totalRealizedEarnings: 0,
+  totalWithdrawn: 0,
+  withdrawablePrincipalCredited: true,
+  firstWithdrawalStatus: "available",
+  withdrawalRequestPending: false,
+  cancellationRefund: legacyRefundAmount,
+  cancellationRefundPackageCredited: false,
+  activatedAt: legacyRefundCreatedAt,
+  lastProfitAt: legacyRefundCreatedAt,
+  cancelledAt: legacyRefundCreatedAt,
+  createdAt: legacyRefundCreatedAt,
+  updatedAt: legacyRefundCreatedAt,
+});
+await db.collection("ledgerentries").insertOne({
+  userId: user._id,
+  scope: "user",
+  asset: "USDT",
+  mode: "live",
+  type: "adjustment",
+  amount: legacyRefundAmount,
+  balanceBefore: legacyRefundWalletBefore - legacyRefundAmount,
+  balanceAfter: legacyRefundWalletBefore,
+  referenceId: legacyRefundReference,
+  note: "Legacy package cancellation refund was credited to the general wallet",
+  createdAt: legacyRefundCreatedAt,
+});
+await db.collection("packageledgers").insertOne({
+  userId: user._id,
+  userPackageId: legacyRefundPackageId,
+  type: "cancellation_refund",
+  asset: "USDT",
+  amount: legacyRefundAmount,
+  note: "تم إلغاء الباقة وإضافة نصف قيمة تفعيلها إلى رصيد السحب العام",
+  createdAt: legacyRefundCreatedAt,
+});
+const migratedLegacyRefundPage = await api("/api/packages");
+ok(migratedLegacyRefundPage, "package API migrates a historical general-wallet refund");
+const migratedLegacyRefundAccount = migratedLegacyRefundPage.data.userPackages.find((x) => String(x._id) === String(legacyRefundPackageId));
+assert.ok(migratedLegacyRefundAccount, "historical cancelled package remains visible");
+closeTo(migratedLegacyRefundAccount.availableEarnings, legacyRefundAmount, "legacy refund is added to its package withdrawal bucket");
+assert.equal(migratedLegacyRefundAccount.cancellationRefundPackageCredited, true, "legacy refund migration is marked complete");
+legacyRefundWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+closeTo(legacyRefundWallet.balances.find((x) => x.asset === "USDT").available, legacyRefundWalletBefore - legacyRefundAmount, "the same legacy refund is deducted from the general wallet");
+ok(await api("/api/packages"), "reloading package page keeps migrated refund stable");
+const migratedLegacyRefundAccountAgain = await db.collection("userpackages").findOne({ _id: legacyRefundPackageId });
+closeTo(migratedLegacyRefundAccountAgain.availableEarnings, legacyRefundAmount, "reloading does not credit the legacy refund twice");
+legacyRefundWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+legacyRefundWallet.balances.find((x) => x.asset === "USDT").available = legacyRefundWalletBefore;
+await db.collection("wallets").replaceOne({ _id: legacyRefundWallet._id }, legacyRefundWallet);
+await db.collection("ledgerentries").deleteMany({
+  userId: user._id,
+  referenceId: { $in: [legacyRefundReference, "package-refund-reclassification:" + String(legacyRefundPackageId)] },
+});
+await db.collection("packageledgers").deleteMany({ userPackageId: legacyRefundPackageId });
+await db.collection("userpackages").deleteOne({ _id: legacyRefundPackageId });
+
 const changed = await api("/api/packages", {
   method: "POST",
   body: { action: "change", packageId: String(plan200._id), userPackageId: String(package100._id) },

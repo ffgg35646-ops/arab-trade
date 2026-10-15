@@ -550,11 +550,12 @@ export async function POST(request: NextRequest) {
         .lean();
       const configuredMinimums = settings.withdrawals.withdrawalMinByPackage as unknown as Record<string, number> | undefined;
       const configuredPackageMinimum = configuredMinimums?.[String(currentPackage.packageId)];
-      // Package withdrawals use only the package-level minimum configured by admin.
-      // General payment/network minimums apply to wallet withdrawals, not package cards.
+      // The effective minimum is at least the administrator's global withdrawal
+      // minimum, while allowing a package-specific setting to override the plan default.
       const packageMinimum = Math.max(
-        0,
         Number(configuredPackageMinimum ?? packagePlan?.minimumWithdrawal ?? 100),
+        Number(settings.withdrawals.minAmount ?? 0),
+        Number(minAmount || 0),
       );
       const [firstWithdrawalRows, referralWithdrawalRows, referredUsers] = await Promise.all([
         WithdrawalRequest.find({

@@ -10,12 +10,12 @@ import PackageLedger from "@/models/PackageLedger";
  * withdrawal could own any part of the lock.
  */
 export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Types.ObjectId) {
+  // Only an active package withdrawal can share UserPackage.lockedEarnings.
+  // General-wallet withdrawals reserve funds in Wallet and must not block package repair.
   const liveWithdrawal = await WithdrawalRequest.exists({
     userId,
-    $or: [
-      { source: "package", status: { $in: ["pending", "processing"] } },
-      { source: { $ne: "package" }, status: { $in: ["pending", "approved", "processing"] } },
-    ],
+    source: "package",
+    status: { $in: ["pending", "processing"] },
   });
   if (liveWithdrawal) return;
 

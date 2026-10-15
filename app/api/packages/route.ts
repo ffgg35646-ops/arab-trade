@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     );
 
     const countedWithdrawalStatuses = ["pending", "approved", "processing", "completed"] as const;
-    const unresolvedWithdrawalStatuses = ["pending", "approved", "processing"] as const;
+    const unresolvedWithdrawalStatuses = ["pending"] as const;
     const [activeReferralDeposits, referralWithdrawalRows, firstWithdrawalRows, packageWithdrawalRows, unresolvedPackageWithdrawalRows] = await Promise.all([
       referredIds.length
         ? DepositRequest.aggregate([
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     for (const row of firstWithdrawalRows as any[]) {
       const key = String(row.userPackageId || "");
       firstWithdrawalByPackage.set(key, (firstWithdrawalByPackage.get(key) || 0) + Number(row.amount || 0));
-      if (["pending", "approved", "processing"].includes(String(row.status))) {
+      if (String(row.status) === "pending") {
         firstWithdrawalPendingPackages.add(key);
       }
     }

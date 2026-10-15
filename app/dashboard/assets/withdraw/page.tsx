@@ -311,7 +311,7 @@ export default function WithdrawPage() {
   }, [packageAccounts, packagePlans]);
   const pendingWithdrawal = history.find((item) => item.status === "pending");
   const hasPendingWithdrawal = Boolean(pendingWithdrawal);
-  const openWithdrawals = history.filter((item) => ["pending", "approved", "processing"].includes(item.status)).length;
+  const openWithdrawals = history.filter((item) => item.status === "pending" || item.status === "processing" || (item.status === "approved" && item.source !== "package")).length;
   const packageHistory = history.filter((item) => item.source === "package");
   const generalHistory = history.filter((item) => item.source !== "package");
 
@@ -667,7 +667,7 @@ export default function WithdrawPage() {
                             ) : (
                               <>
                                 {item.packageWithdrawalStatus === "pending" && <p className="mb-2 rounded-lg bg-amber-400/[0.06] p-2 text-[10px] text-amber-200">طلب السحب قيد المراجعة.</p>}
-                                {item.packageWithdrawalStatus === "approved" && <p className="mb-2 rounded-lg bg-blue-400/[0.06] p-2 text-[10px] text-blue-200">تمت الموافقة على السحب؛ المبلغ محجوز حتى تأكيد إتمام التحويل.</p>}
+                                {item.packageWithdrawalStatus === "approved" && <p className="mb-2 rounded-lg bg-blue-400/[0.06] p-2 text-[10px] text-blue-200">تمت الموافقة النهائية على السحب وتسوية رصيد الباقة.</p>}
                                 {item.packageWithdrawalStatus === "processing" && <p className="mb-2 rounded-lg bg-blue-400/[0.06] p-2 text-[10px] text-blue-200">السحب قيد التنفيذ.</p>}
                                 {renderWithdrawalFields("package", item || undefined, plan)}
                                 {packageCardErrors[String(item._id)] && (

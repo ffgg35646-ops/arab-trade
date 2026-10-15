@@ -1332,6 +1332,10 @@ form.append("screenshot", new Blob(["test-proof"], { type: "image/png" }), "proo
 const disabledDeposit = await api("/api/deposits", { method: "POST", body: form });
 statusIs(disabledDeposit, 400, "backend rejects deposit when admin disabled that channel");
 
+// This is an isolated historical-wallet fixture. Remove wallet-withdrawal ledger
+// rows from earlier flow tests so they do not alter this fixture's legacy deposit exposure.
+await db.collection("ledgerentries").deleteMany({ userId: user._id, type: "withdrawal" });
+
 // Simulate an account partially repaired by legacy v1 (20 moved already,
 // another 70 remains across spot and funding). The original deposit predates
 // the former cutover check; v3 must still recognize it and move only the remainder.

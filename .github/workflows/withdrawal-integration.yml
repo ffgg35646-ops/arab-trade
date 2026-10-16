@@ -1,5 +1,7 @@
 name: Withdrawal end-to-end test
 on:
+  push:
+    branches: [feat/withdrawals-from-scratch-20261016]
   pull_request:
     branches: [main]
   workflow_dispatch:

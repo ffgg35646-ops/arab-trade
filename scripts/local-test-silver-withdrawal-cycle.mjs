@@ -418,13 +418,14 @@ async function main() {
     );
 
     const rejected = await reviewWithdrawal(firstRow._id, "reject");
-    assert.equal(rejected.status, 200 && rejected.body?.success === true ? 200 : 200,
-      "Admin rejection endpoint did not return HTTP 200.");
+    assert.equal(rejected.status, 200, "Admin rejection endpoint returned HTTP " + rejected.status + ".");
+    assert.equal(rejected.body?.success, true, "Admin rejection failed: " + (rejected.body?.message || "unknown error"));
     const firstAfterReview = await db.collection("withdrawalrequests").findOne({ _id: firstRow._id });
     assert.equal(firstAfterReview.status, "rejected", "First Silver request was not rejected.");
     state = await packageSnapshot(silver._id, user._id);
     assert.equal(state.balance, balanceBefore.balance, "Reject did not return 100 USDT to Silver available balance.");
     assert.equal(state.locked, 0, "Reject left Silver earnings locked.");
+    const balanceAfterReject = state.balance;
     const afterRejectCard = await getSilverCard(silver._id);
     assert.equal(round8(afterRejectCard.account.allowance), cap, "Rejected request incorrectly consumed the daily Silver cap.");
     assert.equal(round8(afterRejectCard.account.available), Math.min(balanceBefore.balance, cap),
@@ -490,7 +491,7 @@ async function main() {
       syntheticPackageCredit: false,
       directPackageBalanceWrite: false,
       cycle: {
-        firstRequest: { amount, status: "rejected", balanceAfterReject: state.balance + amount, lockedAfterReject: 0 },
+        firstRequest: { amount, status: "rejected", balanceAfterReject, lockedAfterReject: 0 },
         secondRequest: { amount, status: "approved", balanceAfterApproval: state.balance, lockedAfterApproval: 0 },
         afterApproval: { balance: state.balance, allowanceToday: finalCard.account.allowance, availableToday: finalCard.account.available },
         anotherWithdrawalToday: { status: overCap.status, message: overCap.body.message, requestCreated: false },

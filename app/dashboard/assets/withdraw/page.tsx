@@ -115,12 +115,14 @@ function packageMaximum(item: PackageAccount) {
 }
 function packageFamilyMaximum(accounts: PackageAccount[]) {
   const balanceCap = accounts.reduce((sum, item) => sum + packageMaximum(item), 0);
-  const phaseTwo = accounts.some((item) =>
-    item.packageWithdrawalAlreadyUsed === true ||
-    (item.firstPackageWithdrawalRemaining !== undefined &&
-      Number(item.firstPackageWithdrawalRemaining) <= 1e-8)
-  );
+  const alreadyUsed = accounts.some((item) => item.packageWithdrawalAlreadyUsed === true);
+  const firstRemaining = Math.max(0, ...accounts.map((item) => Number(item.firstPackageWithdrawalRemaining || 0)));
+  if (!alreadyUsed && firstRemaining > 1e-8) return Math.min(balanceCap, firstRemaining);
+
+  const hasPhaseTwoData = accounts.some((item) => item.firstPackageWithdrawalRemaining !== undefined);
+  const phaseTwo = alreadyUsed || (hasPhaseTwoData && firstRemaining <= 1e-8);
   if (!phaseTwo) return balanceCap;
+
   const referralCap = Math.max(0, ...accounts.map((item) => Number(item.referralRemaining || 0)));
   return Math.min(balanceCap, referralCap);
 }

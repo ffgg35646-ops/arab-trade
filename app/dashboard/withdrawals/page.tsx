@@ -11,7 +11,9 @@ type Account = {
   status: string;
   balance: number;
   locked: number;
+  activationAmount: number;
   allowance: number;
+  baseAllowance: number;
   dailyAllowance: number;
   activeReferralCount: number;
   referralDepositTotal: number;
@@ -39,8 +41,17 @@ type Request = {
   network?: string;
   payoutAddress?: string;
   status: string;
+  createdAt?: string;
+  reviewedAt?: string | null;
 };
 type Data = {
+  summary: {
+    totalBalance: number;
+    generalAvailable: number;
+    generalLocked: number;
+    packageAvailable: number;
+    packageLocked: number;
+  };
   general: { available: number; minimum: number; configured: boolean };
   networks: Network[];
   packages: Plan[];
@@ -174,6 +185,22 @@ export default function WithdrawalsPage() {
         <main dir="rtl" className="min-h-screen min-w-0 flex-1 space-y-6 bg-[#050a13] p-4 text-white md:p-6">
           <h1 className="text-2xl font-black">السحب</h1>
 
+          {data && (
+            <section className="space-y-3 rounded-2xl border border-cyan-400/20 bg-[#08111e] p-4 md:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-black">الرصيد المجمل</h2>
+                <strong className="text-2xl font-black text-cyan-200">{money(data.summary.totalBalance)} USDT</strong>
+              </div>
+              <p className="text-xs text-slate-400">الإجمالي = الرصيد العام + أرصدة جميع الباقات، بما فيها المبالغ المحجوزة. رصيد الإيداع منفصل وغير داخل في الإجمالي.</p>
+              <div className="grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-lg bg-white/[0.03] p-3"><span className="text-slate-400">الرصيد العام المتاح</span><div className="mt-1 font-bold">{money(data.summary.generalAvailable)} USDT</div></div>
+                <div className="rounded-lg bg-white/[0.03] p-3"><span className="text-slate-400">السحب العام المحجوز</span><div className="mt-1 font-bold">{money(data.summary.generalLocked)} USDT</div></div>
+                <div className="rounded-lg bg-white/[0.03] p-3"><span className="text-slate-400">أرصدة الباقات المتاحة</span><div className="mt-1 font-bold">{money(data.summary.packageAvailable)} USDT</div></div>
+                <div className="rounded-lg bg-white/[0.03] p-3"><span className="text-slate-400">أرصدة الباقات المحجوزة</span><div className="mt-1 font-bold">{money(data.summary.packageLocked)} USDT</div></div>
+              </div>
+            </section>
+          )}
+
           {message && (
             <div role="status" className="flex items-start gap-2 rounded-xl border border-slate-700 bg-[#0b1422] p-3 text-sm text-slate-200">
               <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-cyan-300" />
@@ -248,13 +275,14 @@ export default function WithdrawalsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="truncate text-lg font-black">{plan.name}</h3>
+                        {!account?.hasAccount && <p className="mt-1 text-xs text-amber-200">لم يتم تفعيل هذه الباقة بعد؛ خانة السحب جاهزة وتظهر تلقائيًا.</p>}
                       </div>
                       <div className="shrink-0 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-2 text-left">
                         <p className="text-xs text-slate-400">إجمالي رصيد الباقة</p>
                         <p className="mt-1 font-black text-white">{money(account?.balance || 0)} USDT</p>
                         <p className="mt-2 text-xs text-slate-400">المتاح للسحب الآن</p>
                         <p className="mt-1 font-black text-emerald-300">{money(account?.available || 0)} USDT</p>
-                        <p className="mt-2 text-xs text-slate-400">المتاح من الحد الأساسي اليوم: {money(account?.dailyAllowance || 0)} USDT</p>
+                        <p className="mt-2 text-xs text-slate-400">المتبقي من حد التفعيل الأساسي: {money(account?.baseAllowance ?? account?.dailyAllowance ?? 0)} USDT</p>
                         <p className="mt-1 text-xs text-slate-400">الإحالات النشطة: {account?.activeReferralCount || 0} — إيداعات معتمدة: {money(account?.referralDepositTotal || 0)} USDT</p>
                         <p className="mt-1 text-xs text-slate-400">المتاح الإضافي بالإحالات ({money(account?.referralUnlockPercent || 0)}% من الإيداعات المعتمدة، حد مشترك بين الباقات): {money(account?.referralAllowance || 0)} USDT</p>
                         <p className="mt-1 text-xs text-slate-400">المستهلك من حد الإحالات: {money(account?.referralUsed || 0)} USDT</p>
@@ -294,6 +322,46 @@ export default function WithdrawalsPage() {
                 );
               })}
             </div>
+          </section>
+
+          <section className="space-y-4 rounded-2xl border border-slate-700 bg-[#08111e] p-4 md:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-black">طلبات السحب وتاريخها</h2>
+              <span className="text-xs text-slate-400">طلبات السحب العام وكل الباقات</span>
+            </div>
+            {!data?.requests.length ? (
+              <p className="rounded-xl border border-slate-700 p-4 text-sm text-slate-400">لا توجد طلبات سحب مسجلة حتى الآن.</p>
+            ) : (
+              <div className="space-y-3">
+                {data.requests.map((item) => {
+                  const plan = data.packages.find((candidate) => candidate._id === item.packageId);
+                  const statusLabel = item.status === "approved"
+                    ? "مقبول"
+                    : item.status === "rejected"
+                      ? "مرفوض"
+                      : item.status === "pending"
+                        ? "قيد المراجعة"
+                        : item.status;
+                  const createdDate = item.createdAt ? new Date(item.createdAt) : null;
+                  const reviewedDate = item.reviewedAt ? new Date(item.reviewedAt) : null;
+                  return (
+                    <article key={item._id} className="rounded-xl border border-slate-700 bg-[#0b1422] p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <strong>{item.type === "general" ? "السحب العام" : plan?.name || "السحب من الباقات"}</strong>
+                        <strong className="font-mono">{money(item.amount)} {item.asset || "USDT"}</strong>
+                        <span className={item.status === "approved" ? "text-emerald-300" : item.status === "rejected" ? "text-red-300" : "text-amber-200"}>الحالة: {statusLabel}</span>
+                      </div>
+                      <div className="mt-2 grid gap-1 text-xs text-slate-400 sm:grid-cols-2">
+                        <p>الشبكة: {item.network || "—"}</p>
+                        <p>عنوان الدفع: <span className="break-all">{item.payoutAddress || "—"}</span></p>
+                        <p>تاريخ الطلب: {createdDate && Number.isFinite(createdDate.getTime()) ? createdDate.toLocaleString("ar-EG") : "—"}</p>
+                        {reviewedDate && Number.isFinite(reviewedDate.getTime()) && <p>تاريخ المراجعة: {reviewedDate.toLocaleString("ar-EG")}</p>}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
         </main>

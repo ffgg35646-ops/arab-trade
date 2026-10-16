@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 import DepositBalance from "@/models/DepositBalance";
 import Wallet from "@/models/Wallet";
 import LedgerEntry from "@/models/LedgerEntry";
-import WithdrawalRequest from "@/models/WithdrawalRequest";
 
 type DepositBalanceLike = {
   asset?: unknown;
@@ -41,7 +40,7 @@ export function normalizeDepositBalanceRows(
 /**
  * Debit the canonical external-deposit source inside the caller's MongoDB
  * transaction. Legacy asset casing/spacing differences are handled without
- * duplicating deposits into tradable or withdrawal wallet balances.
+ * duplicating deposits into tradable or general wallet balances.
  */
 export async function debitDepositBalance(
   userId: mongoose.Types.ObjectId,
@@ -88,7 +87,7 @@ export async function debitDepositBalance(
 }
 
 
-/** Credit the external-deposit balance, never the general withdrawal wallet. */
+/** Credit the external-deposit balance, never the general wallet. */
 export async function creditDepositBalance(
   userId: mongoose.Types.ObjectId,
   assetCode: string,
@@ -146,7 +145,7 @@ export async function creditDepositBalance(
  * temporarily merged into spot. Replay the relevant ledger movements, treat
  * external deposits as a non-withdrawable pool, and move only the remaining
  * available portion from spot back to DepositBalance. Existing locked funds
- * are left in place so any already-pending withdrawal can settle normally.
+ * are left in place so any already-locked funds remain unchanged.
  */
 export async function separateLegacyDepositsFromSpotWallet(
   userId: mongoose.Types.ObjectId,
@@ -164,16 +163,6 @@ export async function separateLegacyDepositsFromSpotWallet(
         referenceId: marker,
       }).session(session).lean();
       if (alreadySeparated) return;
-
-      // Do not rebalance a wallet while a general withdrawal has an amount
-      // locked in it. If that request is later rejected, its original wallet
-      // allocation must be returned before legacy deposits are moved out.
-      const openGeneralWithdrawal = await WithdrawalRequest.findOne({
-        userId,
-        source: { $ne: "package" },
-        status: { $in: ["pending", "approved", "processing"] },
-      }).session(session).select("_id").lean();
-      if (openGeneralWithdrawal) return;
 
       const entries = await LedgerEntry.find({
         userId,

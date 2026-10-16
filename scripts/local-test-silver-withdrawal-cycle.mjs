@@ -504,7 +504,8 @@ async function main() {
       ledgerMarker: "QA ONLY note; arabtrade_test only",
       syntheticCredit: true,
     };
-    completed = true;
+    // Restore modified historical request timestamps when the 150-USDT cap check fails.
+    completed = first150PolicyPass;
 
     const report = {
       result: first150PolicyPass ? "PASS" : "FAIL",

@@ -13,7 +13,6 @@ jobs:
       MONGODB_URI: mongodb://127.0.0.1:27017/arabtrade_withdrawal_ci?replicaSet=rs0&directConnection=true
       AUTH_SECRET: ci-only-secret-not-for-production-7b154d2b4e8f6a9c
       CRON_SECRET: ci-only-cron-secret
-      NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: 1
     steps:
       - uses: actions/checkout@v4

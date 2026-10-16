@@ -1,6 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { withdrawalAllowance, availableToWithdraw, validateWithdrawal } from "../lib/package-withdrawal-policy.ts";
+import { readFile } from "node:fs/promises";
+import ts from "typescript";
+
+// Node builds without native TypeScript support cannot import .ts files directly.
+// Transpile this pure policy module in memory so the tests work with plain node --test.
+const policySource = await readFile(new URL("../lib/package-withdrawal-policy.ts", import.meta.url), "utf8");
+const policyJavaScript = ts.transpileModule(policySource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+}).outputText;
+const policyUrl = "data:text/javascript;base64," + Buffer.from(policyJavaScript).toString("base64");
+const { withdrawalAllowance, availableToWithdraw, validateWithdrawal } = await import(policyUrl);
 
 test("daily withdrawal cap equals the package's original activation amount", () => {
   assert.equal(withdrawalAllowance(100, 0), 100);

@@ -199,7 +199,7 @@ export default function WithdrawalsPage() {
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="block space-y-2 text-sm text-slate-300">
                         <span>العملة</span>
-                        <select value="USDT" disabled className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:opacity-100">
+                        <select defaultValue="USDT" className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white">
                           <option value="USDT">USDT</option>
                         </select>
                       </label>

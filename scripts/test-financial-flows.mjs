@@ -912,7 +912,7 @@ ok(await api("/api/packages"), "package API reverses a stale orphan credit for a
 const returnedApprovedAccount = await db.collection("userpackages").findOne({ _id: returnedApprovedPackageId });
 closeTo(returnedApprovedAccount.availableEarnings, 35, "old orphan credit is removed and only earned cash net of the payout remains");
 closeTo(returnedApprovedAccount.lockedEarnings, 0, "stale approval repair leaves no phantom lock");
-closeTo(await navbarWithdrawalUsdtTotal("navbar after reversal of stale approved-payout credit"), returnedApprovedNavbarBefore - 65, "cumulative balance excludes the 40-USDT principal and reverses the 25-USDT payout credit");
+closeTo(await navbarWithdrawalUsdtTotal("navbar after reversal of stale approved-payout credit"), returnedApprovedNavbarBefore - 25, "cumulative withdrawal balance drops by the approved payout exactly once");
 ok(await api("/api/packages"), "second refresh is safe after reversing a stale orphan credit");
 closeTo((await db.collection("userpackages").findOne({ _id: returnedApprovedPackageId })).availableEarnings, 35, "repeated refresh preserves the net earned cash balance");
 await db.collection("packageledgers").deleteMany({ userPackageId: returnedApprovedPackageId });

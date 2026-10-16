@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+
+const WITHDRAWAL_NETWORKS = [
+  { code: "TRC20", name: "TRON" },
+  { code: "BEP20", name: "BNB Smart Chain" },
+] as const;
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
@@ -9,7 +14,6 @@ import UserPackage from "@/models/UserPackage";
 import InvestmentPackage from "@/models/InvestmentPackage";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
 import Wallet from "@/models/Wallet";
-import Asset from "@/models/Asset";
 import { separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
 import {
   roundWithdrawal,
@@ -29,13 +33,8 @@ async function activeReferralDeposits(userId: mongoose.Types.ObjectId, session?:
   return roundWithdrawal(Number(deposits[0]?.total || 0));
 }
 
-async function allowedNetwork(network: string, session?: mongoose.ClientSession) {
-  const asset = await Asset.findOne({
-    symbol: "USDT",
-    enabled: true,
-    networks: { $elemMatch: { code: network, enabled: true } },
-  }).select("_id").session(session || null).lean();
-  return Boolean(asset);
+function allowedNetwork(network: string) {
+  return WITHDRAWAL_NETWORKS.some((option) => option.code === network);
 }
 
 function getUsdtAvailable(wallet: { balances?: Array<{ asset?: string; available?: number }> } | null) {
@@ -50,13 +49,12 @@ export async function GET(request: NextRequest) {
   await connectDB();
   await separateLegacyDepositsFromSpotWallet(user._id);
 
-  const [plans, sourceAccounts, requests, referralTotal, wallet, assetConfig, platformSettings] = await Promise.all([
+  const [plans, sourceAccounts, requests, referralTotal, wallet, platformSettings] = await Promise.all([
     InvestmentPackage.find({}).select("name price withdrawalMinimum enabled sortOrder").sort({ sortOrder: 1, price: 1 }).lean(),
     UserPackage.find({ userId: user._id }).sort({ createdAt: 1 }).lean(),
     WithdrawalRequest.find({ userId: user._id }).sort({ createdAt: -1 }).lean(),
     activeReferralDeposits(user._id),
     Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).select("balances").lean(),
-    Asset.findOne({ symbol: "USDT", enabled: true }).select("networks").lean(),
     getPlatformSettings(),
   ]);
 
@@ -112,11 +110,6 @@ export async function GET(request: NextRequest) {
     }];
   });
 
-  const networks = (assetConfig?.networks || [])
-    .filter((network: any) => network.enabled !== false && String(network.code || "").trim())
-    .sort((a: any, b: any) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
-    .map((network: any) => ({ code: String(network.code).toUpperCase(), name: String(network.name || network.code) }))
-    .filter((network: { code: string }, index: number, rows: { code: string }[]) => rows.findIndex((candidate) => candidate.code === network.code) === index);
 
   return NextResponse.json({
     success: true,
@@ -125,7 +118,7 @@ export async function GET(request: NextRequest) {
       minimum: Number(platformSettings.withdrawals?.generalMinimum || 0),
       configured: Number(platformSettings.withdrawals?.generalMinimum || 0) > 0,
     },
-    networks,
+    networks: WITHDRAWAL_NETWORKS,
     packages,
     requests: requests.map((item) => ({
       _id: String(item._id),
@@ -159,7 +152,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: "مبلغ السحب غير صالح" }, { status: 400 });
   }
   if (asset !== "USDT") return NextResponse.json({ success: false, message: "العملة المدعومة حاليًا هي USDT" }, { status: 400 });
-  if (!network || !(await allowedNetwork(network))) {
+  if (!network || !allowedNetwork(network)) {
     return NextResponse.json({ success: false, message: "اختر شبكة مفعّلة من إعدادات الأدمن" }, { status: 400 });
   }
   if (payoutAddress.length < 3 || payoutAddress.length > 200) {

@@ -95,12 +95,14 @@ async function activeReferralDepositStats(referrerId: mongoose.Types.ObjectId, s
         creditedAt: { $ne: null },
       },
     },
-    { $group: { _id: null, total: { $sum: "$amount" } } },
+    { $group: { _id: "$userId", total: { $sum: "$amount" } } },
+    { $match: { total: { $gt: 0 } } },
+    { $group: { _id: null, total: { $sum: "$total" }, count: { $sum: 1 } } },
   ]);
   if (session) depositsAggregate = depositsAggregate.session(session);
   const grouped = await depositsAggregate;
   return {
-    activeReferralCount: referrals.length,
+    activeReferralCount: Number(grouped[0]?.count || 0),
     approvedDepositTotal: roundWithdrawal(Number(grouped[0]?.total || 0)),
   };
 }

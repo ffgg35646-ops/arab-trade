@@ -47,7 +47,7 @@ export default function WithdrawPage() {
   useEffect(() => { void load(); }, [load]);
 
   const selected = data?.packages.find((p) => p._id === packageId);
-  const available = kind === "general" ? (data?.general.available || 0) : (selected?.account?.available || 0);
+  const available = data?.general.available || 0;
   const minimum = kind === "general" ? (data?.general.minimum || 0) : (selected?.minimum || 0);
   const pending = data?.requests.filter((r) => r.status === "pending") || [];
   const history = data?.requests.filter((r) => r.status !== "pending") || [];
@@ -83,11 +83,15 @@ export default function WithdrawPage() {
 
           {!data ? <div className="rounded-2xl bg-white p-6 text-slate-500">جاري تحميل بيانات السحب…</div> : <>
             <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h2 className="font-bold">إجمالي رصيد الباقة</h2>
+                <p className="mt-3 text-xl font-bold" dir="ltr">{amount(data.packages.reduce((sum, p) => sum + (p.account ? p.account.balance + p.account.locked : 0), 0))} USDT</p>
+              </article>
               {data.packages.filter((p) => p.account).map((p) => (
                 <article key={p._id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <h2 className="font-bold">{p.name}</h2>
                   <div className="mt-4 grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">المتاح للسحب</p><p className="mt-1 font-bold" dir="ltr">{amount(p.account?.available || 0)} USDT</p></div>
+                    <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">إجمالي رصيد الباقة</p><p className="mt-1 font-bold" dir="ltr">{amount((p.account?.balance || 0) + (p.account?.locked || 0))} USDT</p></div>
                     <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">محجوز لطلبات معلّقة</p><p className="mt-1 font-bold" dir="ltr">{amount(p.account?.locked || 0)} USDT</p></div>
                   </div>
                   <p className="mt-3 text-xs text-slate-500">الحد الأدنى للسحب: {amount(p.minimum)} USDT</p>
@@ -111,12 +115,12 @@ export default function WithdrawPage() {
                 </label>
                 {kind === "package" && <label className="block text-sm font-medium">الباقة
                   <select required className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3" value={packageId} onChange={(e) => setPackageId(e.target.value)}>
-                    <option value="">اختر الباقة</option>{data.packages.filter((p) => p.account).map((p) => <option key={p._id} value={p._id}>{p.name} — متاح {amount(p.account?.available || 0)} USDT</option>)}
+                    <option value="">اختر الباقة</option>{data.packages.filter((p) => p.account).map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
                   </select>
                 </label>}
                 <label className="block text-sm font-medium">المبلغ (USDT)
                   <input required min="0.00000001" step="0.00000001" type="number" className="mt-1 w-full rounded-xl border border-slate-300 p-3" value={value} onChange={(e) => setValue(e.target.value)} />
-                  <span className="mt-1 block text-xs text-slate-500">المتاح: {amount(available)} USDT · الحد الأدنى: {amount(minimum)} USDT</span>
+                  <span className="mt-1 block text-xs text-slate-500">{kind === "general" ? "المتاح في الرصيد العام: " + amount(available) + " USDT · " : ""}الحد الأدنى: {amount(minimum)} USDT</span>
                 </label>
                 <label className="block text-sm font-medium">الشبكة
                   <select required className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3" value={network} onChange={(e) => setNetwork(e.target.value)}>

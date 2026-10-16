@@ -156,7 +156,7 @@ export default function AdminPackagesPage() {
 
       <section className="rounded-2xl border border-white/10 bg-[#08111e] p-5 md:p-6">
         <h2 className="font-black">سجل حركات جميع الباقات</h2>
-        <p className="mt-1 text-xs leading-6 text-slate-500">سجل تدقيقي للتفعيلات والاستردادات والعوائد المحققة وطلبات السحب.</p>
+        <p className="mt-1 text-xs leading-6 text-slate-500">سجل تدقيقي للتفعيلات والاستردادات والعوائد المحققة.</p>
         {loading ? <div className="py-6 text-center text-slate-500">جاري التحميل...</div> : packageLedger.length === 0 ? <div className="mt-4 rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">لا توجد حركات مسجلة.</div> : <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[850px] text-right text-sm"><thead><tr className="border-b border-white/10 text-xs text-slate-500"><th className="px-3 py-3">التاريخ</th><th className="px-3 py-3">المستخدم</th><th className="px-3 py-3">الباقة</th><th className="px-3 py-3">نوع الحركة</th><th className="px-3 py-3">المبلغ</th><th className="px-3 py-3">المرجع / الملاحظة</th></tr></thead><tbody>{packageLedger.map((row) => <tr key={row._id} className="border-b border-white/5"><td className="px-3 py-4 text-xs text-slate-500">{new Date(row.createdAt).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</td><td className="px-3 py-4"><div className="font-bold">{row.userId?.name || row.userId?.username || "مستخدم"}</div><div className="text-xs text-slate-500">{row.userId?.email || "—"}</div></td><td className="px-3 py-4">{row.userPackageId?.packageName || "—"}</td><td className="px-3 py-4 text-xs">{row.type}</td><td className={Number(row.amount) < 0 ? "px-3 py-4 font-black text-red-300" : "px-3 py-4 font-black text-emerald-300"}>{Number(row.amount) > 0 ? "+" : ""}{money(row.amount)} {row.asset}</td><td className="max-w-72 px-3 py-4 text-xs text-slate-400">{row.note || "—"}</td></tr>)}</tbody></table></div>}
       </section>
 
@@ -170,7 +170,7 @@ export default function AdminPackagesPage() {
         </form>
       </section>
 
-      <section className="flex items-start gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.04] p-4 text-xs leading-6 text-amber-100/80"><ShieldAlert size={18} className="mt-0.5 shrink-0 text-amber-300"/><div>الإيداع الخارجي يظهر في رصيد الإيداع. تفعيل الباقة يخصم منه، وإلغاء الباقة يحوّل نصف قيمة التفعيل إلى رصيد السحب العام. العائد داخل الباقة يُسحب من خانة الباقة بعد تسجيل عائد محقق.</div></section>
+      <section className="flex items-start gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.04] p-4 text-xs leading-6 text-amber-100/80"><ShieldAlert size={18} className="mt-0.5 shrink-0 text-amber-300"/><div>الإيداع الخارجي يظهر في رصيد الإيداع. تفعيل الباقة يخصم منه، وإلغاء الباقة يحوّل نصف قيمة التفعيل إلى رصيد الباقة السابقة. العائد اليومي يُضاف إلى رصيد أرباح الباقة بعد تسجيله.</div></section>
     </div>
   </AdminPageFrame>;
 }

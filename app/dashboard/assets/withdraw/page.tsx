@@ -784,7 +784,7 @@ export default function WithdrawPage() {
                   <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                     <div>
                       <h2 className="text-lg font-black">السحب من الباقات</h2>
-                      <p className="mt-1 text-xs text-slate-400">كارت واحد لكل باقة؛ أرصدة التفعيلات القديمة ظاهرة منفصلة داخل كارت الباقة.</p>
+                      <p className="mt-1 text-xs text-slate-400">كل باقة تظهر مرة واحدة؛ أرصدة التفعيلات السابقة داخل التفاصيل عند الحاجة للسحب.</p>
                     </div>
                     <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-bold text-slate-300">{packageCards.length} باقة</span>
                   </div>

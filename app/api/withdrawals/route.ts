@@ -140,19 +140,43 @@ export async function GET(request: NextRequest) {
     requests as any[],
     referralTotal,
   );
-  const packageWithdrawal = {
-    balance: roundWithdrawal(packageBuckets.reduce((sum, bucket) => sum + bucket.balance, 0)),
-    locked: roundWithdrawal(packageBuckets.reduce((sum, bucket) => sum + bucket.locked, 0)),
-    allowance: roundWithdrawal(packageBuckets.reduce((sum, bucket) => sum + (bucket.balance > 0 ? bucket.allowance : 0), 0)),
-    available: roundWithdrawal(packageBuckets.reduce((sum, bucket) => sum + bucket.available, 0)),
-    minimum: packageBuckets
-      .filter((bucket) => bucket.balance > 0)
-      .reduce((minimum, bucket) => Math.min(minimum, bucket.minimum), Number.POSITIVE_INFINITY),
-    hasAccount: sourceAccounts.length > 0,
-  };
-  if (!Number.isFinite(packageWithdrawal.minimum)) {
-    packageWithdrawal.minimum = packageBuckets.reduce((minimum, bucket) => Math.min(minimum, bucket.minimum), 100);
-  }
+
+  // Render one card per catalog package, never one card per historical activation.
+  // A cancelled activation's balance stays grouped under that package's single card.
+  const packages = packageBuckets.flatMap((bucket) => {
+    const planId = String(bucket.plan._id);
+    const hasActiveAccount = bucket.rows.some((account) => account.status === "active");
+    const pending = (requests as any[]).some((item) =>
+      item.status === "pending" && (
+        String(item.packageId || "") === planId ||
+        (Array.isArray(item.allocations) && item.allocations.some((allocation: any) => String(allocation.packageId || "") === planId))
+      )
+    );
+    const hasOutstandingFunds = bucket.balance > 0 || bucket.locked > 0 || pending;
+
+    // Hide unused packages and cancelled history with no remaining funds.
+    if (!hasActiveAccount && !hasOutstandingFunds) return [];
+
+    const account = bucket.rows.length ? {
+      _id: planId,
+      sourceAccountIds: bucket.rows.map((row) => String(row._id)),
+      status: hasActiveAccount ? "active" : "cancelled",
+      balance: bucket.balance,
+      locked: bucket.locked,
+      allowance: bucket.allowance,
+      available: bucket.available,
+      hasAccount: true,
+    } : null;
+
+    return [{
+      _id: planId,
+      name: String(bucket.plan.name || "باقة"),
+      price: Number(bucket.plan.price || 0),
+      minimum: bucket.minimum,
+      enabled: Boolean(bucket.plan.enabled),
+      account,
+    }];
+  });
 
   const networks = (assetConfig?.networks || [])
     .filter((network: any) => network.enabled !== false && String(network.code || "").trim())
@@ -168,7 +192,7 @@ export async function GET(request: NextRequest) {
       configured: Number(platformSettings.withdrawals?.generalMinimum || 0) > 0,
     },
     networks,
-    packageWithdrawal,
+    packages,
     requests: requests.map((item) => ({
       _id: String(item._id),
       type: item.type || "package",
@@ -206,8 +230,8 @@ export async function POST(request: NextRequest) {
   if (payoutAddress.length < 3 || payoutAddress.length > 200) {
     return NextResponse.json({ success: false, message: "عنوان الدفع غير صحيح" }, { status: 400 });
   }
-  if (type === "package" && packageId && !mongoose.isValidObjectId(packageId)) {
-    return NextResponse.json({ success: false, message: "الباقة غير صحيحة" }, { status: 400 });
+  if (type === "package" && !mongoose.isValidObjectId(packageId)) {
+    return NextResponse.json({ success: false, message: "اختر الباقة التي تريد السحب منها" }, { status: 400 });
   }
 
   const session = await mongoose.startSession();
@@ -241,86 +265,6 @@ export async function POST(request: NextRequest) {
       }
 
 
-      // User-facing package withdrawals are pooled into one form. Funds remain
-      // isolated in their original package accounts and are allocated internally.
-      if (!packageId) {
-        const [plans, sourceAccounts, priorRequests] = await Promise.all([
-          InvestmentPackage.find({}).select("name price withdrawalMinimum enabled sortOrder").sort({ sortOrder: 1, price: 1 }).session(session).lean(),
-          UserPackage.find({ userId: user._id }).sort({ createdAt: 1 }).session(session).lean(),
-          WithdrawalRequest.find({ userId: user._id }).session(session).lean(),
-        ]);
-        const referralTotal = await activeReferralDeposits(user._id, session);
-        const buckets = buildPackageWithdrawalBuckets(
-          plans as any[],
-          sourceAccounts as any[],
-          priorRequests as any[],
-          referralTotal,
-        );
-        const minimumCandidates = buckets.filter((bucket) => bucket.balance > 0).map((bucket) => bucket.minimum);
-        const minimum = minimumCandidates.length ? Math.min(...minimumCandidates) : 100;
-        if (amount < minimum) throw new Error("الحد الأدنى للسحب من الباقات هو " + minimum + " USDT");
-
-        const eligibleBuckets = buckets.filter(
-          (bucket) => bucket.balance >= bucket.minimum && bucket.available > 0 && amount >= bucket.minimum,
-        );
-        const eligibleCapacity = roundWithdrawal(eligibleBuckets.reduce((sum, bucket) => sum + bucket.available, 0));
-        if (!eligibleBuckets.length || eligibleCapacity <= 0) {
-          throw new Error("لا توجد أرصدة باقات قابلة للسحب وفق الحدود الدنيا المحددة");
-        }
-        if (amount > eligibleCapacity) {
-          throw new Error("المتاح للسحب " + eligibleCapacity + " USDT فقط وفق حدود الباقات");
-        }
-
-        let remaining = amount;
-        const allocations: Array<{
-          userPackageId: mongoose.Types.ObjectId;
-          packageId: mongoose.Types.ObjectId;
-          amount: number;
-        }> = [];
-        const orderedBuckets = [...eligibleBuckets].sort(
-          (a, b) => Number(a.plan.sortOrder || 0) - Number(b.plan.sortOrder || 0) ||
-            Number(a.plan.price || 0) - Number(b.plan.price || 0),
-        );
-
-        for (const bucket of orderedBuckets) {
-          if (remaining <= 0) break;
-          let planRemaining = roundWithdrawal(Math.min(bucket.available, remaining));
-          for (const account of bucket.rows) {
-            if (remaining <= 0 || planRemaining <= 0) break;
-            const accountAvailable = roundWithdrawal(Number(account.availableEarnings || 0));
-            if (accountAvailable <= 0) continue;
-            const part = roundWithdrawal(Math.min(accountAvailable, planRemaining, remaining));
-            if (part <= 0) continue;
-
-            const reserved = await UserPackage.updateOne(
-              { _id: account._id, userId: user._id, availableEarnings: { $gte: part } },
-              { $inc: { availableEarnings: -part, lockedEarnings: part } },
-              { session },
-            );
-            if (reserved.modifiedCount !== 1) throw new Error("رصيد إحدى الباقات تغير، حاول مجددًا");
-            allocations.push({ userPackageId: account._id, packageId: bucket.plan._id, amount: part });
-            planRemaining = roundWithdrawal(planRemaining - part);
-            remaining = roundWithdrawal(remaining - part);
-          }
-        }
-
-        if (remaining > 0 || !allocations.length) {
-          throw new Error("تعذر حجز كامل مبلغ السحب من أرصدة الباقات؛ لم يتم إنشاء الطلب");
-        }
-
-        await WithdrawalRequest.create([{
-          userId: user._id,
-          type: "package",
-          allocations,
-          amount,
-          asset,
-          network,
-          payoutAddress,
-          status: "pending",
-        }], { session });
-        return;
-      }
-
       const plan = await InvestmentPackage.findById(packageId).session(session);
       if (!plan) throw new Error("الباقة غير موجودة");
       const accounts = await UserPackage.find({ userId: user._id, packageId: plan._id })
@@ -330,11 +274,22 @@ export async function POST(request: NextRequest) {
       const totalBalance = roundWithdrawal(accounts.reduce((sum, account) => sum + Number(account.availableEarnings || 0), 0));
       const prior = await WithdrawalRequest.find({
         userId: user._id,
-        packageId: plan._id,
         status: { $in: ["pending", "approved"] },
         type: { $ne: "general" },
       }).session(session).lean();
-      const used = roundWithdrawal(prior.reduce((sum, item) => sum + Number(item.amount || 0), 0));
+      const used = roundWithdrawal(prior.reduce((sum, item: any) => {
+        const allocations = Array.isArray(item.allocations) ? item.allocations : [];
+        const hasSourcePackageIds = allocations.some((allocation: any) => allocation.packageId);
+        if (hasSourcePackageIds) {
+          return sum + allocations
+            .filter((allocation: any) => String(allocation.packageId || "") === String(plan._id))
+            .reduce((allocationSum: number, allocation: any) => allocationSum + Number(allocation.amount || 0), 0);
+        }
+        if (String(item.packageId || "") !== String(plan._id)) return sum;
+        return sum + (allocations.length
+          ? allocations.reduce((allocationSum: number, allocation: any) => allocationSum + Number(allocation.amount || 0), 0)
+          : Number(item.amount || 0));
+      }, 0));
       const referralTotal = await activeReferralDeposits(user._id, session);
       const activationAmount = accounts.reduce((maximum, account) => Math.max(maximum, Number(account.investedAmount || 0)), 0);
       const allowance = withdrawalAllowance(activationAmount, referralTotal, used);
@@ -343,7 +298,7 @@ export async function POST(request: NextRequest) {
       if (validationMessage) throw new Error(validationMessage);
 
       let remaining = amount;
-      const allocations: Array<{ userPackageId: mongoose.Types.ObjectId; amount: number }> = [];
+      const allocations: Array<{ userPackageId: mongoose.Types.ObjectId; packageId: mongoose.Types.ObjectId; amount: number }> = [];
       for (const account of accounts) {
         if (remaining <= 0) break;
         const available = roundWithdrawal(Number(account.availableEarnings || 0));
@@ -355,7 +310,7 @@ export async function POST(request: NextRequest) {
           { session }
         );
         if (reserved.modifiedCount !== 1) throw new Error("رصيد الباقة تغير، حاول مجددًا");
-        allocations.push({ userPackageId: account._id, amount: part });
+        allocations.push({ userPackageId: account._id, packageId: plan._id, amount: part });
         remaining = roundWithdrawal(remaining - part);
       }
       if (remaining > 0 || !allocations.length) throw new Error("تعذر حجز كامل مبلغ السحب؛ لم يتم إنشاء الطلب");

@@ -10,6 +10,7 @@ import InvestmentPackage from "@/models/InvestmentPackage";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
 import Wallet from "@/models/Wallet";
 import Asset from "@/models/Asset";
+import { separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
 import {
   roundWithdrawal,
   withdrawalAllowance,
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
   const user = await getCurrentUser(request);
   if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
   await connectDB();
+  await separateLegacyDepositsFromSpotWallet(user._id);
 
   const [plans, sourceAccounts, requests, referralTotal, wallet, assetConfig, platformSettings] = await Promise.all([
     InvestmentPackage.find({}).select("name price withdrawalMinimum enabled sortOrder").sort({ sortOrder: 1, price: 1 }).lean(),
@@ -64,7 +66,7 @@ export async function GET(request: NextRequest) {
     const locked = roundWithdrawal(rows.reduce((sum, account) => sum + Number(account.lockedEarnings || 0), 0));
     const hasActiveAccount = rows.some((account) => account.status === "active");
     const pending = requests.some((item) => String(item.packageId || "") === String(plan._id) && item.status === "pending");
-    const hasOutstandingFunds = balance > 0 || locked > 0 || hasActiveAccount || pending;
+    const hasOutstandingFunds = balance > 0 || locked > 0 || pending;
     if (!plan.enabled && !hasOutstandingFunds) return [];
 
     const used = roundWithdrawal(requests
@@ -126,6 +128,7 @@ export async function POST(request: NextRequest) {
   const user = await getCurrentUser(request);
   if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
   await connectDB();
+  await separateLegacyDepositsFromSpotWallet(user._id);
 
   const body = await request.json().catch(() => ({}));
   const type = body.type === "general" ? "general" : "package";

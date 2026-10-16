@@ -36,6 +36,25 @@ function getUsdtAvailable(wallet: { balances?: Array<{ asset?: string; available
   ));
 }
 
+function packageRequestAllocations(item: any) {
+  if (item.status === "rejected" || item.type === "general") return [];
+  const allocations = Array.isArray(item.allocations) ? item.allocations : [];
+  const byPackage = new Map<string, number>();
+  if (allocations.some((allocation: any) => allocation.packageId)) {
+    for (const allocation of allocations) {
+      if (!allocation.packageId) continue;
+      const id = String(allocation.packageId);
+      byPackage.set(id, roundWithdrawal((byPackage.get(id) || 0) + Number(allocation.amount || 0)));
+    }
+    return Array.from(byPackage, ([packageId, amount]) => ({ packageId, amount }));
+  }
+  if (!item.packageId) return [];
+  const amount = roundWithdrawal(allocations.length
+    ? allocations.reduce((sum: number, allocation: any) => sum + Number(allocation.amount || 0), 0)
+    : Number(item.amount || 0));
+  return amount > 0 ? [{ packageId: String(item.packageId), amount }] : [];
+}
+
 function packageWithdrawalUsage(
   requests: any[],
   planId: string,

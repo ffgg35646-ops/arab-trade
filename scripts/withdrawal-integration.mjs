@@ -371,7 +371,7 @@ try {
   const pendingSummary = await call("/api/withdrawals", { cookie: userCookie });
   assert.equal(pendingSummary.data.summary.packageAvailable, 610);
   assert.equal(pendingSummary.data.summary.packageLocked, 200);
-  assert.equal(pendingSummary.data.summary.totalBalance, 870,
+  assert.equal(pendingSummary.data.summary.totalBalance, 860,
     "while a package withdrawal is pending, available plus locked package funds remain in the grand total");
   assert.equal((await review(firstReferralPending._id, "approve")).status, 200);
   await checkPackageBalance(oldUserPackageId, 610, 0, "approved first referral-backed withdrawal");

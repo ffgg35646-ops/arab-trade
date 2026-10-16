@@ -5,7 +5,7 @@ concurrency:
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/withdrawals-from-scratch-20261016]
   pull_request:
     branches: [main]
   workflow_dispatch:

@@ -64,13 +64,14 @@ export async function PATCH(request: NextRequest) {
         const value = Number(values[field]);
         if (!Number.isFinite(value) || value < 0 || value > 1000000000000) {
           return NextResponse.json(
-            { success: false, message: "حدود الإيداع والسحب يجب أن تكون أرقامًا صحيحة لا تقل عن صفر" },
+            { success: false, message: "حدود الإيداع يجب أن تكون أرقامًا صحيحة لا تقل عن صفر" },
             { status: 400 }
           );
         }
       }
     }
 
+    const currentSettings = await getPlatformSettings();
     const nextDepositMin = Number(body?.deposits?.minAmount ?? currentSettings.deposits.minAmount);
     const nextDepositMax = Number(body?.deposits?.maxAmount ?? currentSettings.deposits.maxAmount);
     if (nextDepositMax > 0 && nextDepositMin > nextDepositMax) {

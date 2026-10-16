@@ -52,6 +52,14 @@ test("referral-backed withdrawal capacity is cumulative and cannot be reused", (
   assert.equal(referralWithdrawalAllowance(2000, 50, 500), 500);
 });
 
+test("a used daily base limit requires active referral deposits for additional withdrawal", () => {
+  assert.equal(
+    validateWithdrawal(100, 100, 500, 0, true),
+    "لا يمكن طلب سحب إضافي إلا بعد وجود إحالات نشطة بإيداعات معتمدة",
+  );
+  assert.equal(validateWithdrawal(150, 100, 500, 100, true), "المتاح للسحب 100 USDT فقط");
+});
+
 test("referral deposits do not alter the package's normal daily base allowance", () => {
   assert.equal(withdrawalAllowance(100, 0), 100);
   assert.equal(withdrawalAllowance(100, 100), 0);

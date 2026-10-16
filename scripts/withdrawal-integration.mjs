@@ -270,14 +270,26 @@ try {
   await checkPackageBalance(oldUserPackageId, 710, 0, "repeat rejection protection");
   log("Single pending request enforced; rejection returned the full amount once; duplicate review blocked");
 
+  // Concurrent duplicate requests: at most one request may reserve the same first-phase cap.
+  const concurrent = await Promise.all([requestWithdrawal(100), requestWithdrawal(100)]);
+  assert.equal(concurrent.filter((x) => x.status === 201).length, 1,
+    "only one of two concurrent request submissions must succeed: " + JSON.stringify(concurrent.map(x => ({status:x.status,message:x.data.message}))));
+  assert.equal(await mongoose.connection.collection("withdrawalrequests").countDocuments({ userId: user._id, status: "pending" }), 1);
+  await checkPackageBalance(oldUserPackageId, 610, 100, "concurrent request reservation");
+  pending = await latestPending();
+  assert.equal((await review(pending._id, "reject")).status, 200);
+  await checkPackageBalance(oldUserPackageId, 710, 0, "concurrent rejection return");
+  log("Concurrent duplicate submits created exactly one pending request; rejection restored package balance and cap");
+
   const initialApproveRequest = await requestWithdrawal(200);
-  assert.equal(initialApproveRequest.status, 201, JSON.stringify(initialApproveRequest.data));
+  assert.equal(initialApproveRequest.status, 201, "initial cap withdrawal: " + JSON.stringify(initialApproveRequest.data));
   pending = await latestPending();
   const approved = await review(pending._id, "approve");
   assert.equal(approved.status, 200, "admin approval: " + JSON.stringify(approved.data));
-  await checkPackageBalance(oldUserPackageId, 510, 0, "approved debit");
-  log("Approval finalized the $200 debit and released the reservation");
+  await checkPackageBalance(oldUserPackageId, 510, 0, "approved initial-cap debit");
+  log("Approved exactly the initial $200 package activation cap; package still contains $510 from real earnings/refund");
 
+  // Even if many referrals have approved deposits, the first phase cannot unlock any amount above activation.
   const referrals = [];
   const testHash = await bcrypt.hash(testPassword, 4);
   for (let i = 0; i < 10; i++) {
@@ -295,47 +307,21 @@ try {
       createdAt: new Date(), updatedAt: new Date(),
     });
   }
+
   let state = await getPackageState(packageAId);
-  assert.equal(state.allowance, 500, "10 active referrals × $100 deposits should authorize $500 after initial $200 is used");
-  assert.equal(state.available, 500, "package balance and referral allowance must both constrain available withdrawal");
-  log("10 active referrals × $100 approved deposits unlock $500 allowance only after the initial $200 is used");
+  assert.equal(state.balance, 510, "remaining real package earnings/refund should stay in the package balance");
+  assert.equal(state.allowance, 0, "active referrals must not unlock a second withdrawal phase yet");
+  assert.equal(state.available, 0, "after the initial activation cap is used, first-phase available withdrawal must be zero");
+  const afterCapRequest = await requestWithdrawal(100);
+  assert.equal(afterCapRequest.status, 409, "a further request must be blocked after initial activation cap is used");
+  assert.equal(afterCapRequest.data.message, "تم استنفاد حد السحب الحالي لهذه الباقة");
+  await checkPackageBalance(oldUserPackageId, 510, 0, "attempt after initial cap consumed");
+  log("After $200 is approved, remaining $510 balance stays visible but unavailable; referrals do not unlock more in phase one");
 
-  const referralWithdrawal = await requestWithdrawal(200);
-  assert.equal(referralWithdrawal.status, 201, JSON.stringify(referralWithdrawal.data));
-  pending = await latestPending();
-  assert.equal((await review(pending._id, "approve")).status, 200);
-  await checkPackageBalance(oldUserPackageId, 310, 0, "referral-stage approval");
-  state = await getPackageState(packageAId);
-  assert.equal(state.allowance, 300);
-  assert.equal(state.available, 300);
-  const overReferral = await requestWithdrawal(400);
-  assert.equal(overReferral.status, 409);
-  assert.match(overReferral.data.message, /المتاح للسحب 300/);
-  log("After another $200 withdrawal from the $500 referral allowance, remaining cap is $300; $400 blocked");
-
-  const concurrent = await Promise.all([requestWithdrawal(100), requestWithdrawal(100)]);
-  assert.equal(concurrent.filter((x) => x.status === 201).length, 1,
-    "only one of two concurrent request submissions must succeed: " + JSON.stringify(concurrent.map(x => ({status:x.status,message:x.data.message}))));
-  assert.equal(await mongoose.connection.collection("withdrawalrequests").countDocuments({ userId: user._id, status: "pending" }), 1);
-  await checkPackageBalance(oldUserPackageId, 210, 100, "concurrent request reservation");
-  pending = await latestPending();
-  assert.equal((await review(pending._id, "reject")).status, 200);
-  await checkPackageBalance(oldUserPackageId, 310, 0, "concurrent rejection return");
-  log("Concurrent duplicate submits created exactly one pending request");
-
-  const finalRequest = await requestWithdrawal(100);
-  assert.equal(finalRequest.status, 201, JSON.stringify(finalRequest.data));
-  pending = await latestPending();
-  assert.equal((await review(pending._id, "approve")).status, 200);
-  await checkPackageBalance(oldUserPackageId, 210, 0, "final approved request");
-  assert.equal((await review(pending._id, "approve")).status, 409, "approved request cannot be approved twice");
-  await checkPackageBalance(oldUserPackageId, 210, 0, "duplicate approval protection");
-  state = await getPackageState(packageAId);
-  assert.equal(state.available, 200, "after using $300 of $500 referral allowance, remaining allowance is $200");
   deposit = await mongoose.connection.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
   assert.equal(deposit.available, 100, "withdrawal operations must not alter deposit balance");
   assert.equal(deposit.locked, 0);
-  log("Approval cannot double-debit; deposit balance remains $100 and never enters withdrawal balances");
+  log("Package withdrawal operations do not alter the separate deposit balance");
   log("ALL WITHDRAWAL END-TO-END SCENARIOS PASSED");
 } catch (error) {
   console.error("[E2E] FAILED:", error?.stack || error);

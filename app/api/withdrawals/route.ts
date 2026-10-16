@@ -30,6 +30,12 @@ function getUsdtAvailable(wallet: { balances?: Array<{ asset?: string; available
   ));
 }
 
+function currentWithdrawalDayStart() {
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  return start;
+}
+
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser(request);
   if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
@@ -44,6 +50,7 @@ export async function GET(request: NextRequest) {
     getPlatformSettings(),
   ]);
 
+  const withdrawalDayStart = currentWithdrawalDayStart();
   const packages = plans.flatMap((plan) => {
     const rows = sourceAccounts.filter((account) => String(account.packageId) === String(plan._id));
     const balance = roundWithdrawal(rows.reduce((sum, account) => sum + Number(account.availableEarnings || 0), 0));
@@ -61,6 +68,8 @@ export async function GET(request: NextRequest) {
 
     const used = roundWithdrawal(requests.reduce((sum: number, item: any) => {
       if (item.status === "rejected" || item.type === "general") return sum;
+      const createdAt = item.createdAt ? new Date(item.createdAt).getTime() : Number.NaN;
+      if (!Number.isFinite(createdAt) || createdAt < withdrawalDayStart.getTime()) return sum;
       const allocations = Array.isArray(item.allocations) ? item.allocations : [];
       const allocationHasPlanId = allocations.some((allocation: any) => allocation.packageId);
       if (allocationHasPlanId) {
@@ -191,6 +200,7 @@ export async function POST(request: NextRequest) {
         userId: user._id,
         status: { $in: ["pending", "approved"] },
         type: { $ne: "general" },
+        createdAt: { $gte: currentWithdrawalDayStart() },
         $or: [
           { packageId: plan._id },
           { allocations: { $elemMatch: { packageId: plan._id } } },

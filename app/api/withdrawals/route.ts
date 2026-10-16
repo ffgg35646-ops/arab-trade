@@ -515,7 +515,7 @@ export async function POST(request: NextRequest) {
       const normalizedPackageName = normalizePackageName(currentPackage.packageName);
       const sameNamePackageRows = normalizedPackageName
         ? await UserPackage.find({ userId: user._id })
-            .select("_id packageName packageId investedAmount availableEarnings lockedEarnings status withdrawalRequestPending firstWithdrawalStatus activatedAt createdAt")
+            .select("_id packageName packageId investedAmount availableEarnings lockedEarnings withdrawalBalanceDebt status withdrawalRequestPending firstWithdrawalStatus activatedAt createdAt")
             .lean()
         : [];
       const packageFamilyRows = sameNamePackageRows.filter(
@@ -564,9 +564,20 @@ export async function POST(request: NextRequest) {
         { $set: { withdrawalRequestPending: false } },
       );
 
-      // This request draws only from the UserPackage selected by the user.
-      // Sibling activations and cancellation refunds are separate money buckets.
-      const packageAvailable = Math.max(0, Number(currentPackage.availableEarnings || 0));
+      // The cash bucket is tracked per activation, while historic overpayments
+      // are offset within the same package family. Never permit a withdrawal that
+      // exceeds the family's net available balance.
+      const packageFamilyNetAvailable = packageFamilyRows.reduce(
+        (sum: number, row: any) =>
+          sum +
+          Math.max(0, Number(row.availableEarnings || 0)) -
+          Math.max(0, Number(row.withdrawalBalanceDebt || 0)),
+        0,
+      );
+      const packageAvailable = Math.min(
+        Math.max(0, Number(currentPackage.availableEarnings || 0)),
+        Math.max(0, packageFamilyNetAvailable),
+      );
       const packageInvestedAmount = packageFamilyRows.reduce(
         (sum: number, row: any) => sum + Math.max(0, Number(row.investedAmount || 0)),
         0,

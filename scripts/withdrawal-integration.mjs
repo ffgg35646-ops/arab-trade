@@ -123,13 +123,16 @@ try {
     assert.equal(res.status, 201, "admin create package: " + JSON.stringify(res.data));
     return res.data.package;
   };
-  const planA = await createPlan("QA " + suffix + " Gold A", 600);
+  const planA = await createPlan("QA " + suffix + " Gold A", 900);
   const planB = await createPlan("QA " + suffix + " Gold B", 0);
   packageAId = String(planA._id); packageBId = String(planB._id);
   const catalogBeforeActivation = await call("/api/withdrawals", { cookie: userCookie });
   assert.equal(catalogBeforeActivation.status, 200);
-  assert.deepEqual(catalogBeforeActivation.data.packages, [], "unactivated catalog packages must not appear on the user's withdrawal page");
-  log("No unactivated package cards are shown to the user");
+  assert.equal(catalogBeforeActivation.data.packages.length, 2,
+    "each newly created package must immediately appear as a withdrawal card");
+  assert.ok(catalogBeforeActivation.data.packages.every((item) => item.account && item.account.hasAccount === false),
+    "unactivated packages must show their own card but must not allow withdrawals");
+  log("Each newly created package immediately has its own disabled withdrawal card");
   const minSet = await call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie,
     body: { action: "minimum", packageId: packageAId, minimum: 125 } });
   assert.equal(minSet.status, 200);
@@ -147,8 +150,12 @@ try {
   const collect = await call("/api/packages", { method: "POST", cookie: userCookie,
     body: { action: "collect", userPackageId: oldUserPackageId } });
   assert.equal(collect.status, 200, "collect: " + JSON.stringify(collect.data));
-  await checkPackageBalance(oldUserPackageId, 600, 0, "daily collection");
-  log("Daily Collect added $600 to the correct package account");
+  await checkPackageBalance(oldUserPackageId, 900, 0, "daily collection");
+  const afterCollectView = await call("/api/withdrawals", { cookie: userCookie });
+  assert.equal(afterCollectView.status, 200);
+  assert.equal(afterCollectView.data.packages.find((item) => item._id === packageAId).account.balance, 900,
+    "collected daily profit must appear in its own package withdrawal card");
+  log("Daily Collect added $900 to the correct package withdrawal balance and API card");
 
   const reward = await mongoose.connection.collection("rewards").insertOne({
     userId: user._id, title: "QA reward", type: "bonus", amount: 10, asset: "USDT",
@@ -157,13 +164,13 @@ try {
   });
   const claim = await call("/api/rewards", { method: "POST", cookie: userCookie, body: { rewardId: String(reward.insertedId) } });
   assert.equal(claim.status, 200, "reward claim: " + JSON.stringify(claim.data));
-  await checkPackageBalance(oldUserPackageId, 610, 0, "reward credit");
+  await checkPackageBalance(oldUserPackageId, 910, 0, "reward credit");
   log("Reward added $10 to the active package; did not credit a general wallet");
 
   const change = await call("/api/packages", { method: "POST", cookie: userCookie,
     body: { action: "change", packageId: packageBId, userPackageId: oldUserPackageId } });
   assert.equal(change.status, 200, "package change: " + JSON.stringify(change.data));
-  await checkPackageBalance(oldUserPackageId, 710, 0, "50% refund");
+  await checkPackageBalance(oldUserPackageId, 1010, 0, "50% refund");
   deposit = await mongoose.connection.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
   assert.equal(deposit.available, 100, "changing package should spend only new package activation from deposits");
   log("Changed package; exactly $100 refund credited back to old package, deposit balance remained separate");
@@ -207,7 +214,7 @@ try {
   );
   const silverCard = afterPackageChange.data.packages.find((item) => item._id === packageAId);
   const goldCard = afterPackageChange.data.packages.find((item) => item._id === packageBId);
-  assert.equal(silverCard.account.balance, 710, "old-package refund and earnings remain grouped under the original package");
+  assert.equal(silverCard.account.balance, 1010, "old-package refund and earnings remain grouped under the original package");
   assert.equal(silverCard.account.available, 200, "the old package's own withdrawal allowance is preserved");
   assert.ok(goldCard.account.hasAccount, "the newly active package has its own card");
   log("Twenty historic activation records produce one Silver card and one Gold card with package-specific balances");
@@ -231,7 +238,21 @@ try {
   assert.equal(generalWallet.balances.find((row) => row.asset === "USDT").available, 25);
   let generalPending = await latestPending();
   assert.equal(generalPending.type, "general");
+  const generalRequestNoticeCount = await mongoose.connection.collection("notifications")
+    .countDocuments({ userId: user._id, type: "withdrawal", title: "تم استلام طلب السحب" });
+  assert.equal(generalRequestNoticeCount, 1, "the user should receive a notice when a general withdrawal is created");
+  const adminPendingGeneral = await call("/api/admin/notifications-summary", { cookie: adminCookie });
+  assert.equal(adminPendingGeneral.status, 200);
+  assert.equal(adminPendingGeneral.data.counts.withdrawals, 1, "admin notification menu should count the pending general withdrawal");
+  const generalSummary = await call("/api/withdrawals", { cookie: userCookie });
+  assert.equal(generalSummary.data.summary.generalAvailable, 25);
+  assert.equal(generalSummary.data.summary.generalLocked, 25);
   assert.equal((await review(generalPending._id, "reject")).status, 200);
+  const generalReviewNoticeCount = await mongoose.connection.collection("notifications")
+    .countDocuments({ userId: user._id, type: "withdrawal", title: "تم رفض طلب السحب" });
+  assert.equal(generalReviewNoticeCount, 1, "the user should receive a rejection notice");
+  const adminAfterGeneralReview = await call("/api/admin/notifications-summary", { cookie: adminCookie });
+  assert.equal(adminAfterGeneralReview.data.counts.withdrawals, 0, "reviewed requests must disappear from pending admin count");
   generalWallet = await mongoose.connection.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
   assert.equal(generalWallet.balances.find((row) => row.asset === "USDT").available, 50);
   log("General withdrawal uses configured minimum, enabled admin network and trading USDT balance; rejection returns funds");
@@ -253,7 +274,7 @@ try {
   const overInitial = await requestWithdrawal(300);
   assert.equal(overInitial.status, 409);
   assert.match(overInitial.data.message, /المتاح للسحب 200/);
-  await checkPackageBalance(oldUserPackageId, 710, 0, "failed request rollback");
+  await checkPackageBalance(oldUserPackageId, 1010, 0, "failed request rollback");
   log("Rejects below-minimum and >$200 initial allowance requests without touching balances");
 
   const rejectRequest = await requestWithdrawal(200);
@@ -270,10 +291,10 @@ try {
   let pending = await latestPending();
   const rejection = await review(pending._id, "reject");
   assert.equal(rejection.status, 200, "admin rejection: " + JSON.stringify(rejection.data));
-  await checkPackageBalance(oldUserPackageId, 710, 0, "rejection return");
+  await checkPackageBalance(oldUserPackageId, 1010, 0, "rejection return");
   const repeatReject = await review(pending._id, "reject");
   assert.equal(repeatReject.status, 409, "same request cannot be rejected twice");
-  await checkPackageBalance(oldUserPackageId, 710, 0, "repeat rejection protection");
+  await checkPackageBalance(oldUserPackageId, 1010, 0, "repeat rejection protection");
   log("Single pending request enforced; rejection returned the full amount once; duplicate review blocked");
 
   // Concurrent duplicate requests: at most one request may reserve today's package cap.
@@ -281,10 +302,10 @@ try {
   assert.equal(concurrent.filter((x) => x.status === 201).length, 1,
     "only one of two concurrent request submissions must succeed: " + JSON.stringify(concurrent.map(x => ({status:x.status,message:x.data.message}))));
   assert.equal(await mongoose.connection.collection("withdrawalrequests").countDocuments({ userId: user._id, status: "pending" }), 1);
-  await checkPackageBalance(oldUserPackageId, 610, 100, "concurrent request reservation");
+  await checkPackageBalance(oldUserPackageId, 910, 100, "concurrent request reservation");
   pending = await latestPending();
   assert.equal((await review(pending._id, "reject")).status, 200);
-  await checkPackageBalance(oldUserPackageId, 710, 0, "concurrent rejection return");
+  await checkPackageBalance(oldUserPackageId, 1010, 0, "concurrent rejection return");
   log("Concurrent duplicate submits created one pending request; rejection restored balance and today's cap");
 
   const initialApproveRequest = await requestWithdrawal(200);
@@ -292,22 +313,24 @@ try {
   pending = await latestPending();
   const approved = await review(pending._id, "approve");
   assert.equal(approved.status, 200, "admin approval: " + JSON.stringify(approved.data));
-  await checkPackageBalance(oldUserPackageId, 510, 0, "approved initial-cap debit");
-  log("Approved $200 today; package still holds $510 from collected earnings and cancellation refund");
+  await checkPackageBalance(oldUserPackageId, 810, 0, "approved initial-cap debit");
+  const afterBaseApproval = await call("/api/withdrawals", { cookie: userCookie });
+  assert.equal(afterBaseApproval.data.packages.find((item) => item._id === packageAId).account.baseAllowance, 0,
+    "the activation-based base allowance must be consumed permanently after approved withdrawals");
+  const initialWithdrawNoticeCount = await mongoose.connection.collection("notifications")
+    .countDocuments({ userId: user._id, type: "withdrawal", title: "تم استلام طلب السحب" });
+  assert.ok(initialWithdrawNoticeCount >= 2, "the user should be notified about package withdrawal requests");
+  log("Approved the one-time $200 activation-based withdrawal; no next-day reset is required");
 
-  // Simulate a new UTC day by moving only this CI-only approval timestamp back a day.
-  // No package or wallet balance is changed by this test fixture operation.
-  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const priorApproval = await mongoose.connection.collection("withdrawalrequests").findOne({
-    userId: user._id, packageId: new mongoose.Types.ObjectId(packageAId), status: "approved", type: "package",
-  }, { sort: { createdAt: -1 } });
-  assert.ok(priorApproval, "Expected an approved package withdrawal to verify daily reset");
-  await mongoose.connection.collection("withdrawalrequests").updateOne(
-    { _id: priorApproval._id },
-    { $set: { createdAt: yesterday } },
-  );
+  // No new UTC day can reset the one-time package base cap.
+  // Without credited active-referral deposits, an additional package withdrawal is blocked.
+  const withoutReferrals = await requestWithdrawal(100);
+  assert.equal(withoutReferrals.status, 409, "an exhausted one-time base cap must not reset on a later date");
+  assert.equal(withoutReferrals.data.message, "تم استنفاد حد السحب؛ يلزم وجود إحالات نشطة بإيداعات معتمدة إضافية لفتح سعة جديدة");
+  await checkPackageBalance(oldUserPackageId, 810, 0, "blocked after one-time base cap");
+  log("The package activation cap stays exhausted after approval; no calendar-day reset");
 
-  // Referrals and arbitrary profit sources must not raise the same day's cap.
+  // Ten verified, active referrals with credited deposits totaling $1000 unlock exactly $500.
   const referrals = [];
   const testHash = await bcrypt.hash(testPassword, 4);
   for (let i = 0; i < 10; i++) {
@@ -321,37 +344,78 @@ try {
     });
     await mongoose.connection.collection("depositrequests").insertOne({
       userId: referralId, asset: "USDT", network: "TRC20", amount: 100, txHash: "qa-" + suffix + "-" + i,
-      address: "QA test address", status: "approved", adminNote: "isolated CI seed",
-      createdAt: new Date(), updatedAt: new Date(),
+      address: "QA test address", status: "approved", creditedAt: new Date(),
+      adminNote: "isolated CI seed", createdAt: new Date(), updatedAt: new Date(),
     });
   }
 
   let state = await getPackageState(packageAId);
-  assert.equal(state.balance, 510, "the package balance should remain intact after the previous day's approved withdrawal");
-  assert.equal(state.allowance, 200, "the full activation-based daily cap should reset on a new UTC day");
-  assert.equal(state.available, 200, "new UTC day should make at most the $200 activation amount available");
-  log("Next UTC day restores today's cap to $200 without adding or changing any package balance");
+  assert.equal(state.balance, 810, "referral eligibility must not credit package funds");
+  assert.equal(state.baseAllowance, 0, "the one-time base cap remains exhausted");
+  assert.equal(state.activeReferralCount, 10, "expected ten funded active referrals");
+  assert.equal(state.referralDepositTotal, 1000, "ten $100 approved deposits must total $1000");
+  assert.equal(state.referralUnlockPercent, 50, "expected default referral allowance of 50 percent");
+  assert.equal(state.referralAllowance, 500, "$1000 in approved referral deposits must unlock exactly $500");
+  assert.equal(state.available, 500, "available amount must be the lesser of balance and referral capacity");
+  log("Ten qualifying referral deposits unlock $500 without crediting the package balance");
 
-  const nextDayRequest = await requestWithdrawal(200);
-  assert.equal(nextDayRequest.status, 201, "new-day withdrawal should be allowed up to the activation amount");
-  pending = await latestPending();
-  assert.equal((await review(pending._id, "approve")).status, 200);
-  await checkPackageBalance(oldUserPackageId, 310, 0, "approved new-day cap");
+  // Spend $200 from the $500 referral allowance; exactly $300 should remain.
+  const firstReferralRequest = await requestWithdrawal(200);
+  assert.equal(firstReferralRequest.status, 201, "referral-backed $200 request: " + JSON.stringify(firstReferralRequest.data));
+  const adminPendingPackage = await call("/api/admin/notifications-summary", { cookie: adminCookie });
+  assert.equal(adminPendingPackage.data.counts.withdrawals, 1, "admin should count the pending package withdrawal");
+  const firstReferralPending = await latestPending();
+  const packageRequestNoticeCount = await mongoose.connection.collection("notifications")
+    .countDocuments({ userId: user._id, type: "withdrawal", title: "تم استلام طلب السحب" });
+  assert.ok(packageRequestNoticeCount >= 3, "the user should receive a notice for each accepted withdrawal request");
+  const pendingSummary = await call("/api/withdrawals", { cookie: userCookie });
+  assert.equal(pendingSummary.data.summary.packageAvailable, 610);
+  assert.equal(pendingSummary.data.summary.packageLocked, 200);
+  assert.equal(pendingSummary.data.summary.totalBalance, 870,
+    "while a package withdrawal is pending, available plus locked package funds remain in the grand total");
+  assert.equal((await review(firstReferralPending._id, "approve")).status, 200);
+  await checkPackageBalance(oldUserPackageId, 610, 0, "approved first referral-backed withdrawal");
   state = await getPackageState(packageAId);
-  assert.equal(state.balance, 310);
-  assert.equal(state.allowance, 0, "today's $200 approved withdrawal should consume today's cap");
-  assert.equal(state.available, 0, "second withdrawal today should show zero remaining daily allowance");
+  assert.equal(state.referralUsed, 200);
+  assert.equal(state.referralAllowance, 300);
+  assert.equal(state.available, 300);
+  log("Approving $200 consumes $200 of referral capacity, leaving exactly $300");
 
-  const overDailyCap = await requestWithdrawal(100);
-  assert.equal(overDailyCap.status, 409, "a second day's-limit request must be blocked after today's cap is used");
-  assert.equal(overDailyCap.data.message, "لا يمكن طلب سحب إضافي إلا بعد وجود إحالات نشطة بإيداعات معتمدة");
-  await checkPackageBalance(oldUserPackageId, 310, 0, "blocked second withdrawal today");
-  log("Once $200 is approved today, remaining $310 stays in the package but is unavailable for another withdrawal today");
+  const overRemaining = await requestWithdrawal(400);
+  assert.equal(overRemaining.status, 409, "request larger than remaining referral capacity must be blocked");
+  assert.equal(overRemaining.data.message, "المتاح للسحب 300 USDT فقط");
+  await checkPackageBalance(oldUserPackageId, 610, 0, "blocked request above remaining referral capacity");
+  log("A $400 request is blocked with the exact remaining $300 allowance message");
+
+  const lastReferralRequest = await requestWithdrawal(300);
+  assert.equal(lastReferralRequest.status, 201, "remaining $300 referral allowance should be withdrawable");
+  const lastReferralPending = await latestPending();
+  assert.equal((await review(lastReferralPending._id, "approve")).status, 200);
+  await checkPackageBalance(oldUserPackageId, 310, 0, "approved remaining referral-backed withdrawal");
+  state = await getPackageState(packageAId);
+  assert.equal(state.referralUsed, 500, "the full $500 referral allowance must be consumed cumulatively");
+  assert.equal(state.referralAllowance, 0, "spent referral capacity cannot be reused");
+  assert.equal(state.available, 0, "no allowance remains without additional approved referral deposits");
+
+  const afterCapacitySpent = await requestWithdrawal(100);
+  assert.equal(afterCapacitySpent.status, 409);
+  assert.equal(afterCapacitySpent.data.message, "تم استنفاد حد السحب؛ يلزم وجود إحالات نشطة بإيداعات معتمدة إضافية لفتح سعة جديدة");
+  await checkPackageBalance(oldUserPackageId, 310, 0, "no-capacity request rollback");
+  log("After all $500 referral capacity is spent, another request requires additional qualifying referral deposits");
 
   deposit = await mongoose.connection.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
   assert.equal(deposit.available, 100, "withdrawals must not alter the separate deposit balance");
   assert.equal(deposit.locked, 0);
   log("Package withdrawal operations do not alter the separate deposit balance");
+  const finalSummaryResponse = await call("/api/withdrawals", { cookie: userCookie });
+  assert.equal(finalSummaryResponse.status, 200);
+  assert.equal(finalSummaryResponse.data.summary.generalAvailable, 50);
+  assert.equal(finalSummaryResponse.data.summary.generalLocked, 0);
+  assert.equal(finalSummaryResponse.data.summary.packageAvailable, 310);
+  assert.equal(finalSummaryResponse.data.summary.packageLocked, 0);
+  assert.equal(finalSummaryResponse.data.summary.totalBalance, 360,
+    "grand total combines general and package withdrawal balances but not deposit balance");
+  log("Grand total includes the general balance and all package balances, but excludes the separate deposit balance");
   log("ALL WITHDRAWAL END-TO-END SCENARIOS PASSED");
 } catch (error) {
   console.error("[E2E] FAILED:", error?.stack || error);

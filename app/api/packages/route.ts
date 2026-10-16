@@ -721,9 +721,10 @@ export async function POST(request: NextRequest) {
           const created = await UserPackage.create([{
             userId: user._id, packageId: plan._id, packageName: plan.name,
             investedAmount: price, asset: USDT_ASSET, durationDays: 0, lastProfitAt: new Date(),
-            status: "active", availableEarnings: price, lockedEarnings: 0,
+            status: "active", availableEarnings: 0, lockedEarnings: 0,
             totalRealizedEarnings: 0, totalWithdrawn: 0,
             withdrawablePrincipalCredited: true,
+            withdrawalBalanceDebt: 0, withdrawalBalanceReconciled: true,
             cancellationRefund: 0, activatedAt: new Date(),
           }], { session });
           purchased = created[0];
@@ -732,11 +733,6 @@ export async function POST(request: NextRequest) {
               userId: user._id, userPackageId: purchased._id,
               type: "activation", asset, amount: -price,
               note: "تفعيل باقة " + plan.name + " من رصيد الإيداع",
-            },
-            {
-              userId: user._id, userPackageId: purchased._id,
-              type: "activation_withdrawable", asset, amount: price,
-              note: "إضافة قيمة تفعيل الباقة إلى رصيد السحب المتاح للمرحلة الأولى.",
             },
           ], { session, ordered: true });
         });
@@ -838,11 +834,13 @@ export async function POST(request: NextRequest) {
             durationDays: 0,
             lastProfitAt: new Date(),
             status: "active",
-            availableEarnings: price,
+            availableEarnings: 0,
             lockedEarnings: 0,
             totalRealizedEarnings: 0,
             totalWithdrawn: 0,
             withdrawablePrincipalCredited: true,
+            withdrawalBalanceDebt: 0,
+            withdrawalBalanceReconciled: true,
             firstWithdrawalStatus: "available",
             cancellationRefund: 0,
             activatedAt: new Date(),
@@ -865,14 +863,6 @@ export async function POST(request: NextRequest) {
               asset,
               amount: -price,
               note: "تفعيل باقة " + plan.name + " من رصيد الإيداع عند تغيير الباقة",
-            },
-            {
-              userId: user._id,
-              userPackageId: changedPackage._id,
-              type: "activation_withdrawable",
-              asset,
-              amount: price,
-              note: "إضافة قيمة تفعيل الباقة الجديدة إلى رصيد السحب المتاح للمرحلة الأولى.",
             },
           ], { session, ordered: true });
         });

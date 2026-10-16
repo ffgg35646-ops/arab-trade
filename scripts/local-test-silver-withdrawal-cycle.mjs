@@ -521,8 +521,8 @@ async function main() {
         prepareBalanceForFollowUpTests: topUpReport,
       },
       assertions: {
-        150WasRejectedAtThe100USDTDailyCap: first150PolicyPass,
-        100RequestWasCreatedAndSentToAdminApi: true,
+        "150WasRejectedAtThe100USDTDailyCap": first150PolicyPass,
+        "100RequestWasCreatedAndSentToAdminApi": true,
         rejected100ReturnedAllFundsToSilver: true,
         noLockedFundsRemain: finalSnapshot.locked === 0,
         SilverBalanceIs600ForNextTests: finalSnapshot.balance === 600,

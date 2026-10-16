@@ -17,19 +17,6 @@ export interface IPlatformSettings {
     maxAmount: number;
     autoConfirm: boolean;
   };
-  withdrawals: {
-    enabled: boolean;
-    minAmount: number;
-    minGeneralWithdrawal?: number;
-    withdrawalMinByPackage: Record<string, number>;
-    maxAmount: number;
-    dailyLimit: number;
-    requireEmailVerification: boolean;
-    requireTwoFactor: boolean;
-    manualReview: boolean;
-    firstPackageWithdrawalPercent: number;
-    referralPackageWithdrawalPercent: number;
-  };
   trading: {
     enabled: boolean;
     spotEnabled: boolean;
@@ -84,20 +71,6 @@ const PlatformSettingsSchema = new Schema<IPlatformSettings>(
       minAmount: { type: Number, default: 10 },
       maxAmount: { type: Number, default: 100000 },
       autoConfirm: { type: Boolean, default: false },
-    },
-
-    withdrawals: {
-      enabled: { type: Boolean, default: true },
-      minAmount: { type: Number, default: 50 },
-      minGeneralWithdrawal: { type: Number, default: undefined, min: 0 },
-      withdrawalMinByPackage: { type: Schema.Types.Mixed, default: {} },
-      maxAmount: { type: Number, default: 50000 },
-      dailyLimit: { type: Number, default: 100000 },
-      requireEmailVerification: { type: Boolean, default: true },
-      requireTwoFactor: { type: Boolean, default: false },
-      manualReview: { type: Boolean, default: true },
-      firstPackageWithdrawalPercent: { type: Number, default: 100, min: 0, max: 100 },
-      referralPackageWithdrawalPercent: { type: Number, default: 50, min: 0, max: 100 },
     },
 
     trading: {

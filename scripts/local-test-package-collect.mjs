@@ -3,6 +3,9 @@
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const net = require("node:net");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const { spawn } = require("node:child_process");
 const mongoose = require("mongoose");
 
@@ -43,7 +46,8 @@ async function main() {
   let app = null;
   let db = null;
   let mongoConnected = false;
-  const logTail = [];
+  let serverLogFile = null;
+  let serverUrl = null;
   let pass = false;
   let result = {};
 
@@ -65,24 +69,20 @@ async function main() {
 
     const port = await getFreePort();
     const baseUrl = "http://127.0.0.1:" + port;
+    serverUrl = baseUrl;
+    serverLogFile = path.join(os.tmpdir(), "arabtrade-local-test-next-" + port + ".log");
+    const logFd = fs.openSync(serverLogFile, "a");
     app = spawn("npm", ["run", "dev", "--", "--hostname", "127.0.0.1", "--port", String(port)], {
       cwd: process.cwd(),
       env: { ...childEnv, PORT: String(port) },
-      stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
+      stdio: ["ignore", logFd, logFd],
     });
-
-    const capture = (chunk) => {
-      for (const line of String(chunk).split(/\r?\n/)) {
-        if (line.trim()) logTail.push(line.trim());
-      }
-      if (logTail.length > 35) logTail.splice(0, logTail.length - 35);
-    };
-    app.stdout.on("data", capture);
-    app.stderr.on("data", capture);
+    app.unref();
+    fs.closeSync(logFd);
 
     let ready = false;
     for (let i = 0; i < 120; i += 1) {
-      if (app.exitCode !== null) throw new Error("Next.js exited during startup:\n" + logTail.join("\n"));
       try {
         const health = await fetch(baseUrl + "/api/health", { signal: AbortSignal.timeout(2500) });
         if (health.ok) {
@@ -92,7 +92,10 @@ async function main() {
       } catch {}
       await pause(1000);
     }
-    if (!ready) throw new Error("Local Next.js did not become ready on its temporary port:\n" + logTail.join("\n"));
+    if (!ready) {
+      const log = fs.existsSync(serverLogFile) ? fs.readFileSync(serverLogFile, "utf8").slice(-5000) : "";
+      throw new Error("Local Next.js did not become ready. The isolated server is not stopped automatically. Log: " + serverLogFile + "\n" + log);
+    }
 
     async function api(path, options = {}) {
       const response = await fetch(baseUrl + path, {
@@ -227,17 +230,23 @@ async function main() {
     assert.equal(depositAfter, before.depositAvailable, "FAIL: collecting profit unexpectedly changed the deposit balance.");
     pass = true;
   } catch (error) {
-    result = { ...result, error: error instanceof Error ? error.message : String(error), logTail };
+    result = {
+      ...result,
+      error: error instanceof Error ? error.message : String(error),
+      ...(serverLogFile ? { serverLogFile } : {}),
+    };
   } finally {
-    if (app && app.exitCode === null) {
-      app.kill("SIGTERM");
-      await Promise.race([new Promise((resolve) => app.once("exit", resolve)), pause(5000)]);
-      if (app.exitCode === null) app.kill("SIGKILL");
-    }
+    // Intentionally keep the isolated local server running after the test.
+    // This script must never shut down the user's existing dev server.
     if (mongoConnected) await mongoose.disconnect().catch(() => {});
   }
 
-  console.log(JSON.stringify({ result: pass ? "PASS" : "FAIL", ...result }, null, 2));
+  console.log(JSON.stringify({
+    result: pass ? "PASS" : "FAIL",
+    ...(serverUrl ? { localTestServer: serverUrl, serverRemainsRunning: true } : {}),
+    ...(serverLogFile ? { serverLogFile } : {}),
+    ...result
+  }, null, 2));
   if (!pass) process.exitCode = 1;
 }
 

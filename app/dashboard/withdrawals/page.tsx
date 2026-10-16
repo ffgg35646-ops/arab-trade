@@ -141,7 +141,7 @@ export default function WithdrawalsPage() {
       return;
     }
     if (!network) {
-      setMessage("لا توجد شبكة مفعّلة من إعدادات الأدمن");
+      setMessage("اختر شبكة السحب");
       return;
     }
     if (!Number.isFinite(amount) || amount < plan.minimum) {

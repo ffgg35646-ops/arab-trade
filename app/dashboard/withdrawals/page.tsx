@@ -242,7 +242,6 @@ export default function WithdrawalsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="truncate text-lg font-black">{plan.name}</h3>
-                        <p className="mt-1 text-xs text-slate-400">{account?.status === "active" ? "باقة نشطة" : account?.hasAccount ? "باقة سابقة" : "لم تُفعّل بعد"}</p>
                       </div>
                       <div className="shrink-0 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-2 text-left">
                         <p className="text-xs text-slate-400">الرصيد المتاح</p>
@@ -274,7 +273,6 @@ export default function WithdrawalsPage() {
                     <input aria-label={"مبلغ السحب من " + plan.name} type="number" min={plan.minimum} step="any" value={amounts[plan._id] || ""} onChange={(event) => setAmounts((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder={"الحد الأدنى " + money(plan.minimum) + " USDT"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-400" />
 
                     <div className="mt-auto space-y-2">
-                      <p className="text-xs text-slate-500">المتاح للسحب الآن: {money(account?.available || 0)} USDT</p>
                       <button type="button" disabled={busy || hasPending || !canWithdraw || !addresses[plan._id]?.trim() || !network} onClick={() => submitPackage(plan)} className="w-full rounded-xl bg-blue-600 px-4 py-3 font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">
                         دفع
                       </button>

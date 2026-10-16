@@ -315,6 +315,9 @@ export async function GET(request: NextRequest) {
     await reconcileOrphanedPackageWithdrawalLocks(user._id);
     await separateLegacyDepositsFromSpotWallet(user._id);
     await reconcileLegacyPackageRefunds(user._id);
+    // Refund reclassification can change the real package cash balance, so
+    // run settlement again before returning balance data to the client.
+    await settleLegacyApprovedPackageWithdrawals(user._id);
     await Promise.all([
       UserPackage.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
       PackageLedger.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),

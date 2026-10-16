@@ -283,24 +283,6 @@ export default function WithdrawalsPage() {
             </div>
           </section>
 
-          <section className="space-y-3">
-            <h2 className="text-xl font-black">طلبات السحب</h2>
-            {!data?.requests.length && <p className="rounded-xl border border-slate-700 p-3 text-sm text-slate-400">لا توجد طلبات سحب.</p>}
-            {data?.requests.map((item) => {
-              const planName = data.packages.find((plan) => plan._id === item.packageId)?.name;
-              const status = item.status === "pending" ? "معلق" : item.status === "approved" ? "مقبول" : "مرفوض";
-              return (
-                <div key={item._id} className="rounded-xl border border-slate-700 bg-[#08111e] p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-bold">{item.type === "general" ? "السحب العام" : planName || "سحب باقة"} — {money(item.amount)} {item.asset || "USDT"}</p>
-                    <span className={item.status === "pending" ? "rounded-full bg-amber-400/10 px-3 py-1 text-xs text-amber-200" : item.status === "approved" ? "rounded-full bg-emerald-400/10 px-3 py-1 text-xs text-emerald-200" : "rounded-full bg-red-400/10 px-3 py-1 text-xs text-red-200"}>{status}</span>
-                  </div>
-                  {item.network && <p className="mt-2 text-sm text-slate-400">الشبكة: {item.network}</p>}
-                  {item.payoutAddress && <p className="mt-1 break-all text-sm text-slate-400">عنوان الدفع: {item.payoutAddress}</p>}
-                </div>
-              );
-            })}
-          </section>
         </main>
       </div>
     </>

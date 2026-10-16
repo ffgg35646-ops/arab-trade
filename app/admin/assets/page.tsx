@@ -24,7 +24,6 @@ type Asset = {
   symbol: string;
   enabled: boolean;
   depositEnabled: boolean;
-  withdrawalEnabled: boolean;
   tradingEnabled: boolean;
   sortOrder: number;
   networks: Network[];

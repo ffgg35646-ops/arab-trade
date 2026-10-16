@@ -122,12 +122,14 @@ export async function ensurePackagePrincipalWithdrawalCredit(
           if (!["approved", "completed"].includes(String(row.status))) continue;
 
           const requestCreatedAt = new Date(row.createdAt || 0).getTime();
-          const requestUpdatedAt = new Date(row.updatedAt || 0).getTime();
           const amount = Number(row.amount || 0);
+          // The request may have been approved before this migration but its
+          // legacy balance settlement can still be posted after the migration.
+          // The post-migration debit timestamp, checked below, is the decisive signal.
           if (
             !Number.isFinite(amount) ||
             amount <= 1e-8 ||
-            !(requestCreatedAt <= migrationAt && requestUpdatedAt > migrationAt)
+            !(requestCreatedAt <= migrationAt)
           ) {
             continue;
           }

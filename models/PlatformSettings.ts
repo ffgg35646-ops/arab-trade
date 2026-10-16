@@ -45,6 +45,9 @@ export interface IPlatformSettings {
     facebook: string;
     telegram: string;
   };
+  withdrawals: {
+    generalMinimum: number;
+  };
   security: {
     sessionDays: number;
     maxLoginAttempts: number;
@@ -113,6 +116,10 @@ const PlatformSettingsSchema = new Schema<IPlatformSettings>(
         type: String,
         default: "https://t.me/ArabTrade",
       },
+    },
+
+    withdrawals: {
+      generalMinimum: { type: Number, default: 0, min: 0 },
     },
 
     security: {

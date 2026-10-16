@@ -463,20 +463,58 @@ export async function PATCH(
 
               const expectedRemaining = expectedRemainingByPackage.get(String(allocation.userPackageId)) || 0;
               const actualLocked = Math.max(0, Number(packageAccount.lockedEarnings || 0));
-              // Never consume funds needed by another active request. Any excess
-              // lock, however, is returned to available instead of being stranded.
+              const availableBefore = Math.max(0, Number(packageAccount.availableEarnings || 0));
+              const totalWithdrawnBefore = Math.max(0, Number(packageAccount.totalWithdrawn || 0));
+              // Never consume funds reserved for another live request.
               if (actualLocked + 1e-8 < expectedRemaining) throw new Error("PACKAGE_BALANCE_INVALID");
+
+              // Older requests can be missing their original lock. Approval must
+              // still reduce the package bucket by exactly this payout: consume
+              // the missing reservation from availableEarnings instead of merely
+              // changing the status and inflating the cumulative withdrawal total.
+              const amountLockedForThisRequest = Math.min(
+                allocation.amount,
+                Math.max(0, actualLocked - expectedRemaining),
+              );
+              const missingReservation = Math.max(0, allocation.amount - amountLockedForThisRequest);
               const excessLock = Math.max(0, actualLocked - expectedRemaining - allocation.amount);
-              const availableCredit = (nextStatus === "rejected" ? allocation.amount : 0) + excessLock;
-              const packageSet: Record<string, any> = { lockedEarnings: expectedRemaining };
+              const returningPreviouslyApprovedPayout =
+                nextStatus === "rejected" &&
+                currentStatus === "approved" &&
+                packageBalanceWasSettled;
+
+              let availableChange = 0;
               const increments: Record<string, any> = {};
-              if (availableCredit > 1e-8) increments.availableEarnings = availableCredit;
-              if (nextStatus === "completed" || nextStatus === "approved") increments.totalWithdrawn = allocation.amount;
+              if (nextStatus === "rejected") {
+                // A pending request only returns the part actually reserved.
+                // Rejecting a previously settled approval reverses its payout,
+                // so return the full amount and undo its cumulative counter.
+                availableChange = returningPreviouslyApprovedPayout
+                  ? allocation.amount + excessLock
+                  : Math.max(0, actualLocked - expectedRemaining);
+                if (returningPreviouslyApprovedPayout) {
+                  const counterReversal = Math.min(totalWithdrawnBefore, allocation.amount);
+                  if (counterReversal > 1e-8) increments.totalWithdrawn = -counterReversal;
+                }
+              } else {
+                if (availableBefore + 1e-8 < missingReservation) {
+                  throw new Error("PACKAGE_BALANCE_INVALID");
+                }
+                availableChange = excessLock - missingReservation;
+                increments.totalWithdrawn = allocation.amount;
+              }
+
+              if (Math.abs(availableChange) > 1e-8) increments.availableEarnings = availableChange;
               const updatedPackage = await UserPackage.findOneAndUpdate(
-                { _id: allocation.userPackageId, userId: withdrawal.userId },
+                {
+                  _id: allocation.userPackageId,
+                  userId: withdrawal.userId,
+                  lockedEarnings: actualLocked,
+                  availableEarnings: { $gte: nextStatus === "rejected" ? 0 : missingReservation },
+                },
                 {
                   ...(Object.keys(increments).length ? { $inc: increments } : {}),
-                  $set: packageSet,
+                  $set: { lockedEarnings: expectedRemaining },
                 },
                 { new: true, session }
               );

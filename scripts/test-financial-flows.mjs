@@ -933,7 +933,7 @@ await db.collection("userpackages").insertOne({
   asset: "USDT",
   durationDays: 0,
   status: "cancelled",
-  availableEarnings: 25,
+  availableEarnings: 75,
   lockedEarnings: 0,
   totalRealizedEarnings: 125,
   totalWithdrawn: 0,

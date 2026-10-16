@@ -15,26 +15,26 @@ const policyJavaScript = ts.transpileModule(policySource, {
 const policyUrl = "data:text/javascript;base64," + Buffer.from(policyJavaScript).toString("base64");
 const { withdrawalAllowance, referralWithdrawalAllowance, totalWithdrawalAllowance, availableToWithdraw, validateWithdrawal } = await import(policyUrl);
 
-test("daily withdrawal cap equals the package's original activation amount", () => {
+test("one-time base withdrawal allowance equals the package's original activation amount", () => {
   assert.equal(withdrawalAllowance(100, 0), 100);
   assert.equal(availableToWithdraw(3000, withdrawalAllowance(100, 0)), 100);
   assert.equal(validateWithdrawal(300, 100, 3000, withdrawalAllowance(100, 0)), "المتاح للسحب 100 USDT فقط");
 });
 
-test("Bronze daily cap stays at 50 even when package refund/earnings balance is higher", () => {
+test("Bronze base cap stays at 50 even when package refund/earnings balance is higher", () => {
   assert.equal(withdrawalAllowance(50, 0), 50);
   assert.equal(availableToWithdraw(102, withdrawalAllowance(50, 0)), 50);
   assert.equal(validateWithdrawal(100, 100, 102, withdrawalAllowance(50, 0)), "المتاح للسحب 50 USDT فقط");
 });
 
-test("withdrawals already made today consume today's cap", () => {
+test("pending and approved withdrawals cumulatively consume the package base cap", () => {
   assert.equal(withdrawalAllowance(100, 0), 100);
   assert.equal(withdrawalAllowance(100, 40), 60);
   assert.equal(withdrawalAllowance(100, 100), 0);
-  assert.equal(validateWithdrawal(100, 100, 3000, 0), "تم استنفاد حد السحب اليومي لهذه الباقة");
+  assert.equal(validateWithdrawal(100, 100, 3000, 0), "تم استنفاد حد السحب الأساسي لهذه الباقة");
 });
 
-test("referral deposits unlock 50% additional capacity without changing the daily base cap", () => {
+test("referral deposits unlock 50% additional capacity after the one-time base cap is consumed", () => {
   const activation = 100;
   const balanceAfterFirstApprovedWithdrawal = 500;
   const dailyRemaining = withdrawalAllowance(activation, 100);
@@ -52,15 +52,15 @@ test("referral-backed withdrawal capacity is cumulative and cannot be reused", (
   assert.equal(referralWithdrawalAllowance(2000, 50, 500), 500);
 });
 
-test("a used daily base limit requires active referral deposits for additional withdrawal", () => {
+test("an exhausted base/referral capacity requires more approved active-referral deposits", () => {
   assert.equal(
     validateWithdrawal(100, 100, 500, 0, true),
-    "لا يمكن طلب سحب إضافي إلا بعد وجود إحالات نشطة بإيداعات معتمدة",
+    "تم استنفاد حد السحب؛ يلزم وجود إحالات نشطة بإيداعات معتمدة إضافية لفتح سعة جديدة",
   );
   assert.equal(validateWithdrawal(150, 100, 500, 100, true), "المتاح للسحب 100 USDT فقط");
 });
 
-test("referral deposits do not alter the package's normal daily base allowance", () => {
+test("referral deposits do not replenish the one-time base allowance", () => {
   assert.equal(withdrawalAllowance(100, 0), 100);
   assert.equal(withdrawalAllowance(100, 100), 0);
   assert.equal(referralWithdrawalAllowance(1000, 50, 0), 500);

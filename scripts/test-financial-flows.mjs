@@ -207,7 +207,7 @@ async function databaseWithdrawalUsdtTotal() {
   0);
   const packageTotal = packages.reduce((sum, account) =>
     sum + (String(account.asset || "USDT").toUpperCase() === "USDT"
-      ? Number(account.availableEarnings || 0) + Number(account.lockedEarnings || 0)
+      ? Number(account.availableEarnings || 0) + Number(account.lockedEarnings || 0) - Number(account.withdrawalBalanceDebt || 0)
       : 0),
   0);
   return walletTotal + packageTotal;
@@ -764,7 +764,7 @@ await db.collection("withdrawalrequests").insertOne({
 });
 ok(await api("/api/packages"), "package API reconciles legacy approved package withdrawal locks");
 let legacySettledAccount = await db.collection("userpackages").findOne({ _id: legacyApprovedPackageId });
-closeTo(legacySettledAccount.availableEarnings, 40, "legacy approved withdrawal does not refund already-approved amount to available");
+closeTo(legacySettledAccount.availableEarnings, 0, "legacy approved payout consumes earnings and leaves no principal in cash balance");
 closeTo(legacySettledAccount.lockedEarnings, 0, "legacy approved withdrawal no longer leaves a locked balance");
 closeTo(legacySettledAccount.totalWithdrawn, 60, "legacy approved withdrawal is counted as withdrawn once");
 assert.equal(legacySettledAccount.firstWithdrawalStatus, "completed", "legacy approved first withdrawal is closed");
@@ -827,14 +827,14 @@ await db.collection("withdrawalrequests").insertOne({
 const flaggedApprovedNavbarBefore = await databaseWithdrawalUsdtTotal();
 ok(await api("/api/packages"), "package API repairs a stale settled flag on an approved withdrawal");
 let flaggedApprovedAccount = await db.collection("userpackages").findOne({ _id: flaggedApprovedPackageId });
-closeTo(flaggedApprovedAccount.availableEarnings, 40, "stale approved withdrawal repair does not credit the paid amount back");
+closeTo(flaggedApprovedAccount.availableEarnings, 0, "cash-only reconciliation removes activation principal after stale approved payout");
 closeTo(flaggedApprovedAccount.lockedEarnings, 0, "stale approved withdrawal reservation is consumed");
 closeTo(flaggedApprovedAccount.totalWithdrawn, 60, "stale approved withdrawal is not counted twice");
 const flaggedApprovedNavbarAfter = await navbarWithdrawalUsdtTotal("navbar after stale approved withdrawal repair");
-closeTo(flaggedApprovedNavbarAfter, flaggedApprovedNavbarBefore - 60, "cumulative withdrawal balance decreases once for the approved payout");
+closeTo(flaggedApprovedNavbarAfter, flaggedApprovedNavbarBefore - 100, "stale approved payout migration removes the locked payout and excludes remaining activation principal");
 ok(await api("/api/packages"), "second refresh is idempotent after stale approved withdrawal repair");
 flaggedApprovedAccount = await db.collection("userpackages").findOne({ _id: flaggedApprovedPackageId });
-closeTo(flaggedApprovedAccount.availableEarnings + flaggedApprovedAccount.lockedEarnings, 40, "repeated refresh cannot restore or re-spend the approved withdrawal");
+closeTo(flaggedApprovedAccount.availableEarnings + flaggedApprovedAccount.lockedEarnings, 0, "repeated refresh preserves the zero net cash balance after approval");
 await db.collection("packageledgers").deleteMany({ userPackageId: flaggedApprovedPackageId });
 await db.collection("withdrawalrequests").deleteOne({ _id: flaggedApprovedWithdrawalId });
 await db.collection("userpackages").deleteOne({ _id: flaggedApprovedPackageId });
@@ -855,7 +855,7 @@ await db.collection("userpackages").insertOne({
   asset: "USDT",
   durationDays: 0,
   status: "active",
-  availableEarnings: 100,
+  availableEarnings: 60,
   lockedEarnings: 0,
   totalRealizedEarnings: 60,
   totalWithdrawn: 25,
@@ -910,11 +910,11 @@ await db.collection("packageledgers").insertMany([
 const returnedApprovedNavbarBefore = await databaseWithdrawalUsdtTotal();
 ok(await api("/api/packages"), "package API reverses a stale orphan credit for an approved payout");
 const returnedApprovedAccount = await db.collection("userpackages").findOne({ _id: returnedApprovedPackageId });
-closeTo(returnedApprovedAccount.availableEarnings, 75, "old orphan credit is removed from the package available balance");
+closeTo(returnedApprovedAccount.availableEarnings, 35, "old orphan credit is removed and only earned cash net of the payout remains");
 closeTo(returnedApprovedAccount.lockedEarnings, 0, "stale approval repair leaves no phantom lock");
 closeTo(await navbarWithdrawalUsdtTotal("navbar after reversal of stale approved-payout credit"), returnedApprovedNavbarBefore - 25, "cumulative withdrawal balance drops by the approved payout exactly once");
 ok(await api("/api/packages"), "second refresh is safe after reversing a stale orphan credit");
-closeTo((await db.collection("userpackages").findOne({ _id: returnedApprovedPackageId })).availableEarnings, 75, "stale orphan credit is not reversed twice");
+closeTo((await db.collection("userpackages").findOne({ _id: returnedApprovedPackageId })).availableEarnings, 35, "repeated refresh preserves the net earned cash balance");
 await db.collection("packageledgers").deleteMany({ userPackageId: returnedApprovedPackageId });
 await db.collection("withdrawalrequests").deleteOne({ _id: returnedApprovedWithdrawalId });
 await db.collection("userpackages").deleteOne({ _id: returnedApprovedPackageId });
@@ -933,7 +933,7 @@ await db.collection("userpackages").insertOne({
   asset: "USDT",
   durationDays: 0,
   status: "cancelled",
-  availableEarnings: 75,
+  availableEarnings: 25,
   lockedEarnings: 0,
   totalRealizedEarnings: 75,
   totalWithdrawn: 0,
@@ -963,14 +963,14 @@ await db.collection("withdrawalrequests").insertOne({
 });
 ok(await api("/api/packages"), "package API restores an older rejected package withdrawal");
 let legacyRejectedAccount = await db.collection("userpackages").findOne({ _id: legacyRejectedPackageId });
-closeTo(legacyRejectedAccount.availableEarnings, 125, "legacy rejected amount is restored to package available earnings");
+closeTo(legacyRejectedAccount.availableEarnings, 75, "legacy rejected amount is restored without including principal in cash balance");
 closeTo(legacyRejectedAccount.lockedEarnings, 0, "legacy rejected amount leaves no locked balance");
 closeTo(legacyRejectedAccount.totalWithdrawn, 0, "rejected amount is not counted as withdrawn");
 let legacyRejectedRequest = await db.collection("withdrawalrequests").findOne({ _id: legacyRejectedWithdrawalId });
 assert.equal(legacyRejectedRequest.packageBalanceSettled, true, "legacy rejected request receives an idempotent settlement marker");
 ok(await api("/api/packages"), "refresh is safe after rejected-package refund migration");
 legacyRejectedAccount = await db.collection("userpackages").findOne({ _id: legacyRejectedPackageId });
-closeTo(legacyRejectedAccount.availableEarnings, 125, "repeated refresh does not refund the rejected request twice");
+closeTo(legacyRejectedAccount.availableEarnings, 75, "repeated refresh does not refund the rejected request twice");
 
 // A previous rejection ledger entry means the credit already happened; do not duplicate it.
 const alreadyRefundedPackageId = new mongoose.Types.ObjectId();

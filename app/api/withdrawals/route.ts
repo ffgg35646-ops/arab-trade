@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ success: true, general: { available: 0, configured: false }, packages: plans.map(p => ({
   _id: String(p._id), name: p.name, minimum: Number(p.withdrawalMinimum || 100), accounts: accounts.filter(a => String(a.packageId) === String(p._id)).map(a => {
    const used = requests.filter(r => String(r.userPackageId) === String(a._id) && r.status !== "rejected").reduce((s,r) => s + Number(r.amount),0);
-   const allowance = withdrawalAllowance(Number(a.investedAmount), Number(a.status === "active" ? referralTotal : 0), used);
+   const allowance = withdrawalAllowance(Number(a.investedAmount), Number(referralTotal), used);
    return { _id: String(a._id), status: a.status, balance: roundWithdrawal(Number(a.availableEarnings || 0)), locked: roundWithdrawal(Number(a.lockedEarnings || 0)), allowance, available: availableToWithdraw(Number(a.availableEarnings || 0), allowance) };
   }),
  })), requests: requests.map(r => ({ _id: String(r._id), userPackageId: String(r.userPackageId), amount: r.amount, status: r.status, createdAt: r.createdAt })) });
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
    if (!plan) throw new Error("الباقة غير موجودة");
    const prior = await WithdrawalRequest.find({ userPackageId: account._id, status: { $in: ["pending","approved"] } }).session(session).lean();
    const used = roundWithdrawal(prior.reduce((s,r) => s + r.amount, 0));
-   const referralTotal = account.status === "active" ? await activeReferralDeposits(user._id, session) : 0;
+   const referralTotal = await activeReferralDeposits(user._id, session);
    const allowance = withdrawalAllowance(account.investedAmount, referralTotal, used);
    const minimum = Number(plan.withdrawalMinimum || 100);
    message = validateWithdrawal(amount, minimum, account.availableEarnings, allowance) || "";

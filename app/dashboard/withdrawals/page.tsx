@@ -248,7 +248,7 @@ export default function WithdrawalsPage() {
                         <p className="mt-1 font-black text-white">{money(account?.balance || 0)} USDT</p>
                         <p className="mt-2 text-xs text-slate-400">المتاح للسحب</p>
                         <p className="mt-1 font-black text-emerald-300">{money(account?.available || 0)} USDT</p>
-                        {Number(account?.locked || 0) > 0 && <p className="mt-2 text-xs text-amber-200">محجوز: {money(account.locked)} USDT</p>}
+                        {Number(account?.locked || 0) > 0 && <p className="mt-2 text-xs text-amber-200">محجوز: {money(account?.locked || 0)} USDT</p>}
                       </div>
                     </div>
 

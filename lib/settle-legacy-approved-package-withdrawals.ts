@@ -512,6 +512,10 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
       Number(account.totalWithdrawn || 0) - correctedTotalWithdrawn
     ) > 1e-7;
 
+    // Accounts already at the expected balance are still safe to mark settled.
+    if (Math.abs(actualBalance - expectedBalance) <= 1e-6) {
+      reconciledPackageIds.add(packageId);
+    }
     if (excess <= 1e-7 && !counterNeedsCorrection) continue;
 
     // There are no live requests referencing this package, so any remaining

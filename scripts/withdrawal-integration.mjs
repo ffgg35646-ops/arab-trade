@@ -60,13 +60,15 @@ async function checkPackageBalance(id, available, locked, label) {
 async function getPackageState(id) {
   const { status, data } = await call("/api/withdrawals", { cookie: userCookie });
   assert.equal(status, 200, "withdrawal page API should load");
-  const plan = data.packages.flatMap((p) => p.accounts.map((a) => ({ ...a, planId: p._id, planName: p.name })))
-    .find((a) => a._id === String(id));
-  assert.ok(plan, "expected separate withdrawal account for package");
-  return plan;
+  const plan = data.packages.find((item) => item._id === String(id));
+  assert.ok(plan?.account, "expected one package-level withdrawal card");
+  return plan.account;
 }
-async function requestWithdrawal(amount, userPackageId = oldUserPackageId) {
-  return call("/api/withdrawals", { method: "POST", cookie: userCookie, body: { userPackageId: String(userPackageId), amount, asset: "USDT", network: "TRC20", payoutAddress: "QA-wallet-" + suffix } });
+async function requestWithdrawal(amount, packageId = packageAId) {
+  return call("/api/withdrawals", { method: "POST", cookie: userCookie, body: { type: "package", packageId: String(packageId), amount, asset: "USDT", network: "TRC20", payoutAddress: "QA-wallet-" + suffix } });
+}
+async function requestGeneralWithdrawal(amount) {
+  return call("/api/withdrawals", { method: "POST", cookie: userCookie, body: { type: "general", amount, asset: "USDT", network: "TRC20", payoutAddress: "QA-general-wallet-" + suffix } });
 }
 async function review(requestId, action) {
   return call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie, body: { id: String(requestId), action } });
@@ -88,6 +90,16 @@ try {
   adminId = String(admin._id); userId = String(user._id);
   await mongoose.connection.collection("depositbalances").insertOne({
     userId: user._id, asset: "USDT", available: 500, locked: 0,
+    createdAt: new Date(), updatedAt: new Date(),
+  });
+  await mongoose.connection.collection("assets").insertOne({
+    _id: new mongoose.Types.ObjectId(), name: "Tether", symbol: "USDT", type: "crypto",
+    enabled: true, depositEnabled: true, tradingEnabled: true, sortOrder: 0,
+    networks: [{
+      _id: new mongoose.Types.ObjectId(), name: "TRON", code: "TRC20", enabled: true,
+      depositEnabled: true, depositAddress: "QA deposit address", memoTag: "",
+      confirmations: 1, minDeposit: 0, maxDeposit: 0, warning: "", sortOrder: 0,
+    }],
     createdAt: new Date(), updatedAt: new Date(),
   });
   userCookie = await login(user.email);
@@ -145,6 +157,30 @@ try {
   deposit = await mongoose.connection.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
   assert.equal(deposit.available, 100, "changing package should spend only new package activation from deposits");
   log("Changed package; exactly $100 refund credited back to old package, deposit balance remained separate");
+
+  await mongoose.connection.collection("wallets").insertOne({
+    userId: user._id, type: "spot", mode: "live",
+    balances: [{ asset: "USDT", available: 50, locked: 0 }],
+    createdAt: new Date(), updatedAt: new Date(),
+  });
+  const generalMinSet = await call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie,
+    body: { action: "generalMinimum", minimum: 25 } });
+  assert.equal(generalMinSet.status, 200, "admin can configure general withdrawal minimum");
+  const belowGeneralMinimum = await requestGeneralWithdrawal(20);
+  assert.equal(belowGeneralMinimum.status, 409);
+  assert.match(belowGeneralMinimum.data.message, /الحد الأدنى للسحب العام هو 25/);
+  let generalWallet = await mongoose.connection.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+  assert.equal(generalWallet.balances.find((row) => row.asset === "USDT").available, 50);
+  const generalRequest = await requestGeneralWithdrawal(25);
+  assert.equal(generalRequest.status, 201, "general withdrawal request should reserve trading USDT");
+  generalWallet = await mongoose.connection.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+  assert.equal(generalWallet.balances.find((row) => row.asset === "USDT").available, 25);
+  let generalPending = await latestPending();
+  assert.equal(generalPending.type, "general");
+  assert.equal((await review(generalPending._id, "reject")).status, 200);
+  generalWallet = await mongoose.connection.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+  assert.equal(generalWallet.balances.find((row) => row.asset === "USDT").available, 50);
+  log("General withdrawal uses configured minimum, enabled admin network and trading USDT balance; rejection returns funds");
 
   const setHigherMinimum = await call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie,
     body: { action: "minimum", packageId: packageAId, minimum: 125 } });
@@ -211,7 +247,7 @@ try {
       createdAt: new Date(), updatedAt: new Date(),
     });
   }
-  let state = await getPackageState(oldUserPackageId);
+  let state = await getPackageState(packageAId);
   assert.equal(state.allowance, 500, "10 active referrals × $100 deposits should authorize $500 after initial $200 is used");
   assert.equal(state.available, 500, "package balance and referral allowance must both constrain available withdrawal");
   log("10 active referrals × $100 approved deposits unlock $500 allowance only after the initial $200 is used");
@@ -221,7 +257,7 @@ try {
   pending = await latestPending();
   assert.equal((await review(pending._id, "approve")).status, 200);
   await checkPackageBalance(oldUserPackageId, 310, 0, "referral-stage approval");
-  state = await getPackageState(oldUserPackageId);
+  state = await getPackageState(packageAId);
   assert.equal(state.allowance, 300);
   assert.equal(state.available, 300);
   const overReferral = await requestWithdrawal(400);
@@ -246,7 +282,7 @@ try {
   await checkPackageBalance(oldUserPackageId, 210, 0, "final approved request");
   assert.equal((await review(pending._id, "approve")).status, 409, "approved request cannot be approved twice");
   await checkPackageBalance(oldUserPackageId, 210, 0, "duplicate approval protection");
-  state = await getPackageState(oldUserPackageId);
+  state = await getPackageState(packageAId);
   assert.equal(state.available, 200, "after using $300 of $500 referral allowance, remaining allowance is $200");
   deposit = await mongoose.connection.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
   assert.equal(deposit.available, 100, "withdrawal operations must not alter deposit balance");

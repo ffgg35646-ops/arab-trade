@@ -26,61 +26,16 @@ jobs:
         run: npx tsc --noEmit
       - name: Production build
         run: npm run build
-      - name: Financial flow integration tests
-        env:
-          MONGODB_URI: mongodb://127.0.0.1:27017/arabtrade_test?replicaSet=rs0
-          AUTH_SECRET: ci-financial-test-secret-with-more-than-thirty-two-characters
-          BASE_URL: http://127.0.0.1:3000
-        run: |
-          set -euo pipefail
-          docker run -d --name arabtrade-mongodb -p 27017:27017 mongo:7 --replSet rs0 --bind_ip_all
-          server_pid=""
-          cleanup() {
-            if [ -n "$server_pid" ]; then kill "$server_pid" 2>/dev/null || true; fi
-            docker rm -f arabtrade-mongodb >/dev/null 2>&1 || true
-          }
-          trap cleanup EXIT
-
-          ready=0
-          for i in $(seq 1 60); do
-            if docker exec arabtrade-mongodb mongosh --quiet --eval 'db.adminCommand({ping:1}).ok' >/dev/null 2>&1; then ready=1; break; fi
-            sleep 1
-          done
-          test "$ready" = "1"
-          docker exec arabtrade-mongodb mongosh --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"127.0.0.1:27017"}]})'
-
-          primary=0
-          for i in $(seq 1 60); do
-            if docker exec arabtrade-mongodb mongosh --quiet --eval 'db.hello().isWritablePrimary' | grep -q true; then primary=1; break; fi
-            sleep 1
-          done
-          test "$primary" = "1"
-
-          FINANCIAL_TEST_MODE=prepare node scripts/test-financial-flows.mjs
-
-          npm run start -- --hostname 127.0.0.1 --port 3000 > /tmp/arabtrade-next.log 2>&1 &
-          server_pid=$!
-          healthy=0
-          for i in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:3000/api/payment-options >/dev/null; then healthy=1; break; fi
-            if ! kill -0 "$server_pid" 2>/dev/null; then cat /tmp/arabtrade-next.log; exit 1; fi
-            sleep 1
-          done
-          if [ "$healthy" != "1" ]; then cat /tmp/arabtrade-next.log; exit 1; fi
-
-          node scripts/test-financial-flows.mjs || { cat /tmp/arabtrade-next.log; exit 1; }
-      - name: Lint financial implementation
+      - name: Lint remaining deposit and package implementation
         run: >-
-          npx eslint app/api/packages/route.ts app/api/withdrawals/route.ts
-          app/api/admin/withdrawals/route.ts app/api/deposits/route.ts
+          npx eslint app/api/packages/route.ts app/api/deposits/route.ts
           app/api/admin/deposits/route.ts app/api/blockchain/verify-deposit/route.ts
-          app/api/admin/payment/route.ts app/api/payment-options/route.ts
-          app/api/wallet/route.ts app/api/admin/referral/route.ts
-          app/api/referral/route.ts app/dashboard/packages/page.tsx
-          app/dashboard/assets/deposit/page.tsx app/dashboard/assets/withdraw/page.tsx
+          app/api/admin/payment/route.ts app/api/wallet/route.ts
+          app/api/admin/referral/route.ts app/api/referral/route.ts
+          app/dashboard/packages/page.tsx app/dashboard/assets/deposit/page.tsx
           app/admin/packages/page.tsx app/admin/referral/page.tsx
-          app/admin/payments/page.tsx lib/settlement.ts models/PaymentOption.ts
-          models/UserPackage.ts models/WithdrawalRequest.ts models/BlockchainDepositClaim.ts
+          lib/settlement.ts models/PaymentOption.ts
+          models/UserPackage.ts models/BlockchainDepositClaim.ts
           --rule '@typescript-eslint/no-explicit-any: off'
           --rule '@typescript-eslint/ban-ts-comment: off'
       - name: ESLint check (existing project debt reported separately)

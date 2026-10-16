@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
  const body = await request.json().catch(() => ({}));
  const id = String(body.userPackageId || "");
  const amount = Number(body.amount);
- const asset = String(body.asset || "").trim().toUpperCase();
- const network = String(body.network || "").trim().toUpperCase();
+ const asset = String(body.asset || "").trim().toUpperCase() as "USDT";
+ const network = String(body.network || "").trim().toUpperCase() as "TRC20" | "BEP20";
  const payoutAddress = String(body.payoutAddress || "").trim();
  if (asset !== "USDT") return NextResponse.json({ success: false, message: "العملة غير مدعومة" }, { status: 400 });
  if (!["TRC20", "BEP20"].includes(network)) return NextResponse.json({ success: false, message: "شبكة السحب غير صحيحة" }, { status: 400 });

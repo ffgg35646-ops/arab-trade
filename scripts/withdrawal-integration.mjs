@@ -6,7 +6,7 @@ import mongoose from "mongoose";
 const base = process.env.TEST_BASE_URL || "http://127.0.0.1:3000";
 const mongoUri = process.env.MONGODB_URI;
 assert.ok(mongoUri, "MONGODB_URI must point to an isolated test database");
-const mongoDbName = decodeURIComponent(new URL(mongoUri).pathname.replace(/^\\/+/, ""));
+const mongoDbName = decodeURIComponent(new URL(mongoUri).pathname.slice(1));
 assert.equal(
   mongoDbName,
   "arabtrade_withdrawal_ci",

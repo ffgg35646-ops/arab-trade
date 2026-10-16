@@ -12,12 +12,20 @@ import PackageLedger from "@/models/PackageLedger";
 export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Types.ObjectId) {
   // Only an active package withdrawal can share UserPackage.lockedEarnings.
   // General-wallet withdrawals reserve funds in Wallet and must not block package repair.
-  const liveWithdrawal = await WithdrawalRequest.exists({
+  const liveRequests = await WithdrawalRequest.find({
     userId,
     source: "package",
     status: { $in: ["pending", "processing"] },
-  });
-  if (liveWithdrawal) return;
+  }).select("userPackageId packageAllocations").lean();
+  const livePackageIds = new Set<string>();
+  for (const request of liveRequests as any[]) {
+    livePackageIds.add(String(request.userPackageId || ""));
+    for (const allocation of request.packageAllocations || []) {
+      livePackageIds.add(String(allocation.userPackageId || ""));
+    }
+  }
+  const overlapsLiveRequest = (allocations: Array<{ userPackageId: string }>) =>
+    allocations.some((allocation) => livePackageIds.has(allocation.userPackageId));
 
   const requests = await WithdrawalRequest.find({
     userId,
@@ -36,6 +44,9 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
       amount: Number(row.amount),
     }));
     const allocationTotal = allocations.reduce((sum: number, row: any) => sum + row.amount, 0);
+    // Another request may own this package's locked funds; repair unrelated
+    // historical package accounts without touching its live reservation.
+    if (overlapsLiveRequest(allocations)) continue;
 
     if (
       !Number.isFinite(amount) || amount <= 0 ||
@@ -146,6 +157,9 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
       amount: Number(row.amount),
     }));
     const allocationTotal = allocations.reduce((sum: number, row: any) => sum + row.amount, 0);
+    // Another request may own this package's locked funds; repair unrelated
+    // historical package accounts without touching its live reservation.
+    if (overlapsLiveRequest(allocations)) continue;
 
     if (
       !Number.isFinite(amount) || amount <= 0 ||
@@ -293,6 +307,9 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
       amount: Number(row.amount),
     }));
     const allocationTotal = allocations.reduce((sum: number, row: any) => sum + row.amount, 0);
+    // Another request may own this package's locked funds; repair unrelated
+    // historical package accounts without touching its live reservation.
+    if (overlapsLiveRequest(allocations)) continue;
 
     if (
       !Number.isFinite(amount) || amount <= 0 ||

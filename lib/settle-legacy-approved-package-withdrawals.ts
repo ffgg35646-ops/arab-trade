@@ -551,14 +551,16 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
     }
     const correctedAmount = Number((removeFromAvailable + removeFromLocked).toFixed(8));
     if (correctedAmount > 1e-7) {
-      const requestIds = [...new Set(settledRequestIdsByPackage.get(packageId) || [])];
       await PackageLedger.create({
         userId,
         userPackageId: corrected._id,
         type: "withdrawal",
         asset: "USDT",
         amount: -correctedAmount,
-        note: "تصحيح الرصيد التراكمي بعد مطابقة السحوبات المعتمدة. الطلبات: " + requestIds.join(", "),
+        // Do not append request IDs here: the legacy principal migration detector
+        // uses request IDs on individual payout rows as proof of a post-migration
+        // debit and must not mistake this aggregate balance correction for payout.
+        note: "تصحيح الرصيد التراكمي الزائد بعد مطابقة السحوبات المعتمدة.",
       }).catch((ledgerError) => {
         console.error("PACKAGE CUMULATIVE WITHDRAWAL RECONCILIATION LEDGER:", packageId, ledgerError);
       });

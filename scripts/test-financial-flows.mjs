@@ -319,7 +319,7 @@ spotWallet = await db.collection("wallets").findOne({ userId: user._id, type: "s
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(spotWallet.balances.find((x) => x.asset === "USDT").available, 50, "package activation does not debit the general spot balance");
 closeTo(depositBalance && depositBalance.available, 900, "package activation debits the separate deposit balance");
-closeTo(Number(package100.availableEarnings || 0), 100, "package activation principal is withdrawable within the first-stage cap");
+closeTo(Number(package100.availableEarnings || 0), 0, "package activation principal is not cash available for withdrawal");
 
 // Regression: a package minimum of 200 USDT must reject a 50-USDT request,
 // even when 50 is the entire remaining balance for that package.
@@ -469,7 +469,7 @@ ok(await api("/api/admin/packages/credit", {
   body: { userPackageId: String(package100._id), amount: 600, note: "CI realized proceeds test credit" },
 }), "admin credits realized earnings to package");
 let package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 700, "withdrawable activation principal plus realized earnings stay in package withdrawal bucket");
+closeTo(package100Doc.availableEarnings, 600, "only realized earnings enter the package withdrawal bucket");
 
 const tooLargeFirst = await api("/api/withdrawals", {
   method: "POST",
@@ -477,7 +477,7 @@ const tooLargeFirst = await api("/api/withdrawals", {
 });
 statusIs(tooLargeFirst, 400, "first package withdrawal cannot exceed activation price");
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 700, "rejected over-limit first withdrawal preserves bucket");
+closeTo(package100Doc.availableEarnings, 600, "rejected over-limit first withdrawal preserves bucket");
 
 const navbarBeforeRejectedPackageRequest = await navbarWithdrawalUsdtTotal("navbar total before package withdrawal");
 const firstWithdrawal = await api("/api/withdrawals", {
@@ -488,7 +488,7 @@ ok(firstWithdrawal, "first package withdrawal in activation limit", 201);
 closeTo(await navbarWithdrawalUsdtTotal("navbar total while package withdrawal is pending"), navbarBeforeRejectedPackageRequest, "pending package reservation remains included in total funds");
 const rejectedPackageWithdrawalId = String(firstWithdrawal.data.withdrawal._id);
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 600, "package available earnings decrease by the requested amount while pending");
+closeTo(package100Doc.availableEarnings, 500, "package available earnings decrease by the requested amount while pending");
 closeTo(package100Doc.lockedEarnings, 100, "package withdrawal reserved as locked");
 assert.equal(package100Doc.firstWithdrawalStatus, "pending", "first package withdrawal marked pending");
 
@@ -510,7 +510,7 @@ ok(await api("/api/admin/withdrawals", {
   body: { id: rejectedPackageWithdrawalId, status: "rejected", adminNote: "CI verify package balance restoration" },
 }), "admin rejects package withdrawal");
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 700, "rejected package withdrawal restores available earnings");
+closeTo(package100Doc.availableEarnings, 600, "rejected package withdrawal restores available earnings");
 closeTo(package100Doc.lockedEarnings, 0, "rejected package withdrawal unlocks funds");
 assert.equal(package100Doc.firstWithdrawalStatus, "available", "rejected first package withdrawal can be retried");
 closeTo(await navbarWithdrawalUsdtTotal("navbar total after package rejection"), navbarBeforeRejectedPackageRequest, "rejected package withdrawal restores the exact prior total without double credit");
@@ -522,7 +522,7 @@ const retryFirstWithdrawal = await api("/api/withdrawals", {
 ok(retryFirstWithdrawal, "first package withdrawal can be retried after rejection", 201);
 const packageWithdrawalId = String(retryFirstWithdrawal.data.withdrawal._id);
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 600, "retried package withdrawal decreases available earnings");
+closeTo(package100Doc.availableEarnings, 500, "retried package withdrawal decreases available earnings");
 closeTo(package100Doc.lockedEarnings, 100, "retried package withdrawal locks funds again");
 assert.equal(package100Doc.firstWithdrawalStatus, "pending", "retried first package withdrawal marked pending");
 
@@ -538,7 +538,7 @@ ok(await api("/api/admin/withdrawals", {
 }), "admin approves and settles package withdrawal in one decision");
 closeTo(await navbarWithdrawalUsdtTotal("navbar total after package approval"), navbarBeforePackageApproval - 100, "approved package withdrawal is removed from navbar total exactly once");
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 600, "remaining package principal and earnings after approval");
+closeTo(package100Doc.availableEarnings, 500, "remaining realized earnings after approval");
 closeTo(package100Doc.lockedEarnings, 0, "approved package withdrawal immediately clears the locked amount");
 closeTo(package100Doc.totalWithdrawn, 100, "approved package withdrawal is counted once as withdrawn");
 assert.equal(package100Doc.firstWithdrawalStatus, "completed", "approved first package withdrawal closes the first stage");
@@ -554,7 +554,7 @@ ok(await api("/api/admin/withdrawals", {
 closeTo(await navbarWithdrawalUsdtTotal("navbar total after package completion"), navbarAtPackageApproval, "completion does not deduct the package payout a second time");
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
 closeTo(package100Doc.totalWithdrawn, 100, "completion does not count the same approved payout twice");
-closeTo(package100Doc.availableEarnings + package100Doc.lockedEarnings, 600, "completion leaves the package balance unchanged after approval");
+closeTo(package100Doc.availableEarnings + package100Doc.lockedEarnings, 500, "completion leaves the package cash balance unchanged after approval");
 
 // Regression: same-name activation records own independent balances. A payout
 // must reserve and later reverse the selected account only.
@@ -701,7 +701,7 @@ const secondStageWithdrawal = await api("/api/withdrawals", {
 ok(secondStageWithdrawal, "user can withdraw 50 USDT against a 100-USDT active referral deposit", 201);
 const secondStageWithdrawalId = String(secondStageWithdrawal.data.withdrawal._id);
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 550, "second-stage withdrawal reduces the package's available bucket");
+closeTo(package100Doc.availableEarnings, 450, "second-stage withdrawal reduces the package's available cash bucket");
 closeTo(package100Doc.lockedEarnings, 50, "second-stage withdrawal locks its requested amount");
 
 ok(await api("/api/admin/withdrawals", {
@@ -1622,7 +1622,7 @@ closeTo(oldPackage.cancellationRefund, 50, "changing package refunds half old ac
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
 closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 40, "package change does not mix deposit or package refund into the general wallet");
 const oldPackageAfterChange = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(oldPackageAfterChange.availableEarnings, 600, "package change adds the 50-USDT refund to the old package's remaining 550-USDT balance");
+closeTo(oldPackageAfterChange.availableEarnings, 500, "package change adds the 50-USDT refund to the old package's remaining 450-USDT cash balance");
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(depositBalance && depositBalance.available, 700, "package change debits the new plan from deposit balance");
 

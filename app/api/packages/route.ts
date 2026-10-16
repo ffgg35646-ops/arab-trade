@@ -10,333 +10,25 @@ import PackageLedger from "@/models/PackageLedger";
 import { ensureDefaultInvestmentPackages } from "@/lib/ensure-default-investment-packages";
 import Wallet from "@/models/Wallet";
 import LedgerEntry from "@/models/LedgerEntry";
-import User from "@/models/User";
-import DepositRequest from "@/models/DepositRequest";
-import WithdrawalRequest from "@/models/WithdrawalRequest";
-import PlatformSettings from "@/models/PlatformSettings";
 import { normalizeMissedPackageCollectionWindows } from "@/lib/package-collection-window";
 import { USDT_ASSET } from "@/lib/unified-usdt-wallet";
 import { debitDepositBalance, normalizeDepositBalanceRows, separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
-import { ensurePackagePrincipalWithdrawalCredit } from "@/lib/ensure-package-principal-withdrawal";
-import { settleLegacyApprovedPackageWithdrawals } from "@/lib/settle-legacy-approved-package-withdrawals";
 
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8) / 1e8;
-const normalizePackageGroup = (value: unknown) =>
-  String(value ?? "").normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
-
-/**
- * Reclassify historical package refunds that an older release credited to the
- * general spot wallet. Move only refunds with the exact legacy reference and
- * only when the source wallet still has the funds available; never mint a
- * second credit when the source money has already been spent.
- */
-async function reconcileLegacyPackageRefunds(userId: mongoose.Types.ObjectId) {
-  const legacyAccounts = await UserPackage.find({
-    userId,
-    status: "cancelled",
-    cancellationRefund: { $gt: 0 },
-  }).select("_id packageName asset cancellationRefund").sort({ cancelledAt: 1, _id: 1 }).lean();
-
-  for (const account of legacyAccounts as any[]) {
-    const refund = roundAmount(Number(account.cancellationRefund || 0));
-    if (!Number.isFinite(refund) || refund <= 1e-8) continue;
-
-    const packageId = String(account._id);
-    const asset = String(account.asset || USDT_ASSET).trim().toUpperCase();
-    const legacyReferences = ["package-cancel:" + packageId, "package-change-refund:" + packageId];
-    const legacyCredit = await LedgerEntry.findOne({
-      userId,
-      scope: "user",
-      asset,
-      mode: "live",
-      type: "adjustment",
-      amount: { $gt: 0 },
-      referenceId: { $in: legacyReferences },
-    }).sort({ createdAt: 1, _id: 1 }).lean();
-
-    // The legacy general-wallet credit is the evidence that this is an old
-    // misrouted refund. Ignore unrelated or differently valued ledger entries.
-    if (!legacyCredit || Math.abs(Number(legacyCredit.amount || 0) - refund) > 1e-7) continue;
-
-    const migrationNote = "ترحيل استرداد قديم من رصيد السحب العام إلى رصيد سحب الباقة نفسها. المرجع: " + String(legacyCredit.referenceId || "");
-    const session = await mongoose.startSession();
-    try {
-      await session.withTransaction(async () => {
-        const currentPackage = await UserPackage.findOne({
-          _id: account._id,
-          userId,
-          status: "cancelled",
-          cancellationRefund: refund,
-        }).session(session).lean();
-        if (!currentPackage) return;
-
-        const existingReclassification = await PackageLedger.exists({
-          userId,
-          userPackageId: account._id,
-          type: "refund_reclassification",
-          note: migrationNote,
-        }).session(session);
-        if (existingReclassification) {
-          await UserPackage.updateOne(
-            { _id: account._id, userId },
-            { $set: { cancellationRefundPackageCredited: true } },
-            { session },
-          );
-          return;
-        }
-
-        const legacyPackageRefundLedger = await PackageLedger.findOne({
-          userId,
-          userPackageId: account._id,
-          type: "cancellation_refund",
-          amount: { $gte: refund - 1e-7, $lte: refund + 1e-7 },
-          note: { $regex: "رصيد السحب العام|المحفظة العامة" },
-        }).session(session).lean();
-
-        const wallet = await Wallet.findOne({
-          userId,
-          type: "spot",
-          mode: "live",
-        }).session(session);
-        if (!wallet) return;
-
-        const balance = wallet.balances.find((item: any) => String(item.asset || "").toUpperCase() === asset) as any;
-        if (!balance) return;
-        const balanceBefore = Math.max(0, Number(balance.available || 0));
-        if (balanceBefore + 1e-8 < refund) return;
-
-        const balanceAfter = roundAmount(balanceBefore - refund);
-        balance.available = balanceAfter;
-        await wallet.save({ session });
-
-        const creditedPackage = await UserPackage.findOneAndUpdate(
-          {
-            _id: account._id,
-            userId,
-            status: "cancelled",
-            cancellationRefund: refund,
-          },
-          {
-            $inc: { availableEarnings: refund },
-            $set: { cancellationRefundPackageCredited: true },
-          },
-          { new: true, session },
-        );
-        if (!creditedPackage) throw new Error("LEGACY_PACKAGE_REFUND_CHANGED");
-
-        const reclassificationEntries: any[] = [];
-        if (legacyPackageRefundLedger) {
-          // The old code wrote a positive package-ledger row even though the
-          // money was sent to the general wallet. Reverse that misleading row.
-          reclassificationEntries.push({
-            userId,
-            userPackageId: account._id,
-            type: "cancellation_refund",
-            asset,
-            amount: -refund,
-            note: "عكس قيد استرداد قديم كان مسجلًا في سجل الباقة رغم إضافته إلى رصيد السحب العام. المرجع: " + String(legacyCredit.referenceId || ""),
-          });
-        }
-        reclassificationEntries.push({
-          userId,
-          userPackageId: account._id,
-          type: "refund_reclassification",
-          asset,
-          amount: refund,
-          note: migrationNote,
-        });
-        await PackageLedger.create(reclassificationEntries, { session, ordered: true });
-
-        await LedgerEntry.create([{
-          userId,
-          scope: "user",
-          asset,
-          mode: "live",
-          type: "adjustment",
-          amount: -refund,
-          balanceBefore,
-          balanceAfter,
-          referenceId: "package-refund-reclassification:" + packageId,
-          note: "نقل الاسترداد القديم من رصيد السحب العام إلى رصيد سحب الباقة " + account.packageName + ".",
-        }], { session });
-      });
-    } catch (error) {
-      console.error("LEGACY PACKAGE REFUND RECLASSIFICATION:", String(account._id), error);
-    } finally {
-      await session.endSession();
-    }
-  }
-}
-
-/**
- * Repair package balances stranded by older withdrawal settlement paths.
- * The request record is the source of truth: while any withdrawal is active,
- * or the user-wide withdrawal guard is held, do not reconcile anything.
- * Only accounts with no per-account pending flag are eligible, and the
- * compare-and-update prevents racing a newly created lock.
- */
-async function reconcileOrphanedPackageWithdrawalLocks(userId: mongoose.Types.ObjectId) {
-  const currentUser = await User.findById(userId).select("hasPendingWithdrawal updatedAt").lean();
-  if (!currentUser) return;
-
-  const activeWithdrawal = await WithdrawalRequest.exists({
-    userId,
-    $or: [
-      { source: "package", status: { $in: ["pending", "processing"] } },
-      { source: { $ne: "package" }, status: { $in: ["pending", "approved", "processing"] } },
-    ],
-  });
-  if (activeWithdrawal) return;
-
-  // If an approved legacy request could not be reconciled against its locked
-  // allocation, preserve the lock for inspection instead of refunding it.
-  const unsettledApprovedPackage = await WithdrawalRequest.exists({
-    userId,
-    source: "package",
-    status: "approved",
-    packageBalanceSettled: { $ne: true },
-  });
-  if (unsettledApprovedPackage) return;
-
-  // Never move a remaining lock back to availableEarnings if an approved request
-  // has not yet been reconciled. That old fallback made an approved withdrawal
-  // appear to have no effect on the cumulative balance.
-  const settledApprovals = await WithdrawalRequest.find({
-    userId,
-    source: "package",
-    status: "approved",
-    packageBalanceSettled: true,
-  }).select("_id userPackageId packageAllocations amount").lean();
-  for (const request of settledApprovals as any[]) {
-    const requestId = String(request._id);
-    const amount = Number(request.amount || 0);
-    const allocations = Array.isArray(request.packageAllocations) && request.packageAllocations.length
-      ? request.packageAllocations
-      : [{ userPackageId: request.userPackageId, amount }];
-    for (const allocation of allocations as any[]) {
-      const packageId = String(allocation.userPackageId || "");
-      if (!mongoose.Types.ObjectId.isValid(packageId)) continue;
-      const repaired = await PackageLedger.exists({
-        userId,
-        userPackageId: new mongoose.Types.ObjectId(packageId),
-        type: "withdrawal",
-        note: {
-          $regex: "تصحيح خصم سحب معتمد قديم؛ رقم الطلب: " + requestId + "؛ حساب الباقة: " + packageId,
-        },
-      });
-      if (repaired) continue;
-
-      const account = await UserPackage.findOne({ _id: packageId, userId })
-        .select("lockedEarnings")
-        .lean();
-      if (Number(account?.lockedEarnings || 0) > 1e-8) return;
-    }
-  }
-
-  // The submit endpoint briefly owns these guards while it moves a balance
-  // and creates the withdrawal document. Avoid racing that short critical
-  // section, but recover guards older than the grace window when no live
-  // request exists in the database.
-  const guardGracePeriodMs = 2 * 60 * 1000;
-  const guardCutoff = new Date(Date.now() - guardGracePeriodMs);
-  const userGuardIsFresh = currentUser.hasPendingWithdrawal === true &&
-    currentUser.updatedAt instanceof Date &&
-    currentUser.updatedAt.getTime() >= guardCutoff.getTime();
-  const packageGuardIsFresh = await UserPackage.exists({
-    userId,
-    withdrawalRequestPending: true,
-    updatedAt: { $gte: guardCutoff },
-  });
-  if (userGuardIsFresh || packageGuardIsFresh) return;
-
-  // Request status is authoritative. With no active request and no fresh
-  // submission lock, clear old booleans before attempting to release balances.
-  await User.updateOne(
-    { _id: userId, hasPendingWithdrawal: true },
-    { $set: { hasPendingWithdrawal: false } },
-  );
-  await UserPackage.updateMany(
-    { userId, withdrawalRequestPending: true },
-    { $set: { withdrawalRequestPending: false } },
-  );
-  await UserPackage.updateMany(
-    { userId, firstWithdrawalStatus: "pending" },
-    { $set: { firstWithdrawalStatus: "available" } },
-  );
-
-  const accounts = await UserPackage.find({
-    userId,
-    asset: USDT_ASSET,
-    lockedEarnings: { $gt: 1e-8 },
-    withdrawalRequestPending: { $ne: true },
-  }).select("_id asset packageName lockedEarnings").lean();
-
-  for (const account of accounts as any[]) {
-    const strandedAmount = Number(account.lockedEarnings || 0);
-    if (!Number.isFinite(strandedAmount) || strandedAmount <= 1e-8) continue;
-
-    const repaired = await UserPackage.findOneAndUpdate(
-      {
-        _id: account._id,
-        userId,
-        lockedEarnings: strandedAmount,
-        withdrawalRequestPending: { $ne: true },
-      },
-      {
-        $inc: { availableEarnings: strandedAmount },
-        $set: { lockedEarnings: 0 },
-      },
-      { new: true },
-    );
-
-    // Record the correction separately from ordinary earnings/withdrawals.
-    if (repaired) {
-      await PackageLedger.create({
-        userId,
-        userPackageId: repaired._id,
-        type: "withdrawal_reversal",
-        asset: USDT_ASSET,
-        amount: strandedAmount,
-        note: "تصحيح حجز سحب قديم: لا يوجد طلب سحب قائم؛ أُعيد " + strandedAmount + " USDT إلى الرصيد المتاح.",
-      }).catch((ledgerError) => {
-        console.error("PACKAGE WITHDRAWAL LOCK RECONCILIATION LEDGER:", ledgerError);
-      });
-    }
-  }
-}
-
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser(request);
     if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
 
     await connectDB();
-    await settleLegacyApprovedPackageWithdrawals(user._id);
-    await reconcileOrphanedPackageWithdrawalLocks(user._id);
     await separateLegacyDepositsFromSpotWallet(user._id);
-    await reconcileLegacyPackageRefunds(user._id);
-    // Refund reclassification can change the real package cash balance, so
-    // run settlement again before returning balance data to the client.
-    await settleLegacyApprovedPackageWithdrawals(user._id);
-    await Promise.all([
-      UserPackage.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
-      PackageLedger.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
-      WithdrawalRequest.updateMany({ userId: user._id, source: "package", asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
-    ]);
     await ensureDefaultInvestmentPackages();
     await normalizeMissedPackageCollectionWindows({ userId: user._id });
-    const [packages, allPlansForProfit, rawDepositBalances, settings, referredUsers] = await Promise.all([
+
+    const [packages, allPlansForProfit, rawDepositBalances, rawUserPackages, packageLedger] = await Promise.all([
       InvestmentPackage.find({ enabled: true }).sort({ sortOrder: 1, price: 1 }).lean(),
       InvestmentPackage.find({}).select("_id dailyProfit").lean(),
       DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
-      PlatformSettings.findOne({ key: "global" }).lean(),
-      User.find({ referredBy: user._id }).select("_id").lean(),
-    ]);
-    await ensurePackagePrincipalWithdrawalCredit(
-      user._id,
-      Number(settings?.withdrawals?.firstPackageWithdrawalPercent ?? 100)
-    );
-    const [rawUserPackages, packageLedger] = await Promise.all([
       UserPackage.find({ userId: user._id }).sort({ createdAt: -1 }).lean(),
       PackageLedger.find({ userId: user._id })
         .populate("userPackageId", "packageName")
@@ -344,144 +36,8 @@ export async function GET(request: NextRequest) {
         .limit(200)
         .lean(),
     ]);
+
     const depositBalances = normalizeDepositBalanceRows(rawDepositBalances as any[]);
-    const referredIds = referredUsers.map((item: any) => item._id);
-    const packageMinimumRows = await InvestmentPackage.find({})
-      .select("_id minimumWithdrawal")
-      .lean();
-    const configuredMinimums = settings?.withdrawals?.withdrawalMinByPackage as unknown as Record<string, number> | undefined;
-    const minimumWithdrawalByPlan = new Map(
-      (packageMinimumRows as any[]).map((plan) => [
-        String(plan._id),
-        Number(configuredMinimums?.[String(plan._id)] ?? plan.minimumWithdrawal ?? 100),
-      ])
-    );
-
-    const countedWithdrawalStatuses = ["pending", "approved", "processing", "completed"] as const;
-    const unresolvedWithdrawalStatuses = ["pending"] as const;
-    const [activeReferralDeposits, referralWithdrawalRows, firstWithdrawalRows, unresolvedPackageWithdrawalRows, successfulPackageWithdrawalRows] = await Promise.all([
-      referredIds.length
-        ? DepositRequest.aggregate([
-            { $match: { userId: { $in: referredIds }, status: "approved", asset: "USDT" } },
-            { $group: { _id: "$userId", total: { $sum: "$amount" } } },
-          ])
-        : Promise.resolve([]),
-      WithdrawalRequest.find({
-        userId: user._id,
-        source: "package",
-        isFirstPackageWithdrawal: { $ne: true },
-        status: { $in: countedWithdrawalStatuses },
-      }).select("userPackageId amount").lean(),
-      WithdrawalRequest.find({
-        userId: user._id,
-        source: "package",
-        isFirstPackageWithdrawal: true,
-        status: { $in: countedWithdrawalStatuses },
-      }).select("userPackageId amount status").lean(),
-      WithdrawalRequest.find({
-        userId: user._id,
-        source: "package",
-        status: { $in: unresolvedWithdrawalStatuses },
-      }).select("userPackageId status amount createdAt").sort({ createdAt: -1 }).lean(),
-      WithdrawalRequest.find({
-        userId: user._id,
-        source: "package",
-        status: { $in: ["approved", "processing"] },
-      }).select("userPackageId status createdAt").sort({ createdAt: -1 }).lean(),
-    ]);
-
-    const activeReferralCount = activeReferralDeposits.length;
-    const activeReferralDepositTotal = activeReferralDeposits.reduce(
-      (sum: number, row: any) => sum + Number(row.total || 0), 0
-    );
-    const firstPackageWithdrawalPercent = Math.max(0, Math.min(100, Number(settings?.withdrawals?.firstPackageWithdrawalPercent ?? 100)));
-    const referralPackageWithdrawalPercent = Math.max(0, Math.min(100, Number(settings?.withdrawals?.referralPackageWithdrawalPercent ?? 50)));
-    // Referral-deposit capacity is user-wide, so the same referral deposits
-    // cannot unlock repeated withdrawal limits across multiple package accounts.
-    const referralAlreadyWithdrawnTotal = (referralWithdrawalRows as any[]).reduce(
-      (sum: number, row: any) => sum + Number(row.amount || 0),
-      0
-    );
-    const packageGroupByAccountId = new Map<string, string>();
-    for (const account of rawUserPackages as any[]) {
-      const id = String(account._id);
-      const normalizedName = normalizePackageGroup(account.packageName);
-      packageGroupByAccountId.set(id, normalizedName || "account:" + id);
-    }
-    const firstWithdrawalByPackageName = new Map<string, number>();
-    const firstWithdrawalPendingPackageNames = new Set<string>();
-    const completedFirstWithdrawalPackageNames = new Set<string>();
-    const unresolvedWithdrawalByPackage = new Map<string, any>();
-    const unresolvedWithdrawalByPackageName = new Map<string, any>();
-    const successfulWithdrawalPackageNames = new Set<string>();
-    const inFlightWithdrawalPackageNames = new Set<string>();
-    const inFlightWithdrawalStatusByPackageName = new Map<string, string>();
-    for (const row of successfulPackageWithdrawalRows as any[]) {
-      const key = String(row.userPackageId || "");
-      const groupKey = packageGroupByAccountId.get(key) || key;
-      if (groupKey) {
-        successfulWithdrawalPackageNames.add(groupKey);
-        if (String(row.status) === "processing") {
-          inFlightWithdrawalPackageNames.add(groupKey);
-          // Query results are newest-first; keep the latest unresolved transfer status.
-          if (!inFlightWithdrawalStatusByPackageName.has(groupKey)) {
-            inFlightWithdrawalStatusByPackageName.set(groupKey, String(row.status));
-          }
-        }
-      }
-    }
-    for (const row of unresolvedPackageWithdrawalRows as any[]) {
-      const key = String(row.userPackageId || "");
-      const groupKey = packageGroupByAccountId.get(key) || key;
-      if (key && !unresolvedWithdrawalByPackage.has(key)) unresolvedWithdrawalByPackage.set(key, row);
-      if (groupKey && !unresolvedWithdrawalByPackageName.has(groupKey)) unresolvedWithdrawalByPackageName.set(groupKey, row);
-    }
-    for (const row of firstWithdrawalRows as any[]) {
-      const key = String(row.userPackageId || "");
-      const groupKey = packageGroupByAccountId.get(key) || key;
-      if (!groupKey) continue;
-      firstWithdrawalByPackageName.set(groupKey, (firstWithdrawalByPackageName.get(groupKey) || 0) + Number(row.amount || 0));
-      if (String(row.status) === "pending") {
-        firstWithdrawalPendingPackageNames.add(groupKey);
-      }
-      if (String(row.status) === "completed") {
-        completedFirstWithdrawalPackageNames.add(groupKey);
-      }
-    }
-
-    // Balance buckets belong to one UserPackage activation record. Only the
-    // first-withdrawal policy cap is grouped by package family; money itself is not.
-    const packageInvestedByName = new Map<string, number>();
-    const packageFamilyAvailableBalance = new Map<string, number>();
-    for (const account of rawUserPackages as any[]) {
-      const key = String(account._id);
-      const groupKey = packageGroupByAccountId.get(key) || "account:" + key;
-      packageInvestedByName.set(
-        groupKey,
-        roundAmount((packageInvestedByName.get(groupKey) || 0) + Math.max(0, Number(account.investedAmount || 0))),
-      );
-      packageFamilyAvailableBalance.set(
-        groupKey,
-        roundAmount(
-          (packageFamilyAvailableBalance.get(groupKey) || 0) +
-            Math.max(0, Number(account.availableEarnings || 0)) -
-            Math.max(0, Number(account.withdrawalBalanceDebt || 0)),
-        ),
-      );
-    }
-    const packageFamilyAvailableRemaining = new Map(
-      [...packageFamilyAvailableBalance.entries()].map(([key, value]) => [key, Math.max(0, value)] as const)
-    );
-    // Deficits from historical overpayments in one package family also reduce
-    // the user's global cash available for withdrawal across all package cards.
-    let globalPackageAvailableRemaining = Math.max(0, rawUserPackages.reduce(
-      (sum: number, account: any) =>
-        sum +
-        Math.max(0, Number(account.availableEarnings || 0)) -
-        Math.max(0, Number(account.withdrawalBalanceDebt || 0)),
-      0,
-    ));
-
     const dailyProfitByPackage = new Map(
       (allPlansForProfit as any[]).map((plan) => [String(plan._id), Math.max(0, Number(plan.dailyProfit || 0))])
     );
@@ -490,86 +46,12 @@ export async function GET(request: NextRequest) {
       const anchor = item.lastProfitAt ? new Date(item.lastProfitAt).getTime() : new Date(item.activatedAt || collectionNow).getTime();
       const nextCollectAt = anchor + 24 * 60 * 60 * 1000;
       const collectWindowEndsAt = nextCollectAt + 30 * 60 * 1000;
-      const dailyProfit = dailyProfitByPackage.get(String(item.packageId)) || 0;
-      const collectWindowOpen = item.status === "active" && collectionNow >= nextCollectAt && collectionNow <= collectWindowEndsAt;
-      const packageKey = String(item._id);
-      const packageGroupKey = packageGroupByAccountId.get(packageKey) || "account:" + packageKey;
-      const accountNetAvailable = Math.max(
-        0,
-        Number(item.availableEarnings || 0) - Number(item.withdrawalBalanceDebt || 0),
-      );
-      const familyAvailableRemaining = Math.max(0, packageFamilyAvailableRemaining.get(packageGroupKey) || 0);
-      const accountFamilyAvailable = Math.min(accountNetAvailable, familyAvailableRemaining);
-      packageFamilyAvailableRemaining.set(
-        packageGroupKey,
-        roundAmount(Math.max(0, familyAvailableRemaining - accountFamilyAvailable)),
-      );
-      const accountGlobalAvailable = Math.min(accountNetAvailable, globalPackageAvailableRemaining);
-      globalPackageAvailableRemaining = roundAmount(
-        Math.max(0, globalPackageAvailableRemaining - accountGlobalAvailable),
-      );
-      const referralCap = activeReferralDepositTotal * referralPackageWithdrawalPercent / 100;
-      const referralAlreadyWithdrawn = referralAlreadyWithdrawnTotal;
-      const referralRemaining = Math.max(0, referralCap - referralAlreadyWithdrawn);
-      const packageGroupInvestedAmount = packageInvestedByName.get(packageGroupKey) || Math.max(0, Number(item.investedAmount || 0));
-      const firstPackageWithdrawalCap = Math.max(0, packageGroupInvestedAmount * firstPackageWithdrawalPercent / 100);
-      const firstPackageWithdrawalUsed = firstWithdrawalByPackageName.get(packageGroupKey) || 0;
-      const firstPackageWithdrawalRemaining = Math.max(0, firstPackageWithdrawalCap - firstPackageWithdrawalUsed);
-      const firstPackageWithdrawalPending = firstWithdrawalPendingPackageNames.has(packageGroupKey);
-      const unresolvedPackageWithdrawal =
-        unresolvedWithdrawalByPackage.get(packageKey) ||
-        unresolvedWithdrawalByPackageName.get(packageGroupKey) ||
-        null;
-      // WithdrawalRequest status is authoritative. The package flag can be stale
-      // after earlier admin decisions, so never show a pending-review notice from it.
-      const packageWithdrawalPending = Boolean(unresolvedPackageWithdrawal) ||
-        inFlightWithdrawalPackageNames.has(packageGroupKey);
-      const packageWithdrawalStatus = unresolvedPackageWithdrawal
-        ? "pending"
-        : inFlightWithdrawalStatusByPackageName.get(packageGroupKey) || null;
-      const packageWithdrawalAlreadyUsed =
-        successfulWithdrawalPackageNames.has(packageGroupKey) ||
-        completedFirstWithdrawalPackageNames.has(packageGroupKey);
-      // The package principal cap applies to the first completed payout only.
-      // Every later payout uses the configured active-referral withdrawal cap.
-      const packageWithdrawalCap = firstPackageWithdrawalCap;
-      const packageWithdrawalUsed = firstWithdrawalByPackageName.get(packageGroupKey) || 0;
-      const packageWithdrawalRemaining = firstPackageWithdrawalRemaining;
-      // The first approved withdrawal changes the phase: any later request is
-      // limited by active-referral capacity, but can never exceed this account's money.
-      const phaseWithdrawalLimit = packageWithdrawalPending || firstPackageWithdrawalPending
-        ? 0
-        : Math.min(Math.max(0, Number(item.availableEarnings || 0)), packageWithdrawalAlreadyUsed || firstPackageWithdrawalRemaining <= 1e-8
-          ? referralRemaining
-          : firstPackageWithdrawalRemaining);
-      const withdrawalLimit = Math.min(phaseWithdrawalLimit, accountFamilyAvailable, accountGlobalAvailable);
       return {
         ...item,
-        firstPackageWithdrawalCap,
-        firstPackageWithdrawalUsed,
-        firstPackageWithdrawalRemaining,
-        firstPackageWithdrawalPending,
-        packageWithdrawalPending,
-        packageWithdrawalStatus,
-        packageWithdrawalAlreadyUsed,
-        unresolvedWithdrawalAmount: unresolvedPackageWithdrawal ? Number(unresolvedPackageWithdrawal.amount || 0) : null,
-        unresolvedWithdrawalStatus: unresolvedPackageWithdrawal ? String(unresolvedPackageWithdrawal.status) : null,
-        packageWithdrawalCap,
-        packageWithdrawalUsed,
-        packageWithdrawalRemaining,
-        dailyProfit,
+        dailyProfit: dailyProfitByPackage.get(String(item.packageId)) || 0,
         nextCollectAt: new Date(nextCollectAt).toISOString(),
         collectWindowEndsAt: new Date(collectWindowEndsAt).toISOString(),
-        collectWindowOpen,
-        minimumWithdrawal: minimumWithdrawalByPlan.get(String(item.packageId)) ?? 100,
-        activeReferralCount,
-        activeReferralDepositTotal,
-        firstPackageWithdrawalPercent,
-        referralPackageWithdrawalPercent,
-        referralWithdrawalCap: referralCap,
-        referralAlreadyWithdrawn,
-        referralRemaining,
-        withdrawalLimit,
+        collectWindowOpen: item.status === "active" && collectionNow >= nextCollectAt && collectionNow <= collectWindowEndsAt,
       };
     });
 
@@ -577,7 +59,6 @@ export async function GET(request: NextRequest) {
       success: true,
       packages: packages.map((plan: any) => ({
         ...plan,
-        minimumWithdrawal: Number(configuredMinimums?.[String(plan._id)] ?? plan.minimumWithdrawal ?? 100),
         asset: USDT_ASSET,
         durationDays: 0,
         dailyProfit: Number(plan.dailyProfit || 0),
@@ -597,8 +78,8 @@ export async function GET(request: NextRequest) {
         collectionWindowMinutes: 30,
         earningsNotice: "يصبح الربح اليومي متاحًا للجمع بعد اكتمال 24 ساعة، وتستمر فرصة الجمع 30 دقيقة فقط. إذا انتهت المهلة دون جمع، يسقط ربح الدورة وتبدأ دورة جديدة؛ والباقة نفسها مستمرة دون مدة انتهاء.",
         singleActivePackageNotice: "يسمح لكل مستخدم بباقة نشطة واحدة فقط.",
-        activationSourceNotice: "تفعيل الباقات يتم من رصيد الإيداع المنفصل بعملة USDT، ولا يُضاف إلى رصيد السحب العام.",
-        cancellationNotice: "عند التغيير إلى باقة أخرى، يضاف 50% من قيمة تفعيل الباقة السابقة إلى رصيد السحب الخاص بالباقة السابقة نفسها. تظل الأرباح المجمعة في سجل هذه الباقة، ويُخصم سعر الباقة الجديدة من رصيد الإيداع.",
+        activationSourceNotice: "تفعيل الباقات يتم من رصيد الإيداع المنفصل بعملة USDT.",
+        cancellationNotice: "عند التغيير إلى باقة أخرى، يضاف 50% من قيمة تفعيل الباقة السابقة إلى رصيد الأرباح الخاص بالباقة السابقة نفسها، ويُخصم سعر الباقة الجديدة من رصيد الإيداع.",
       },
     });
   } catch (error) {
@@ -614,16 +95,9 @@ export async function POST(request: NextRequest) {
 
     await connectDB();
     await separateLegacyDepositsFromSpotWallet(user._id);
-    await reconcileLegacyPackageRefunds(user._id);
-    const withdrawalSettings = await PlatformSettings.findOne({ key: "global" }).select("withdrawals.firstPackageWithdrawalPercent").lean();
-    await ensurePackagePrincipalWithdrawalCredit(
-      user._id,
-      Number((withdrawalSettings as any)?.withdrawals?.firstPackageWithdrawalPercent ?? 100)
-    );
     await Promise.all([
       UserPackage.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
       PackageLedger.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
-      WithdrawalRequest.updateMany({ userId: user._id, source: "package", asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
     ]);
     const body = await request.json();
     const action = String(body.action || "");

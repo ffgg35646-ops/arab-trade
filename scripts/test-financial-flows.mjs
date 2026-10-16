@@ -1657,12 +1657,12 @@ closeTo(cancelledPackage.cancellationRefund, 100, "cancel package refunds half i
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
 closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 40, "package cancellation refund remains isolated from the general wallet");
 const cancelledPackageWithRefund = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package200._id)) });
-closeTo(cancelledPackageWithRefund.availableEarnings, 300, "package card shows the 200-USDT package balance plus its 100-USDT cancellation refund");
+closeTo(cancelledPackageWithRefund.availableEarnings, 100, "package card shows only the 100-USDT cancellation refund as cash");
 const cancelledPackagePage = await api("/api/packages");
 ok(cancelledPackagePage, "cancelled package card reports balance and withdrawal cap separately");
 const cancelledPackageView = cancelledPackagePage.data.userPackages.find((x) => String(x._id) === String(package200._id));
 assert.ok(cancelledPackageView, "cancelled package is still visible");
-closeTo(cancelledPackageView.withdrawalLimit, 200, "cancellation refund does not lift the first-stage cap above the 200-USDT activation amount");
+closeTo(cancelledPackageView.withdrawalLimit, 100, "withdrawal limit is capped by 100 USDT of real cancellation-refund cash");
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(depositBalance && depositBalance.available, 700, "cancellation does not change external deposit balance");
 

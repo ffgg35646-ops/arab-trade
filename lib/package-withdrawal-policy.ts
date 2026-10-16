@@ -1,8 +1,11 @@
 export const roundWithdrawal = (n: number) => Math.round((n + Number.EPSILON) * 1e8) / 1e8;
 
-/** The normal daily allowance is capped by the package's first activation amount. */
-export function withdrawalAllowance(activation: number, usedToday: number) {
-  return roundWithdrawal(Math.max(0, Number(activation || 0) - Math.max(0, Number(usedToday || 0))));
+/**
+ * The one-time base withdrawal allowance equals the package's first activation amount.
+ * Pending and approved package withdrawals consume it cumulatively; rejected requests do not.
+ */
+export function withdrawalAllowance(activation: number, alreadyWithdrawn: number) {
+  return roundWithdrawal(Math.max(0, Number(activation || 0) - Math.max(0, Number(alreadyWithdrawn || 0))));
 }
 
 /**
@@ -16,8 +19,8 @@ export function referralWithdrawalAllowance(referralDeposits: number, percent: n
   return roundWithdrawal(Math.max(0, earnedCapacity - Math.max(0, Number(alreadyUsed || 0))));
 }
 
-export function totalWithdrawalAllowance(dailyRemaining: number, referralRemaining: number) {
-  return roundWithdrawal(Math.max(0, Number(dailyRemaining || 0)) + Math.max(0, Number(referralRemaining || 0)));
+export function totalWithdrawalAllowance(baseRemaining: number, referralRemaining: number) {
+  return roundWithdrawal(Math.max(0, Number(baseRemaining || 0)) + Math.max(0, Number(referralRemaining || 0)));
 }
 
 export function availableToWithdraw(balance: number, allowance: number) {
@@ -37,8 +40,8 @@ export function validateWithdrawal(
   const available = availableToWithdraw(balance, allowance);
   if (amount > available) {
     if (available > 0) return "المتاح للسحب " + available + " USDT فقط";
-    if (referralRequired) return "لا يمكن طلب سحب إضافي إلا بعد وجود إحالات نشطة بإيداعات معتمدة";
-    return "تم استنفاد حد السحب اليومي لهذه الباقة";
+    if (referralRequired) return "تم استنفاد حد السحب؛ يلزم وجود إحالات نشطة بإيداعات معتمدة إضافية لفتح سعة جديدة";
+    return "تم استنفاد حد السحب الأساسي لهذه الباقة";
   }
   return null;
 }

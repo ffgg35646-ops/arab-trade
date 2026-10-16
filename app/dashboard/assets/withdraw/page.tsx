@@ -54,6 +54,7 @@ type PackageAccount = {
   investedAmount: number;
   totalRealizedEarnings: number;
   totalWithdrawn: number;
+  withdrawalBalanceDebt?: number;
   firstPackageWithdrawalRemaining?: number;
   packageWithdrawalStatus?: "pending" | "approved" | "processing" | null;
   packageWithdrawalAlreadyUsed?: boolean;
@@ -271,7 +272,12 @@ export default function WithdrawPage() {
     [generalBalances],
   );
   const totalPackageAvailable = useMemo(
-    () => packageAccounts.reduce((sum, row) => sum + Math.max(0, Number(row.availableEarnings || 0)), 0),
+    () => Math.max(0, packageAccounts.reduce(
+      (sum, row) => sum +
+        Math.max(0, Number(row.availableEarnings || 0)) -
+        Math.max(0, Number(row.withdrawalBalanceDebt || 0)),
+      0,
+    )),
     [packageAccounts],
   );
   const totalAllAvailable = useMemo(
@@ -744,7 +750,12 @@ export default function WithdrawPage() {
                   ) : (
                     <div className="grid gap-4 xl:grid-cols-2">
                       {packageCards.map(({ key, plan, accounts, legacy }) => {
-                        const available = accounts.reduce((sum, account) => sum + Math.max(0, Number(account.availableEarnings || 0)), 0);
+                        const available = Math.max(0, accounts.reduce(
+                          (sum, account) => sum +
+                            Math.max(0, Number(account.availableEarnings || 0)) -
+                            Math.max(0, Number(account.withdrawalBalanceDebt || 0)),
+                          0,
+                        ));
                         const locked = accounts.reduce((sum, account) => sum + Math.max(0, Number(account.lockedEarnings || 0)), 0);
                         const withdrawable = accounts.reduce((sum, account) => sum + packageMaximum(account), 0);
                         const active = accounts.some((account) => account.status === "active");
@@ -802,7 +813,7 @@ export default function WithdrawPage() {
                                         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-left sm:grid-cols-3">
                                           <div>
                                             <div className="text-[10px] text-slate-500">المتاح</div>
-                                            <div className="text-sm font-black text-emerald-200">{money(account.availableEarnings)} USDT</div>
+                                            <div className="text-sm font-black text-emerald-200">{money(Math.max(0, Number(account.availableEarnings || 0) - Number(account.withdrawalBalanceDebt || 0)))} USDT</div>
                                           </div>
                                           <div>
                                             <div className="text-[10px] text-slate-500">المحجوز</div>

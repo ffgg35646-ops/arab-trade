@@ -1,0 +1,61 @@
+name: Withdrawal end-to-end test
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  withdrawal-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MONGODB_URI: mongodb://127.0.0.1:27017/arabtrade_withdrawal_ci?replicaSet=rs0&directConnection=true
+      AUTH_SECRET: ci-only-secret-not-for-production-7b154d2b4e8f6a9c
+      CRON_SECRET: ci-only-cron-secret
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Start isolated MongoDB replica set
+        run: |
+          docker run -d --name arabtrade-mongo-test -p 27017:27017 mongo:7.0 mongod --replSet rs0 --bind_ip_all
+          for i in $(seq 1 40); do
+            if docker exec arabtrade-mongo-test mongosh --quiet --eval 'db.adminCommand("ping").ok' >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          docker exec arabtrade-mongo-test mongosh --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"localhost:27017"}]})'
+          for i in $(seq 1 40); do
+            if docker exec arabtrade-mongo-test mongosh --quiet --eval 'db.hello().isWritablePrimary' | grep -q true; then exit 0; fi
+            sleep 2
+          done
+          echo "MongoDB replica set did not become ready"
+          exit 1
+      - name: Build the actual Next.js application
+        run: npm run build
+      - name: Start application against test database
+        run: |
+          npm start > /tmp/arabtrade-withdrawal-app.log 2>&1 &
+          echo $! > /tmp/arabtrade-withdrawal-app.pid
+          for i in $(seq 1 60); do
+            if curl --silent --fail http://127.0.0.1:3000/api/health >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/arabtrade-withdrawal-app.log
+          exit 1
+      - name: Run end-to-end withdrawal scenarios with fresh test accounts
+        run: node scripts/withdrawal-integration.mjs
+      - name: Show application log only on failure
+        if: failure()
+        run: tail -200 /tmp/arabtrade-withdrawal-app.log || true
+      - name: Stop test application and database
+        if: always()
+        run: |
+          if [ -f /tmp/arabtrade-withdrawal-app.pid ]; then kill "$(cat /tmp/arabtrade-withdrawal-app.pid)" || true; fi
+          docker rm -f arabtrade-mongo-test || true

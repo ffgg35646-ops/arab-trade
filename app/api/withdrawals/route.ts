@@ -41,38 +41,60 @@ function currentWithdrawalDayStart() {
   return start;
 }
 
-function packageRequestAmount(item: any, planId: string) {
-  if (item.status === "rejected" || item.type === "general") return 0;
+function packageRequestAllocations(item: any) {
+  if (item.status === "rejected" || item.type === "general") return [];
   const allocations = Array.isArray(item.allocations) ? item.allocations : [];
+  const byPackage = new Map<string, number>();
   if (allocations.some((allocation: any) => allocation.packageId)) {
-    return roundWithdrawal(allocations
-      .filter((allocation: any) => String(allocation.packageId || "") === planId)
-      .reduce((sum: number, allocation: any) => sum + Number(allocation.amount || 0), 0));
+    for (const allocation of allocations) {
+      if (!allocation.packageId) continue;
+      const id = String(allocation.packageId);
+      byPackage.set(id, roundWithdrawal((byPackage.get(id) || 0) + Number(allocation.amount || 0)));
+    }
+    return Array.from(byPackage, ([packageId, amount]) => ({ packageId, amount }));
   }
-  if (String(item.packageId || "") !== planId) return 0;
-  return roundWithdrawal(allocations.length
+  if (!item.packageId) return [];
+  const amount = roundWithdrawal(allocations.length
     ? allocations.reduce((sum: number, allocation: any) => sum + Number(allocation.amount || 0), 0)
     : Number(item.amount || 0));
+  return amount > 0 ? [{ packageId: String(item.packageId), amount }] : [];
 }
 
-function packageWithdrawalUsage(requests: any[], planId: string, activationAmount: number, dayStart: Date) {
-  const byUtcDay = new Map<string, number>();
+function packageWithdrawalUsage(
+  requests: any[],
+  planId: string,
+  activationAmount: number,
+  dayStart: Date,
+  activationCaps: Map<string, number>,
+) {
+  const byPlanDay = new Map<string, { packageId: string; dayKey: string; amount: number }>();
   for (const item of requests) {
     if (!["pending", "approved"].includes(String(item.status || ""))) continue;
     const createdAt = item.createdAt ? new Date(item.createdAt) : null;
     if (!createdAt || !Number.isFinite(createdAt.getTime())) continue;
-    const amount = packageRequestAmount(item, planId);
-    if (amount <= 0) continue;
     const dayKey = createdAt.toISOString().slice(0, 10);
-    byUtcDay.set(dayKey, roundWithdrawal((byUtcDay.get(dayKey) || 0) + amount));
+    for (const allocation of packageRequestAllocations(item)) {
+      if (allocation.amount <= 0) continue;
+      const key = allocation.packageId + ":" + dayKey;
+      const row = byPlanDay.get(key) || { packageId: allocation.packageId, dayKey, amount: 0 };
+      row.amount = roundWithdrawal(row.amount + allocation.amount);
+      byPlanDay.set(key, row);
+    }
   }
+
   const todayKey = dayStart.toISOString().slice(0, 10);
-  const usedToday = roundWithdrawal(byUtcDay.get(todayKey) || 0);
-  // Each UTC day's first-activation amount is the base allowance for that day.
-  // Only the amount above that base is charged against cumulative referral capacity.
-  const referralUsed = roundWithdrawal(Array.from(byUtcDay.values())
-    .reduce((sum, dailyTotal) => sum + Math.max(0, dailyTotal - Math.max(0, activationAmount)), 0));
-  return { usedToday, referralUsed };
+  const usedToday = roundWithdrawal(Array.from(byPlanDay.values())
+    .filter((row) => row.packageId === planId && row.dayKey === todayKey)
+    .reduce((sum, row) => sum + row.amount, 0));
+
+  // Referral capacity is user-level: the same referral deposits cannot unlock
+  // multiple package buckets. Each package's daily base is excluded before
+  // computing the additional amount already consumed across all packages.
+  const referralUsed = roundWithdrawal(Array.from(byPlanDay.values()).reduce((sum, row) => {
+    const baseCap = Math.max(0, Number(activationCaps.get(row.packageId) || 0));
+    return sum + Math.max(0, row.amount - baseCap);
+  }, 0));
+  return { usedToday, referralUsed, activationAmount };
 }
 
 async function activeReferralDepositStats(referrerId: mongoose.Types.ObjectId, session?: mongoose.ClientSession) {
@@ -123,6 +145,13 @@ export async function GET(request: NextRequest) {
   ]);
 
   const withdrawalDayStart = currentWithdrawalDayStart();
+  const activationCaps = new Map<string, number>();
+  for (const row of sourceAccounts) {
+    const planId = String(row.packageId);
+    if (!activationCaps.has(planId) && Number(row.investedAmount || 0) > 0) {
+      activationCaps.set(planId, roundWithdrawal(Number(row.investedAmount || 0)));
+    }
+  }
   const packages = plans.flatMap((plan) => {
     const rows = sourceAccounts.filter((account) => String(account.packageId) === String(plan._id));
     const balance = roundWithdrawal(rows.reduce((sum, account) => sum + Number(account.availableEarnings || 0), 0));
@@ -141,7 +170,7 @@ export async function GET(request: NextRequest) {
     // Rows are sorted oldest-first: the first activation sets this package's daily base allowance.
     const firstActivation = rows.find((account) => Number(account.investedAmount || 0) > 0);
     const activationAmount = roundWithdrawal(Number(firstActivation?.investedAmount || 0));
-    const usage = packageWithdrawalUsage(requests, planId, activationAmount, withdrawalDayStart);
+    const usage = packageWithdrawalUsage(requests, planId, activationAmount, withdrawalDayStart, activationCaps);
     const dailyAllowance = rows.length ? withdrawalAllowance(activationAmount, usage.usedToday) : 0;
     const referralPercent = Math.min(100, Math.max(0, Number(platformSettings.withdrawals?.packageReferralUnlockPercent ?? 50)));
     const referralAllowance = rows.length
@@ -259,8 +288,16 @@ export async function POST(request: NextRequest) {
 
       const plan = await InvestmentPackage.findById(packageId).session(session);
       if (!plan) throw new Error("الباقة غير موجودة");
-      const accounts = await UserPackage.find({ userId: user._id, packageId: plan._id })
+      const allUserAccounts = await UserPackage.find({ userId: user._id })
         .sort({ createdAt: 1 }).session(session).lean();
+      const activationCaps = new Map<string, number>();
+      for (const row of allUserAccounts) {
+        const id = String(row.packageId);
+        if (!activationCaps.has(id) && Number(row.investedAmount || 0) > 0) {
+          activationCaps.set(id, roundWithdrawal(Number(row.investedAmount || 0)));
+        }
+      }
+      const accounts = allUserAccounts.filter((row) => String(row.packageId) === String(plan._id));
       if (!accounts.length) throw new Error("لم يتم تفعيل هذه الباقة من قبل؛ لا يوجد رصيد سحب لها");
 
       const totalBalance = roundWithdrawal(accounts.reduce((sum, account) => sum + Number(account.availableEarnings || 0), 0));
@@ -268,17 +305,13 @@ export async function POST(request: NextRequest) {
         userId: user._id,
         status: { $in: ["pending", "approved"] },
         type: { $ne: "general" },
-        $or: [
-          { packageId: plan._id },
-          { allocations: { $elemMatch: { packageId: plan._id } } },
-        ],
       }).session(session).lean();
       // The first activation amount remains the per-UTC-day base allowance.
       // Extra capacity comes from 50% (admin-configurable) of credited deposits by active referrals,
       // minus extra withdrawals already consumed beyond each day's base allowance.
       const firstActivation = accounts.find((account) => Number(account.investedAmount || 0) > 0);
       const activationAmount = roundWithdrawal(Number(firstActivation?.investedAmount || 0));
-      const usage = packageWithdrawalUsage(prior, String(plan._id), activationAmount, currentWithdrawalDayStart());
+      const usage = packageWithdrawalUsage(prior, String(plan._id), activationAmount, currentWithdrawalDayStart(), activationCaps);
       const dailyAllowance = withdrawalAllowance(activationAmount, usage.usedToday);
       const referralStats = await activeReferralDepositStats(user._id, session);
       const settings = await PlatformSettings.findOne({ key: "global" }).session(session).lean();

@@ -480,7 +480,7 @@ export default function WithdrawPage() {
     }
 
     const minimum = source === "package"
-      ? Math.max(Number(selected.minWithdrawal || 0), Number(account?.minimumWithdrawal ?? 100))
+      ? Number(account?.minimumWithdrawal ?? 100)
       : Math.max(Number(selected.minWithdrawal || 0), Number(limits.minGeneralWithdrawal || limits.minWithdrawal || 0));
     const maximums = [
       Number(selected.maxWithdrawal || 0),
@@ -532,7 +532,7 @@ export default function WithdrawPage() {
     const options = source === "wallet" ? methods : packageMethods;
     const selected = options.find((item) => item._id === form.methodId);
     const minimum = source === "package"
-      ? Math.max(Number(selected?.minWithdrawal || 0), Number(account?.minimumWithdrawal ?? plan?.minimumWithdrawal ?? 100))
+      ? Number(account?.minimumWithdrawal ?? plan?.minimumWithdrawal ?? 100)
       : Math.max(Number(selected?.minWithdrawal || 0), Number(limits.minGeneralWithdrawal || limits.minWithdrawal || 0));
     const max = account ? packageMaximum(account) : Number(generalBalances.find((row) =>
       String(row.asset).toUpperCase() === String(selected?.asset || "USDT").toUpperCase()

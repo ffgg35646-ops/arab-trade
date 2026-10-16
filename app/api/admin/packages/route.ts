@@ -3,7 +3,6 @@ import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongodb";
 import { requireAdminLeader } from "@/lib/admin-auth";
 import InvestmentPackage from "@/models/InvestmentPackage";
-import PlatformSettings from "@/models/PlatformSettings";
 import UserPackage from "@/models/UserPackage";
 import DepositBalance from "@/models/DepositBalance";
 import PackageLedger from "@/models/PackageLedger";
@@ -16,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
     await ensureDefaultInvestmentPackages();
-    const [rawPackages, userPackages, depositBalances, packageLedger, savedSettings] = await Promise.all([
+    const [rawPackages, userPackages, depositBalances, packageLedger] = await Promise.all([
       InvestmentPackage.find({}).sort({ sortOrder: 1, price: 1 }).lean(),
       UserPackage.find({})
         .populate("userId", "name username email")
@@ -36,13 +35,8 @@ export async function GET(request: NextRequest) {
         .sort({ createdAt: -1 })
         .limit(500)
         .lean(),
-      PlatformSettings.findOne({ key: "global" }).select("withdrawals.withdrawalMinByPackage").lean(),
     ]);
-    const savedMinimums = (savedSettings as any)?.withdrawals?.withdrawalMinByPackage || {};
-    const packages = (rawPackages as any[]).map((plan) => ({
-      ...plan,
-      minimumWithdrawal: Number(savedMinimums[String(plan._id)] ?? plan.minimumWithdrawal ?? 100),
-    }));
+    const packages = rawPackages;
 
     return NextResponse.json({
       success: true,
@@ -100,26 +94,18 @@ export async function POST(request: NextRequest) {
     const price = Number(body.price);
     const durationDays = 0;
     const dailyProfit = Number(body.dailyProfit ?? (Number(body.price) / 25));
-    const minimumWithdrawal = Number(body.minimumWithdrawal ?? 100);
     const sortOrder = Number(body.sortOrder || 0);
     const enabled = body.enabled !== false;
 
     if (!name || !Number.isFinite(price) || price < 1 ||
         !Number.isFinite(dailyProfit) || dailyProfit < 0 || dailyProfit > 1000000000 ||
-        !Number.isFinite(minimumWithdrawal) || minimumWithdrawal < 0 ||
         !Number.isFinite(sortOrder)) {
       return NextResponse.json({ success: false, message: "تحقق من الاسم والسعر والمدة والترتيب" }, { status: 400 });
     }
 
     const item = await InvestmentPackage.create({
-      name, description, price, asset: "USDT", durationDays, dailyProfit, minimumWithdrawal, sortOrder, enabled,
+      name, description, price, asset: "USDT", durationDays, dailyProfit, sortOrder, enabled,
     });
-    await PlatformSettings.updateOne(
-      { key: "global" },
-      { $set: { key: "global", [`withdrawals.withdrawalMinByPackage.${String(item._id)}`]: minimumWithdrawal } },
-      { upsert: true }
-    );
-
     return NextResponse.json({ success: true, package: item }, { status: 201 });
   } catch (error) {
     console.error("ADMIN PACKAGES POST:", error);
@@ -159,11 +145,6 @@ export async function PATCH(request: NextRequest) {
       if (!Number.isFinite(value)) return NextResponse.json({ success: false, message: "ترتيب الباقة غير صالح" }, { status: 400 });
       update.sortOrder = value;
     }
-    if (body.minimumWithdrawal !== undefined) {
-      const value = Number(body.minimumWithdrawal);
-      if (!Number.isFinite(value) || value < 0) return NextResponse.json({ success: false, message: "الحد الأدنى لسحب هذه الباقة غير صالح" }, { status: 400 });
-      update.minimumWithdrawal = value;
-    }
     if (body.enabled !== undefined) update.enabled = body.enabled === true;
 
     // Package earnings are credited only when the user collects within the 30-minute window.
@@ -175,35 +156,6 @@ export async function PATCH(request: NextRequest) {
 
     const item = await InvestmentPackage.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true });
     if (!item) return NextResponse.json({ success: false, message: "الباقة غير موجودة" }, { status: 404 });
-    if (update.minimumWithdrawal !== undefined) {
-      // Duplicate catalog rows with the same visible name are rendered as one
-      // logical package on the withdrawal page. Keep their withdrawal minimums
-      // synchronized so older account IDs do not retain a stale limit.
-      const normalizePackageName = (value: unknown) =>
-        String(value || "").normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
-      const catalogRows = await InvestmentPackage.find({}).select("_id name").lean();
-      const targetName = normalizePackageName(item.name);
-      const siblingIds = catalogRows
-        .filter((row: any) => normalizePackageName(row.name) === targetName)
-        .map((row: any) => String(row._id));
-      if (!siblingIds.includes(id)) siblingIds.push(id);
-
-      const minimum = Number(update.minimumWithdrawal);
-      await InvestmentPackage.updateMany(
-        { _id: { $in: siblingIds } },
-        { $set: { minimumWithdrawal: minimum } }
-      );
-
-      const settingsUpdate: Record<string, unknown> = { key: "global" };
-      for (const siblingId of siblingIds) {
-        settingsUpdate[`withdrawals.withdrawalMinByPackage.${siblingId}`] = minimum;
-      }
-      await PlatformSettings.updateOne(
-        { key: "global" },
-        { $set: settingsUpdate },
-        { upsert: true }
-      );
-    }
     if (profitRateChanged) {
       // Apply the new rate only to future 24-hour windows; preserve elapsed profit.
       await UserPackage.updateMany({ packageId: id, status: "active" }, { $set: { lastProfitAt: new Date() } });

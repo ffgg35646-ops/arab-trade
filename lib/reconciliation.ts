@@ -1,7 +1,6 @@
 import Wallet from "@/models/Wallet";
 import Order from "@/models/Order";
 import Trade from "@/models/Trade";
-import WithdrawalRequest from "@/models/WithdrawalRequest";
 import DepositRequest from "@/models/DepositRequest";
 import LedgerEntry from "@/models/LedgerEntry";
 
@@ -19,13 +18,11 @@ export async function runReconciliation() {
     wallets,
     orders,
     trades,
-    withdrawals,
     deposits,
   ] = await Promise.all([
     Wallet.find({}).lean(),
     Order.find({}).lean(),
     Trade.find({}).lean(),
-    WithdrawalRequest.find({}).lean(),
     DepositRequest.find({}).lean(),
   ]);
 
@@ -327,81 +324,6 @@ export async function runReconciliation() {
   }
 
   // ----------------------------------------------------------
-  // Withdrawal checks
-  // ----------------------------------------------------------
-  const withdrawalReferenceCount =
-    new Map<string, number>();
-
-  for (const withdrawal of withdrawals as any[]) {
-    const id = String(withdrawal._id);
-    const status = String(withdrawal.status);
-
-    if (
-      status === "processing" ||
-      status === "completed"
-    ) {
-      if (!withdrawal.txHash) {
-        issues.push({
-          severity: "error",
-          category: "withdrawal",
-          message: "Processing/completed withdrawal has no txHash",
-          details: {
-            withdrawalId: id,
-            status,
-          },
-        });
-      }
-    }
-
-    if (
-      status === "completed" &&
-      !withdrawal.completedAt
-    ) {
-      issues.push({
-        severity: "warning",
-        category: "withdrawal",
-        message: "Completed withdrawal has no completedAt",
-        details: {
-          withdrawalId: id,
-        },
-      });
-    }
-
-    const receiveAmount =
-      Number(withdrawal.receiveAmount || 0);
-    const amount =
-      Number(withdrawal.amount || 0);
-    const fee =
-      Number(withdrawal.fee || 0);
-
-    if (
-      Math.abs(
-        receiveAmount - (amount - fee)
-      ) > 1e-8
-    ) {
-      issues.push({
-        severity: "error",
-        category: "withdrawal",
-        message: "Withdrawal receiveAmount mismatch",
-        details: {
-          withdrawalId: id,
-          amount,
-          fee,
-          receiveAmount,
-        },
-      });
-    }
-
-    const ref =
-      `WITHDRAWAL:${id}`;
-
-    withdrawalReferenceCount.set(
-      ref,
-      (withdrawalReferenceCount.get(ref) || 0) + 1
-    );
-  }
-
-  // ----------------------------------------------------------
   // Deposit checks
   // ----------------------------------------------------------
   for (const deposit of deposits as any[]) {
@@ -436,74 +358,6 @@ export async function runReconciliation() {
     }
   }
 
-  // ----------------------------------------------------------
-  // Ledger duplicate checks for withdrawals
-  // ----------------------------------------------------------
-  const ledgerDocs =
-    await LedgerEntry.find({
-      mode: "live",
-      type: "withdrawal",
-    })
-      .select({
-        referenceId: 1,
-        userId: 1,
-        asset: 1,
-        amount: 1,
-      })
-      .lean();
-
-  const ledgerWithdrawalRefs =
-    new Map<string, number>();
-
-  for (const entry of ledgerDocs as any[]) {
-    const ref = String(entry.referenceId || "");
-
-    if (!ref) {
-      issues.push({
-        severity: "warning",
-        category: "ledger",
-        message: "Withdrawal ledger entry has no referenceId",
-        details: {
-          ledgerId: String(entry._id),
-        },
-      });
-      continue;
-    }
-
-    ledgerWithdrawalRefs.set(
-      ref,
-      (ledgerWithdrawalRefs.get(ref) || 0) + 1
-    );
-
-    if (
-      Number(entry.amount || 0) >= 0
-    ) {
-      issues.push({
-        severity: "error",
-        category: "ledger",
-        message: "Withdrawal ledger amount is not negative",
-        details: {
-          ledgerId: String(entry._id),
-          amount: entry.amount,
-        },
-      });
-    }
-  }
-
-  for (const [ref, count] of ledgerWithdrawalRefs) {
-    if (count > 1) {
-      issues.push({
-        severity: "error",
-        category: "ledger",
-        message: "Duplicate withdrawal ledger entries",
-        details: {
-          referenceId: ref,
-          count,
-        },
-      });
-    }
-  }
-
   const errors =
     issues.filter(
       (item) => item.severity === "error"
@@ -524,7 +378,6 @@ export async function runReconciliation() {
       filledOrders,
       cancelledOrders,
       trades: tradeCount,
-      withdrawals: withdrawals.length,
       deposits: deposits.length,
       errors,
       warnings,

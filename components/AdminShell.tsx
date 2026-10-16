@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 type Counts = {
-  withdrawals: number;
   deposits: number;
   kyc: number;
   total: number;
@@ -27,10 +26,8 @@ const groups = [
     title: "العمليات المالية",
     items: [
       { label: "الإيداعات", href: "/admin/deposits" },
-      { label: "السحوبات", href: "/admin/withdrawals" },
       { label: "الباقات", href: "/admin/packages" },
       { label: "وسائل الإيداع", href: "/admin/payments" },
-      { label: "وسائل السحب", href: "/admin/withdrawal-methods" },
       { label: "الأصول والشبكات", href: "/admin/assets" },
     ],
   },
@@ -58,7 +55,6 @@ export default function AdminShell({
   const [busy, setBusy] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [counts, setCounts] = useState<Counts>({
-    withdrawals: 0,
     deposits: 0,
     kyc: 0,
     total: 0,
@@ -77,7 +73,6 @@ export default function AdminShell({
 
       if (json?.success && json?.counts) {
         setCounts({
-          withdrawals: Number(json.counts.withdrawals || 0),
           deposits: Number(json.counts.deposits || 0),
           kyc: Number(json.counts.kyc || 0),
           total: Number(json.counts.total || 0),
@@ -117,11 +112,6 @@ export default function AdminShell({
   }
 
   const notificationItems = [
-    {
-      title: "طلبات السحب",
-      count: counts.withdrawals,
-      href: "/admin/withdrawals",
-    },
     {
       title: "طلبات الإيداع",
       count: counts.deposits,

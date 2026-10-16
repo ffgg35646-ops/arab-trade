@@ -60,7 +60,7 @@ export async function adjustWallet(
     userId: uid,
     asset: sym,
     amount: availableDelta,
-    type: type as "fee" | "referral" | "withdrawal" | "deposit" | "trade" | "reward" | "adjustment" | "transfer",
+    type: type as "fee" | "referral" | "deposit" | "trade" | "reward" | "adjustment" | "transfer",
     referenceId: reference,
     note
   });

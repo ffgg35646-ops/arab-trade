@@ -334,7 +334,7 @@ export async function POST(
             balanceBefore: credited.availableBefore,
             balanceAfter: credited.availableAfter,
             referenceId: `external-deposit-balance:DEPOSIT:${current._id}`,
-            note: "تم تأكيد إيداع USDT وإضافته إلى رصيد الإيداع المنفصل عن رصيد السحب العام.",
+            note: "تم تأكيد إيداع USDT وإضافته إلى رصيد الإيداع المنفصل عن الرصيد العام.",
           }],
           { session },
         );

@@ -15,12 +15,9 @@ type Dashboard = {
     assets: number;
     deposits: number;
     pendingDeposits: number;
-    withdrawals: number;
-    pendingWithdrawals: number;
   };
   latestUsers: any[];
   latestDeposits: any[];
-  latestWithdrawals: any[];
 };
 
 function money(v: unknown) {
@@ -93,7 +90,6 @@ export default function AdminDashboard() {
               {[
                 ["المستخدمون", data.stats.users, "/admin/users"],
                 ["الإيداعات", data.stats.deposits, "/admin/deposits"],
-                ["السحوبات", data.stats.withdrawals, "/admin/withdrawals"],
                 ["الأوامر", data.stats.orders, "/admin/orders"],
                 ["الصفقات", data.stats.trades, "/admin/trading"],
               ].map(([name, value, href]) => (
@@ -126,10 +122,6 @@ export default function AdminDashboard() {
                 <div className="mt-2 text-2xl font-black">{data.stats.pendingDeposits.toLocaleString("en-US")}</div>
               </Link>
 
-              <Link href="/admin/withdrawals" className="rounded-2xl border border-slate-800 bg-[#08111e] p-5">
-                <div className="text-sm text-slate-500">سحوبات معلقة</div>
-                <div className="mt-2 text-2xl font-black">{data.stats.pendingWithdrawals.toLocaleString("en-US")}</div>
-              </Link>
             </div>
 
             <div className="grid gap-6 xl:grid-cols-3">
@@ -169,24 +161,6 @@ export default function AdminDashboard() {
                 </div>
               </section>
 
-              <section className="overflow-hidden rounded-2xl border border-slate-800 bg-[#08111e]">
-                <div className="flex items-center justify-between border-b border-slate-800 p-5">
-                  <h2 className="font-black">أحدث السحوبات</h2>
-                  <Link href="/admin/withdrawals" className="text-sm text-blue-400">عرض الكل</Link>
-                </div>
-
-                <div className="divide-y divide-slate-800">
-                  {data.latestWithdrawals.map((item) => (
-                    <div key={item._id} className="flex items-center justify-between gap-3 p-4">
-                      <div>
-                        <div className="font-bold">{money(item.amount)} {item.asset || item.symbol || ""}</div>
-                        <div className="mt-1 text-xs text-slate-500">{item.status || "—"}</div>
-                      </div>
-                      <div className="text-left text-xs text-slate-500">{date(item.createdAt)}</div>
-                    </div>
-                  ))}
-                </div>
-              </section>
             </div>
           </div>
         ) : error ? (

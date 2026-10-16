@@ -193,7 +193,7 @@ export async function PATCH(request: NextRequest) {
             balanceBefore: credited.availableBefore,
             balanceAfter: credited.availableAfter,
             referenceId: "external-deposit-balance:" + String(current._id),
-            note: adminNote || "إيداع USDT معتمد — أضيف إلى رصيد الإيداع المنفصل، ولا يُضاف إلى رصيد السحب العام.",
+            note: adminNote || "إيداع USDT معتمد — أضيف إلى رصيد الإيداع المنفصل، ولا يُضاف إلى الرصيد العام.",
           }], { session });
 
           // Referral activity and commission are tied to this one approved external deposit.

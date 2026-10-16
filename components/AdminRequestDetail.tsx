@@ -27,7 +27,7 @@ function label(key: string) {
     _id: "المعرف",
     userId: "المستخدم",
     userPackageId: "حساب الباقة",
-    source: "مصدر السحب",
+    source: "المصدر",
     amount: "المبلغ",
     asset: "الأصل",
     symbol: "الرمز",
@@ -67,7 +67,7 @@ export default function AdminRequestDetail({
   title: string;
   endpoint: string;
   backHref: string;
-  kind: "deposit" | "withdrawal";
+  kind: "deposit";
 }) {
   const [item, setItem] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -102,7 +102,7 @@ export default function AdminRequestDetail({
     void load();
   }, [endpoint]);
 
-  async function action(actionName: "approve" | "reject" | "complete") {
+  async function action(actionName: "approve" | "reject") {
     let reason = "";
 
     if (actionName === "reject") {
@@ -110,16 +110,10 @@ export default function AdminRequestDetail({
       if (!reason.trim()) return;
     }
 
-    if (actionName === "complete" && !window.confirm("تأكيد تنفيذ السحب؟ سيتم إنهاء الطلب وخصم المبلغ من الرصيد المقفل.")) {
-      return;
-    }
-
     setBusy(true);
 
     try {
-      const status =
-        actionName === "approve" ? "approved" :
-        actionName === "reject" ? "rejected" : "completed";
+      const status = actionName === "approve" ? "approved" : "rejected";
 
       const res = await fetch(backHref.replace("/admin/", "/api/admin/"), {
         method: "PATCH",
@@ -202,8 +196,7 @@ export default function AdminRequestDetail({
             {(() => {
               const currentStatus = String(item.status || "").toLowerCase();
               const pending = ["pending", "review", "processing"].includes(currentStatus);
-              const approvedWithdrawal = kind === "withdrawal" && currentStatus === "approved" && item.source !== "package";
-              if (!pending && !approvedWithdrawal) return null;
+              if (!pending) return null;
               return (
                 <div className="flex flex-wrap gap-3 rounded-2xl border border-slate-800 bg-[#08111e] p-5">
                   {pending && (
@@ -212,26 +205,17 @@ export default function AdminRequestDetail({
                       onClick={() => void action("approve")}
                       className="rounded-xl bg-emerald-600 px-6 py-3 font-black disabled:opacity-50"
                     >
-                      {kind === "withdrawal" && item.source === "package" ? "موافقة نهائية وتسوية الرصيد" : "اعتماد"}
+                      اعتماد
                     </button>
                   )}
 
-                  {approvedWithdrawal && (
-                    <button
-                      disabled={busy}
-                      onClick={() => void action("complete")}
-                      className="rounded-xl bg-blue-600 px-6 py-3 font-black disabled:opacity-50"
-                    >
-                      تنفيذ السحب
-                    </button>
-                  )}
 
                   <button
                     disabled={busy}
                     onClick={() => void action("reject")}
                     className="rounded-xl bg-red-600 px-6 py-3 font-black disabled:opacity-50"
                   >
-                    {approvedWithdrawal ? "رفض وإرجاع الرصيد" : "رفض"}
+                    رفض
                   </button>
                 </div>
               );

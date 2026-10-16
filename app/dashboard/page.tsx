@@ -4,7 +4,6 @@ import { apiFetch } from "@/lib/frontend-api";
 import Link from "next/link";
 import {
   ArrowDownToLine,
-  ArrowUpFromLine,
   BadgeCheck,
   ChevronLeft,
   CircleHelp,
@@ -304,13 +303,6 @@ export default function DashboardPage() {
                         إيداع
                       </Link>
 
-                      <Link
-                        href="/dashboard/assets/withdraw"
-                        className="flex items-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-xs text-slate-300"
-                      >
-                        <ArrowUpFromLine size={15} />
-                        سحب
-                      </Link>
 
                       <Link
                         href="/markets"

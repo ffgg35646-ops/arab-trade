@@ -7,7 +7,6 @@ export interface IInvestmentPackage {
   asset: string;
   durationDays: number;
   dailyProfit: number;
-  minimumWithdrawal: number;
   enabled: boolean;
   sortOrder: number;
   createdAt?: Date;
@@ -22,7 +21,6 @@ const InvestmentPackageSchema = new Schema<IInvestmentPackage>(
     asset: { type: String, default: "USDT", uppercase: true, trim: true },
     durationDays: { type: Number, required: true, default: 0, min: 0, max: 36500 },
     dailyProfit: { type: Number, default: 0, min: 0, max: 1000000000 },
-    minimumWithdrawal: { type: Number, default: 100, min: 0 },
     enabled: { type: Boolean, default: true, index: true },
     sortOrder: { type: Number, default: 0, index: true },
   },

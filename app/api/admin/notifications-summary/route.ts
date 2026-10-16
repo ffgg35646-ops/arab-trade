@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { requireAdminLeader } from "@/lib/admin-auth";
 import DepositRequest from "@/models/DepositRequest";
-import WithdrawalRequest from "@/models/WithdrawalRequest";
 import KycRequest from "@/models/KycRequest";
 
 export async function GET(request: NextRequest) {
@@ -18,8 +17,7 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
 
-    const [withdrawals, deposits, kyc] = await Promise.all([
-      WithdrawalRequest.countDocuments({ status: "pending" } as any),
+    const [deposits, kyc] = await Promise.all([
       DepositRequest.countDocuments({ status: "pending" } as any),
       KycRequest.countDocuments({ status: "pending" }),
     ]);
@@ -27,10 +25,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       counts: {
-        withdrawals,
         deposits,
         kyc,
-        total: withdrawals + deposits + kyc,
+        total: deposits + kyc,
       },
     });
   } catch (error) {

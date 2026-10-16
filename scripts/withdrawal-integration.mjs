@@ -299,7 +299,7 @@ try {
   assert.equal(pendingHistoryRow.status, "pending");
   assert.equal(pendingHistoryRow.type, "package");
   log("Withdrawal request stores USDT network and payout address and appears in dated user history");
-  await checkPackageBalance(oldUserPackageId, 510, 200, "pending reserve");
+  await checkPackageBalance(oldUserPackageId, 810, 200, "pending reserve");
   const secondWhilePending = await requestWithdrawal(100);
   assert.equal(secondWhilePending.status, 409, "second pending withdrawal must be blocked");
   assert.equal(await mongoose.connection.collection("withdrawalrequests").countDocuments({ userId: user._id, status: "pending" }), 1);
@@ -325,7 +325,7 @@ try {
   pending = await latestPending();
   assert.equal((await review(pending._id, "reject")).status, 200);
   await checkPackageBalance(oldUserPackageId, 1010, 0, "concurrent rejection return");
-  log("Concurrent duplicate submits created one pending request; rejection restored balance and today's cap");
+  log("Concurrent duplicate submits created one pending request; rejection restored the full available balance and allowance");
 
   const initialApproveRequest = await requestWithdrawal(200);
   assert.equal(initialApproveRequest.status, 201, "first base-cap withdrawal: " + JSON.stringify(initialApproveRequest.data));

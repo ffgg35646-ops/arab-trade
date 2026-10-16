@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/mongodb";
 import { requireAdminLeader } from "@/lib/admin-auth";
 import DepositRequest from "@/models/DepositRequest";
 import KycRequest from "@/models/KycRequest";
+import WithdrawalRequest from "@/models/WithdrawalRequest";
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,9 +18,10 @@ export async function GET(request: NextRequest) {
 
     await connectDB();
 
-    const [deposits, kyc] = await Promise.all([
+    const [deposits, kyc, withdrawals] = await Promise.all([
       DepositRequest.countDocuments({ status: "pending" } as any),
       KycRequest.countDocuments({ status: "pending" }),
+      WithdrawalRequest.countDocuments({ status: "pending" }),
     ]);
 
     return NextResponse.json({
@@ -27,7 +29,8 @@ export async function GET(request: NextRequest) {
       counts: {
         deposits,
         kyc,
-        total: deposits + kyc,
+        withdrawals,
+        total: deposits + kyc + withdrawals,
       },
     });
   } catch (error) {

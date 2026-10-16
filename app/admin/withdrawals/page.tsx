@@ -1,0 +1,12 @@
+"use client";
+import { useCallback, useEffect, useState } from "react";
+import AdminPageFrame from "@/components/AdminPageFrame";
+type Plan = { _id:string; name:string; withdrawalMinimum?:number };
+type Request = { _id:string; amount:number; status:string; userId?:{email?:string};userPackageId?:{packageName?:string} };
+export default function AdminWithdrawalsPage(){
+ const [plans,setPlans]=useState<Plan[]>([]),[requests,setRequests]=useState<Request[]>([]),[minimums,setMinimums]=useState<Record<string,string>>({}),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
+ const load=useCallback(async()=>{const r=await fetch("/api/admin/withdrawals",{cache:"no-store"});const j=await r.json();if(j.success){setPlans(j.plans);setRequests(j.requests);}else setMessage("تعذر تحميل السحوبات");},[]);
+ useEffect(()=>{void load();},[load]);
+ async function act(body:object){setBusy(true);setMessage("");try{const r=await fetch("/api/admin/withdrawals",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await r.json();setMessage(j.success?"تم حفظ العملية":j.message||"فشلت العملية");await load();}catch{setMessage("تعذر الاتصال");}finally{setBusy(false);}}
+ return <AdminPageFrame title="السحوبات"><div dir="rtl" className="space-y-5 p-4 text-white">{message&&<p role="status">{message}</p>}<h2 className="text-lg font-bold">الحد الأدنى لكل باقة</h2>{plans.map(p=><div key={p._id} className="rounded border border-slate-700 p-3"><label>{p.name} — الحالي {p.withdrawalMinimum ?? 100} USDT <input className="mr-3 rounded bg-slate-900 p-2" type="number" min="0.00000001" step="any" value={minimums[p._id]??String(p.withdrawalMinimum??100)} onChange={e=>setMinimums(v=>({...v,[p._id]:e.target.value}))}/></label><button className="mr-3 rounded bg-blue-700 p-2" disabled={busy} onClick={()=>void act({action:"minimum",packageId:p._id,minimum:Number(minimums[p._id]??p.withdrawalMinimum??100)})}>حفظ</button></div>)}<h2 className="text-lg font-bold">طلبات السحب</h2>{requests.map(r=><div key={r._id} className="rounded border border-slate-700 p-3"><p>{r.userId?.email} — {r.userPackageId?.packageName} — {r.amount} USDT — {r.status}</p>{r.status==="pending"&&<div className="mt-2 flex gap-2"><button disabled={busy} className="rounded bg-green-700 p-2" onClick={()=>void act({action:"approve",id:r._id})}>قبول</button><button disabled={busy} className="rounded bg-red-700 p-2" onClick={()=>void act({action:"reject",id:r._id})}>رفض</button></div>}</div>)}</div></AdminPageFrame>;
+}

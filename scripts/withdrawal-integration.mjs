@@ -133,6 +133,11 @@ try {
   assert.ok(catalogBeforeActivation.data.packages.every((item) => item.account && item.account.hasAccount === false),
     "unactivated packages must show their own card but must not allow withdrawals");
   log("Each newly created package immediately has its own disabled withdrawal card");
+  const unactivatedWithdrawal = await requestWithdrawal(100, packageBId);
+  assert.equal(unactivatedWithdrawal.status, 409, "a visible but unactivated package must not accept withdrawals");
+  assert.match(unactivatedWithdrawal.data.message, /لم يتم تفعيل هذه الباقة/);
+  assert.equal(await mongoose.connection.collection("withdrawalrequests").countDocuments({ userId: user._id }), 0,
+    "unactivated package withdrawal must not create a request");
   const minSet = await call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie,
     body: { action: "minimum", packageId: packageAId, minimum: 125 } });
   assert.equal(minSet.status, 200);
@@ -247,12 +252,17 @@ try {
   const generalSummary = await call("/api/withdrawals", { cookie: userCookie });
   assert.equal(generalSummary.data.summary.generalAvailable, 25);
   assert.equal(generalSummary.data.summary.generalLocked, 25);
+  assert.equal(generalSummary.data.summary.totalBalance, 1060,
+    "the grand total should include the reserved general withdrawal while it is pending");
   assert.equal((await review(generalPending._id, "reject")).status, 200);
   const generalReviewNoticeCount = await mongoose.connection.collection("notifications")
     .countDocuments({ userId: user._id, type: "withdrawal", title: "تم رفض طلب السحب" });
   assert.equal(generalReviewNoticeCount, 1, "the user should receive a rejection notice");
   const adminAfterGeneralReview = await call("/api/admin/notifications-summary", { cookie: adminCookie });
   assert.equal(adminAfterGeneralReview.data.counts.withdrawals, 0, "reviewed requests must disappear from pending admin count");
+  const generalAfterRejectSummary = await call("/api/withdrawals", { cookie: userCookie });
+  assert.equal(generalAfterRejectSummary.data.summary.totalBalance, 1060,
+    "rejecting a general withdrawal returns its amount and keeps the grand total unchanged");
   generalWallet = await mongoose.connection.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
   assert.equal(generalWallet.balances.find((row) => row.asset === "USDT").available, 50);
   log("General withdrawal uses configured minimum, enabled admin network and trading USDT balance; rejection returns funds");
@@ -283,7 +293,12 @@ try {
   assert.equal(savedDestination.asset, "USDT");
   assert.equal(savedDestination.network, "TRC20");
   assert.equal(savedDestination.payoutAddress, "QA-wallet-" + suffix);
-  log("Withdrawal request stores USDT network and payout address for admin review");
+  const pendingHistoryResponse = await call("/api/withdrawals", { cookie: userCookie });
+  const pendingHistoryRow = pendingHistoryResponse.data.requests.find((row) => row._id === String(savedDestination._id));
+  assert.ok(pendingHistoryRow?.createdAt, "user withdrawal history must expose the request date");
+  assert.equal(pendingHistoryRow.status, "pending");
+  assert.equal(pendingHistoryRow.type, "package");
+  log("Withdrawal request stores USDT network and payout address and appears in dated user history");
   await checkPackageBalance(oldUserPackageId, 510, 200, "pending reserve");
   const secondWhilePending = await requestWithdrawal(100);
   assert.equal(secondWhilePending.status, 409, "second pending withdrawal must be blocked");
@@ -292,12 +307,16 @@ try {
   const rejection = await review(pending._id, "reject");
   assert.equal(rejection.status, 200, "admin rejection: " + JSON.stringify(rejection.data));
   await checkPackageBalance(oldUserPackageId, 1010, 0, "rejection return");
+  const rejectedHistoryResponse = await call("/api/withdrawals", { cookie: userCookie });
+  const rejectedHistoryRow = rejectedHistoryResponse.data.requests.find((row) => row._id === String(pending._id));
+  assert.equal(rejectedHistoryRow.status, "rejected");
+  assert.ok(rejectedHistoryRow.reviewedAt, "reviewed withdrawals must include their review timestamp");
   const repeatReject = await review(pending._id, "reject");
   assert.equal(repeatReject.status, 409, "same request cannot be rejected twice");
   await checkPackageBalance(oldUserPackageId, 1010, 0, "repeat rejection protection");
   log("Single pending request enforced; rejection returned the full amount once; duplicate review blocked");
 
-  // Concurrent duplicate requests: at most one request may reserve today's package cap.
+  // Concurrent duplicate requests: at most one request may reserve the package withdrawal allowance.
   const concurrent = await Promise.all([requestWithdrawal(100), requestWithdrawal(100)]);
   assert.equal(concurrent.filter((x) => x.status === 201).length, 1,
     "only one of two concurrent request submissions must succeed: " + JSON.stringify(concurrent.map(x => ({status:x.status,message:x.data.message}))));
@@ -309,7 +328,7 @@ try {
   log("Concurrent duplicate submits created one pending request; rejection restored balance and today's cap");
 
   const initialApproveRequest = await requestWithdrawal(200);
-  assert.equal(initialApproveRequest.status, 201, "first daily-cap withdrawal: " + JSON.stringify(initialApproveRequest.data));
+  assert.equal(initialApproveRequest.status, 201, "first base-cap withdrawal: " + JSON.stringify(initialApproveRequest.data));
   pending = await latestPending();
   const approved = await review(pending._id, "approve");
   assert.equal(approved.status, 200, "admin approval: " + JSON.stringify(approved.data));
@@ -320,6 +339,9 @@ try {
   const initialWithdrawNoticeCount = await mongoose.connection.collection("notifications")
     .countDocuments({ userId: user._id, type: "withdrawal", title: "تم استلام طلب السحب" });
   assert.ok(initialWithdrawNoticeCount >= 2, "the user should be notified about package withdrawal requests");
+  const approvalNoticeCount = await mongoose.connection.collection("notifications")
+    .countDocuments({ userId: user._id, type: "withdrawal", title: "تم قبول طلب السحب" });
+  assert.ok(approvalNoticeCount >= 1, "the user should receive a notice after withdrawal approval");
   log("Approved the one-time $200 activation-based withdrawal; no next-day reset is required");
 
   // No new UTC day can reset the one-time package base cap.

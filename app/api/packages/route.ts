@@ -502,10 +502,10 @@ export async function GET(request: NextRequest) {
       const accountFamilyAvailable = Math.min(accountNetAvailable, familyAvailableRemaining);
       packageFamilyAvailableRemaining.set(
         packageGroupKey,
-        roundBalance(Math.max(0, familyAvailableRemaining - accountFamilyAvailable)),
+        roundAmount(Math.max(0, familyAvailableRemaining - accountFamilyAvailable)),
       );
       const accountGlobalAvailable = Math.min(accountNetAvailable, globalPackageAvailableRemaining);
-      globalPackageAvailableRemaining = roundBalance(
+      globalPackageAvailableRemaining = roundAmount(
         Math.max(0, globalPackageAvailableRemaining - accountGlobalAvailable),
       );
       const referralCap = activeReferralDepositTotal * referralPackageWithdrawalPercent / 100;

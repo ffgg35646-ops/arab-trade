@@ -18,6 +18,9 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
     status: { $in: ["pending", "processing"] },
   }).select("userPackageId packageAllocations").lean();
   const livePackageIds = new Set<string>();
+  // Any approved payout that cannot be fully tied to an actual reservation or
+  // a known orphan-release credit is left untouched by the cash reconciliation.
+  const approvalBalancesBlocked = new Set<string>();
   for (const request of liveRequests as any[]) {
     livePackageIds.add(String(request.userPackageId || ""));
     for (const allocation of request.packageAllocations || []) {
@@ -118,6 +121,7 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
         if (marked.matchedCount !== 1) throw new Error("APPROVED_PACKAGE_REQUEST_CHANGED");
       });
     } catch (error) {
+      for (const allocation of allocations) approvalBalancesBlocked.add(allocation.userPackageId);
       console.error("PACKAGE APPROVAL LEGACY SETTLEMENT: request left unchanged", String(request._id), error);
     } finally {
       await session.endSession();
@@ -278,8 +282,12 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
           }
 
           // No matching locked amount or orphan-return credit: preserve the
-          // balance for inspection rather than inventing a deduction.
-          if (!updatedPackage) continue;
+          // balance for inspection rather than inventing a deduction. Also stop
+          // the later aggregate reconciliation from changing this same account.
+          if (!updatedPackage) {
+            approvalBalancesBlocked.add(allocation.userPackageId);
+            continue;
+          }
 
           await PackageLedger.create([{
             userId,
@@ -292,6 +300,7 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
         }
       });
     } catch (error) {
+      for (const allocation of allocations) approvalBalancesBlocked.add(allocation.userPackageId);
       console.error("PACKAGE APPROVAL BALANCE REPAIR: request left unchanged", requestId, error);
     } finally {
       await session.endSession();
@@ -429,6 +438,25 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
   const settledAmountByPackage = new Map<string, number>();
   const reconciliationSafePackageIds = new Set<string>();
   const reconciliationBlockedPackageIds = new Set<string>();
+  for (const packageId of approvalBalancesBlocked) reconciliationBlockedPackageIds.add(packageId);
+
+  // Approved requests that remain unsettled after the lock-repair passes are
+  // excluded from principal/cash reconciliation until their payout evidence is
+  // understood. In particular, do not zero their existing balance just because
+  // the old request says "approved".
+  const unsettledApprovedForBalance = await WithdrawalRequest.find({
+    userId,
+    source: "package",
+    status: "approved",
+    packageBalanceSettled: { $ne: true },
+  }).select("userPackageId packageAllocations").lean();
+  for (const request of unsettledApprovedForBalance as any[]) {
+    if (request.userPackageId) reconciliationBlockedPackageIds.add(String(request.userPackageId));
+    for (const allocation of request.packageAllocations || []) {
+      if (allocation.userPackageId) reconciliationBlockedPackageIds.add(String(allocation.userPackageId));
+    }
+  }
+
   for (const request of liveRequests as any[]) {
     if (request.userPackageId) reconciliationSafePackageIds.add(String(request.userPackageId));
     for (const allocation of request.packageAllocations || []) {
@@ -481,7 +509,11 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
 
   for (const account of packageAccounts as any[]) {
     const packageId = String(account._id);
-    if (reconciliationSafePackageIds.has(packageId) || reconciliationBlockedPackageIds.has(packageId)) continue;
+    if (
+      reconciliationSafePackageIds.has(packageId) ||
+      reconciliationBlockedPackageIds.has(packageId) ||
+      approvalBalancesBlocked.has(packageId)
+    ) continue;
 
     const requestTotal = roundBalance(settledAmountByPackage.get(packageId) || 0);
     const available = Math.max(0, Number(account.availableEarnings || 0));

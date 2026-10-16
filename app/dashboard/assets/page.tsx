@@ -119,7 +119,6 @@ export default function WalletPage() {
   });
 
   const [depositBalances, setDepositBalances] = useState<SplitBalance[]>([]);
-  const [withdrawalBalances, setWithdrawalBalances] = useState<SplitBalance[]>([]);
 
   const [transactions, setTransactions] = useState<
     TransactionItem[]
@@ -156,7 +155,6 @@ export default function WalletPage() {
 
       setWallet(data.wallet);
       setDepositBalances(Array.isArray(data.depositBalances) ? data.depositBalances : []);
-      setWithdrawalBalances(Array.isArray(data.withdrawalBalances) ? data.withdrawalBalances : []);
       setTransactions(data.transactions || []);
     } catch (error: any) {
       setError(
@@ -314,7 +312,7 @@ export default function WalletPage() {
                   </div>
 
                   <p className="mt-3 text-xs text-slate-500">
-                    هذا الإجمالي يشمل رصيد التداول والتمويل والإيداع الخارجي؛ رصيد السحب العام والإيداع الخارجي معروضان بشكل منفصل أدناه.
+                    هذا الإجمالي يشمل رصيد التداول والتمويل والإيداع الخارجي؛ رصيد الإيداع الخارجي معروض بشكل منفصل أدناه.
                   </p>
                 </div>
 
@@ -327,13 +325,6 @@ export default function WalletPage() {
                     إيداع
                   </Link>
 
-                  <Link
-                    href="/dashboard/assets/withdraw"
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3.5 text-sm font-bold text-slate-200 transition hover:border-blue-400/20 hover:bg-blue-500/10"
-                  >
-                    <ArrowUpFromLine size={17} />
-                    سحب
-                  </Link>
 
                   <Link
                     href="/protrade"
@@ -359,19 +350,6 @@ export default function WalletPage() {
                     </div>
                   )) : <p className="text-sm text-slate-500">لا يوجد رصيد إيداع خارجي متاح حاليًا.</p>}
                 </div>
-              </div>
-              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.06] p-5">
-                <div className="text-sm font-bold text-emerald-200">رصيد السحب من داخل الموقع</div>
-                <p className="mt-1 text-xs text-slate-400">يشمل رصيد المحفظة وأرباح الباقات المتاحة واستردادات الباقات وعمولات الإحالة المسجلة.</p>
-                <div className="mt-4 space-y-2">
-                  {withdrawalBalances.length ? withdrawalBalances.map((item) => (
-                    <div key={item.asset} className="flex items-center justify-between rounded-xl bg-black/20 px-3 py-2 text-sm">
-                      <span className="font-bold">{item.asset}</span>
-                      <span>{hideBalance ? "••••••" : assetAmount(item.available)} <span className="text-slate-500">متاح</span>{item.locked > 0 ? <span className="mr-2 text-amber-300">({hideBalance ? "••••" : assetAmount(item.locked)} محجوز)</span> : null}</span>
-                    </div>
-                  )) : <p className="text-sm text-slate-500">لا يوجد رصيد سحب متاح حاليًا.</p>}
-                </div>
-                <Link href="/dashboard/assets/withdraw" className="mt-4 inline-flex rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-500">عرض خيارات السحب</Link>
               </div>
             </section>
 
@@ -580,12 +558,6 @@ export default function WalletPage() {
                                 إيداع
                               </Link>
 
-                              <Link
-                                href="/dashboard/assets/withdraw"
-                                className="rounded-xl border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-blue-500/10 hover:text-cyan-300"
-                              >
-                                سحب
-                              </Link>
 
                             </div>
                           </td>
@@ -635,7 +607,7 @@ export default function WalletPage() {
                   </h3>
 
                   <p className="mt-2 text-xs text-slate-600">
-                    ستظهر عمليات الإيداع والسحب والأرباح هنا.
+                    ستظهر عمليات الإيداع والأرباح هنا.
                   </p>
                 </div>
               ) : (

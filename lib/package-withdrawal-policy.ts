@@ -2,9 +2,10 @@ export const roundWithdrawal = (n: number) => Math.round((n + Number.EPSILON) * 
 
 /**
  * First withdrawal phase:
- * the cumulative allowance is limited to the first activation/deposit amount for this package.
+ * the daily allowance is limited to the first activation/deposit amount for this package.
+ * Approved and pending withdrawals consume today's cap; rejected requests do not.
  * Collected profits and cancellation refunds increase the package balance, not this allowance.
- * Any later withdrawal phase is intentionally left out until its rule is defined.
+ * Any separate rule for withdrawing beyond this daily cap is intentionally left out until defined.
  */
 export function withdrawalAllowance(activation: number, used: number) {
   return roundWithdrawal(Math.max(0, Number(activation || 0) - Math.max(0, Number(used || 0))));
@@ -22,7 +23,7 @@ export function validateWithdrawal(amount: number, minimum: number, balance: num
   if (amount > available) {
     return available > 0
       ? "المتاح للسحب " + available + " USDT فقط"
-      : "تم استنفاد حد السحب الحالي لهذه الباقة";
+      : "تم استنفاد حد السحب اليومي لهذه الباقة";
   }
   return null;
 }

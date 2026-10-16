@@ -126,13 +126,21 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
   // Older rejection handlers sometimes released the lock without returning the
   // requested amount to availableEarnings. Restore only rejected requests that
   // have no matching reversal ledger entry from the original decision.
-  const stillUnsettledApproved = await WithdrawalRequest.exists({
+  // An approved legacy request that still cannot be reconciled protects only
+  // the package accounts it references. Do not block refunds/repairs for other
+  // independent package accounts belonging to the same user.
+  const remainingUnsettledApproved = await WithdrawalRequest.find({
     userId,
     source: "package",
     status: "approved",
     packageBalanceSettled: { $ne: true },
-  });
-  if (stillUnsettledApproved) return;
+  }).select("userPackageId packageAllocations").lean();
+  for (const request of remainingUnsettledApproved as any[]) {
+    livePackageIds.add(String(request.userPackageId || ""));
+    for (const allocation of request.packageAllocations || []) {
+      livePackageIds.add(String(allocation.userPackageId || ""));
+    }
+  }
 
   // Some older deployments set packageBalanceSettled before the locked amount
   // was actually consumed. Repair only when the request is approved and either

@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
    const allowance = withdrawalAllowance(Number(a.investedAmount), Number(referralTotal), used);
    return { _id: String(a._id), status: a.status, balance: roundWithdrawal(Number(a.availableEarnings || 0)), locked: roundWithdrawal(Number(a.lockedEarnings || 0)), allowance, available: availableToWithdraw(Number(a.availableEarnings || 0), allowance) };
   }),
- })), requests: requests.map(r => ({ _id: String(r._id), userPackageId: String(r.userPackageId), amount: r.amount, status: r.status, createdAt: r.createdAt })) });
+ })), requests: requests.map(r => ({ _id: String(r._id), userPackageId: String(r.userPackageId), amount: r.amount, asset: r.asset || "USDT", network: r.network, payoutAddress: r.payoutAddress, status: r.status, createdAt: r.createdAt })) });
 }
 export async function POST(request: NextRequest) {
  const user = await getCurrentUser(request);
@@ -39,6 +39,12 @@ export async function POST(request: NextRequest) {
  const body = await request.json().catch(() => ({}));
  const id = String(body.userPackageId || "");
  const amount = Number(body.amount);
+ const asset = String(body.asset || "").trim().toUpperCase();
+ const network = String(body.network || "").trim().toUpperCase();
+ const payoutAddress = String(body.payoutAddress || "").trim();
+ if (asset !== "USDT") return NextResponse.json({ success: false, message: "العملة غير مدعومة" }, { status: 400 });
+ if (!["TRC20", "BEP20"].includes(network)) return NextResponse.json({ success: false, message: "شبكة السحب غير صحيحة" }, { status: 400 });
+ if (payoutAddress.length < 3 || payoutAddress.length > 200) return NextResponse.json({ success: false, message: "عنوان الدفع غير صحيح" }, { status: 400 });
  if (!mongoose.isValidObjectId(id)) return NextResponse.json({ success: false, message: "الباقة غير صحيحة" }, { status: 400 });
  const session = await mongoose.startSession();
  try {
@@ -59,7 +65,7 @@ export async function POST(request: NextRequest) {
    if (message) throw new Error(message);
    const reserved = await UserPackage.updateOne({ _id: account._id, userId: user._id, availableEarnings: { $gte: amount } }, { $inc: { availableEarnings: -amount, lockedEarnings: amount } }, { session });
    if (reserved.modifiedCount !== 1) throw new Error("الرصيد تغير، حاول مجددًا");
-   await WithdrawalRequest.create([{ userId: user._id, userPackageId: account._id, packageId: account.packageId, amount, status: "pending" }], { session });
+   await WithdrawalRequest.create([{ userId: user._id, userPackageId: account._id, packageId: account.packageId, amount, asset, network, payoutAddress, status: "pending" }], { session });
   });
   return NextResponse.json({ success: true, message: "تم إنشاء طلب السحب وحجز المبلغ" }, { status: 201 });
  } catch(e) {

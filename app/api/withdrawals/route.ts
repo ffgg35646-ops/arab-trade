@@ -567,7 +567,9 @@ export async function POST(request: NextRequest) {
       // The cash bucket is tracked per activation, while historic overpayments
       // are offset within the same package family. Never permit a withdrawal that
       // exceeds the family's net available balance.
-      const packageFamilyNetAvailable = packageFamilyRows.reduce(
+      // A historical debt in any package reduces the user's total cash
+      // budget. Still require the selected activation itself to hold the funds.
+      const packageGlobalNetAvailable = sameNamePackageRows.reduce(
         (sum: number, row: any) =>
           sum +
           Math.max(0, Number(row.availableEarnings || 0)) -
@@ -576,7 +578,7 @@ export async function POST(request: NextRequest) {
       );
       const packageAvailable = Math.min(
         Math.max(0, Number(currentPackage.availableEarnings || 0)),
-        Math.max(0, packageFamilyNetAvailable),
+        Math.max(0, packageGlobalNetAvailable),
       );
       const packageInvestedAmount = packageFamilyRows.reduce(
         (sum: number, row: any) => sum + Math.max(0, Number(row.investedAmount || 0)),

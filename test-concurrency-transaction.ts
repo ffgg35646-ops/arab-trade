@@ -39,7 +39,6 @@ async function main() {
           type: "crypto",
           enabled: true,
           depositEnabled: false,
-          withdrawalEnabled: false,
           tradingEnabled: true,
           sortOrder: 9992,
           networks: [],

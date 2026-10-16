@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
   const packageWithdrawal = {
     balance: roundWithdrawal(packageBuckets.reduce((sum, bucket) => sum + bucket.balance, 0)),
     locked: roundWithdrawal(packageBuckets.reduce((sum, bucket) => sum + bucket.locked, 0)),
-    allowance: roundWithdrawal(packageBuckets.reduce((sum, bucket) => sum + bucket.allowance, 0)),
+    allowance: roundWithdrawal(packageBuckets.reduce((sum, bucket) => sum + (bucket.balance > 0 ? bucket.allowance : 0), 0)),
     available: roundWithdrawal(packageBuckets.reduce((sum, bucket) => sum + bucket.available, 0)),
     minimum: packageBuckets
       .filter((bucket) => bucket.balance > 0)
@@ -268,7 +268,7 @@ export async function POST(request: NextRequest) {
           throw new Error("لا توجد أرصدة باقات قابلة للسحب وفق الحدود الدنيا المحددة");
         }
         if (amount > eligibleCapacity) {
-          throw new Error("المتاح للسحب وفق الحدود الدنيا لهذا المبلغ هو " + eligibleCapacity + " USDT فقط");
+          throw new Error("المتاح للسحب " + eligibleCapacity + " USDT فقط وفق حدود الباقات");
         }
 
         let remaining = amount;

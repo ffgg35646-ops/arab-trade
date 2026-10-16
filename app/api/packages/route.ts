@@ -449,6 +449,7 @@ export async function GET(request: NextRequest) {
     // Balance buckets belong to one UserPackage activation record. Only the
     // first-withdrawal policy cap is grouped by package family; money itself is not.
     const packageInvestedByName = new Map<string, number>();
+    const packageFamilyAvailableBalance = new Map<string, number>();
     for (const account of rawUserPackages as any[]) {
       const key = String(account._id);
       const groupKey = packageGroupByAccountId.get(key) || "account:" + key;
@@ -456,7 +457,18 @@ export async function GET(request: NextRequest) {
         groupKey,
         roundAmount((packageInvestedByName.get(groupKey) || 0) + Math.max(0, Number(account.investedAmount || 0))),
       );
+      packageFamilyAvailableBalance.set(
+        groupKey,
+        roundAmount(
+          (packageFamilyAvailableBalance.get(groupKey) || 0) +
+            Math.max(0, Number(account.availableEarnings || 0)) -
+            Math.max(0, Number(account.withdrawalBalanceDebt || 0)),
+        ),
+      );
     }
+    const packageFamilyAvailableRemaining = new Map(
+      [...packageFamilyAvailableBalance.entries()].map(([key, value]) => [key, Math.max(0, value)] as const)
+    );
 
     const dailyProfitByPackage = new Map(
       (allPlansForProfit as any[]).map((plan) => [String(plan._id), Math.max(0, Number(plan.dailyProfit || 0))])
@@ -470,6 +482,15 @@ export async function GET(request: NextRequest) {
       const collectWindowOpen = item.status === "active" && collectionNow >= nextCollectAt && collectionNow <= collectWindowEndsAt;
       const packageKey = String(item._id);
       const packageGroupKey = packageGroupByAccountId.get(packageKey) || "account:" + packageKey;
+      const familyAvailableRemaining = Math.max(0, packageFamilyAvailableRemaining.get(packageGroupKey) || 0);
+      const accountFamilyAvailable = Math.min(
+        Math.max(0, Number(item.availableEarnings || 0)),
+        familyAvailableRemaining,
+      );
+      packageFamilyAvailableRemaining.set(
+        packageGroupKey,
+        roundAmount(Math.max(0, familyAvailableRemaining - accountFamilyAvailable)),
+      );
       const referralCap = activeReferralDepositTotal * referralPackageWithdrawalPercent / 100;
       const referralAlreadyWithdrawn = referralAlreadyWithdrawnTotal;
       const referralRemaining = Math.max(0, referralCap - referralAlreadyWithdrawn);
@@ -504,7 +525,7 @@ export async function GET(request: NextRequest) {
         : Math.min(Math.max(0, Number(item.availableEarnings || 0)), packageWithdrawalAlreadyUsed || firstPackageWithdrawalRemaining <= 1e-8
           ? referralRemaining
           : firstPackageWithdrawalRemaining);
-      const withdrawalLimit = phaseWithdrawalLimit;
+      const withdrawalLimit = Math.min(phaseWithdrawalLimit, accountFamilyAvailable);
       return {
         ...item,
         firstPackageWithdrawalCap,

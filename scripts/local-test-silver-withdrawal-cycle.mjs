@@ -393,7 +393,7 @@ async function main() {
         .find({ userId: user._id })
         .sort({ createdAt: 1, _id: 1 })
         .toArray()).map((row) => String(row._id));
-      assert.deepEqual(requestIdsAfter150, initialRequestIds, "Rejected/failed 150-USDT attempt created a request unexpectedly.");
+      assert.deepEqual([...requestIdsAfter150].sort(), [...initialRequestIds].sort(), "Rejected/failed 150-USDT attempt created a request unexpectedly.");
       assert.deepEqual(after150.rows, balanceBefore.rows, "150-USDT attempt changed Silver package balances.");
       first150PolicyPass = attempt150.status === 409 &&
         attempt150.body.message === "المتاح للسحب 100 USDT فقط";

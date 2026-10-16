@@ -146,6 +146,17 @@ try {
   assert.equal(deposit.available, 100, "changing package should spend only new package activation from deposits");
   log("Changed package; exactly $100 refund credited back to old package, deposit balance remained separate");
 
+  const setHigherMinimum = await call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie,
+    body: { action: "minimum", packageId: packageAId, minimum: 125 } });
+  assert.equal(setHigherMinimum.status, 200);
+  const belowChangedMinimum = await requestWithdrawal(100);
+  assert.equal(belowChangedMinimum.status, 409, "changed $125 minimum must block $100 request");
+  assert.match(belowChangedMinimum.data.message, /الحد الأدنى للسحب هو 125/);
+  const resetMinimum = await call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie,
+    body: { action: "minimum", packageId: packageAId, minimum: 100 } });
+  assert.equal(resetMinimum.status, 200);
+  log("Admin minimum change is enforced by the live withdrawals API");
+
   const minimumBlock = await requestWithdrawal(100);
   assert.equal(minimumBlock.status, 409);
   assert.match(minimumBlock.data.message, /الحد الأدنى للسحب هو 100|رصيد سحب الباقة/);

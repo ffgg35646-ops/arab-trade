@@ -15,6 +15,7 @@ import Wallet from "@/models/Wallet";
 import User from "@/models/User";
 import DepositRequest from "@/models/DepositRequest";
 import PlatformSettings from "@/models/PlatformSettings";
+import Notification from "@/models/Notification";
 import { separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
 import {
   roundWithdrawal,
@@ -35,66 +36,32 @@ function getUsdtAvailable(wallet: { balances?: Array<{ asset?: string; available
   ));
 }
 
-function currentWithdrawalDayStart() {
-  const start = new Date();
-  start.setUTCHours(0, 0, 0, 0);
-  return start;
-}
-
-function packageRequestAllocations(item: any) {
-  if (item.status === "rejected" || item.type === "general") return [];
-  const allocations = Array.isArray(item.allocations) ? item.allocations : [];
-  const byPackage = new Map<string, number>();
-  if (allocations.some((allocation: any) => allocation.packageId)) {
-    for (const allocation of allocations) {
-      if (!allocation.packageId) continue;
-      const id = String(allocation.packageId);
-      byPackage.set(id, roundWithdrawal((byPackage.get(id) || 0) + Number(allocation.amount || 0)));
-    }
-    return Array.from(byPackage, ([packageId, amount]) => ({ packageId, amount }));
-  }
-  if (!item.packageId) return [];
-  const amount = roundWithdrawal(allocations.length
-    ? allocations.reduce((sum: number, allocation: any) => sum + Number(allocation.amount || 0), 0)
-    : Number(item.amount || 0));
-  return amount > 0 ? [{ packageId: String(item.packageId), amount }] : [];
-}
-
 function packageWithdrawalUsage(
   requests: any[],
   planId: string,
   activationAmount: number,
-  dayStart: Date,
   activationCaps: Map<string, number>,
 ) {
-  const byPlanDay = new Map<string, { packageId: string; dayKey: string; amount: number }>();
+  const byPackage = new Map<string, { packageId: string; amount: number }>();
   for (const item of requests) {
-    if (!["pending", "approved"].includes(String(item.status || ""))) continue;
-    const createdAt = item.createdAt ? new Date(item.createdAt) : null;
-    if (!createdAt || !Number.isFinite(createdAt.getTime())) continue;
-    const dayKey = createdAt.toISOString().slice(0, 10);
+    if (![ "pending", "approved" ].includes(String(item.status || ""))) continue;
     for (const allocation of packageRequestAllocations(item)) {
       if (allocation.amount <= 0) continue;
-      const key = allocation.packageId + ":" + dayKey;
-      const row = byPlanDay.get(key) || { packageId: allocation.packageId, dayKey, amount: 0 };
+      const row = byPackage.get(allocation.packageId) || { packageId: allocation.packageId, amount: 0 };
       row.amount = roundWithdrawal(row.amount + allocation.amount);
-      byPlanDay.set(key, row);
+      byPackage.set(allocation.packageId, row);
     }
   }
 
-  const todayKey = dayStart.toISOString().slice(0, 10);
-  const usedToday = roundWithdrawal(Array.from(byPlanDay.values())
-    .filter((row) => row.packageId === planId && row.dayKey === todayKey)
-    .reduce((sum, row) => sum + row.amount, 0));
-
-  // Referral capacity is user-level: the same referral deposits cannot unlock
-  // multiple package buckets. Each package's daily base is excluded before
-  // computing the additional amount already consumed across all packages.
-  const referralUsed = roundWithdrawal(Array.from(byPlanDay.values()).reduce((sum, row) => {
+  const usedBase = roundWithdrawal(byPackage.get(planId)?.amount || 0);
+  // The base activation cap and referral capacity are cumulative, not daily.
+  // Referral capacity is shared across all package buckets and only pending/approved
+  // requests consume it; rejected requests are returned to available balances.
+  const referralUsed = roundWithdrawal(Array.from(byPackage.values()).reduce((sum, row) => {
     const baseCap = Math.max(0, Number(activationCaps.get(row.packageId) || 0));
     return sum + Math.max(0, row.amount - baseCap);
   }, 0));
-  return { usedToday, referralUsed, activationAmount };
+  return { usedBase, referralUsed, activationAmount };
 }
 
 async function activeReferralDepositStats(referrerId: mongoose.Types.ObjectId, session?: mongoose.ClientSession) {
@@ -144,7 +111,6 @@ export async function GET(request: NextRequest) {
     activeReferralDepositStats(user._id),
   ]);
 
-  const withdrawalDayStart = currentWithdrawalDayStart();
   const activationCaps = new Map<string, number>();
   for (const row of sourceAccounts) {
     const planId = String(row.packageId);
@@ -152,63 +118,71 @@ export async function GET(request: NextRequest) {
       activationCaps.set(planId, roundWithdrawal(Number(row.investedAmount || 0)));
     }
   }
-  const packages = plans.flatMap((plan) => {
+  // Show one withdrawal card for every package in the admin catalog, even before
+  // the user activates it. API validation still refuses withdrawals without an account.
+  const packages = plans.map((plan) => {
     const rows = sourceAccounts.filter((account) => String(account.packageId) === String(plan._id));
     const balance = roundWithdrawal(rows.reduce((sum, account) => sum + Number(account.availableEarnings || 0), 0));
     const locked = roundWithdrawal(rows.reduce((sum, account) => sum + Number(account.lockedEarnings || 0), 0));
     const hasActiveAccount = rows.some((account) => account.status === "active");
     const planId = String(plan._id);
-    const pending = requests.some((item: any) => item.status === "pending" && (
-      String(item.packageId || "") === planId ||
-      (Array.isArray(item.allocations) && item.allocations.some((allocation: any) => String(allocation.packageId || "") === planId))
-    ));
-    const hasOutstandingFunds = balance > 0 || locked > 0 || pending;
-    // Hide unused catalog entries and historical activations that have no balance.
-    // Keep the plan visible if it is active or still owns funds / a pending withdrawal.
-    if (!hasActiveAccount && !hasOutstandingFunds) return [];
-
-    // Rows are sorted oldest-first: the first activation sets this package's daily base allowance.
     const firstActivation = rows.find((account) => Number(account.investedAmount || 0) > 0);
     const activationAmount = roundWithdrawal(Number(firstActivation?.investedAmount || 0));
-    const usage = packageWithdrawalUsage(requests, planId, activationAmount, withdrawalDayStart, activationCaps);
-    const dailyAllowance = rows.length ? withdrawalAllowance(activationAmount, usage.usedToday) : 0;
+    const usage = packageWithdrawalUsage(requests, planId, activationAmount, activationCaps);
+    const baseAllowance = rows.length ? withdrawalAllowance(activationAmount, usage.usedBase) : 0;
     const referralPercent = Math.min(100, Math.max(0, Number(platformSettings.withdrawals?.packageReferralUnlockPercent ?? 50)));
     const referralAllowance = rows.length
       ? referralWithdrawalAllowance(referralStats.approvedDepositTotal, referralPercent, usage.referralUsed)
       : 0;
-    const allowance = totalWithdrawalAllowance(dailyAllowance, referralAllowance);
-    const account = rows.length ? {
+    const allowance = totalWithdrawalAllowance(baseAllowance, referralAllowance);
+    const account = {
       _id: String(plan._id),
       sourceAccountIds: rows.map((row) => String(row._id)),
-      status: hasActiveAccount ? "active" : "cancelled",
+      status: hasActiveAccount ? "active" : rows.length ? "cancelled" : "not_activated",
       balance,
       locked,
+      activationAmount,
       allowance,
-      dailyAllowance,
+      baseAllowance,
+      // Kept as a compatibility alias for the existing local QA scripts.
+      dailyAllowance: baseAllowance,
       activeReferralCount: referralStats.activeReferralCount,
       referralDepositTotal: referralStats.approvedDepositTotal,
       referralUnlockPercent: referralPercent,
       referralUsed: usage.referralUsed,
       referralAllowance,
-      available: availableToWithdraw(balance, allowance),
-      hasAccount: true,
-    } : null;
+      available: rows.length ? availableToWithdraw(balance, allowance) : 0,
+      hasAccount: rows.length > 0,
+    };
 
-    return [{
+    return {
       _id: String(plan._id),
       name: plan.name,
       price: Number(plan.price || 0),
       minimum: Number(plan.withdrawalMinimum || 100),
       enabled: Boolean(plan.enabled),
       account,
-    }];
+    };
   });
-
+  const generalLocked = roundWithdrawal(requests
+    .filter((item: any) => (item.type || "package") === "general" && item.status === "pending")
+    .reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0));
+  const packageAvailable = roundWithdrawal(packages.reduce((sum, plan) => sum + Number(plan.account?.balance || 0), 0));
+  const packageLocked = roundWithdrawal(packages.reduce((sum, plan) => sum + Number(plan.account?.locked || 0), 0));
+  const generalAvailable = getUsdtAvailable(wallet);
+  const totalBalance = roundWithdrawal(generalAvailable + generalLocked + packageAvailable + packageLocked);
 
   return NextResponse.json({
     success: true,
+    summary: {
+      totalBalance,
+      generalAvailable,
+      generalLocked,
+      packageAvailable,
+      packageLocked,
+    },
     general: {
-      available: getUsdtAvailable(wallet),
+      available: generalAvailable,
       minimum: Number(platformSettings.withdrawals?.generalMinimum || 0),
       configured: Number(platformSettings.withdrawals?.generalMinimum || 0) > 0,
     },
@@ -224,6 +198,7 @@ export async function GET(request: NextRequest) {
       payoutAddress: item.payoutAddress,
       status: item.status,
       createdAt: item.createdAt,
+      reviewedAt: item.reviewedAt,
     })),
   });
 }
@@ -257,6 +232,8 @@ export async function POST(request: NextRequest) {
   }
 
   const session = await mongoose.startSession();
+  let createdWithdrawal: any = null;
+  let withdrawalPackageName = "";
   try {
     await session.withTransaction(async () => {
       const existing = await WithdrawalRequest.findOne({ userId: user._id, status: "pending" }).session(session);
@@ -280,14 +257,16 @@ export async function POST(request: NextRequest) {
         );
         if (reserved.modifiedCount !== 1) throw new Error("الرصيد العام تغير، حاول مجددًا");
 
-        await WithdrawalRequest.create([{
+        const created = await WithdrawalRequest.create([{
           userId: user._id, type: "general", amount, asset, network, payoutAddress, status: "pending",
         }], { session });
+        createdWithdrawal = created[0];
         return;
       }
 
       const plan = await InvestmentPackage.findById(packageId).session(session);
       if (!plan) throw new Error("الباقة غير موجودة");
+      withdrawalPackageName = String(plan.name || "");
       const allUserAccounts = await UserPackage.find({ userId: user._id })
         .sort({ createdAt: 1 }).session(session).lean();
       const activationCaps = new Map<string, number>();
@@ -306,13 +285,13 @@ export async function POST(request: NextRequest) {
         status: { $in: ["pending", "approved"] },
         type: { $ne: "general" },
       }).session(session).lean();
-      // The first activation amount remains the per-UTC-day base allowance.
-      // Extra capacity comes from 50% (admin-configurable) of credited deposits by active referrals,
-      // minus extra withdrawals already consumed beyond each day's base allowance.
+      // The activation amount is a one-time base allowance for this package bucket.
+      // Extra capacity comes from credited deposits by active referrals, minus cumulative
+      // package withdrawals already consumed beyond each package's base allowance.
       const firstActivation = accounts.find((account) => Number(account.investedAmount || 0) > 0);
       const activationAmount = roundWithdrawal(Number(firstActivation?.investedAmount || 0));
-      const usage = packageWithdrawalUsage(prior, String(plan._id), activationAmount, currentWithdrawalDayStart(), activationCaps);
-      const dailyAllowance = withdrawalAllowance(activationAmount, usage.usedToday);
+      const usage = packageWithdrawalUsage(prior, String(plan._id), activationAmount, activationCaps);
+      const baseAllowance = withdrawalAllowance(activationAmount, usage.usedBase);
       const referralStats = await activeReferralDepositStats(user._id, session);
       const settings = await PlatformSettings.findOne({ key: "global" }).session(session).lean();
       const referralPercent = Math.min(100, Math.max(0, Number(settings?.withdrawals?.packageReferralUnlockPercent ?? 50)));
@@ -321,9 +300,9 @@ export async function POST(request: NextRequest) {
         referralPercent,
         usage.referralUsed,
       );
-      const allowance = totalWithdrawalAllowance(dailyAllowance, referralAllowance);
+      const allowance = totalWithdrawalAllowance(baseAllowance, referralAllowance);
       const minimum = Number(plan.withdrawalMinimum || 100);
-      const referralRequired = dailyAllowance <= 0 && referralAllowance <= 0;
+      const referralRequired = baseAllowance <= 0 && referralAllowance <= 0;
       const validationMessage = validateWithdrawal(amount, minimum, totalBalance, allowance, referralRequired);
       if (validationMessage) throw new Error(validationMessage);
 
@@ -345,7 +324,7 @@ export async function POST(request: NextRequest) {
       }
       if (remaining > 0 || !allocations.length) throw new Error("تعذر حجز كامل مبلغ السحب؛ لم يتم إنشاء الطلب");
 
-      await WithdrawalRequest.create([{
+      const created = await WithdrawalRequest.create([{
         userId: user._id,
         type: "package",
         userPackageId: allocations[0].userPackageId,
@@ -357,8 +336,23 @@ export async function POST(request: NextRequest) {
         payoutAddress,
         status: "pending",
       }], { session });
+      createdWithdrawal = created[0];
     });
 
+    if (createdWithdrawal) {
+      try {
+        const sourceLabel = type === "general" ? "السحب العام" : "باقة " + (withdrawalPackageName || "الباقة");
+        await Notification.create({
+          userId: user._id,
+          type: "withdrawal",
+          title: "تم استلام طلب السحب",
+          message: "تم استلام طلب سحب بقيمة " + amount + " USDT من " + sourceLabel + ". تم حجز المبلغ مؤقتًا لحين مراجعة الأدمن.",
+          read: false,
+        });
+      } catch (notificationError) {
+        console.error("WITHDRAWAL REQUEST NOTIFICATION:", notificationError);
+      }
+    }
     return NextResponse.json({ success: true, message: "تم إنشاء طلب السحب وحجز المبلغ" }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "تعذر إنشاء الطلب";

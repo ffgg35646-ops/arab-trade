@@ -487,20 +487,17 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
     const available = Math.max(0, Number(account.availableEarnings || 0));
     const locked = Math.max(0, Number(account.lockedEarnings || 0));
     const debt = Math.max(0, Number(account.withdrawalBalanceDebt || 0));
-    const effectiveCurrentBalance = roundBalance(available + locked - debt);
+    const actualNetBalance = roundBalance(available + locked - debt);
 
     const ledgerRows = await PackageLedger.find({
       userId,
       userPackageId: account._id,
     }).select("type amount note createdAt").sort({ createdAt: 1, _id: 1 }).lean();
 
-    const principalRows = (ledgerRows as any[]).filter((row) => String(row.type || "") === "activation_withdrawable");
-    const principalLedgerTotal = roundBalance(principalRows.reduce(
-      (sum: number, row: any) => sum + Number(row.amount || 0),
-      0,
-    ));
+    const principalRows = (ledgerRows as any[]).filter(
+      (row) => String(row.type || "") === "activation_withdrawable"
+    );
     const hasPrincipalRows = principalRows.length > 0;
-
     const earningsLedgerTotal = (ledgerRows as any[]).reduce(
       (sum: number, row: any) => {
         if (!["daily_earning", "realized_earning", "reward"].includes(String(row.type || ""))) return sum;
@@ -516,34 +513,42 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
     );
     const cancellationRefund = Math.max(0, Number(account.cancellationRefund || 0));
 
-    // Principal is a withdrawal cap, not a cash credit. The actual package
-    // balance is refunds + realized earnings - settled paid withdrawals.
+    // The displayed cash bucket must contain refunds and realized earnings,
+    // less successful payouts. Package activation principal is only the first
+    // withdrawal cap and is never part of the withdrawable cash balance.
     const expectedNetBalance = roundBalance(cancellationRefund + realizedEarnings - requestTotal);
     const expectedAvailable = Math.max(0, expectedNetBalance);
     const expectedDebt = Math.max(0, -expectedNetBalance);
-    const balanceDifference = roundBalance(effectiveCurrentBalance - expectedNetBalance);
+    const balanceDifference = roundBalance(actualNetBalance - expectedNetBalance);
     const alreadyReconciled = account.withdrawalBalanceReconciled === true;
+    const investedAmount = Math.max(0, Number(account.investedAmount || 0));
 
-    if (Math.abs(balanceDifference) <= epsilon &&
-      Math.abs(Number(account.totalWithdrawn || 0) - requestTotal) <= epsilon &&
-      Math.abs(locked) <= epsilon &&
-      alreadyReconciled) {
-      reconciledPackageIds.add(packageId);
+    // Apply the first migration only when the account has principal-ledger
+    // evidence, a matching legacy principal discrepancy, or was already
+    // reconciled by this cash-only model. For accounts with no evidence, do not
+    // guess by erasing an arbitrary available balance.
+    const hasLegacyPrincipalDiscrepancy =
+      Math.abs(balanceDifference - investedAmount) <= epsilon;
+    const canReconcile = alreadyReconciled ||
+      hasPrincipalRows ||
+      hasLegacyPrincipalDiscrepancy ||
+      Math.abs(balanceDifference) <= epsilon;
+
+    if (!canReconcile || balanceDifference < -epsilon) {
+      // A deficit compared with the independent cash calculation is never
+      // silently topped up. Leave it visible for investigation.
       continue;
     }
 
-    // For the first migration only, adjust an account when the complete balance
-    // difference is exactly explained by its posted activation-withdrawable
-    // principal credits. Do not guess if the ledger or the balance does not match.
-    if (!alreadyReconciled) {
-      const principalExplainsDifference = hasPrincipalRows &&
-        principalLedgerTotal > epsilon &&
-        Math.abs(balanceDifference - principalLedgerTotal) <= epsilon;
-      const alreadyCashOnly = !hasPrincipalRows &&
-        Math.abs(balanceDifference) <= epsilon;
-      if (!principalExplainsDifference && !alreadyCashOnly) {
-        continue;
-      }
+    const needsChange =
+      Math.abs(balanceDifference) > epsilon ||
+      Math.abs(Number(account.totalWithdrawn || 0) - requestTotal) > epsilon ||
+      Math.abs(locked) > epsilon ||
+      alreadyReconciled !== true;
+
+    if (!needsChange) {
+      reconciledPackageIds.add(packageId);
+      continue;
     }
 
     const session = await mongoose.startSession();
@@ -586,6 +591,7 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
               lockedEarnings: 0,
               withdrawalBalanceDebt: expectedDebt,
               totalWithdrawn: requestTotal,
+              withdrawablePrincipalCredited: true,
               withdrawalBalanceReconciled: true,
             },
           },
@@ -593,14 +599,14 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
         );
         if (!updated) return;
 
-        if (!alreadyReconciled && hasPrincipalRows && Math.abs(principalLedgerTotal) > epsilon) {
+        if (balanceDifference > epsilon) {
           await PackageLedger.create([{
             userId,
             userPackageId: account._id,
             type: "activation_withdrawable",
             asset: "USDT",
-            amount: -principalLedgerTotal,
-            note: "تصحيح الرصيد: استبعاد رأس مال التفعيل من رصيد السحب؛ حساب الباقة: " + packageId,
+            amount: -balanceDifference,
+            note: "تصحيح صافي رصيد الباقة بعد استبعاد رأس مال التفعيل ومطابقة السحوبات المعتمدة؛ حساب الباقة: " + packageId,
           }], { session });
         }
 
@@ -612,9 +618,7 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
       await session.endSession();
     }
 
-    if (applied || Math.abs(effectiveCurrentBalance - expectedNetBalance) <= epsilon) {
-      reconciledPackageIds.add(packageId);
-    }
+    if (applied) reconciledPackageIds.add(packageId);
   }
 
   const terminalUnsettledRequests = await WithdrawalRequest.find({

@@ -6,7 +6,6 @@ import User from "@/models/User";
 import Order from "@/models/Order";
 import Trade from "@/models/Trade";
 import DepositRequest from "@/models/DepositRequest";
-import WithdrawalRequest from "@/models/WithdrawalRequest";
 import Asset from "@/models/Asset";
 
 export async function GET(request: NextRequest) {
@@ -31,11 +30,8 @@ export async function GET(request: NextRequest) {
       assetsCount,
       depositsCount,
       pendingDepositsCount,
-      withdrawalsCount,
-      pendingWithdrawalsCount,
       latestUsers,
       latestDeposits,
-      latestWithdrawals,
     ] = await Promise.all([
       User.countDocuments({}),
       User.countDocuments({ isActive: true }),
@@ -47,11 +43,6 @@ export async function GET(request: NextRequest) {
       DepositRequest.countDocuments({
         status: "pending",
       }),
-      WithdrawalRequest.countDocuments({}),
-      WithdrawalRequest.countDocuments({
-        status: "pending",
-      }),
-
       User.find({})
         .select("_id name username email role isActive isVerified createdAt")
         .sort({ createdAt: -1 })
@@ -63,10 +54,6 @@ export async function GET(request: NextRequest) {
         .limit(8)
         .lean(),
 
-      WithdrawalRequest.find({})
-        .sort({ createdAt: -1 })
-        .limit(8)
-        .lean(),
     ]);
 
     return NextResponse.json({
@@ -80,19 +67,12 @@ export async function GET(request: NextRequest) {
         assets: assetsCount,
         deposits: depositsCount,
         pendingDeposits: pendingDepositsCount,
-        withdrawals: withdrawalsCount,
-        pendingWithdrawals: pendingWithdrawalsCount,
       },
       latestUsers: latestUsers.map((u: any) => ({
         ...u,
         _id: u._id ? String(u._id) : undefined,
       })),
       latestDeposits: latestDeposits.map((x: any) => ({
-        ...x,
-        _id: x._id ? String(x._id) : undefined,
-        userId: x.userId ? String(x.userId) : undefined,
-      })),
-      latestWithdrawals: latestWithdrawals.map((x: any) => ({
         ...x,
         _id: x._id ? String(x._id) : undefined,
         userId: x.userId ? String(x.userId) : undefined,

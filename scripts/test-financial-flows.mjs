@@ -349,7 +349,7 @@ await db.collection("userpackages").insertOne({
   status: "cancelled",
   availableEarnings: 50,
   lockedEarnings: 0,
-  totalRealizedEarnings: 0,
+  totalRealizedEarnings: 50,
   totalWithdrawn: 0,
   withdrawablePrincipalCredited: true,
   firstWithdrawalStatus: "available",
@@ -571,7 +571,7 @@ await db.collection("userpackages").insertMany(splitAccountIds.map((_id, index) 
   status: "cancelled",
   availableEarnings: index === 0 ? 150 : 50,
   lockedEarnings: 0,
-  totalRealizedEarnings: 0,
+  totalRealizedEarnings: index === 0 ? 150 : 50,
   totalWithdrawn: 0,
   withdrawablePrincipalCredited: true,
   firstWithdrawalStatus: "available",
@@ -639,7 +639,7 @@ await db.collection("userpackages").insertOne({
   status: "cancelled",
   availableEarnings: 100,
   lockedEarnings: 0,
-  totalRealizedEarnings: 0,
+  totalRealizedEarnings: 100,
   totalWithdrawn: 0,
   withdrawablePrincipalCredited: true,
   firstWithdrawalStatus: "available",
@@ -1110,6 +1110,7 @@ ok(migratedLegacyPage, "legacy package migration does not re-credit a completed 
 const migratedLegacyAccount = migratedLegacyPage.data.userPackages.find((x) => String(x._id) === String(legacyPackageId));
 assert.ok(migratedLegacyAccount, "legacy package account remains visible");
 closeTo(migratedLegacyAccount.availableEarnings, 0, "legacy 500-USDT withdrawal does not restore another 500 to the card balance");
+closeTo(migratedLegacyAccount.withdrawalBalanceDebt, 500, "a legacy payout beyond refundable earnings is reflected as package balance debt");
 closeTo(migratedLegacyAccount.firstPackageWithdrawalRemaining, 0, "legacy withdrawal consumes the first-stage package allowance");
 assert.equal((await db.collection("userpackages").findOne({ _id: legacyPackageId })).withdrawablePrincipalCredited, true, "legacy principal migration is marked once");
 assert.equal((await db.collection("withdrawalrequests").findOne({ _id: legacyPrincipalWithdrawalId })).isFirstPackageWithdrawal, true, "legacy withdrawal is classified against the package principal cap");
@@ -1177,6 +1178,7 @@ ok(repairedLegacyPage, "previously migrated legacy account is repaired");
 const repairedLegacyAccount = repairedLegacyPage.data.userPackages.find((x) => String(x._id) === String(previouslyMigratedPackageId));
 assert.ok(repairedLegacyAccount, "previously migrated account is visible after repair");
 closeTo(repairedLegacyAccount.availableEarnings, 0, "old duplicate principal top-up is removed from the visible package balance");
+closeTo(repairedLegacyAccount.withdrawalBalanceDebt, 500, "historical payout debt is retained when the package has no refund or realized earnings");
 closeTo(repairedLegacyAccount.firstPackageWithdrawalRemaining, 0, "old 500 withdrawal consumes the first-stage allowance after repair");
 assert.equal((await db.collection("withdrawalrequests").findOne({ _id: previouslyMigratedWithdrawalId })).isFirstPackageWithdrawal, true, "old completed withdrawal is classified on an already-migrated account");
 
@@ -1248,10 +1250,12 @@ const refundRetainedPage = await api("/api/packages");
 ok(refundRetainedPage, "package API reconciles legacy migration without consuming a refund");
 const refundRetainedAccount = refundRetainedPage.data.userPackages.find((x) => String(x._id) === String(refundRetainedPackageId));
 assert.ok(refundRetainedAccount, "cancelled package remains visible after reconciliation");
-closeTo(refundRetainedAccount.availableEarnings, 50, "legacy duplicate principal is removed but the 50-USDT cancellation refund remains available");
+closeTo(refundRetainedAccount.availableEarnings, 0, "cash bucket cannot stay positive after a payout exceeds the cancellation refund");
+closeTo(refundRetainedAccount.withdrawalBalanceDebt, 450, "legacy payout debt offsets the 50-USDT refund");
 ok(await api("/api/packages"), "reloading package data remains safe after refund reconciliation");
 const refundRetainedAccountAfterReload = await db.collection("userpackages").findOne({ _id: refundRetainedPackageId });
-closeTo(refundRetainedAccountAfterReload.availableEarnings, 50, "repeated package refresh never removes the retained cancellation refund");
+closeTo(refundRetainedAccountAfterReload.availableEarnings, 0, "repeated package refresh never restores non-cash principal");
+closeTo(refundRetainedAccountAfterReload.withdrawalBalanceDebt, 450, "repeated package refresh preserves the net package debt");
 await db.collection("packageledgers").deleteMany({ userPackageId: refundRetainedPackageId });
 await db.collection("withdrawalrequests").deleteOne({ _id: refundRetainedWithdrawalId });
 await db.collection("userpackages").deleteOne({ _id: refundRetainedPackageId });

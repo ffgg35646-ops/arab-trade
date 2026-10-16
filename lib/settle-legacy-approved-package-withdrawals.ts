@@ -428,6 +428,16 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
 
   const settledAmountByPackage = new Map<string, number>();
   const settledRequestIdsByPackage = new Map<string, string[]>();
+  // Keep active reservations separate from legacy approved requests that could
+  // not be settled because older code failed to lock the amount.
+  const reconciliationSafePackageIds = new Set<string>();
+  for (const request of liveRequests as any[]) {
+    if (request.userPackageId) reconciliationSafePackageIds.add(String(request.userPackageId));
+    for (const allocation of request.packageAllocations || []) {
+      if (allocation.userPackageId) reconciliationSafePackageIds.add(String(allocation.userPackageId));
+    }
+  }
+  const reconciledPackageIds = new Set<string>();
   for (const request of settledRequestsForBalance as any[]) {
     const fallbackAmount = Number(request.amount || 0);
     const rows = Array.isArray(request.packageAllocations) && request.packageAllocations.length
@@ -454,9 +464,9 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
   }
 
   for (const [packageId, requestTotal] of settledAmountByPackage) {
-    // Never repair a bucket while a live/unreconciled request may still own
-    // part of its locked amount.
-    if (livePackageIds.has(packageId)) continue;
+    // Pending/processing reservations are protected. Approved legacy requests
+    // are terminal in this app and are reconciled below against their full total.
+    if (reconciliationSafePackageIds.has(packageId)) continue;
 
     const account = await UserPackage.findOne({ _id: packageId, userId })
       .select("investedAmount cancellationRefund totalRealizedEarnings totalWithdrawn availableEarnings lockedEarnings")
@@ -507,8 +517,10 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
     // There are no live requests referencing this package, so any remaining
     // lock belongs to a stale settled request. Remove only the excess above the
     // independently recomputed balance and normalize the cumulative counter.
-    const removeFromAvailable = Math.min(available, excess);
-    const removeFromLocked = Math.min(locked, Math.max(0, excess - removeFromAvailable));
+    // Completed/approved payouts must not leave stale funds in lockedEarnings.
+    // Remove stale locks first, then consume any remaining overage from available.
+    const removeFromLocked = Math.min(locked, excess);
+    const removeFromAvailable = Math.min(available, Math.max(0, excess - removeFromLocked));
     const corrected = await UserPackage.findOneAndUpdate(
       {
         _id: packageId,
@@ -528,6 +540,12 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
     );
 
     if (!corrected) continue;
+    const resultingBalance =
+      Math.max(0, Number(corrected.availableEarnings || 0)) +
+      Math.max(0, Number(corrected.lockedEarnings || 0));
+    if (Math.abs(resultingBalance - expectedBalance) <= 1e-6) {
+      reconciledPackageIds.add(packageId);
+    }
     const correctedAmount = Number((removeFromAvailable + removeFromLocked).toFixed(8));
     if (correctedAmount > 1e-7) {
       const requestIds = [...new Set(settledRequestIdsByPackage.get(packageId) || [])];
@@ -542,6 +560,43 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
         console.error("PACKAGE CUMULATIVE WITHDRAWAL RECONCILIATION LEDGER:", packageId, ledgerError);
       });
     }
+  }
+
+
+  // Mark terminal legacy requests settled only when every affected package
+  // reconciles exactly and no active reservation overlaps it. This prevents
+  // the legacy settlement routine from retrying the same withdrawal later.
+  const terminalUnsettledRequests = await WithdrawalRequest.find({
+    userId,
+    source: "package",
+    status: { $in: ["approved", "completed"] },
+    packageBalanceSettled: { $ne: true },
+  }).select("_id userPackageId packageAllocations amount").lean();
+
+  for (const request of terminalUnsettledRequests as any[]) {
+    const fallbackAmount = Number(request.amount || 0);
+    const rows = Array.isArray(request.packageAllocations) && request.packageAllocations.length
+      ? request.packageAllocations
+      : [{ userPackageId: request.userPackageId, amount: fallbackAmount }];
+    const packageIds = rows.map((row: any) => String(row.userPackageId || "")).filter(Boolean);
+    if (
+      !packageIds.length ||
+      packageIds.some((id: string) =>
+        !mongoose.Types.ObjectId.isValid(id) ||
+        reconciliationSafePackageIds.has(id) ||
+        !reconciledPackageIds.has(id)
+      )
+    ) continue;
+
+    await WithdrawalRequest.updateOne(
+      {
+        _id: request._id,
+        userId,
+        status: { $in: ["approved", "completed"] },
+        packageBalanceSettled: { $ne: true },
+      },
+      { $set: { packageBalanceSettled: true } },
+    );
   }
 
 }

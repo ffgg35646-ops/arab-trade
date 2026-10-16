@@ -316,7 +316,7 @@ export default function WalletPage() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 sm:flex">
+                <div className="grid grid-cols-1 gap-3 sm:flex">
                   <Link
                     href="/dashboard/assets/deposit"
                     className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-500 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-400"

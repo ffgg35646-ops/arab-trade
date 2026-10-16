@@ -612,11 +612,7 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
       await session.endSession();
     }
 
-    if (applied || (
-      Math.abs(expectedNetBalance - (Math.max(0, Number(account.availableEarnings || 0)) +
-        Math.max(0, Number(account.lockedEarnings || 0) -
-          0) - Math.max(0, Number(account.withdrawalBalanceDebt || 0)))) <= epsilon
-    )) {
+    if (applied || Math.abs(effectiveCurrentBalance - expectedNetBalance) <= epsilon) {
       reconciledPackageIds.add(packageId);
     }
   }

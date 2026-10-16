@@ -592,9 +592,10 @@ export async function POST(request: NextRequest) {
       const configuredPackageMinimum = configuredMinimums?.[String(currentPackage.packageId)];
       // Package requests use the package plan minimum and the package-only method.
       // Global-wallet minimums are intentionally excluded from this calculation.
-      const packageMinimum = Math.max(
-        Number(configuredPackageMinimum ?? packagePlan?.minimumWithdrawal ?? 100),
-        Number(minAmount || 0),
+      // Package minimum comes only from the administrator's package setting.
+      // General-wallet and withdrawal-method minimums must not override it.
+      const packageMinimum = Number(
+        configuredPackageMinimum ?? packagePlan?.minimumWithdrawal ?? 100,
       );
       const [firstWithdrawalRows, referralWithdrawalRows, referredUsers] = await Promise.all([
         WithdrawalRequest.find({

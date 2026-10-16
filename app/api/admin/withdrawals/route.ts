@@ -520,20 +520,25 @@ export async function PATCH(
               );
               if (!updatedPackage) throw new Error("PACKAGE_BALANCE_INVALID");
 
-              await PackageLedger.create([{
-                userId: withdrawal.userId,
-                userPackageId: updatedPackage._id,
-                type: nextStatus === "rejected" ? "withdrawal_reversal" : "withdrawal",
-                asset: withdrawal.asset,
-                amount: nextStatus === "rejected" ? allocation.amount : -allocation.amount,
-                note: (adminNote || (nextStatus === "rejected"
-                  ? "تم رفض طلب السحب؛ أُعيد مبلغ " + allocation.amount + " " + withdrawal.asset + " إلى رصيد باقة " + updatedPackage.packageName
-                  : nextStatus === "approved"
-                    ? "تم اعتماد سحب بقيمة " + allocation.amount + " " + withdrawal.asset + " وخصمه من رصيد باقة " + updatedPackage.packageName
-                    : "تم تنفيذ طلب سحب بقيمة " + allocation.amount + " " + withdrawal.asset + " من رصيد باقة " + updatedPackage.packageName)) +
-                  " مرجع طلب السحب: " + String(withdrawal._id),
-                createdBy: admin._id,
-              }], { session });
+              const ledgerReversalAmount = returningPreviouslyApprovedPayout
+                ? allocation.amount
+                : amountLockedForThisRequest;
+              if (nextStatus !== "rejected" || ledgerReversalAmount > 1e-8) {
+                await PackageLedger.create([{
+                  userId: withdrawal.userId,
+                  userPackageId: updatedPackage._id,
+                  type: nextStatus === "rejected" ? "withdrawal_reversal" : "withdrawal",
+                  asset: withdrawal.asset,
+                  amount: nextStatus === "rejected" ? ledgerReversalAmount : -allocation.amount,
+                  note: (adminNote || (nextStatus === "rejected"
+                    ? "تم رفض طلب السحب؛ أُعيد مبلغ " + ledgerReversalAmount + " " + withdrawal.asset + " إلى رصيد باقة " + updatedPackage.packageName
+                    : nextStatus === "approved"
+                      ? "تم اعتماد سحب بقيمة " + allocation.amount + " " + withdrawal.asset + " وخصمه من رصيد باقة " + updatedPackage.packageName
+                      : "تم تنفيذ طلب سحب بقيمة " + allocation.amount + " " + withdrawal.asset + " من رصيد باقة " + updatedPackage.packageName)) +
+                    " مرجع طلب السحب: " + String(withdrawal._id),
+                  createdBy: admin._id,
+                }], { session });
+              }
 
               if (excessLock > 1e-8) {
                 await PackageLedger.create([{

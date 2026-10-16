@@ -912,7 +912,7 @@ ok(await api("/api/packages"), "package API reverses a stale orphan credit for a
 const returnedApprovedAccount = await db.collection("userpackages").findOne({ _id: returnedApprovedPackageId });
 closeTo(returnedApprovedAccount.availableEarnings, 35, "old orphan credit is removed and only earned cash net of the payout remains");
 closeTo(returnedApprovedAccount.lockedEarnings, 0, "stale approval repair leaves no phantom lock");
-closeTo(await navbarWithdrawalUsdtTotal("navbar after reversal of stale approved-payout credit"), returnedApprovedNavbarBefore - 25, "cumulative withdrawal balance drops by the approved payout exactly once");
+closeTo(await navbarWithdrawalUsdtTotal("navbar after reversal of stale approved-payout credit"), returnedApprovedNavbarBefore - 65, "cumulative balance excludes the 40-USDT principal and reverses the 25-USDT payout credit");
 ok(await api("/api/packages"), "second refresh is safe after reversing a stale orphan credit");
 closeTo((await db.collection("userpackages").findOne({ _id: returnedApprovedPackageId })).availableEarnings, 35, "repeated refresh preserves the net earned cash balance");
 await db.collection("packageledgers").deleteMany({ userPackageId: returnedApprovedPackageId });
@@ -935,7 +935,7 @@ await db.collection("userpackages").insertOne({
   status: "cancelled",
   availableEarnings: 25,
   lockedEarnings: 0,
-  totalRealizedEarnings: 75,
+  totalRealizedEarnings: 125,
   totalWithdrawn: 0,
   withdrawablePrincipalCredited: true,
   firstWithdrawalStatus: "available",
@@ -963,14 +963,14 @@ await db.collection("withdrawalrequests").insertOne({
 });
 ok(await api("/api/packages"), "package API restores an older rejected package withdrawal");
 let legacyRejectedAccount = await db.collection("userpackages").findOne({ _id: legacyRejectedPackageId });
-closeTo(legacyRejectedAccount.availableEarnings, 75, "legacy rejected amount is restored without including principal in cash balance");
+closeTo(legacyRejectedAccount.availableEarnings, 125, "rejected package cash is restored without counting invested principal");
 closeTo(legacyRejectedAccount.lockedEarnings, 0, "legacy rejected amount leaves no locked balance");
 closeTo(legacyRejectedAccount.totalWithdrawn, 0, "rejected amount is not counted as withdrawn");
 let legacyRejectedRequest = await db.collection("withdrawalrequests").findOne({ _id: legacyRejectedWithdrawalId });
 assert.equal(legacyRejectedRequest.packageBalanceSettled, true, "legacy rejected request receives an idempotent settlement marker");
 ok(await api("/api/packages"), "refresh is safe after rejected-package refund migration");
 legacyRejectedAccount = await db.collection("userpackages").findOne({ _id: legacyRejectedPackageId });
-closeTo(legacyRejectedAccount.availableEarnings, 75, "repeated refresh does not refund the rejected request twice");
+closeTo(legacyRejectedAccount.availableEarnings, 125, "repeated refresh does not refund the rejected request twice");
 
 // A previous rejection ledger entry means the credit already happened; do not duplicate it.
 const alreadyRefundedPackageId = new mongoose.Types.ObjectId();
@@ -1117,6 +1117,9 @@ assert.equal((await db.collection("withdrawalrequests").findOne({ _id: legacyPri
 const migratedLegacyPageAgain = await api("/api/packages");
 ok(migratedLegacyPageAgain, "reloading package balances keeps the legacy migration idempotent");
 closeTo(migratedLegacyPageAgain.data.userPackages.find((x) => String(x._id) === String(legacyPackageId)).availableEarnings, 0, "reloading does not put the withdrawn 500 back");
+await db.collection("packageledgers").deleteMany({ userPackageId: legacyPackageId });
+await db.collection("withdrawalrequests").deleteOne({ _id: legacyPrincipalWithdrawalId });
+await db.collection("userpackages").deleteOne({ _id: legacyPackageId });
 
 // Repair an account already marked migrated by the previous buggy helper: it credited
 // 500 again even though a 500-USDT legacy withdrawal was already completed.
@@ -1181,6 +1184,9 @@ closeTo(repairedLegacyAccount.availableEarnings, 0, "old duplicate principal top
 closeTo(repairedLegacyAccount.withdrawalBalanceDebt, 500, "historical payout debt is retained when the package has no refund or realized earnings");
 closeTo(repairedLegacyAccount.firstPackageWithdrawalRemaining, 0, "old 500 withdrawal consumes the first-stage allowance after repair");
 assert.equal((await db.collection("withdrawalrequests").findOne({ _id: previouslyMigratedWithdrawalId })).isFirstPackageWithdrawal, true, "old completed withdrawal is classified on an already-migrated account");
+await db.collection("packageledgers").deleteMany({ userPackageId: previouslyMigratedPackageId });
+await db.collection("withdrawalrequests").deleteOne({ _id: previouslyMigratedWithdrawalId });
+await db.collection("userpackages").deleteOne({ _id: previouslyMigratedPackageId });
 
 // Regression: an old duplicated principal migration must not consume a later package refund.
 const refundRetainedPackageId = new mongoose.Types.ObjectId();

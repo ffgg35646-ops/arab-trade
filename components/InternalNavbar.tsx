@@ -78,7 +78,6 @@ export default function InternalNavbar() {
   ] = useState(0);
 
   const [depositBalanceSummary, setDepositBalanceSummary] = useState("0 USDT");
-  const [withdrawUsdtBalance, setWithdrawUsdtBalance] = useState(0);
 
   const ref =
     useRef<HTMLDivElement>(null);
@@ -145,7 +144,6 @@ export default function InternalNavbar() {
         if (!data?.success || cancelled) return;
 
         const depositBalances = Array.isArray(data.depositBalances) ? data.depositBalances : [];
-        const withdrawalBalances = Array.isArray(data.withdrawalBalances) ? data.withdrawalBalances : [];
         const depositSummary = depositBalances
           .map((item: { asset?: string; available?: number; locked?: number }) => ({
             asset: String(item.asset || "").trim().toUpperCase(),
@@ -157,12 +155,7 @@ export default function InternalNavbar() {
             `${item.available.toLocaleString("en-US", { maximumFractionDigits: 8 })} ${item.asset}${item.locked > 0 ? ` (+${item.locked.toLocaleString("en-US", { maximumFractionDigits: 8 })} محجوز)` : ""}`
           )
           .join(" · ");
-        const withdrawalUsdt = withdrawalBalances
-          .filter((item: { asset?: string }) => String(item.asset || "").toUpperCase() === "USDT")
-          .reduce((sum: number, item: { available?: number; locked?: number }) => sum + Number(item.available || 0) + Number(item.locked || 0), 0);
-
         setDepositBalanceSummary(depositSummary || "0 USDT");
-        setWithdrawUsdtBalance(withdrawalUsdt);
       } catch {
         // احتفظ بآخر أرصدة ناجحة بدل تصفيرها عند انقطاع الشبكة
       }
@@ -413,10 +406,6 @@ export default function InternalNavbar() {
               <span className="block text-[10px] text-amber-200/80">رصيد الإيداع</span>
               <span className="block max-w-[205px] truncate text-xs font-black text-amber-100">{depositBalanceSummary}</span>
             </Link>
-            <Link href="/dashboard/assets/withdraw" className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] px-2 py-2 transition hover:bg-cyan-300/[0.1] xl:px-3" title="إجمالي رصيد السحب العام وأرصدة الباقات">
-              <span className="block text-[10px] text-cyan-200/80">رصيد السحب</span>
-              <span className="block text-xs font-black text-cyan-100">{withdrawUsdtBalance.toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</span>
-            </Link>
           </div>
 
           <Link
@@ -579,14 +568,10 @@ export default function InternalNavbar() {
               )
             )}
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2">
               <Link href="/dashboard/assets/deposit" onClick={() => setMobile(false)} className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-3">
                 <span className="block text-[10px] text-amber-200/80">رصيد الإيداع</span>
                 <span className="mt-1 block break-words text-xs font-black leading-5 text-amber-100">{depositBalanceSummary}</span>
-              </Link>
-              <Link href="/dashboard/assets/withdraw" onClick={() => setMobile(false)} className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-3">
-                <span className="block text-[10px] text-cyan-200/80">رصيد السحب</span>
-                <span className="mt-1 block text-xs font-black text-cyan-100">{withdrawUsdtBalance.toLocaleString("en-US", { maximumFractionDigits: 8 })} USDT</span>
               </Link>
             </div>
 

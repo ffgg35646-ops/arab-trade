@@ -521,6 +521,11 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
     const expectedDebt = Math.max(0, -expectedNetBalance);
     const balanceDifference = roundBalance(actualNetBalance - expectedNetBalance);
     const alreadyReconciled = account.withdrawalBalanceReconciled === true;
+    // Legacy Mongo documents do not have this new field yet. Matching them
+    // against an exact zero would miss the document because absent != 0.
+    const originalDebtFilter = account.withdrawalBalanceDebt === undefined
+      ? { $in: [null, 0] }
+      : account.withdrawalBalanceDebt;
     const investedAmount = Math.max(0, Number(account.investedAmount || 0));
 
     // Apply the first migration only when the account has principal-ledger
@@ -564,7 +569,7 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
           userId,
           availableEarnings: account.availableEarnings ?? 0,
           lockedEarnings: account.lockedEarnings ?? 0,
-          withdrawalBalanceDebt: account.withdrawalBalanceDebt ?? 0,
+          withdrawalBalanceDebt: originalDebtFilter,
           withdrawalBalanceReconciled: alreadyReconciled ? true : { $ne: true },
         }).session(session).lean();
         if (!current) return;
@@ -586,7 +591,7 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
             userId,
             availableEarnings: account.availableEarnings ?? 0,
             lockedEarnings: account.lockedEarnings ?? 0,
-            withdrawalBalanceDebt: account.withdrawalBalanceDebt ?? 0,
+            withdrawalBalanceDebt: originalDebtFilter,
             withdrawalBalanceReconciled: alreadyReconciled ? true : { $ne: true },
           },
           {

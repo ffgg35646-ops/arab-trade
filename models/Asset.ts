@@ -5,15 +5,11 @@ export interface IAssetNetwork {
   code: string;
   enabled: boolean;
   depositEnabled: boolean;
-  withdrawalEnabled: boolean;
   depositAddress: string;
   memoTag: string;
   confirmations: number;
   minDeposit: number;
   maxDeposit: number;
-  minWithdrawal: number;
-  maxWithdrawal: number;
-  withdrawalFee: number;
   warning: string;
   sortOrder: number;
 }
@@ -35,15 +31,11 @@ const NetworkSchema = new Schema<IAssetNetwork>({
   code: { type: String, required: true },
   enabled: { type: Boolean, default: true },
   depositEnabled: { type: Boolean, default: true },
-  withdrawalEnabled: { type: Boolean, default: true },
   depositAddress: { type: String, default: "" },
   memoTag: { type: String, default: "" },
   confirmations: { type: Number, default: 12 },
   minDeposit: { type: Number, default: 10 },
   maxDeposit: { type: Number, default: 100000 },
-  minWithdrawal: { type: Number, default: 50 },
-  maxWithdrawal: { type: Number, default: 50000 },
-  withdrawalFee: { type: Number, default: 0 },
   warning: { type: String, default: "" },
   sortOrder: { type: Number, default: 0 },
 });

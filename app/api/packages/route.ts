@@ -316,8 +316,6 @@ export async function POST(request: NextRequest) {
           availableDepositBefore = debit.availableBefore;
           if (!debit.ok) throw new Error("INSUFFICIENT_DEPOSIT_BALANCE");
 
-          // Credit the 50% refund to the cancelled package's own withdrawal balance.
-          // This keeps each package's withdrawal account separate from the general wallet.
           if (refund > 0) {
             const creditedPackage = await UserPackage.findOneAndUpdate(
               { _id: cancelled._id, userId: user._id, status: "cancelled" },
@@ -347,10 +345,6 @@ export async function POST(request: NextRequest) {
             availableEarnings: 0,
             lockedEarnings: 0,
             totalRealizedEarnings: 0,
-            totalWithdrawn: 0,
-            withdrawablePrincipalCredited: true,
-            withdrawalBalanceDebt: 0,
-            withdrawalBalanceReconciled: true,
             cancellationRefund: 0,
             activatedAt: new Date(),
           }], { session });
@@ -459,7 +453,7 @@ export async function POST(request: NextRequest) {
             type: "cancellation_refund",
             asset: cancelled.asset,
             amount: refund,
-            note: "تم إلغاء الباقة وإضافة نصف قيمة تفعيلها إلى رصيد سحب الباقة نفسها",
+            note: "تم إلغاء الباقة وإضافة نصف قيمة تفعيلها إلى رصيد أرباح الباقة نفسها",
           }], { session });
 
           cancelledPackage = cancelled;

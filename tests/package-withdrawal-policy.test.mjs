@@ -7,3 +7,5 @@ test("ten active referrals at 100 unlock exactly 500 additional allowance",()=>{
 test("spent referral allowance does not regenerate without new referrals",()=>{assert.equal(withdrawalAllowance(200,1000,700),0);assert.match(validateWithdrawal(100,100,500,0),/إحالات نشطة جديدة/);});
 test("referrals never increase package balance",()=>{assert.equal(availableToWithdraw(76,500),76);assert.equal(availableToWithdraw(0,500),0);});
 test("invalid and fractional overflow requests are rejected",()=>{assert.match(validateWithdrawal(-1,100,1000,1000),/غير صالح/);assert.match(validateWithdrawal(0.123456789,0.01,1000,1000),/غير صالح/);});
+
+test("referral capacity starts only after initial activation allowance is consumed",()=>{assert.equal(withdrawalAllowance(200,1000,0),200);assert.equal(withdrawalAllowance(200,1000,100),100);assert.equal(withdrawalAllowance(200,1000,200),500);});

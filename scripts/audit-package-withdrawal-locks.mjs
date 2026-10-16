@@ -64,7 +64,9 @@ try {
     db.collection("userpackages")
       .find(accountFilter)
       .project({
-        _id: 1, userId: 1, packageName: 1, status: 1,
+        _id: 1, userId: 1, packageId: 1, packageName: 1, status: 1,
+        investedAmount: 1, cancellationRefund: 1, totalRealizedEarnings: 1, totalWithdrawn: 1,
+        withdrawablePrincipalCredited: 1,
         availableEarnings: 1, lockedEarnings: 1, withdrawalRequestPending: 1,
       })
       .toArray(),
@@ -78,11 +80,52 @@ try {
       .toArray(),
     db.collection("withdrawalrequests")
       .find({ source: "package", ...(userId ? { userId } : {}) })
-      .project({ _id: 1, userId: 1, userPackageId: 1, packageAllocations: 1, amount: 1, status: 1 })
+      .project({
+        _id: 1, userId: 1, userPackageId: 1, packageAllocations: 1, amount: 1, status: 1,
+        isFirstPackageWithdrawal: 1, packageBalanceSettled: 1, createdAt: 1, updatedAt: 1,
+      })
       .toArray(),
   ]);
 
   const accountById = new Map(accounts.map((row) => [idOf(row._id), row]));
+  const relevantAccountIds = accounts.map((row) => row._id);
+  const packageLedgerRows = relevantAccountIds.length
+    ? await db.collection("packageledgers")
+        .find({ userPackageId: { $in: relevantAccountIds }, ...(userId ? { userId } : {}) })
+        .project({ _id: 1, userId: 1, userPackageId: 1, type: 1, asset: 1, amount: 1, note: 1, createdAt: 1 })
+        .sort({ createdAt: 1, _id: 1 })
+        .limit(50000)
+        .toArray()
+    : [];
+  const ledgerByAccount = new Map();
+  for (const row of packageLedgerRows) {
+    const accountId = idOf(row.userPackageId);
+    const rows = ledgerByAccount.get(accountId) || [];
+    rows.push(row);
+    ledgerByAccount.set(accountId, rows);
+  }
+  const requestsByAccount = new Map();
+  for (const request of allPackageRequests) {
+    const allocations = Array.isArray(request.packageAllocations) && request.packageAllocations.length
+      ? request.packageAllocations
+      : [{ userPackageId: request.userPackageId, amount: request.amount }];
+    for (const allocation of allocations) {
+      const accountId = idOf(allocation.userPackageId);
+      if (!accountId || !accountById.has(accountId)) continue;
+      const rows = requestsByAccount.get(accountId) || [];
+      rows.push({
+        requestId: idOf(request._id),
+        status: String(request.status || ""),
+        amount: asNumber(allocation.amount),
+        requestAmount: asNumber(request.amount),
+        isFirstPackageWithdrawal: request.isFirstPackageWithdrawal === true,
+        packageBalanceSettled: request.packageBalanceSettled === true,
+        createdAt: request.createdAt || null,
+        updatedAt: request.updatedAt || null,
+      });
+      requestsByAccount.set(accountId, rows);
+    }
+  }
   const expectedLockedByAccount = new Map();
   const activeRequestIdsByAccount = new Map();
   const allocationWarnings = [];
@@ -189,12 +232,95 @@ try {
     }
   }
 
+  // Compare the stored bucket with posted package-ledger movements and request history.
+  // This report never mutates balances. "ledgerExpectedBucket" excludes activation
+  // debits because those are funded from the separate deposit wallet, not the package bucket.
+  const bucketLedgerTypes = new Set([
+    "activation_withdrawable", "realized_earning", "daily_earning", "reward",
+    "cancellation_refund", "refund_reclassification", "withdrawal", "withdrawal_reversal",
+  ]);
+  const terminalWithdrawalStatuses = new Set(["approved", "completed"]);
+  const packageBalanceAudit = accounts.map((account) => {
+    const accountId = idOf(account._id);
+    const ledger = ledgerByAccount.get(accountId) || [];
+    const movements = ledger.filter((row) => bucketLedgerTypes.has(String(row.type || "")));
+    const ledgerExpectedBucket = movements.reduce((sum, row) => sum + asNumber(row.amount), 0);
+    const available = asNumber(account.availableEarnings);
+    const locked = asNumber(account.lockedEarnings);
+    const storedBucket = available + locked;
+    const accountRequests = requestsByAccount.get(accountId) || [];
+    const statusSummary = {};
+    for (const request of accountRequests) {
+      const key = request.status || "(missing status)";
+      if (!statusSummary[key]) statusSummary[key] = { count: 0, amount: 0, requestIds: [] };
+      statusSummary[key].count += 1;
+      statusSummary[key].amount = Number((statusSummary[key].amount + request.amount).toFixed(8));
+      statusSummary[key].requestIds.push(request.requestId);
+    }
+    const successfulWithdrawalAmount = accountRequests
+      .filter((request) => terminalWithdrawalStatuses.has(request.status))
+      .reduce((sum, request) => sum + request.amount, 0);
+    const ledgerWithdrawalDebits = movements
+      .filter((row) => row.type === "withdrawal" && asNumber(row.amount) < 0)
+      .reduce((sum, row) => sum + Math.abs(asNumber(row.amount)), 0);
+    const ledgerReversalCredits = movements
+      .filter((row) => row.type === "withdrawal_reversal")
+      .reduce((sum, row) => sum + asNumber(row.amount), 0);
+    return {
+      userId: idOf(account.userId),
+      packageAccountId: accountId,
+      packageId: idOf(account.packageId),
+      packageName: String(account.packageName || ""),
+      packageStatus: String(account.status || ""),
+      withdrawablePrincipalCredited: account.withdrawablePrincipalCredited === true,
+      investedAmount: asNumber(account.investedAmount),
+      cancellationRefund: asNumber(account.cancellationRefund),
+      totalRealizedEarnings: asNumber(account.totalRealizedEarnings),
+      totalWithdrawnField: asNumber(account.totalWithdrawn),
+      storedAvailable: available,
+      storedLocked: locked,
+      storedBucketTotal: storedBucket,
+      ledgerExpectedBucket: Number(ledgerExpectedBucket.toFixed(8)),
+      storedMinusLedger: Number((storedBucket - ledgerExpectedBucket).toFixed(8)),
+      successfulRequestAmountApprovedOrCompleted: Number(successfulWithdrawalAmount.toFixed(8)),
+      ledgerWithdrawalDebits: Number(ledgerWithdrawalDebits.toFixed(8)),
+      ledgerWithdrawalReversalCredits: Number(ledgerReversalCredits.toFixed(8)),
+      requestStatusSummary: statusSummary,
+      recentLedgerMovements: ledger.slice(-40).map((row) => ({
+        id: idOf(row._id),
+        type: String(row.type || ""),
+        amount: asNumber(row.amount),
+        asset: String(row.asset || ""),
+        createdAt: row.createdAt || null,
+        note: String(row.note || "").slice(0, 240),
+      })),
+    };
+  });
+  const totals = packageBalanceAudit.reduce((sum, row) => ({
+    accounts: sum.accounts + 1,
+    storedAvailable: sum.storedAvailable + row.storedAvailable,
+    storedLocked: sum.storedLocked + row.storedLocked,
+    storedBucketTotal: sum.storedBucketTotal + row.storedBucketTotal,
+    ledgerExpectedBucket: sum.ledgerExpectedBucket + row.ledgerExpectedBucket,
+    successfulRequestAmountApprovedOrCompleted: sum.successfulRequestAmountApprovedOrCompleted + row.successfulRequestAmountApprovedOrCompleted,
+    ledgerWithdrawalDebits: sum.ledgerWithdrawalDebits + row.ledgerWithdrawalDebits,
+  }), {
+    accounts: 0, storedAvailable: 0, storedLocked: 0, storedBucketTotal: 0,
+    ledgerExpectedBucket: 0, successfulRequestAmountApprovedOrCompleted: 0, ledgerWithdrawalDebits: 0,
+  });
+  for (const key of Object.keys(totals)) {
+    if (key !== "accounts") totals[key] = Number(totals[key].toFixed(8));
+  }
+
   const report = {
     mode: "read-only",
     database: "arabtrade",
     userScope: userEmail ? "AUDIT_USER_EMAIL supplied (email omitted from report)" : "all users",
     accountsChecked: accounts.length,
     activePackageRequestsChecked: activeRequests.length,
+    packageBalanceAuditTotals: totals,
+    packageBalanceAudit,
+    packageLedgerRowsChecked: packageLedgerRows.length,
     activeStatusesUsedForExpectedLockedBalance: activeStatuses,
     mismatchCount: discrepancies.length,
     stalePendingFlagCount: staleFlags.length,

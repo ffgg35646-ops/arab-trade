@@ -243,7 +243,7 @@ try {
   ]);
   const terminalWithdrawalStatuses = new Set(["approved", "completed"]);
   const requestIdFromNote = (value) => {
-    const match = String(value || "").match(/(?:رقم الطلب|مرجع طلب السحب):\\s*([0-9a-f]{24})/i);
+    const match = String(value || "").match(/(?:رقم الطلب|مرجع طلب السحب):\s*([0-9a-f]{24})/i);
     return match ? match[1].toLowerCase() : "";
   };
   const packageBalanceAudit = accounts.map((account) => {

@@ -20,7 +20,6 @@ export interface IAsset {
   type: "crypto";
   enabled: boolean;
   depositEnabled: boolean;
-  withdrawalEnabled: boolean;
   tradingEnabled: boolean;
   sortOrder: number;
   networks: IAssetNetwork[];
@@ -47,7 +46,6 @@ const AssetSchema = new Schema<IAsset>(
     type: { type: String, enum: ["crypto"], default: "crypto" },
     enabled: { type: Boolean, default: true },
     depositEnabled: { type: Boolean, default: true },
-    withdrawalEnabled: { type: Boolean, default: true },
     tradingEnabled: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
     networks: { type: [NetworkSchema], default: [] },

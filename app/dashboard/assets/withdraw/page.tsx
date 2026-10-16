@@ -784,7 +784,7 @@ export default function WithdrawPage() {
                   <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                     <div>
                       <h2 className="text-lg font-black">السحب من الباقات</h2>
-                      <p className="mt-1 text-xs text-slate-400">كل باقة تظهر مرة واحدة؛ أرصدة التفعيلات السابقة داخل التفاصيل عند الحاجة للسحب.</p>
+                      <p className="mt-1 text-xs text-slate-400">كل باقة تظهر مرة واحدة مع حساب التفعيل النشط فقط.</p>
                     </div>
                     <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-bold text-slate-300">{packageCards.length} باقة</span>
                   </div>
@@ -832,17 +832,7 @@ export default function WithdrawPage() {
                             ) : (
                               <div className="space-y-3 p-3 md:p-4">
                                 {activeAccounts.map((account) => renderPackageAccount(account, plan))}
-                                {previousAccounts.length > 0 && (
-                                  <details className="rounded-xl border border-white/10 bg-[#050b14]">
-                                    <summary className="cursor-pointer list-none p-3 text-sm font-bold text-slate-200 marker:hidden">
-                                      أرصدة التفعيلات السابقة ({previousAccounts.length})
-                                      <span className="mr-2 text-xs font-normal text-slate-500">اضغط لعرض الأرصدة القديمة وطلب السحب</span>
-                                    </summary>
-                                    <div className="space-y-3 border-t border-white/5 p-3">
-                                      {previousAccounts.map((account) => renderPackageAccount(account, plan))}
-                                    </div>
-                                  </details>
-                                )}
+
                               </div>
                             )}
                           </article>

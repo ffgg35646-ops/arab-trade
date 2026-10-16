@@ -4,7 +4,6 @@ import { apiFetch } from "@/lib/frontend-api";
 import Link from "next/link";
 import {
   ArrowDownToLine,
-  ArrowUpFromLine,
   BadgeCheck,
   ChevronLeft,
   CircleHelp,

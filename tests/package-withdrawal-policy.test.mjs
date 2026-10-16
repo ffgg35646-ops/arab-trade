@@ -13,7 +13,7 @@ const policyJavaScript = ts.transpileModule(policySource, {
   },
 }).outputText;
 const policyUrl = "data:text/javascript;base64," + Buffer.from(policyJavaScript).toString("base64");
-const { withdrawalAllowance, availableToWithdraw, validateWithdrawal } = await import(policyUrl);
+const { withdrawalAllowance, referralWithdrawalAllowance, totalWithdrawalAllowance, availableToWithdraw, validateWithdrawal } = await import(policyUrl);
 
 test("daily withdrawal cap equals the package's original activation amount", () => {
   assert.equal(withdrawalAllowance(100, 0), 100);
@@ -34,12 +34,28 @@ test("withdrawals already made today consume today's cap", () => {
   assert.equal(validateWithdrawal(100, 100, 3000, 0), "تم استنفاد حد السحب اليومي لهذه الباقة");
 });
 
-test("daily profits, package refunds, and referrals do not increase the daily cap", () => {
-  const activation = 200;
-  const packageBalanceAfterProfitsAndRefunds = 3000;
-  const allowanceBeforeAnyWithdrawalToday = withdrawalAllowance(activation, 0);
-  assert.equal(availableToWithdraw(packageBalanceAfterProfitsAndRefunds, allowanceBeforeAnyWithdrawalToday), 200);
-  assert.equal(availableToWithdraw(packageBalanceAfterProfitsAndRefunds, withdrawalAllowance(activation, 200)), 0);
+test("referral deposits unlock 50% additional capacity without changing the daily base cap", () => {
+  const activation = 100;
+  const balanceAfterFirstApprovedWithdrawal = 500;
+  const dailyRemaining = withdrawalAllowance(activation, 100);
+  const referralRemaining = referralWithdrawalAllowance(1000, 50, 0);
+  assert.equal(dailyRemaining, 0);
+  assert.equal(referralRemaining, 500);
+  assert.equal(totalWithdrawalAllowance(dailyRemaining, referralRemaining), 500);
+  assert.equal(availableToWithdraw(balanceAfterFirstApprovedWithdrawal, totalWithdrawalAllowance(dailyRemaining, referralRemaining)), 500);
+});
+
+test("referral-backed withdrawal capacity is cumulative and cannot be reused", () => {
+  assert.equal(referralWithdrawalAllowance(1000, 50, 0), 500);
+  assert.equal(referralWithdrawalAllowance(1000, 50, 100), 400);
+  assert.equal(referralWithdrawalAllowance(1000, 50, 500), 0);
+  assert.equal(referralWithdrawalAllowance(2000, 50, 500), 500);
+});
+
+test("referral deposits do not alter the package's normal daily base allowance", () => {
+  assert.equal(withdrawalAllowance(100, 0), 100);
+  assert.equal(withdrawalAllowance(100, 100), 0);
+  assert.equal(referralWithdrawalAllowance(1000, 50, 0), 500);
 });
 
 test("minimum withdrawal and actual package balance are still independently enforced", () => {

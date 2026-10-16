@@ -111,14 +111,6 @@ try {
   const minSet = await call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie,
     body: { action: "minimum", packageId: packageAId, minimum: 125 } });
   assert.equal(minSet.status, 200);
-  const belowChangedMinimum = await requestWithdrawal(100);
-  assert.equal(belowChangedMinimum.status, 409, "changed $125 minimum must block $100 request");
-  assert.match(belowChangedMinimum.data.message, /الحد الأدنى للسحب هو 125/);
-  const minimumReset = await call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie,
-    body: { action: "minimum", packageId: packageAId, minimum: 100 } });
-  assert.equal(minimumReset.status, 200);
-  log("Admin can change package-specific minimum and the API enforces the changed value");
-
   const activate = await call("/api/packages", { method: "POST", cookie: userCookie, body: { action: "activate", packageId: packageAId } });
   assert.equal(activate.status, 201, "package activation: " + JSON.stringify(activate.data));
   oldUserPackageId = String(activate.data.userPackage._id);

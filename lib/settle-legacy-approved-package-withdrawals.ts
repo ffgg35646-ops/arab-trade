@@ -414,4 +414,134 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
     }
   }
 
+
+  // Reconcile settled historical package withdrawals against the package's
+  // real funding sources. Older approval code could mark a payout settled and
+  // increment totalWithdrawn while leaving the same amount in availableEarnings.
+  // Approved package withdrawals are final in this workflow, so their request
+  // records—not a possibly stale counter—define the cumulative amount withdrawn.
+  const settledRequestsForBalance = await WithdrawalRequest.find({
+    userId,
+    source: "package",
+    status: { $in: ["approved", "completed"] },
+  }).select("_id userPackageId packageAllocations amount").lean();
+
+  const settledAmountByPackage = new Map<string, number>();
+  const settledRequestIdsByPackage = new Map<string, string[]>();
+  for (const request of settledRequestsForBalance as any[]) {
+    const fallbackAmount = Number(request.amount || 0);
+    const rows = Array.isArray(request.packageAllocations) && request.packageAllocations.length
+      ? request.packageAllocations
+      : [{ userPackageId: request.userPackageId, amount: fallbackAmount }];
+
+    for (const allocation of rows as any[]) {
+      const packageId = String(allocation.userPackageId || "");
+      const amount = Number(allocation.amount);
+      if (
+        !mongoose.Types.ObjectId.isValid(packageId) ||
+        !Number.isFinite(amount) ||
+        amount <= 0
+      ) continue;
+
+      settledAmountByPackage.set(
+        packageId,
+        Number(((settledAmountByPackage.get(packageId) || 0) + amount).toFixed(8)),
+      );
+      const ids = settledRequestIdsByPackage.get(packageId) || [];
+      ids.push(String(request._id));
+      settledRequestIdsByPackage.set(packageId, ids);
+    }
+  }
+
+  for (const [packageId, requestTotal] of settledAmountByPackage) {
+    // Never repair a bucket while a live/unreconciled request may still own
+    // part of its locked amount.
+    if (livePackageIds.has(packageId)) continue;
+
+    const account = await UserPackage.findOne({ _id: packageId, userId })
+      .select("investedAmount cancellationRefund totalRealizedEarnings totalWithdrawn availableEarnings lockedEarnings")
+      .lean();
+    if (!account) continue;
+
+    const available = Math.max(0, Number(account.availableEarnings || 0));
+    const locked = Math.max(0, Number(account.lockedEarnings || 0));
+    const ledgerEarnings = await PackageLedger.find({
+      userId,
+      userPackageId: new mongoose.Types.ObjectId(packageId),
+      type: { $in: ["daily_earning", "realized_earning", "reward"] },
+    }).select("type amount").lean();
+
+    let earningLedgerTotal = 0;
+    let rewardLedgerTotal = 0;
+    for (const row of ledgerEarnings as any[]) {
+      const amount = Number(row.amount || 0);
+      if (!Number.isFinite(amount) || amount <= 0) continue;
+      if (row.type === "reward") rewardLedgerTotal += amount;
+      else earningLedgerTotal += amount;
+    }
+
+    // totalRealizedEarnings includes collected earnings; use the ledger as a
+    // fallback for releases where a legacy earning write missed that counter.
+    const realizedEarnings = Math.max(
+      0,
+      Number(account.totalRealizedEarnings || 0),
+      earningLedgerTotal,
+    );
+    const expectedBalance = Math.max(
+      0,
+      Number(account.investedAmount || 0) +
+        Math.max(0, Number(account.cancellationRefund || 0)) +
+        realizedEarnings +
+        rewardLedgerTotal -
+        requestTotal,
+    );
+    const actualBalance = available + locked;
+    const excess = Math.max(0, actualBalance - expectedBalance);
+    const correctedTotalWithdrawn = Number(requestTotal.toFixed(8));
+    const counterNeedsCorrection = Math.abs(
+      Number(account.totalWithdrawn || 0) - correctedTotalWithdrawn
+    ) > 1e-7;
+
+    if (excess <= 1e-7 && !counterNeedsCorrection) continue;
+
+    // There are no live requests referencing this package, so any remaining
+    // lock belongs to a stale settled request. Remove only the excess above the
+    // independently recomputed balance and normalize the cumulative counter.
+    const removeFromAvailable = Math.min(available, excess);
+    const removeFromLocked = Math.min(locked, Math.max(0, excess - removeFromAvailable));
+    const corrected = await UserPackage.findOneAndUpdate(
+      {
+        _id: packageId,
+        userId,
+        availableEarnings: account.availableEarnings ?? 0,
+        lockedEarnings: account.lockedEarnings ?? 0,
+        totalWithdrawn: account.totalWithdrawn ?? 0,
+      },
+      {
+        $set: {
+          totalWithdrawn: correctedTotalWithdrawn,
+          availableEarnings: Math.max(0, available - removeFromAvailable),
+          lockedEarnings: Math.max(0, locked - removeFromLocked),
+        },
+      },
+      { new: true },
+    );
+
+    if (!corrected) continue;
+    const correctedAmount = Number((removeFromAvailable + removeFromLocked).toFixed(8));
+    if (correctedAmount > 1e-7) {
+      const requestIds = [...new Set(settledRequestIdsByPackage.get(packageId) || [])];
+      await PackageLedger.create({
+        userId,
+        userPackageId: corrected._id,
+        type: "withdrawal",
+        asset: "USDT",
+        amount: -correctedAmount,
+        note: "تصحيح الرصيد التراكمي بعد مطابقة السحوبات المعتمدة. الطلبات: " + requestIds.join(", "),
+      }).catch((ledgerError) => {
+        console.error("PACKAGE CUMULATIVE WITHDRAWAL RECONCILIATION LEDGER:", packageId, ledgerError);
+      });
+    }
+  }
+
 }

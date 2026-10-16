@@ -12,13 +12,9 @@ type Payment = {
   address: string;
   minDeposit: number;
   maxDeposit: number;
-  minWithdrawal: number;
-  maxWithdrawal: number;
-  withdrawalFee: number;
   warning: string;
   enabled: boolean;
   depositEnabled: boolean;
-  withdrawalEnabled: boolean;
 };
 
 export default function PaymentsAdminPage() {
@@ -30,7 +26,7 @@ export default function PaymentsAdminPage() {
   const [error, setError] = useState("");
   const [globalDepositsEnabled, setGlobalDepositsEnabled] = useState(true);
   const [savingGlobalDeposits, setSavingGlobalDeposits] = useState(false);
-  const [addingKind, setAddingKind] = useState<"deposit" | "withdrawal" | "">("");
+  const [addingKind, setAddingKind] = useState<"deposit" | "">("");
   const [newCurrency, setNewCurrency] = useState("USDT");
   const [newNetwork, setNewNetwork] = useState("");
   const [newMinimum, setNewMinimum] = useState("0");
@@ -73,13 +69,9 @@ export default function PaymentsAdminPage() {
             address: String(item.address || ""),
             minDeposit: Number(item.minDeposit || 0),
             maxDeposit: Number(item.maxDeposit || 0),
-            minWithdrawal: Number(item.minWithdrawal || 0),
-            maxWithdrawal: Number(item.maxWithdrawal || 0),
-            withdrawalFee: Number(item.withdrawalFee || 0),
             warning: String(item.warning || ""),
             enabled: Boolean(item.enabled),
             depositEnabled: item.depositEnabled !== false,
-            withdrawalEnabled: item.withdrawalEnabled !== false,
           }))
         : [];
 
@@ -112,8 +104,8 @@ export default function PaymentsAdminPage() {
     );
   }
 
-  function addPayment(kind: "deposit" | "withdrawal") {
-    setAddingKind(kind);
+  function addPayment() {
+    setAddingKind("deposit");
     setNewCurrency("USDT");
     setNewNetwork("");
     setNewMinimum("0");
@@ -135,7 +127,7 @@ export default function PaymentsAdminPage() {
       setError("الحد الأدنى غير صالح");
       return;
     }
-    if (addingKind === "deposit" && !newAddress.trim()) {
+    if (!newAddress.trim()) {
       setError("عنوان الإيداع مطلوب");
       return;
     }
@@ -149,23 +141,20 @@ export default function PaymentsAdminPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          kind: addingKind,
           name: asset,
           asset,
           network,
-          address: addingKind === "deposit" ? newAddress.trim() : "",
-          minDeposit: addingKind === "deposit" ? minimum : 0,
-          minWithdrawal: addingKind === "withdrawal" ? minimum : 0,
+          address: newAddress.trim(),
+          minDeposit: minimum,
           enabled: true,
-          depositEnabled: addingKind === "deposit",
-          withdrawalEnabled: addingKind === "withdrawal",
+          depositEnabled: true,
         }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.success) {
         throw new Error(json.message || "تعذر إضافة الوسيلة");
       }
-      setMessage(addingKind === "deposit" ? "تمت إضافة وسيلة الإيداع بنجاح." : "تمت إضافة وسيلة السحب بنجاح.");
+      setMessage("تمت إضافة وسيلة الإيداع بنجاح.");
       setAddingKind("");
       setNewCurrency("USDT");
       setNewNetwork("");
@@ -358,7 +347,7 @@ export default function PaymentsAdminPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={() => addPayment("deposit")} className="rounded-xl bg-blue-600 px-5 py-3 font-black transition hover:bg-blue-500">
+            <button type="button" onClick={addPayment} className="rounded-xl bg-blue-600 px-5 py-3 font-black transition hover:bg-blue-500">
               + إضافة وسيلة إيداع
             </button>
 </div>
@@ -381,7 +370,7 @@ export default function PaymentsAdminPage() {
         {addingKind ? (
           <section className="rounded-2xl border border-slate-700 bg-[#08111e] p-5 md:p-6">
             <div className="mb-5 flex items-center justify-between gap-3">
-              <h2 className="text-xl font-black">{addingKind === "deposit" ? "إضافة وسيلة إيداع" : "إضافة وسيلة سحب"}</h2>
+              <h2 className="text-xl font-black">"إضافة وسيلة إيداع"</h2>
               <button type="button" onClick={() => setAddingKind("")} className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-bold text-slate-300">إلغاء</button>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
@@ -397,17 +386,17 @@ export default function PaymentsAdminPage() {
                   <option value="BEP20">BNB Smart Chain (BEP20)</option>
                 </select>
               </label>
-              <label className="block text-sm font-bold">{addingKind === "deposit" ? "الحد الأدنى للإيداع" : "الحد الأدنى للسحب"}
+              <label className="block text-sm font-bold">"الحد الأدنى للإيداع"
                 <input type="number" min="0" step="any" value={newMinimum} onChange={(e) => setNewMinimum(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
               </label>
-              {addingKind === "deposit" ? (
+              {true ? (
                 <label className="block text-sm font-bold md:col-span-2">عنوان الإيداع
                   <textarea value={newAddress} onChange={(e) => setNewAddress(e.target.value)} rows={3} placeholder="عنوان المحفظة أو بيانات التحويل التي ستظهر للمستخدم" className="mt-2 w-full resize-y rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none focus:border-blue-500" />
                 </label>
               ) : null}
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
-              <button type="button" disabled={savingNew} onClick={() => void saveNewPayment()} className="rounded-xl bg-emerald-500 px-5 py-3 font-black text-slate-950 disabled:opacity-50">{savingNew ? "جاري الحفظ..." : addingKind === "deposit" ? "حفظ وسيلة الإيداع" : "حفظ وسيلة السحب"}</button>
+              <button type="button" disabled={savingNew} onClick={() => void saveNewPayment()} className="rounded-xl bg-emerald-500 px-5 py-3 font-black text-slate-950 disabled:opacity-50">{savingNew ? "جاري الحفظ..." : "حفظ وسيلة الإيداع"}</button>
               <button type="button" disabled={savingNew} onClick={() => setAddingKind("")} className="rounded-xl border border-slate-700 px-5 py-3 font-bold disabled:opacity-50">إلغاء</button>
             </div>
           </section>

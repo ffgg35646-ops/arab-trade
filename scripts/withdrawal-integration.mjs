@@ -66,7 +66,7 @@ async function getPackageState(id) {
   return plan;
 }
 async function requestWithdrawal(amount, userPackageId = oldUserPackageId) {
-  return call("/api/withdrawals", { method: "POST", cookie: userCookie, body: { userPackageId: String(userPackageId), amount } });
+  return call("/api/withdrawals", { method: "POST", cookie: userCookie, body: { userPackageId: String(userPackageId), amount, asset: "USDT", network: "TRC20", payoutAddress: "QA-wallet-" + suffix } });
 }
 async function review(requestId, action) {
   return call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie, body: { id: String(requestId), action } });
@@ -168,6 +168,11 @@ try {
 
   const rejectRequest = await requestWithdrawal(200);
   assert.equal(rejectRequest.status, 201, "withdrawal request: " + JSON.stringify(rejectRequest.data));
+  const savedDestination = await latestPending();
+  assert.equal(savedDestination.asset, "USDT");
+  assert.equal(savedDestination.network, "TRC20");
+  assert.equal(savedDestination.payoutAddress, "QA-wallet-" + suffix);
+  log("Withdrawal request stores USDT network and payout address for admin review");
   await checkPackageBalance(oldUserPackageId, 510, 200, "pending reserve");
   const secondWhilePending = await requestWithdrawal(100);
   assert.equal(secondWhilePending.status, 409, "second pending withdrawal must be blocked");

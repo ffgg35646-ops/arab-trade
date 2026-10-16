@@ -464,7 +464,6 @@ export default function AssetsAdminPage() {
               className="rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none"
             />
 
-            <input
           </div>
         </section>
 

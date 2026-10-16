@@ -70,14 +70,29 @@ async function main() {
       .filter((row) => String(row.asset || "").trim().toUpperCase() === "USDT")
       .reduce((sum, row) => sum + Number(row.available || 0), 0));
 
+    const sourceDir = process.cwd();
+    const isolatedDir = fs.mkdtempSync(path.join(os.tmpdir(), "arabtrade-package-qa-"));
+    const excludedRootDirs = new Set([".git", ".next", "node_modules", ".turbo", "coverage", "out"]);
+    fs.cpSync(sourceDir, isolatedDir, {
+      recursive: true,
+      filter(source) {
+        const relative = path.relative(sourceDir, source);
+        if (!relative || relative === "") return true;
+        const firstPart = relative.split(path.sep)[0];
+        return !excludedRootDirs.has(firstPart);
+      },
+    });
+    // Reuse the installed dependency tree while giving the QA server its own app directory and .next output.
+    fs.symlinkSync(path.join(sourceDir, "node_modules"), path.join(isolatedDir, "node_modules"), "dir");
+
     const port = await getFreePort();
     const baseUrl = "http://127.0.0.1:" + port;
     serverUrl = baseUrl;
     serverLogFile = path.join(os.tmpdir(), "arabtrade-local-test-next-" + port + ".log");
     const logFd = fs.openSync(serverLogFile, "a");
     app = spawn("npm", ["run", "dev", "--", "--hostname", "127.0.0.1", "--port", String(port)], {
-      cwd: process.cwd(),
-      env: { ...childEnv, PORT: String(port) },
+      cwd: isolatedDir,
+      env: { ...childEnv, PORT: String(port), TURBOREPO_ROOT: isolatedDir },
       detached: true,
       stdio: ["ignore", logFd, logFd],
     });

@@ -186,10 +186,6 @@ export default function WithdrawalsPage() {
               <h2 className="text-xl font-black">السحب من أرباح الباقات</h2>
             </div>
 
-            <p className="text-sm text-slate-400">
-              أرصدة التفعيلات والتغييرات السابقة تُدار داخليًا، ويظهر لك هنا نموذج سحب واحد فقط.
-            </p>
-
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl border border-slate-700 bg-[#0b1422] p-4">
                 <p className="text-sm text-slate-400">إجمالي أرباح الباقات المتاحة بالحساب</p>

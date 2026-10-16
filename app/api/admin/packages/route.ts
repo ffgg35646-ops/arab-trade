@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     const item = await InvestmentPackage.create({
-      name, description, price, asset: "USDT", durationDays, dailyProfit, sortOrder, enabled,
+      name, description, price, asset: "USDT", durationDays, dailyProfit, sortOrder, enabled, withdrawalMinimum: 100,
     });
     return NextResponse.json({ success: true, package: item }, { status: 201 });
   } catch (error) {

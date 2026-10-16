@@ -166,6 +166,37 @@ try {
   deposit = await mongoose.connection.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
   assert.equal(deposit.available, 100, "changing package should spend only new package activation from deposits");
   log("Changed package; exactly $100 refund credited back to old package, deposit balance remained separate");
+
+  // Simulate many cancelled activations from repeated Silver/Gold-style switching.
+  // They must remain internal ledger rows and must never become user-facing cards.
+  const historicalActivations = Array.from({ length: 20 }, (_, index) => {
+    const historicalPlanId = index % 2 === 0 ? packageAId : packageBId;
+    const historicalName = index % 2 === 0 ? planA.name : planB.name;
+    const historicalDate = new Date(Date.now() - (index + 1) * 24 * 60 * 60 * 1000);
+    return {
+      _id: new mongoose.Types.ObjectId(),
+      userId: user._id,
+      packageId: new mongoose.Types.ObjectId(historicalPlanId),
+      packageName: historicalName,
+      investedAmount: 200,
+      asset: "USDT",
+      durationDays: 0,
+      status: "cancelled",
+      availableEarnings: 0,
+      lockedEarnings: 0,
+      totalRealizedEarnings: 0,
+      cancellationRefund: 0,
+      cancellationRefundPackageCredited: true,
+      activatedAt: historicalDate,
+      lastProfitAt: historicalDate,
+      cancelledAt: historicalDate,
+      createdAt: historicalDate,
+      updatedAt: historicalDate,
+    };
+  });
+  await mongoose.connection.collection("userpackages").insertMany(historicalActivations);
+  log("Seeded 20 historical Silver/Gold activations in isolated CI data");
+
   const afterPackageChange = await call("/api/withdrawals", { cookie: userCookie });
   assert.equal(afterPackageChange.status, 200);
   assert.equal(afterPackageChange.data.packages, undefined, "switching packages must never expose another user-facing package card");

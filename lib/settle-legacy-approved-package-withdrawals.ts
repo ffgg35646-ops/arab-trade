@@ -30,6 +30,18 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
   const overlapsLiveRequest = (allocations: Array<{ userPackageId: string }>) =>
     allocations.some((allocation) => livePackageIds.has(allocation.userPackageId));
 
+  // Remember which approved requests were already settled before this pass so
+  // a request settled just above is not processed a second time as legacy.
+  const alreadySettledApprovalRows = await WithdrawalRequest.find({
+    userId,
+    source: "package",
+    status: "approved",
+    packageBalanceSettled: true,
+  }).select("_id").lean();
+  const alreadySettledApprovalIds = new Set(
+    (alreadySettledApprovalRows as any[]).map((row) => String(row._id))
+  );
+
   const requests = await WithdrawalRequest.find({
     userId,
     source: "package",
@@ -160,6 +172,7 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
 
   for (const request of previouslySettledApproved as any[]) {
     const requestId = String(request._id);
+    if (!alreadySettledApprovalIds.has(requestId)) continue;
     const amount = Number(request.amount);
     const rawAllocations = Array.isArray(request.packageAllocations) && request.packageAllocations.length
       ? request.packageAllocations

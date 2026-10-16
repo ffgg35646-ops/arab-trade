@@ -344,7 +344,7 @@ try {
 
   const overDailyCap = await requestWithdrawal(100);
   assert.equal(overDailyCap.status, 409, "a second day's-limit request must be blocked after today's cap is used");
-  assert.equal(overDailyCap.data.message, "تم استنفاد حد السحب اليومي لهذه الباقة");
+  assert.equal(overDailyCap.data.message, "لا يمكن طلب سحب إضافي إلا بعد وجود إحالات نشطة بإيداعات معتمدة");
   await checkPackageBalance(oldUserPackageId, 310, 0, "blocked second withdrawal today");
   log("Once $200 is approved today, remaining $310 stays in the package but is unavailable for another withdrawal today");
 

@@ -315,6 +315,9 @@ export async function GET(request: NextRequest) {
     await reconcileOrphanedPackageWithdrawalLocks(user._id);
     await separateLegacyDepositsFromSpotWallet(user._id);
     await reconcileLegacyPackageRefunds(user._id);
+    // Refund reclassification can change the real package cash balance, so
+    // run settlement again before returning balance data to the client.
+    await settleLegacyApprovedPackageWithdrawals(user._id);
     await Promise.all([
       UserPackage.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
       PackageLedger.updateMany({ userId: user._id, asset: { $ne: USDT_ASSET } }, { $set: { asset: USDT_ASSET } }),
@@ -449,6 +452,7 @@ export async function GET(request: NextRequest) {
     // Balance buckets belong to one UserPackage activation record. Only the
     // first-withdrawal policy cap is grouped by package family; money itself is not.
     const packageInvestedByName = new Map<string, number>();
+    const packageFamilyAvailableBalance = new Map<string, number>();
     for (const account of rawUserPackages as any[]) {
       const key = String(account._id);
       const groupKey = packageGroupByAccountId.get(key) || "account:" + key;
@@ -456,7 +460,27 @@ export async function GET(request: NextRequest) {
         groupKey,
         roundAmount((packageInvestedByName.get(groupKey) || 0) + Math.max(0, Number(account.investedAmount || 0))),
       );
+      packageFamilyAvailableBalance.set(
+        groupKey,
+        roundAmount(
+          (packageFamilyAvailableBalance.get(groupKey) || 0) +
+            Math.max(0, Number(account.availableEarnings || 0)) -
+            Math.max(0, Number(account.withdrawalBalanceDebt || 0)),
+        ),
+      );
     }
+    const packageFamilyAvailableRemaining = new Map(
+      [...packageFamilyAvailableBalance.entries()].map(([key, value]) => [key, Math.max(0, value)] as const)
+    );
+    // Deficits from historical overpayments in one package family also reduce
+    // the user's global cash available for withdrawal across all package cards.
+    let globalPackageAvailableRemaining = Math.max(0, rawUserPackages.reduce(
+      (sum: number, account: any) =>
+        sum +
+        Math.max(0, Number(account.availableEarnings || 0)) -
+        Math.max(0, Number(account.withdrawalBalanceDebt || 0)),
+      0,
+    ));
 
     const dailyProfitByPackage = new Map(
       (allPlansForProfit as any[]).map((plan) => [String(plan._id), Math.max(0, Number(plan.dailyProfit || 0))])
@@ -470,6 +494,20 @@ export async function GET(request: NextRequest) {
       const collectWindowOpen = item.status === "active" && collectionNow >= nextCollectAt && collectionNow <= collectWindowEndsAt;
       const packageKey = String(item._id);
       const packageGroupKey = packageGroupByAccountId.get(packageKey) || "account:" + packageKey;
+      const accountNetAvailable = Math.max(
+        0,
+        Number(item.availableEarnings || 0) - Number(item.withdrawalBalanceDebt || 0),
+      );
+      const familyAvailableRemaining = Math.max(0, packageFamilyAvailableRemaining.get(packageGroupKey) || 0);
+      const accountFamilyAvailable = Math.min(accountNetAvailable, familyAvailableRemaining);
+      packageFamilyAvailableRemaining.set(
+        packageGroupKey,
+        roundAmount(Math.max(0, familyAvailableRemaining - accountFamilyAvailable)),
+      );
+      const accountGlobalAvailable = Math.min(accountNetAvailable, globalPackageAvailableRemaining);
+      globalPackageAvailableRemaining = roundAmount(
+        Math.max(0, globalPackageAvailableRemaining - accountGlobalAvailable),
+      );
       const referralCap = activeReferralDepositTotal * referralPackageWithdrawalPercent / 100;
       const referralAlreadyWithdrawn = referralAlreadyWithdrawnTotal;
       const referralRemaining = Math.max(0, referralCap - referralAlreadyWithdrawn);
@@ -504,7 +542,7 @@ export async function GET(request: NextRequest) {
         : Math.min(Math.max(0, Number(item.availableEarnings || 0)), packageWithdrawalAlreadyUsed || firstPackageWithdrawalRemaining <= 1e-8
           ? referralRemaining
           : firstPackageWithdrawalRemaining);
-      const withdrawalLimit = phaseWithdrawalLimit;
+      const withdrawalLimit = Math.min(phaseWithdrawalLimit, accountFamilyAvailable, accountGlobalAvailable);
       return {
         ...item,
         firstPackageWithdrawalCap,
@@ -721,9 +759,10 @@ export async function POST(request: NextRequest) {
           const created = await UserPackage.create([{
             userId: user._id, packageId: plan._id, packageName: plan.name,
             investedAmount: price, asset: USDT_ASSET, durationDays: 0, lastProfitAt: new Date(),
-            status: "active", availableEarnings: price, lockedEarnings: 0,
+            status: "active", availableEarnings: 0, lockedEarnings: 0,
             totalRealizedEarnings: 0, totalWithdrawn: 0,
             withdrawablePrincipalCredited: true,
+            withdrawalBalanceDebt: 0, withdrawalBalanceReconciled: true,
             cancellationRefund: 0, activatedAt: new Date(),
           }], { session });
           purchased = created[0];
@@ -732,11 +771,6 @@ export async function POST(request: NextRequest) {
               userId: user._id, userPackageId: purchased._id,
               type: "activation", asset, amount: -price,
               note: "تفعيل باقة " + plan.name + " من رصيد الإيداع",
-            },
-            {
-              userId: user._id, userPackageId: purchased._id,
-              type: "activation_withdrawable", asset, amount: price,
-              note: "إضافة قيمة تفعيل الباقة إلى رصيد السحب المتاح للمرحلة الأولى.",
             },
           ], { session, ordered: true });
         });
@@ -838,11 +872,13 @@ export async function POST(request: NextRequest) {
             durationDays: 0,
             lastProfitAt: new Date(),
             status: "active",
-            availableEarnings: price,
+            availableEarnings: 0,
             lockedEarnings: 0,
             totalRealizedEarnings: 0,
             totalWithdrawn: 0,
             withdrawablePrincipalCredited: true,
+            withdrawalBalanceDebt: 0,
+            withdrawalBalanceReconciled: true,
             firstWithdrawalStatus: "available",
             cancellationRefund: 0,
             activatedAt: new Date(),
@@ -865,14 +901,6 @@ export async function POST(request: NextRequest) {
               asset,
               amount: -price,
               note: "تفعيل باقة " + plan.name + " من رصيد الإيداع عند تغيير الباقة",
-            },
-            {
-              userId: user._id,
-              userPackageId: changedPackage._id,
-              type: "activation_withdrawable",
-              asset,
-              amount: price,
-              note: "إضافة قيمة تفعيل الباقة الجديدة إلى رصيد السحب المتاح للمرحلة الأولى.",
             },
           ], { session, ordered: true });
         });

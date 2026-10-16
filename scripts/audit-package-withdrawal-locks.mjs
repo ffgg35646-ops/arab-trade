@@ -66,7 +66,7 @@ try {
       .project({
         _id: 1, userId: 1, packageId: 1, packageName: 1, status: 1,
         investedAmount: 1, cancellationRefund: 1, totalRealizedEarnings: 1, totalWithdrawn: 1,
-        withdrawablePrincipalCredited: 1,
+        withdrawablePrincipalCredited: 1, withdrawalBalanceDebt: 1, withdrawalBalanceReconciled: 1,
         availableEarnings: 1, lockedEarnings: 1, withdrawalRequestPending: 1,
       })
       .toArray(),
@@ -232,23 +232,55 @@ try {
     }
   }
 
-  // Compare the stored bucket with posted package-ledger movements and request history.
-  // This report never mutates balances. "ledgerExpectedBucket" excludes activation
-  // debits because those are funded from the separate deposit wallet, not the package bucket.
-  const bucketLedgerTypes = new Set([
-    "activation_withdrawable", "realized_earning", "daily_earning", "reward",
-    "cancellation_refund", "refund_reclassification", "withdrawal", "withdrawal_reversal",
+  // Compare the current package cash balance with both package-ledger movements
+  // and request history. Invested principal/activation_withdrawable rows are caps,
+  // not cash. Rejected requests only create a true reversal if an earlier payout
+  // debit for that exact request exists; otherwise the positive reversal is a
+  // reservation release and must not increase the ledger's economic balance.
+  const cashLedgerTypes = new Set([
+    "realized_earning", "daily_earning", "reward", "cancellation_refund",
+    "refund_reclassification", "withdrawal", "withdrawal_reversal",
   ]);
   const terminalWithdrawalStatuses = new Set(["approved", "completed"]);
+  const requestIdFromNote = (value) => {
+    const match = String(value || "").match(/(?:رقم الطلب|مرجع طلب السحب):\s*([0-9a-f]{24})/i);
+    return match ? match[1].toLowerCase() : "";
+  };
   const packageBalanceAudit = accounts.map((account) => {
     const accountId = idOf(account._id);
     const ledger = ledgerByAccount.get(accountId) || [];
-    const movements = ledger.filter((row) => bucketLedgerTypes.has(String(row.type || "")));
+    const accountRequests = requestsByAccount.get(accountId) || [];
+    const successfulRequests = accountRequests.filter((request) => terminalWithdrawalStatuses.has(request.status));
+    const successfulWithdrawalAmount = successfulRequests.reduce((sum, request) => sum + request.amount, 0);
+    const successfulRequestIds = new Set(successfulRequests.map((request) => request.requestId.toLowerCase()));
+
+    const debitedRequestIds = new Set(
+      ledger
+        .filter((row) => row.type === "withdrawal" && asNumber(row.amount) < 0 &&
+          !String(row.note || "").includes("تصحيح الرصيد التراكمي الزائد"))
+        .map((row) => requestIdFromNote(row.note))
+        .filter(Boolean)
+    );
+    const movements = ledger.filter((row) => {
+      const type = String(row.type || "");
+      if (!cashLedgerTypes.has(type)) return false;
+      if (type === "withdrawal" && String(row.note || "").includes("تصحيح الرصيد التراكمي الزائد")) {
+        return false;
+      }
+      if (type === "withdrawal_reversal") {
+        const requestId = requestIdFromNote(row.note);
+        return Boolean(requestId && debitedRequestIds.has(requestId));
+      }
+      return true;
+    });
+
     const ledgerExpectedBucket = movements.reduce((sum, row) => sum + asNumber(row.amount), 0);
     const available = asNumber(account.availableEarnings);
     const locked = asNumber(account.lockedEarnings);
+    const debt = Math.max(0, asNumber(account.withdrawalBalanceDebt));
     const storedBucket = available + locked;
-    const accountRequests = requestsByAccount.get(accountId) || [];
+    const storedEffectiveBucket = storedBucket - debt;
+
     const statusSummary = {};
     for (const request of accountRequests) {
       const key = request.status || "(missing status)";
@@ -257,15 +289,39 @@ try {
       statusSummary[key].amount = Number((statusSummary[key].amount + request.amount).toFixed(8));
       statusSummary[key].requestIds.push(request.requestId);
     }
-    const successfulWithdrawalAmount = accountRequests
-      .filter((request) => terminalWithdrawalStatuses.has(request.status))
-      .reduce((sum, request) => sum + request.amount, 0);
-    const ledgerWithdrawalDebits = movements
-      .filter((row) => row.type === "withdrawal" && asNumber(row.amount) < 0)
+
+    const ledgerWithdrawalDebits = ledger
+      .filter((row) => row.type === "withdrawal" && asNumber(row.amount) < 0 &&
+        !String(row.note || "").includes("تصحيح الرصيد التراكمي الزائد"))
       .reduce((sum, row) => sum + Math.abs(asNumber(row.amount)), 0);
-    const ledgerReversalCredits = movements
-      .filter((row) => row.type === "withdrawal_reversal")
+    const ledgerReversalCredits = ledger
+      .filter((row) => row.type === "withdrawal_reversal" &&
+        Boolean(requestIdFromNote(row.note)) &&
+        debitedRequestIds.has(requestIdFromNote(row.note)))
       .reduce((sum, row) => sum + asNumber(row.amount), 0);
+    const unpairedReversalCredits = ledger
+      .filter((row) => row.type === "withdrawal_reversal" &&
+        asNumber(row.amount) > 0 &&
+        !(
+          Boolean(requestIdFromNote(row.note)) &&
+          debitedRequestIds.has(requestIdFromNote(row.note))
+        ))
+      .reduce((sum, row) => sum + asNumber(row.amount), 0);
+
+    const earningLedgerTotal = ledger.reduce((sum, row) => {
+      if (!["daily_earning", "realized_earning", "reward"].includes(String(row.type || ""))) return sum;
+      const amount = asNumber(row.amount);
+      return amount > 0 ? sum + amount : sum;
+    }, 0);
+    const realizedEarningsForExpected = Math.max(0, asNumber(account.totalRealizedEarnings), earningLedgerTotal);
+    const expectedCashFromRequestHistory = Number((
+      asNumber(account.cancellationRefund) +
+      realizedEarningsForExpected -
+      successfulWithdrawalAmount
+    ).toFixed(8));
+
+    const principalLedgerRows = ledger.filter((row) => row.type === "activation_withdrawable");
+    const principalLedgerNet = principalLedgerRows.reduce((sum, row) => sum + asNumber(row.amount), 0);
     return {
       userId: idOf(account.userId),
       packageAccountId: accountId,
@@ -273,18 +329,25 @@ try {
       packageName: String(account.packageName || ""),
       packageStatus: String(account.status || ""),
       withdrawablePrincipalCredited: account.withdrawablePrincipalCredited === true,
+      withdrawalBalanceReconciled: account.withdrawalBalanceReconciled === true,
       investedAmount: asNumber(account.investedAmount),
       cancellationRefund: asNumber(account.cancellationRefund),
       totalRealizedEarnings: asNumber(account.totalRealizedEarnings),
       totalWithdrawnField: asNumber(account.totalWithdrawn),
       storedAvailable: available,
       storedLocked: locked,
+      storedDebt: debt,
       storedBucketTotal: storedBucket,
+      storedEffectiveBucketTotal: Number(storedEffectiveBucket.toFixed(8)),
+      principalLedgerNet: Number(principalLedgerNet.toFixed(8)),
       ledgerExpectedBucket: Number(ledgerExpectedBucket.toFixed(8)),
-      storedMinusLedger: Number((storedBucket - ledgerExpectedBucket).toFixed(8)),
+      storedMinusLedger: Number((storedEffectiveBucket - ledgerExpectedBucket).toFixed(8)),
+      expectedCashFromRequestHistory: Number(expectedCashFromRequestHistory.toFixed(8)),
+      storedMinusRequestExpected: Number((storedEffectiveBucket - expectedCashFromRequestHistory).toFixed(8)),
       successfulRequestAmountApprovedOrCompleted: Number(successfulWithdrawalAmount.toFixed(8)),
       ledgerWithdrawalDebits: Number(ledgerWithdrawalDebits.toFixed(8)),
       ledgerWithdrawalReversalCredits: Number(ledgerReversalCredits.toFixed(8)),
+      unpairedReversalCredits: Number(unpairedReversalCredits.toFixed(8)),
       requestStatusSummary: statusSummary,
       recentLedgerMovements: ledger.slice(-40).map((row) => ({
         id: idOf(row._id),
@@ -300,13 +363,20 @@ try {
     accounts: sum.accounts + 1,
     storedAvailable: sum.storedAvailable + row.storedAvailable,
     storedLocked: sum.storedLocked + row.storedLocked,
+    storedDebt: sum.storedDebt + row.storedDebt,
     storedBucketTotal: sum.storedBucketTotal + row.storedBucketTotal,
+    storedEffectiveBucketTotal: sum.storedEffectiveBucketTotal + row.storedEffectiveBucketTotal,
     ledgerExpectedBucket: sum.ledgerExpectedBucket + row.ledgerExpectedBucket,
+    expectedCashFromRequestHistory: sum.expectedCashFromRequestHistory + row.expectedCashFromRequestHistory,
     successfulRequestAmountApprovedOrCompleted: sum.successfulRequestAmountApprovedOrCompleted + row.successfulRequestAmountApprovedOrCompleted,
     ledgerWithdrawalDebits: sum.ledgerWithdrawalDebits + row.ledgerWithdrawalDebits,
+    ledgerWithdrawalReversalCredits: sum.ledgerWithdrawalReversalCredits + row.ledgerWithdrawalReversalCredits,
+    unpairedReversalCredits: sum.unpairedReversalCredits + row.unpairedReversalCredits,
   }), {
-    accounts: 0, storedAvailable: 0, storedLocked: 0, storedBucketTotal: 0,
-    ledgerExpectedBucket: 0, successfulRequestAmountApprovedOrCompleted: 0, ledgerWithdrawalDebits: 0,
+    accounts: 0, storedAvailable: 0, storedLocked: 0, storedDebt: 0, storedBucketTotal: 0,
+    storedEffectiveBucketTotal: 0, ledgerExpectedBucket: 0, expectedCashFromRequestHistory: 0,
+    successfulRequestAmountApprovedOrCompleted: 0, ledgerWithdrawalDebits: 0,
+    ledgerWithdrawalReversalCredits: 0, unpairedReversalCredits: 0,
   });
   for (const key of Object.keys(totals)) {
     if (key !== "accounts") totals[key] = Number(totals[key].toFixed(8));

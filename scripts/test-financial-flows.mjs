@@ -207,7 +207,7 @@ async function databaseWithdrawalUsdtTotal() {
   0);
   const packageTotal = packages.reduce((sum, account) =>
     sum + (String(account.asset || "USDT").toUpperCase() === "USDT"
-      ? Number(account.availableEarnings || 0) + Number(account.lockedEarnings || 0)
+      ? Number(account.availableEarnings || 0) + Number(account.lockedEarnings || 0) - Number(account.withdrawalBalanceDebt || 0)
       : 0),
   0);
   return walletTotal + packageTotal;
@@ -319,7 +319,7 @@ spotWallet = await db.collection("wallets").findOne({ userId: user._id, type: "s
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(spotWallet.balances.find((x) => x.asset === "USDT").available, 50, "package activation does not debit the general spot balance");
 closeTo(depositBalance && depositBalance.available, 900, "package activation debits the separate deposit balance");
-closeTo(Number(package100.availableEarnings || 0), 100, "package activation principal is withdrawable within the first-stage cap");
+closeTo(Number(package100.availableEarnings || 0), 0, "package activation principal is not cash available for withdrawal");
 
 // Regression: a package minimum of 200 USDT must reject a 50-USDT request,
 // even when 50 is the entire remaining balance for that package.
@@ -349,7 +349,7 @@ await db.collection("userpackages").insertOne({
   status: "cancelled",
   availableEarnings: 50,
   lockedEarnings: 0,
-  totalRealizedEarnings: 0,
+  totalRealizedEarnings: 50,
   totalWithdrawn: 0,
   withdrawablePrincipalCredited: true,
   firstWithdrawalStatus: "available",
@@ -404,7 +404,7 @@ await db.collection("userpackages").insertOne({
   status: "cancelled",
   availableEarnings: 50,
   lockedEarnings: 0,
-  totalRealizedEarnings: 0,
+  totalRealizedEarnings: 50,
   totalWithdrawn: 0,
   withdrawablePrincipalCredited: true,
   firstWithdrawalStatus: "available",
@@ -469,7 +469,7 @@ ok(await api("/api/admin/packages/credit", {
   body: { userPackageId: String(package100._id), amount: 600, note: "CI realized proceeds test credit" },
 }), "admin credits realized earnings to package");
 let package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 700, "withdrawable activation principal plus realized earnings stay in package withdrawal bucket");
+closeTo(package100Doc.availableEarnings, 600, "only realized earnings enter the package withdrawal bucket");
 
 const tooLargeFirst = await api("/api/withdrawals", {
   method: "POST",
@@ -477,7 +477,7 @@ const tooLargeFirst = await api("/api/withdrawals", {
 });
 statusIs(tooLargeFirst, 400, "first package withdrawal cannot exceed activation price");
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 700, "rejected over-limit first withdrawal preserves bucket");
+closeTo(package100Doc.availableEarnings, 600, "rejected over-limit first withdrawal preserves bucket");
 
 const navbarBeforeRejectedPackageRequest = await navbarWithdrawalUsdtTotal("navbar total before package withdrawal");
 const firstWithdrawal = await api("/api/withdrawals", {
@@ -488,7 +488,7 @@ ok(firstWithdrawal, "first package withdrawal in activation limit", 201);
 closeTo(await navbarWithdrawalUsdtTotal("navbar total while package withdrawal is pending"), navbarBeforeRejectedPackageRequest, "pending package reservation remains included in total funds");
 const rejectedPackageWithdrawalId = String(firstWithdrawal.data.withdrawal._id);
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 600, "package available earnings decrease by the requested amount while pending");
+closeTo(package100Doc.availableEarnings, 500, "package available earnings decrease by the requested amount while pending");
 closeTo(package100Doc.lockedEarnings, 100, "package withdrawal reserved as locked");
 assert.equal(package100Doc.firstWithdrawalStatus, "pending", "first package withdrawal marked pending");
 
@@ -510,7 +510,7 @@ ok(await api("/api/admin/withdrawals", {
   body: { id: rejectedPackageWithdrawalId, status: "rejected", adminNote: "CI verify package balance restoration" },
 }), "admin rejects package withdrawal");
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 700, "rejected package withdrawal restores available earnings");
+closeTo(package100Doc.availableEarnings, 600, "rejected package withdrawal restores available earnings");
 closeTo(package100Doc.lockedEarnings, 0, "rejected package withdrawal unlocks funds");
 assert.equal(package100Doc.firstWithdrawalStatus, "available", "rejected first package withdrawal can be retried");
 closeTo(await navbarWithdrawalUsdtTotal("navbar total after package rejection"), navbarBeforeRejectedPackageRequest, "rejected package withdrawal restores the exact prior total without double credit");
@@ -522,7 +522,7 @@ const retryFirstWithdrawal = await api("/api/withdrawals", {
 ok(retryFirstWithdrawal, "first package withdrawal can be retried after rejection", 201);
 const packageWithdrawalId = String(retryFirstWithdrawal.data.withdrawal._id);
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 600, "retried package withdrawal decreases available earnings");
+closeTo(package100Doc.availableEarnings, 500, "retried package withdrawal decreases available earnings");
 closeTo(package100Doc.lockedEarnings, 100, "retried package withdrawal locks funds again");
 assert.equal(package100Doc.firstWithdrawalStatus, "pending", "retried first package withdrawal marked pending");
 
@@ -538,7 +538,7 @@ ok(await api("/api/admin/withdrawals", {
 }), "admin approves and settles package withdrawal in one decision");
 closeTo(await navbarWithdrawalUsdtTotal("navbar total after package approval"), navbarBeforePackageApproval - 100, "approved package withdrawal is removed from navbar total exactly once");
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 600, "remaining package principal and earnings after approval");
+closeTo(package100Doc.availableEarnings, 500, "remaining realized earnings after approval");
 closeTo(package100Doc.lockedEarnings, 0, "approved package withdrawal immediately clears the locked amount");
 closeTo(package100Doc.totalWithdrawn, 100, "approved package withdrawal is counted once as withdrawn");
 assert.equal(package100Doc.firstWithdrawalStatus, "completed", "approved first package withdrawal closes the first stage");
@@ -554,7 +554,7 @@ ok(await api("/api/admin/withdrawals", {
 closeTo(await navbarWithdrawalUsdtTotal("navbar total after package completion"), navbarAtPackageApproval, "completion does not deduct the package payout a second time");
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
 closeTo(package100Doc.totalWithdrawn, 100, "completion does not count the same approved payout twice");
-closeTo(package100Doc.availableEarnings + package100Doc.lockedEarnings, 600, "completion leaves the package balance unchanged after approval");
+closeTo(package100Doc.availableEarnings + package100Doc.lockedEarnings, 500, "completion leaves the package cash balance unchanged after approval");
 
 // Regression: same-name activation records own independent balances. A payout
 // must reserve and later reverse the selected account only.
@@ -571,7 +571,7 @@ await db.collection("userpackages").insertMany(splitAccountIds.map((_id, index) 
   status: "cancelled",
   availableEarnings: index === 0 ? 150 : 50,
   lockedEarnings: 0,
-  totalRealizedEarnings: 0,
+  totalRealizedEarnings: index === 0 ? 150 : 50,
   totalWithdrawn: 0,
   withdrawablePrincipalCredited: true,
   firstWithdrawalStatus: "available",
@@ -639,7 +639,7 @@ await db.collection("userpackages").insertOne({
   status: "cancelled",
   availableEarnings: 100,
   lockedEarnings: 0,
-  totalRealizedEarnings: 0,
+  totalRealizedEarnings: 100,
   totalWithdrawn: 0,
   withdrawablePrincipalCredited: true,
   firstWithdrawalStatus: "available",
@@ -701,7 +701,7 @@ const secondStageWithdrawal = await api("/api/withdrawals", {
 ok(secondStageWithdrawal, "user can withdraw 50 USDT against a 100-USDT active referral deposit", 201);
 const secondStageWithdrawalId = String(secondStageWithdrawal.data.withdrawal._id);
 package100Doc = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(package100Doc.availableEarnings, 550, "second-stage withdrawal reduces the package's available bucket");
+closeTo(package100Doc.availableEarnings, 450, "second-stage withdrawal reduces the package's available cash bucket");
 closeTo(package100Doc.lockedEarnings, 50, "second-stage withdrawal locks its requested amount");
 
 ok(await api("/api/admin/withdrawals", {
@@ -764,7 +764,7 @@ await db.collection("withdrawalrequests").insertOne({
 });
 ok(await api("/api/packages"), "package API reconciles legacy approved package withdrawal locks");
 let legacySettledAccount = await db.collection("userpackages").findOne({ _id: legacyApprovedPackageId });
-closeTo(legacySettledAccount.availableEarnings, 40, "legacy approved withdrawal does not refund already-approved amount to available");
+closeTo(legacySettledAccount.availableEarnings, 0, "legacy approved payout consumes earnings and leaves no principal in cash balance");
 closeTo(legacySettledAccount.lockedEarnings, 0, "legacy approved withdrawal no longer leaves a locked balance");
 closeTo(legacySettledAccount.totalWithdrawn, 60, "legacy approved withdrawal is counted as withdrawn once");
 assert.equal(legacySettledAccount.firstWithdrawalStatus, "completed", "legacy approved first withdrawal is closed");
@@ -827,14 +827,14 @@ await db.collection("withdrawalrequests").insertOne({
 const flaggedApprovedNavbarBefore = await databaseWithdrawalUsdtTotal();
 ok(await api("/api/packages"), "package API repairs a stale settled flag on an approved withdrawal");
 let flaggedApprovedAccount = await db.collection("userpackages").findOne({ _id: flaggedApprovedPackageId });
-closeTo(flaggedApprovedAccount.availableEarnings, 40, "stale approved withdrawal repair does not credit the paid amount back");
+closeTo(flaggedApprovedAccount.availableEarnings, 0, "cash-only reconciliation removes activation principal after stale approved payout");
 closeTo(flaggedApprovedAccount.lockedEarnings, 0, "stale approved withdrawal reservation is consumed");
 closeTo(flaggedApprovedAccount.totalWithdrawn, 60, "stale approved withdrawal is not counted twice");
 const flaggedApprovedNavbarAfter = await navbarWithdrawalUsdtTotal("navbar after stale approved withdrawal repair");
-closeTo(flaggedApprovedNavbarAfter, flaggedApprovedNavbarBefore - 60, "cumulative withdrawal balance decreases once for the approved payout");
+closeTo(flaggedApprovedNavbarAfter, flaggedApprovedNavbarBefore - 100, "stale approved payout migration removes the locked payout and excludes remaining activation principal");
 ok(await api("/api/packages"), "second refresh is idempotent after stale approved withdrawal repair");
 flaggedApprovedAccount = await db.collection("userpackages").findOne({ _id: flaggedApprovedPackageId });
-closeTo(flaggedApprovedAccount.availableEarnings + flaggedApprovedAccount.lockedEarnings, 40, "repeated refresh cannot restore or re-spend the approved withdrawal");
+closeTo(flaggedApprovedAccount.availableEarnings + flaggedApprovedAccount.lockedEarnings, 0, "repeated refresh preserves the zero net cash balance after approval");
 await db.collection("packageledgers").deleteMany({ userPackageId: flaggedApprovedPackageId });
 await db.collection("withdrawalrequests").deleteOne({ _id: flaggedApprovedWithdrawalId });
 await db.collection("userpackages").deleteOne({ _id: flaggedApprovedPackageId });
@@ -855,7 +855,7 @@ await db.collection("userpackages").insertOne({
   asset: "USDT",
   durationDays: 0,
   status: "active",
-  availableEarnings: 100,
+  availableEarnings: 60,
   lockedEarnings: 0,
   totalRealizedEarnings: 60,
   totalWithdrawn: 25,
@@ -910,11 +910,11 @@ await db.collection("packageledgers").insertMany([
 const returnedApprovedNavbarBefore = await databaseWithdrawalUsdtTotal();
 ok(await api("/api/packages"), "package API reverses a stale orphan credit for an approved payout");
 const returnedApprovedAccount = await db.collection("userpackages").findOne({ _id: returnedApprovedPackageId });
-closeTo(returnedApprovedAccount.availableEarnings, 75, "old orphan credit is removed from the package available balance");
+closeTo(returnedApprovedAccount.availableEarnings, 35, "old orphan credit is removed and only earned cash net of the payout remains");
 closeTo(returnedApprovedAccount.lockedEarnings, 0, "stale approval repair leaves no phantom lock");
 closeTo(await navbarWithdrawalUsdtTotal("navbar after reversal of stale approved-payout credit"), returnedApprovedNavbarBefore - 25, "cumulative withdrawal balance drops by the approved payout exactly once");
 ok(await api("/api/packages"), "second refresh is safe after reversing a stale orphan credit");
-closeTo((await db.collection("userpackages").findOne({ _id: returnedApprovedPackageId })).availableEarnings, 75, "stale orphan credit is not reversed twice");
+closeTo((await db.collection("userpackages").findOne({ _id: returnedApprovedPackageId })).availableEarnings, 35, "repeated refresh preserves the net earned cash balance");
 await db.collection("packageledgers").deleteMany({ userPackageId: returnedApprovedPackageId });
 await db.collection("withdrawalrequests").deleteOne({ _id: returnedApprovedWithdrawalId });
 await db.collection("userpackages").deleteOne({ _id: returnedApprovedPackageId });
@@ -935,7 +935,7 @@ await db.collection("userpackages").insertOne({
   status: "cancelled",
   availableEarnings: 75,
   lockedEarnings: 0,
-  totalRealizedEarnings: 75,
+  totalRealizedEarnings: 125,
   totalWithdrawn: 0,
   withdrawablePrincipalCredited: true,
   firstWithdrawalStatus: "available",
@@ -963,7 +963,7 @@ await db.collection("withdrawalrequests").insertOne({
 });
 ok(await api("/api/packages"), "package API restores an older rejected package withdrawal");
 let legacyRejectedAccount = await db.collection("userpackages").findOne({ _id: legacyRejectedPackageId });
-closeTo(legacyRejectedAccount.availableEarnings, 125, "legacy rejected amount is restored to package available earnings");
+closeTo(legacyRejectedAccount.availableEarnings, 125, "rejected package cash is restored without counting invested principal");
 closeTo(legacyRejectedAccount.lockedEarnings, 0, "legacy rejected amount leaves no locked balance");
 closeTo(legacyRejectedAccount.totalWithdrawn, 0, "rejected amount is not counted as withdrawn");
 let legacyRejectedRequest = await db.collection("withdrawalrequests").findOne({ _id: legacyRejectedWithdrawalId });
@@ -1110,12 +1110,16 @@ ok(migratedLegacyPage, "legacy package migration does not re-credit a completed 
 const migratedLegacyAccount = migratedLegacyPage.data.userPackages.find((x) => String(x._id) === String(legacyPackageId));
 assert.ok(migratedLegacyAccount, "legacy package account remains visible");
 closeTo(migratedLegacyAccount.availableEarnings, 0, "legacy 500-USDT withdrawal does not restore another 500 to the card balance");
+closeTo(migratedLegacyAccount.withdrawalBalanceDebt, 500, "a legacy payout beyond refundable earnings is reflected as package balance debt");
 closeTo(migratedLegacyAccount.firstPackageWithdrawalRemaining, 0, "legacy withdrawal consumes the first-stage package allowance");
 assert.equal((await db.collection("userpackages").findOne({ _id: legacyPackageId })).withdrawablePrincipalCredited, true, "legacy principal migration is marked once");
 assert.equal((await db.collection("withdrawalrequests").findOne({ _id: legacyPrincipalWithdrawalId })).isFirstPackageWithdrawal, true, "legacy withdrawal is classified against the package principal cap");
 const migratedLegacyPageAgain = await api("/api/packages");
 ok(migratedLegacyPageAgain, "reloading package balances keeps the legacy migration idempotent");
 closeTo(migratedLegacyPageAgain.data.userPackages.find((x) => String(x._id) === String(legacyPackageId)).availableEarnings, 0, "reloading does not put the withdrawn 500 back");
+await db.collection("packageledgers").deleteMany({ userPackageId: legacyPackageId });
+await db.collection("withdrawalrequests").deleteOne({ _id: legacyPrincipalWithdrawalId });
+await db.collection("userpackages").deleteOne({ _id: legacyPackageId });
 
 // Repair an account already marked migrated by the previous buggy helper: it credited
 // 500 again even though a 500-USDT legacy withdrawal was already completed.
@@ -1177,8 +1181,12 @@ ok(repairedLegacyPage, "previously migrated legacy account is repaired");
 const repairedLegacyAccount = repairedLegacyPage.data.userPackages.find((x) => String(x._id) === String(previouslyMigratedPackageId));
 assert.ok(repairedLegacyAccount, "previously migrated account is visible after repair");
 closeTo(repairedLegacyAccount.availableEarnings, 0, "old duplicate principal top-up is removed from the visible package balance");
+closeTo(repairedLegacyAccount.withdrawalBalanceDebt, 500, "historical payout debt is retained when the package has no refund or realized earnings");
 closeTo(repairedLegacyAccount.firstPackageWithdrawalRemaining, 0, "old 500 withdrawal consumes the first-stage allowance after repair");
 assert.equal((await db.collection("withdrawalrequests").findOne({ _id: previouslyMigratedWithdrawalId })).isFirstPackageWithdrawal, true, "old completed withdrawal is classified on an already-migrated account");
+await db.collection("packageledgers").deleteMany({ userPackageId: previouslyMigratedPackageId });
+await db.collection("withdrawalrequests").deleteOne({ _id: previouslyMigratedWithdrawalId });
+await db.collection("userpackages").deleteOne({ _id: previouslyMigratedPackageId });
 
 // Regression: an old duplicated principal migration must not consume a later package refund.
 const refundRetainedPackageId = new mongoose.Types.ObjectId();
@@ -1248,10 +1256,12 @@ const refundRetainedPage = await api("/api/packages");
 ok(refundRetainedPage, "package API reconciles legacy migration without consuming a refund");
 const refundRetainedAccount = refundRetainedPage.data.userPackages.find((x) => String(x._id) === String(refundRetainedPackageId));
 assert.ok(refundRetainedAccount, "cancelled package remains visible after reconciliation");
-closeTo(refundRetainedAccount.availableEarnings, 50, "legacy duplicate principal is removed but the 50-USDT cancellation refund remains available");
+closeTo(refundRetainedAccount.availableEarnings, 0, "cash bucket cannot stay positive after a payout exceeds the cancellation refund");
+closeTo(refundRetainedAccount.withdrawalBalanceDebt, 450, "legacy payout debt offsets the 50-USDT refund");
 ok(await api("/api/packages"), "reloading package data remains safe after refund reconciliation");
 const refundRetainedAccountAfterReload = await db.collection("userpackages").findOne({ _id: refundRetainedPackageId });
-closeTo(refundRetainedAccountAfterReload.availableEarnings, 50, "repeated package refresh never removes the retained cancellation refund");
+closeTo(refundRetainedAccountAfterReload.availableEarnings, 0, "repeated package refresh never restores non-cash principal");
+closeTo(refundRetainedAccountAfterReload.withdrawalBalanceDebt, 450, "repeated package refresh preserves the net package debt");
 await db.collection("packageledgers").deleteMany({ userPackageId: refundRetainedPackageId });
 await db.collection("withdrawalrequests").deleteOne({ _id: refundRetainedWithdrawalId });
 await db.collection("userpackages").deleteOne({ _id: refundRetainedPackageId });
@@ -1622,7 +1632,7 @@ closeTo(oldPackage.cancellationRefund, 50, "changing package refunds half old ac
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
 closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 40, "package change does not mix deposit or package refund into the general wallet");
 const oldPackageAfterChange = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package100._id)) });
-closeTo(oldPackageAfterChange.availableEarnings, 600, "package change adds the 50-USDT refund to the old package's remaining 550-USDT balance");
+closeTo(oldPackageAfterChange.availableEarnings, 500, "package change adds the 50-USDT refund to the old package's remaining 450-USDT cash balance");
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(depositBalance && depositBalance.available, 700, "package change debits the new plan from deposit balance");
 
@@ -1647,12 +1657,12 @@ closeTo(cancelledPackage.cancellationRefund, 100, "cancel package refunds half i
 userWallet = await db.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
 closeTo(userWallet.balances.find((x) => x.asset === "USDT").available, 40, "package cancellation refund remains isolated from the general wallet");
 const cancelledPackageWithRefund = await db.collection("userpackages").findOne({ _id: new mongoose.Types.ObjectId(String(package200._id)) });
-closeTo(cancelledPackageWithRefund.availableEarnings, 300, "package card shows the 200-USDT package balance plus its 100-USDT cancellation refund");
+closeTo(cancelledPackageWithRefund.availableEarnings, 100, "package card shows only the 100-USDT cancellation refund as cash");
 const cancelledPackagePage = await api("/api/packages");
 ok(cancelledPackagePage, "cancelled package card reports balance and withdrawal cap separately");
 const cancelledPackageView = cancelledPackagePage.data.userPackages.find((x) => String(x._id) === String(package200._id));
 assert.ok(cancelledPackageView, "cancelled package is still visible");
-closeTo(cancelledPackageView.withdrawalLimit, 200, "cancellation refund does not lift the first-stage cap above the 200-USDT activation amount");
+closeTo(cancelledPackageView.withdrawalLimit, 100, "withdrawal limit is capped by 100 USDT of real cancellation-refund cash");
 depositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(depositBalance && depositBalance.available, 700, "cancellation does not change external deposit balance");
 

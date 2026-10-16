@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
         .lean(),
       DepositBalance.find({ userId: user._id }).sort({ asset: 1 }).lean(),
       UserPackage.find({ userId: user._id, status: { $in: ["active", "cancelled"] } })
-        .select("asset availableEarnings lockedEarnings")
+        .select("asset availableEarnings lockedEarnings withdrawalBalanceDebt")
         .lean(),
     ]);
     const depositBalances = normalizeDepositBalanceRows(rawDepositBalances as any[]);
@@ -297,7 +297,7 @@ export async function GET(request: NextRequest) {
     for (const account of packageAccounts as any[]) {
       const asset = String(account.asset || "USDT").toUpperCase();
       const current = withdrawalMap.get(asset) || { asset, available: 0, locked: 0 };
-      current.available += Number(account.availableEarnings || 0);
+      current.available += Number(account.availableEarnings || 0) - Number(account.withdrawalBalanceDebt || 0);
       current.locked += Number(account.lockedEarnings || 0);
       withdrawalMap.set(asset, current);
     }

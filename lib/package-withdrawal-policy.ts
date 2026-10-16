@@ -1,7 +1,9 @@
 export const roundWithdrawal = (n: number) => Math.round((n + Number.EPSILON) * 1e8) / 1e8;
 /** Referrals authorize a ceiling; they never credit the actual package balance. */
 export function withdrawalAllowance(activation: number, activeReferralDeposits: number, used: number) {
- return roundWithdrawal(Math.max(0, roundWithdrawal(activation) + roundWithdrawal(activeReferralDeposits * 0.5) - roundWithdrawal(used)));
+ const initialRemaining = roundWithdrawal(Math.max(0, activation - used));
+ if (initialRemaining > 0) return initialRemaining;
+ return roundWithdrawal(Math.max(0, roundWithdrawal(activeReferralDeposits * 0.5) - roundWithdrawal(Math.max(0, used - activation))));
 }
 export function availableToWithdraw(balance: number, allowance: number) {
  return roundWithdrawal(Math.max(0, Math.min(balance, allowance)));

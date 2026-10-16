@@ -314,12 +314,11 @@ try {
       return amount > 0 ? sum + amount : sum;
     }, 0);
     const realizedEarningsForExpected = Math.max(0, asNumber(account.totalRealizedEarnings), earningLedgerTotal);
-    const expectedCashFromRequestHistory = Math.max(
-      0,
+    const expectedCashFromRequestHistory = Number((
       asNumber(account.cancellationRefund) +
-        realizedEarningsForExpected -
-        successfulWithdrawalAmount
-    );
+      realizedEarningsForExpected -
+      successfulWithdrawalAmount
+    ).toFixed(8));
 
     const principalLedgerRows = ledger.filter((row) => row.type === "activation_withdrawable");
     const principalLedgerNet = principalLedgerRows.reduce((sum, row) => sum + asNumber(row.amount), 0);

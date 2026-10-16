@@ -271,15 +271,6 @@ export default function WithdrawPage() {
       sum + (String(row.asset).toUpperCase() === "USDT" ? Math.max(0, Number(row.available || 0)) : 0), 0),
     [generalBalances],
   );
-  const totalPackageAvailable = useMemo(
-    () => Math.max(0, packageAccounts.reduce(
-      (sum, row) => sum +
-        Math.max(0, Number(row.availableEarnings || 0)) -
-        Math.max(0, Number(row.withdrawalBalanceDebt || 0)),
-      0,
-    )),
-    [packageAccounts],
-  );
   const totalAllAvailable = useMemo(
     () => allWithdrawalBalances.reduce((sum, row) =>
       sum + (String(row.asset).toUpperCase() === "USDT" ? Math.max(0, Number(row.available || 0)) : 0), 0),
@@ -683,7 +674,7 @@ export default function WithdrawPage() {
               </div>
             ) : (
               <>
-                <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   <div className="rounded-2xl border border-emerald-300/20 bg-gradient-to-br from-[#0b2822] to-[#08111e] p-4">
                     <div className="flex items-center gap-2 text-xs font-bold text-emerald-100/80"><Wallet size={15} /> إجمالي المتاح للسحب</div>
                     <div className="mt-3 text-2xl font-black text-emerald-200">{money(totalAllAvailable)} <span className="text-xs">USDT</span></div>
@@ -693,11 +684,6 @@ export default function WithdrawPage() {
                     <div className="flex items-center gap-2 text-xs font-bold text-cyan-100/80"><Wallet size={15} /> السحب العام المتاح</div>
                     <div className="mt-3 text-2xl font-black text-cyan-200">{money(totalGeneralAvailable)} <span className="text-xs">USDT</span></div>
                     <p className="mt-1 text-[11px] text-cyan-100/50">لا يشمل رصيد الإيداع الخارجي</p>
-                  </div>
-                  <div className="rounded-2xl border border-purple-300/20 bg-gradient-to-br from-[#201331] to-[#08111e] p-4">
-                    <div className="flex items-center gap-2 text-xs font-bold text-purple-100/80"><PackageOpen size={15} /> أرباح الباقات المتاحة</div>
-                    <div className="mt-3 text-2xl font-black text-purple-200">{money(totalPackageAvailable)} <span className="text-xs">USDT</span></div>
-                    <p className="mt-1 text-[11px] text-purple-100/50">{packageAccounts.length} حساب تفعيل محفوظ</p>
                   </div>
                   <div className="rounded-2xl border border-amber-300/20 bg-gradient-to-br from-[#2b2110] to-[#08111e] p-4">
                     <div className="flex items-center gap-2 text-xs font-bold text-amber-100/80"><Clock3 size={15} /> المبالغ المحجوزة</div>

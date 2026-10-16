@@ -8,8 +8,6 @@ import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
 import { getPlatformSettings } from "@/lib/platform-settings";
-import User from "@/models/User";
-import DepositRequest from "@/models/DepositRequest";
 import UserPackage from "@/models/UserPackage";
 import InvestmentPackage from "@/models/InvestmentPackage";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
@@ -21,17 +19,6 @@ import {
   availableToWithdraw,
   validateWithdrawal,
 } from "@/lib/package-withdrawal-policy";
-
-async function activeReferralDeposits(userId: mongoose.Types.ObjectId, session?: mongoose.ClientSession) {
-  const referrals = await User.find({ referredBy: userId, isActive: true })
-    .select("_id").session(session || null).lean();
-  if (!referrals.length) return 0;
-  const deposits = await DepositRequest.aggregate([
-    { $match: { userId: { $in: referrals.map((referral) => referral._id) }, status: "approved", asset: "USDT" } },
-    { $group: { _id: null, total: { $sum: "$amount" } } },
-  ]).session(session || null);
-  return roundWithdrawal(Number(deposits[0]?.total || 0));
-}
 
 function allowedNetwork(network: string) {
   return WITHDRAWAL_NETWORKS.some((option) => option.code === network);
@@ -49,11 +36,10 @@ export async function GET(request: NextRequest) {
   await connectDB();
   await separateLegacyDepositsFromSpotWallet(user._id);
 
-  const [plans, sourceAccounts, requests, referralTotal, wallet, platformSettings] = await Promise.all([
+  const [plans, sourceAccounts, requests, wallet, platformSettings] = await Promise.all([
     InvestmentPackage.find({}).select("name price withdrawalMinimum enabled sortOrder").sort({ sortOrder: 1, price: 1 }).lean(),
     UserPackage.find({ userId: user._id }).sort({ createdAt: 1 }).lean(),
     WithdrawalRequest.find({ userId: user._id }).sort({ createdAt: -1 }).lean(),
-    activeReferralDeposits(user._id),
     Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).select("balances").lean(),
     getPlatformSettings(),
   ]);
@@ -87,8 +73,10 @@ export async function GET(request: NextRequest) {
         ? allocations.reduce((inner: number, allocation: any) => inner + Number(allocation.amount || 0), 0)
         : Number(item.amount || 0));
     }, 0));
-    const activationAmount = rows.reduce((maximum, account) => Math.max(maximum, Number(account.investedAmount || 0)), 0);
-    const allowance = rows.length ? withdrawalAllowance(activationAmount, referralTotal, used) : 0;
+    // Rows are sorted oldest-first: the first activation sets this package's initial withdrawal cap.
+    const firstActivation = rows.find((account) => Number(account.investedAmount || 0) > 0);
+    const activationAmount = roundWithdrawal(Number(firstActivation?.investedAmount || 0));
+    const allowance = rows.length ? withdrawalAllowance(activationAmount, used) : 0;
     const account = rows.length ? {
       _id: String(plan._id),
       sourceAccountIds: rows.map((row) => String(row._id)),
@@ -220,9 +208,10 @@ export async function POST(request: NextRequest) {
           ? allocations.reduce((inner: number, allocation: any) => inner + Number(allocation.amount || 0), 0)
           : Number(item.amount || 0));
       }, 0));
-      const referralTotal = await activeReferralDeposits(user._id, session);
-      const activationAmount = accounts.reduce((maximum, account) => Math.max(maximum, Number(account.investedAmount || 0)), 0);
-      const allowance = withdrawalAllowance(activationAmount, referralTotal, used);
+      // Accounts are sorted oldest-first: the first activation sets this package's initial withdrawal cap.
+      const firstActivation = accounts.find((account) => Number(account.investedAmount || 0) > 0);
+      const activationAmount = roundWithdrawal(Number(firstActivation?.investedAmount || 0));
+      const allowance = withdrawalAllowance(activationAmount, used);
       const minimum = Number(plan.withdrawalMinimum || 100);
       const validationMessage = validateWithdrawal(amount, minimum, totalBalance, allowance);
       if (validationMessage) throw new Error(validationMessage);

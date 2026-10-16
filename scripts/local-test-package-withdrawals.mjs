@@ -83,6 +83,7 @@ async function main() {
     const minimum = Number(plan.withdrawalMinimum || 100);
     const amount = minimum;
     assert.ok(amount > 0 && amount === round8(amount), "The package minimum is invalid for a test withdrawal.");
+    assert.ok(minimum <= Number(active.investedAmount || 0), "The configured minimum exceeds this package account\u2019s first-stage withdrawal cap; stopped before creating the test balance.");
 
     const beforeSetupBalance = round8(active.availableEarnings);
     if (beforeSetupBalance < amount) {

@@ -7,6 +7,7 @@ import InternalSidebar from "@/components/InternalSidebar";
 import {
   Wallet,
   ArrowDownToLine,
+  ArrowUpFromLine,
   ArrowLeftRight,
   TrendingUp,
   History,

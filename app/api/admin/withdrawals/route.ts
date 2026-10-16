@@ -7,6 +7,7 @@ import UserPackage from "@/models/UserPackage";
 import InvestmentPackage from "@/models/InvestmentPackage";
 import Wallet from "@/models/Wallet";
 import PlatformSettings from "@/models/PlatformSettings";
+import Notification from "@/models/Notification";
 
 export async function GET(request: NextRequest) {
   const admin = await requireAdminLeader(request);
@@ -81,6 +82,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   const session = await mongoose.startSession();
+  let processedWithdrawal: any = null;
   try {
     await session.withTransaction(async () => {
       const row = await WithdrawalRequest.findOneAndUpdate(
@@ -89,6 +91,7 @@ export async function PATCH(request: NextRequest) {
         { session, new: true }
       );
       if (!row) throw new Error("تمت معالجة الطلب بالفعل");
+      processedWithdrawal = row;
 
       const rejecting = body.action === "reject";
       if ((row.type || "package") === "general") {
@@ -122,6 +125,28 @@ export async function PATCH(request: NextRequest) {
         if (updated.modifiedCount !== 1) throw new Error("تعذر مطابقة رصيد الباقة المحجوز؛ لم تتغير المراجعة");
       }
     });
+
+    if (processedWithdrawal) {
+      try {
+        const approved = body.action === "approve";
+        let sourceLabel = "السحب العام";
+        if ((processedWithdrawal.type || "package") !== "general") {
+          const plan = await InvestmentPackage.findById(processedWithdrawal.packageId).select("name").lean();
+          sourceLabel = "باقة " + String(plan?.name || "الباقات");
+        }
+        await Notification.create({
+          userId: processedWithdrawal.userId,
+          type: "withdrawal",
+          title: approved ? "تم قبول طلب السحب" : "تم رفض طلب السحب",
+          message: approved
+            ? "وافق الأدمن على طلب سحب " + Number(processedWithdrawal.amount || 0) + " USDT من " + sourceLabel + "، وتم خصم المبلغ من الرصيد المحجوز."
+            : "رفض الأدمن طلب سحب " + Number(processedWithdrawal.amount || 0) + " USDT من " + sourceLabel + "، وتم إرجاع المبلغ إلى رصيد السحب الخاص به.",
+          read: false,
+        });
+      } catch (notificationError) {
+        console.error("WITHDRAWAL REVIEW NOTIFICATION:", notificationError);
+      }
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({

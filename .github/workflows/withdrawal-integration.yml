@@ -41,7 +41,7 @@ jobs:
       - name: Build the actual Next.js application
         run: npm run build
       - name: Run package withdrawal policy tests
-        run: node --experimental-strip-types --test tests/package-withdrawal-policy.test.mjs
+        run: node --test tests/package-withdrawal-policy.test.mjs
       - name: Start application against test database
         run: |
           npm start > /tmp/arabtrade-withdrawal-app.log 2>&1 &

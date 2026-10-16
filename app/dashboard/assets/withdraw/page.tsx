@@ -113,6 +113,18 @@ function packageMaximum(item: PackageAccount) {
     : Math.max(0, Number(item.withdrawalLimit || 0));
   return Math.min(available, cap);
 }
+function packageFamilyMaximum(accounts: PackageAccount[]) {
+  const balanceCap = accounts.reduce((sum, item) => sum + packageMaximum(item), 0);
+  const phaseTwo = accounts.some((item) =>
+    item.packageWithdrawalAlreadyUsed === true ||
+    (item.firstPackageWithdrawalRemaining !== undefined &&
+      Number(item.firstPackageWithdrawalRemaining) <= 1e-8)
+  );
+  if (!phaseTwo) return balanceCap;
+  const referralCap = Math.max(0, ...accounts.map((item) => Number(item.referralRemaining || 0)));
+  return Math.min(balanceCap, referralCap);
+}
+
 function statusLabel(status: string) {
   if (status === "completed") return "مكتمل";
   if (status === "approved") return "تمت الموافقة";
@@ -426,6 +438,7 @@ export default function WithdrawPage() {
     event: FormEvent<HTMLFormElement>,
     source: "wallet" | "package",
     account?: PackageAccount,
+    accountFamily: PackageAccount[] = [],
   ) {
     event.preventDefault();
     const accountId = account?._id;
@@ -456,16 +469,22 @@ export default function WithdrawPage() {
         setError("تعذر تحديد حساب الباقة.");
         return;
       }
-      const max = packageMaximum(account);
+      const family = accountFamily.length ? accountFamily : [account];
+      const max = packageFamilyMaximum(family);
       if (amount > max + 1e-8) {
-        const firstRemaining = Math.max(0, Number(account.firstPackageWithdrawalRemaining || 0));
-        const phaseTwo = account.packageWithdrawalAlreadyUsed === true || firstRemaining <= 1e-8;
-        if (phaseTwo && Number(account.activeReferralCount || 0) <= 0) {
+        const phaseTwo = family.some((item) =>
+          item.packageWithdrawalAlreadyUsed === true ||
+          (item.firstPackageWithdrawalRemaining !== undefined &&
+            Number(item.firstPackageWithdrawalRemaining) <= 1e-8)
+        );
+        const activeReferralCount = Math.max(0, ...family.map((item) => Number(item.activeReferralCount || 0)));
+        const referralRemaining = Math.max(0, ...family.map((item) => Number(item.referralRemaining || 0)));
+        if (phaseTwo && activeReferralCount <= 0) {
           setError("لا يوجد حد سحب متاح حاليًا؛ يلزم وجود إحالات نشطة حسب سياسة الباقة.");
-        } else if (phaseTwo && Number(account.referralRemaining || 0) <= 1e-8) {
+        } else if (phaseTwo && referralRemaining <= 1e-8) {
           setError("لا يوجد حد سحب متاح مقابل الإحالات النشطة حاليًا.");
         } else {
-          setError("المتاح للسحب من حساب الباقة ده هو " + money(max) + " USDT.");
+          setError("المتاح للسحب من الباقة دي هو " + money(max) + " USDT.");
         }
         return;
       }
@@ -525,7 +544,12 @@ export default function WithdrawPage() {
     }
   }
 
-  function renderWithdrawalForm(source: "wallet" | "package", account?: PackageAccount, plan?: PackagePlan) {
+  function renderWithdrawalForm(
+    source: "wallet" | "package",
+    account?: PackageAccount,
+    plan?: PackagePlan,
+    accountFamily: PackageAccount[] = [],
+  ) {
     const accountId = account?._id;
     const key = source === "wallet" ? "general" : String(accountId || "");
     const form = source === "wallet" ? generalForm : (packageForms[accountId || ""] || emptyForm);
@@ -534,16 +558,18 @@ export default function WithdrawPage() {
     const minimum = source === "package"
       ? Math.max(Number(selected?.minWithdrawal || 0), Number(account?.minimumWithdrawal ?? plan?.minimumWithdrawal ?? 100))
       : Math.max(Number(selected?.minWithdrawal || 0), Number(limits.minGeneralWithdrawal || limits.minWithdrawal || 0));
-    const max = account ? packageMaximum(account) : Number(generalBalances.find((row) =>
-      String(row.asset).toUpperCase() === String(selected?.asset || "USDT").toUpperCase()
-    )?.available || 0);
+    const max = source === "package" && accountFamily.length
+      ? packageFamilyMaximum(accountFamily)
+      : account ? packageMaximum(account) : Number(generalBalances.find((row) =>
+          String(row.asset).toUpperCase() === String(selected?.asset || "USDT").toUpperCase()
+        )?.available || 0);
     const submitting = submittingKey === key;
     const saving = savingAddressKey === key;
     const addressIsSaved = Boolean(selected && savedAddresses.some((row) =>
       row.asset === selected.asset && row.network === selected.network && row.source === source
     ));
     return (
-      <form onSubmit={(event) => void submitWithdrawal(event, source, account)} className="mt-3 space-y-3">
+      <form onSubmit={(event) => void submitWithdrawal(event, source, account, accountFamily)} className="mt-3 space-y-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block min-w-0">
             <span className="mb-1.5 block text-xs font-bold text-slate-300">وسيلة السحب</span>
@@ -607,55 +633,6 @@ export default function WithdrawPage() {
           {submitting ? "جارٍ إرسال الطلب..." : "تأكيد السحب"}
         </button>
       </form>
-    );
-  }
-
-  function renderPackageAccount(account: PackageAccount, plan: PackagePlan) {
-    const policyLimit = packageMaximum(account);
-    const formMinimum = Math.max(
-      Number(packageMethods.find((method) => method._id === (packageForms[account._id] || emptyForm).methodId)?.minWithdrawal || 0),
-      Number(account.minimumWithdrawal ?? plan.minimumWithdrawal ?? 100),
-    );
-    return (
-      <div key={account._id} className="rounded-xl border border-white/10 bg-[#050b14] p-3 md:p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-bold">{account.status === "active" ? "حساب تفعيل نشط" : "رصيد تفعيل سابق"}</div>
-            <div className="mt-1 text-[11px] text-slate-500">
-              {account.activatedAt
-                ? "تاريخ التفعيل: " + new Date(account.activatedAt).toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo" })
-                : "سجل تفعيل محفوظ"}
-            </div>
-            {account.packageWithdrawalStatus === "pending" && (
-              <div className="mt-2 inline-flex rounded-full bg-amber-300/10 px-2.5 py-1 text-[10px] text-amber-200">طلب مرتبط بالحساب: قيد المراجعة</div>
-            )}
-            {account.packageWithdrawalStatus === "processing" && (
-              <div className="mt-2 inline-flex rounded-full bg-blue-300/10 px-2.5 py-1 text-[10px] text-blue-200">طلب مرتبط بالحساب: قيد التنفيذ</div>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-left sm:grid-cols-3">
-            <div>
-              <div className="text-[10px] text-slate-500">المتاح</div>
-              <div className="text-sm font-black text-emerald-200">{money(Math.max(0, Number(account.availableEarnings || 0) - Number(account.withdrawalBalanceDebt || 0)))} USDT</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-slate-500">المحجوز</div>
-              <div className="text-sm font-bold text-amber-200">{money(account.lockedEarnings)} USDT</div>
-            </div>
-            <div>
-              <div className="text-[10px] text-slate-500">المسموح الآن</div>
-              <div className="text-sm font-bold text-slate-100">{money(policyLimit)} USDT</div>
-            </div>
-          </div>
-        </div>
-        <div className="mt-3 border-t border-white/5 pt-3">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <span className="text-xs font-bold text-slate-300">طلب سحب من الحساب ده</span>
-            <span className="text-[10px] text-slate-500">الحد الأدنى {money(formMinimum)} USDT</span>
-          </div>
-          {renderWithdrawalForm("package", account, plan)}
-        </div>
-      </div>
     );
   }
 
@@ -784,7 +761,7 @@ export default function WithdrawPage() {
                   <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                     <div>
                       <h2 className="text-lg font-black">السحب من الباقات</h2>
-                      <p className="mt-1 text-xs text-slate-400">كل باقة تظهر مرة واحدة؛ أرصدة التفعيلات السابقة داخل التفاصيل عند الحاجة للسحب.</p>
+                      <p className="mt-1 text-xs text-slate-400">كل باقة تظهر مرة واحدة، ورصيدها مجمّع داخل نفس البطاقة.</p>
                     </div>
                     <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-bold text-slate-300">{packageCards.length} باقة</span>
                   </div>
@@ -792,7 +769,7 @@ export default function WithdrawPage() {
                     <div className="rounded-2xl border border-dashed border-white/10 bg-[#08111e] p-8 text-center text-sm text-slate-500">لا توجد باقات أو أرصدة باقات على هذا الحساب.</div>
                   ) : (
                     <div className="grid gap-4 xl:grid-cols-2">
-                      {packageCards.map(({ key, plan, accounts, legacy }) => {
+                      {packageCards.map(({ key, plan, accounts }) => {
                         const available = Math.max(0, accounts.reduce(
                           (sum, account) => sum +
                             Math.max(0, Number(account.availableEarnings || 0)) -
@@ -800,10 +777,10 @@ export default function WithdrawPage() {
                           0,
                         ));
                         const locked = accounts.reduce((sum, account) => sum + Math.max(0, Number(account.lockedEarnings || 0)), 0);
-                        const withdrawable = accounts.reduce((sum, account) => sum + packageMaximum(account), 0);
+                        const withdrawable = packageFamilyMaximum(accounts);
                         const active = accounts.some((account) => account.status === "active");
-                        const activeAccounts = accounts.filter((account) => account.status === "active");
-                        const previousAccounts = accounts.filter((account) => account.status !== "active");
+                        const withdrawalAccount = accounts.find((account) => account.status === "active") ||
+                          [...accounts].sort((a, b) => packageMaximum(b) - packageMaximum(a))[0];
                         return (
                           <article key={key} className="overflow-hidden rounded-2xl border border-white/10 bg-[#08111e]">
                             <header className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 bg-white/[0.025] p-4">
@@ -814,9 +791,8 @@ export default function WithdrawPage() {
                                 </div>
                                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
                                   <span className={active ? "rounded-full bg-emerald-300/10 px-2.5 py-1 text-emerald-200" : "rounded-full bg-slate-700/50 px-2.5 py-1 text-slate-300"}>
-                                    {active ? "لها تفعيل نشط" : accounts.length ? "أرصدة تفعيلات سابقة" : "لم تُفعّل"}
+                                    {active ? "تفعيل نشط" : accounts.length ? "رصيد محفوظ" : "لم تُفعّل"}
                                   </span>
-                                  {legacy && <span className="rounded-full bg-white/[0.05] px-2.5 py-1 text-slate-400">باقة سابقة</span>}
                                 </div>
                               </div>
                               <div className="text-left">
@@ -827,22 +803,11 @@ export default function WithdrawPage() {
                               </div>
                             </header>
 
-                            {!accounts.length ? (
+                            {!accounts.length || !withdrawalAccount ? (
                               <div className="p-4 text-sm text-slate-500">فعّل الباقة أولًا حتى يظهر حساب سحب لها.</div>
                             ) : (
-                              <div className="space-y-3 p-3 md:p-4">
-                                {activeAccounts.map((account) => renderPackageAccount(account, plan))}
-                                {previousAccounts.length > 0 && (
-                                  <details className="rounded-xl border border-white/10 bg-[#050b14]">
-                                    <summary className="cursor-pointer list-none p-3 text-sm font-bold text-slate-200 marker:hidden">
-                                      أرصدة التفعيلات السابقة ({previousAccounts.length})
-                                      <span className="mr-2 text-xs font-normal text-slate-500">اضغط لعرض الأرصدة القديمة وطلب السحب</span>
-                                    </summary>
-                                    <div className="space-y-3 border-t border-white/5 p-3">
-                                      {previousAccounts.map((account) => renderPackageAccount(account, plan))}
-                                    </div>
-                                  </details>
-                                )}
+                              <div className="p-3 md:p-4">
+                                {renderWithdrawalForm("package", withdrawalAccount, plan, accounts)}
                               </div>
                             )}
                           </article>
@@ -879,7 +844,7 @@ export default function WithdrawPage() {
                   )}
                 </section>
                 <p className="text-center text-[11px] leading-6 text-slate-600">
-                  رصيد الإيداع منفصل عن السحب. السحب من الباقة يخصم من حساب التفعيل المختار فقط.
+                  رصيد الإيداع منفصل عن السحب. طلب سحب الباقة يخصم من أرصدتها المتاحة فقط.
                 </p>
               </>
             )}

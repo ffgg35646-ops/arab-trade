@@ -20,9 +20,7 @@ const testUrl = new URL(configuredUri);
 testUrl.pathname = "/arabtrade_test";
 const testUri = testUrl.toString();
 const dbName = decodeURIComponent(new URL(testUri).pathname.slice(1));
-if (dbName !== "arabtrade_test") {
-  throw new Error("Safety stop: this test may use only arabtrade_test.");
-}
+if (dbName !== "arabtrade_test") throw new Error("Safety stop: this script may use only arabtrade_test.");
 
 const username = process.env.QA_TEST_USERNAME || "qauser_mvba0lmg625a99";
 const password = process.env.QA_TEST_PASSWORD || "QaUser#100000";
@@ -31,6 +29,7 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const suffix = crypto.randomBytes(5).toString("hex");
 const adminUsername = "qa_silver_admin_" + suffix;
 const adminPassword = "QaSilverAdmin#" + suffix;
+const runStartedAt = new Date();
 
 let connected = false;
 let db = null;
@@ -42,9 +41,11 @@ let baseUrl = null;
 let userCookie = null;
 let adminCookie = null;
 let adminId = null;
+let silverId = null;
+let testedUserId = null;
 let movedDates = [];
 let cycleRequestIds = [];
-let successfulApproval = false;
+let completed = false;
 
 async function getFreePort() {
   const server = net.createServer();
@@ -81,35 +82,33 @@ function sessionCookie(response) {
     .find((value) => value.startsWith("arabtrade_session="));
 }
 
-function getPlanAmountInRequest(item, planId) {
-  if (item.status === "rejected" || item.type === "general") return 0;
-  const allocations = Array.isArray(item.allocations) ? item.allocations : [];
-  const hasAllocationPlanId = allocations.some((allocation) => allocation.packageId);
-  if (hasAllocationPlanId) {
+function amountForSilver(request, packageId) {
+  if (request.status === "rejected" || request.type === "general") return 0;
+  const allocations = Array.isArray(request.allocations) ? request.allocations : [];
+  if (allocations.some((allocation) => allocation.packageId)) {
     return round8(allocations
-      .filter((allocation) => String(allocation.packageId || "") === String(planId))
+      .filter((allocation) => String(allocation.packageId || "") === String(packageId))
       .reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0));
   }
-  if (String(item.packageId || "") !== String(planId)) return 0;
+  if (String(request.packageId || "") !== String(packageId)) return 0;
   return round8(allocations.length
     ? allocations.reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0)
-    : Number(item.amount || 0));
+    : Number(request.amount || 0));
 }
 
-function isCreatedToday(item, dayStart) {
-  const timestamp = item.createdAt ? new Date(item.createdAt).getTime() : Number.NaN;
-  return Number.isFinite(timestamp) && timestamp >= dayStart.getTime();
+function isTodayUtc(request, dayStart) {
+  const time = request.createdAt ? new Date(request.createdAt).getTime() : Number.NaN;
+  return Number.isFinite(time) && time >= dayStart.getTime();
 }
 
-async function packageSnapshot(planId, userId) {
+async function silverSnapshot(userId, packageId) {
   const rows = await db.collection("userpackages")
-    .find({ userId, packageId: planId })
+    .find({ userId, packageId })
     .sort({ createdAt: 1, _id: 1 })
     .toArray();
   return {
     balance: round8(rows.reduce((sum, row) => sum + Number(row.availableEarnings || 0), 0)),
     locked: round8(rows.reduce((sum, row) => sum + Number(row.lockedEarnings || 0), 0)),
-    accountRows: rows.length,
     rows: rows.map((row) => ({
       id: String(row._id),
       availableEarnings: round8(row.availableEarnings),
@@ -120,22 +119,22 @@ async function packageSnapshot(planId, userId) {
   };
 }
 
-async function getSilverCard(planId) {
+async function getSilverCard() {
   const response = await api("/api/withdrawals", { cookie: userCookie });
   assert.equal(response.status, 200, "GET /api/withdrawals failed: " + (response.body.message || response.status));
   assert.equal(response.body.success, true, "GET /api/withdrawals did not return success.");
-  const plan = (response.body.packages || []).find((item) => String(item._id) === String(planId));
-  assert.ok(plan?.account?.hasAccount, "Silver package card was not returned by the API.");
+  const plan = (response.body.packages || []).find((item) => String(item._id) === String(silverId));
+  assert.ok(plan?.account?.hasAccount, "Silver package card was not returned.");
   return plan;
 }
 
-async function requestSilver(amount, planId) {
+async function requestSilver(amount) {
   return api("/api/withdrawals", {
     method: "POST",
     cookie: userCookie,
     body: JSON.stringify({
       type: "package",
-      packageId: String(planId),
+      packageId: String(silverId),
       amount,
       asset: "USDT",
       network: "TRC20",
@@ -150,6 +149,17 @@ async function reviewWithdrawal(id, action) {
     cookie: adminCookie,
     body: JSON.stringify({ action, id: String(id) }),
   });
+}
+
+async function login(identifier, secret) {
+  const response = await api("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ identifier, password: secret }),
+  });
+  assert.equal(response.status, 200, "Login failed for " + identifier + ": " + (response.body.message || response.status));
+  const cookie = sessionCookie(response);
+  assert.ok(cookie, "Login did not return arabtrade_session for " + identifier);
+  return cookie;
 }
 
 async function startIsolatedApp() {
@@ -196,30 +206,27 @@ async function startIsolatedApp() {
     await pause(1000);
   }
   const details = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8").slice(-6000) : "";
-  throw new Error("Isolated local API did not become ready. No Silver withdrawal was submitted. Log: " + logFile + "\n" + details);
+  throw new Error("Isolated local API did not become ready. No test withdrawal was submitted. Log: " + logFile + "\n" + details);
 }
 
-async function login(identifier, secret) {
-  const response = await api("/api/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ identifier, password: secret }),
-  });
-  assert.equal(response.status, 200, "Login failed for " + identifier + ": " + (response.body.message || response.status));
-  const cookie = sessionCookie(response);
-  assert.ok(cookie, "Login did not return arabtrade_session for " + identifier);
-  return cookie;
-}
-
-async function restoreMovedDatesWhenNoApproval() {
-  if (!db || !movedDates.length) return;
-  let approvedCount = 0;
-  if (cycleRequestIds.length) {
-    approvedCount = await db.collection("withdrawalrequests").countDocuments({
-      _id: { $in: cycleRequestIds.map((id) => new mongoose.Types.ObjectId(id)) },
-      status: "approved",
-    });
+async function rejectPendingTestRequests() {
+  if (!db || !testedUserId || !adminCookie || !silverId || !baseUrl) return;
+  const pending = await db.collection("withdrawalrequests").find({
+    userId: testedUserId,
+    packageId: silverId,
+    status: "pending",
+    createdAt: { $gte: runStartedAt },
+  }).toArray();
+  for (const row of pending) {
+    const response = await reviewWithdrawal(row._id, "reject");
+    if (response.status !== 200 || response.body?.success !== true) {
+      console.error("Recovery warning: could not reject pending QA Silver request " + row._id + "; inspect it before another test.");
+    }
   }
-  if (approvedCount > 0 || successfulApproval) return;
+}
+
+async function restoreMovedDatesOnFailure() {
+  if (!db || completed || !movedDates.length) return;
   for (const item of movedDates) {
     await db.collection("withdrawalrequests").updateOne(
       { _id: item._id },
@@ -229,29 +236,15 @@ async function restoreMovedDatesWhenNoApproval() {
   movedDates = [];
 }
 
-async function cleanupPendingCycleRequests(userId) {
-  if (!db || !userId || !adminCookie || !baseUrl) return;
-  for (const id of cycleRequestIds) {
-    const row = await db.collection("withdrawalrequests").findOne({
-      _id: new mongoose.Types.ObjectId(id),
-      userId,
-      status: "pending",
-    });
-    if (!row) continue;
-    const result = await reviewWithdrawal(id, "reject");
-    if (!result.ok || result.body?.success !== true) {
-      console.error("Recovery warning: could not reject pending QA request " + id + ". Please inspect it before rerunning.");
-    }
-  }
-}
-
 async function main() {
   let user = null;
   let silver = null;
-  let baselineRequestCount = 0;
-  let amount = 0;
-  let cap = 0;
-  let movedRequestReport = [];
+  let initialRequestIds = [];
+  let dateShiftReport = [];
+  let first150Report = null;
+  let second100Report = null;
+  let topUpReport = null;
+  let first150PolicyPass = false;
   try {
     await mongoose.connect(testUri, { dbName, serverSelectionTimeoutMS: 12000 });
     connected = true;
@@ -263,64 +256,51 @@ async function main() {
       isVerified: true,
     });
     assert.ok(user, "QA account not found in arabtrade_test: " + username);
+    testedUserId = user._id;
 
     silver = await db.collection("investmentpackages").findOne({ name: /^Silver$/i });
-    assert.ok(silver, "Silver plan was not found in the test database.");
-    assert.equal(round8(silver.price), 100, "Safety stop: Silver price is not the expected 100 USDT.");
+    assert.ok(silver, "Silver plan was not found in arabtrade_test.");
+    silverId = silver._id;
+    assert.equal(round8(silver.price), 100, "Safety stop: Silver price must be 100 USDT.");
 
     const allUserPackages = await db.collection("userpackages")
       .find({ userId: user._id })
       .sort({ createdAt: 1, _id: 1 })
       .toArray();
     const silverRows = allUserPackages.filter((row) => String(row.packageId) === String(silver._id));
-    assert.ok(silverRows.length > 0, "QA user has no Silver package account.");
+    assert.ok(silverRows.length > 0, "QA user has no Silver account rows.");
     const firstActivation = silverRows.find((row) => Number(row.investedAmount || 0) > 0);
-    cap = round8(firstActivation?.investedAmount || 0);
-    assert.equal(cap, 100, "Safety stop: first Silver activation is not 100 USDT.");
-    amount = cap;
-
-    const activePackages = allUserPackages.filter((row) => row.status === "active");
-    assert.equal(activePackages.length, 1, "QA account must have exactly one active package.");
-    assert.equal(String(activePackages[0].packageId), String(silver._id), "QA account must currently be active on Silver.");
+    const cap = round8(firstActivation?.investedAmount || 0);
+    assert.equal(cap, 100, "Safety stop: first Silver activation must be 100 USDT.");
+    const activeSilver = silverRows.filter((row) => row.status === "active");
+    assert.equal(activeSilver.length, 1, "QA user must have exactly one active Silver account.");
+    assert.equal(
+      allUserPackages.filter((row) => row.status === "active").length,
+      1,
+      "QA user must have exactly one active package overall.",
+    );
     assert.equal(
       round8(allUserPackages.reduce((sum, row) => sum + Number(row.lockedEarnings || 0), 0)),
       0,
-      "QA account already has locked package funds; no changes were made.",
+      "QA user has locked package funds already; no changes were made.",
     );
 
-    const balanceBefore = await packageSnapshot(silver._id, user._id);
-    assert.equal(balanceBefore.balance, 150, "Safety stop: existing Silver package balance is not 150 USDT.");
+    const balanceBefore = await silverSnapshot(user._id, silver._id);
+    assert.equal(balanceBefore.balance, 150, "Safety stop: expected the current Silver total balance to be exactly 150 USDT.");
     assert.equal(balanceBefore.locked, 0, "Safety stop: Silver already has locked earnings.");
-    const minimum = Number(silver.withdrawalMinimum || 100);
-    assert.ok(minimum <= amount, "Configured Silver minimum exceeds the 100 USDT daily cap; stopped before creating a request.");
+    assert.ok(Number(silver.withdrawalMinimum || 100) <= 100,
+      "Configured Silver withdrawal minimum exceeds 100 USDT; no requests were made.");
 
     const allRequestsBefore = await db.collection("withdrawalrequests")
       .find({ userId: user._id })
       .sort({ createdAt: 1, _id: 1 })
       .toArray();
-    assert.equal(
-      allRequestsBefore.filter((row) => row.status === "pending").length,
-      0,
-      "QA user already has a pending withdrawal. Resolve it before running the Silver cycle.",
-    );
-    baselineRequestCount = allRequestsBefore.length;
-
-    const today = new Date();
-    const dayStart = new Date(today);
-    dayStart.setUTCHours(0, 0, 0, 0);
-    const usedTodayBefore = round8(allRequestsBefore.reduce((sum, row) => {
-      if (!["pending", "approved"].includes(row.status) || !isCreatedToday(row, dayStart)) return sum;
-      return sum + getPlanAmountInRequest(row, silver._id);
-    }, 0));
-    assert.ok(usedTodayBefore <= cap, "Existing Silver withdrawal history already exceeds the daily cap; no changes were made.");
+    assert.equal(allRequestsBefore.filter((row) => row.status === "pending").length, 0,
+      "QA user already has a pending request; resolve it before testing.");
+    initialRequestIds = allRequestsBefore.map((row) => String(row._id));
 
     await startIsolatedApp();
     userCookie = await login(user.username, password);
-
-    const initialCard = await getSilverCard(silver._id);
-    assert.equal(round8(initialCard.account.balance), balanceBefore.balance, "API Silver balance does not match the QA database.");
-    assert.equal(round8(initialCard.account.allowance), round8(Math.max(0, cap - usedTodayBefore)),
-      "API daily allowance does not match the current Silver withdrawal history.");
 
     const adminObjectId = new mongoose.Types.ObjectId();
     adminId = adminObjectId;
@@ -341,182 +321,226 @@ async function main() {
     });
     adminCookie = await login(adminUsername, adminPassword);
 
-    // This QA database already has an approved Silver request using today's cap.
-    // Move only the existing request timestamps back one UTC day; never change their amount or package balances.
-    // This opens a clean daily allowance for a real API request/reject/request/approve cycle.
-    const sameDaySilverApprovals = allRequestsBefore.filter((row) =>
+    // The QA account has an older approved request dated today. Shift only the
+    // timestamp of approved Silver QA requests to the previous UTC day so the
+    // two requested POST attempts can test a fresh 100-USDT daily allowance.
+    const dayStart = new Date();
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const sameDayApprovals = allRequestsBefore.filter((row) =>
       row.status === "approved" &&
       row.type !== "general" &&
-      isCreatedToday(row, dayStart) &&
-      getPlanAmountInRequest(row, silver._id) > 0
+      isTodayUtc(row, dayStart) &&
+      amountForSilver(row, silver._id) > 0
     );
-    const sameDayUsedFromApprovals = round8(sameDaySilverApprovals.reduce(
-      (sum, row) => sum + getPlanAmountInRequest(row, silver._id), 0
-    ));
-    assert.equal(sameDayUsedFromApprovals, usedTodayBefore,
-      "Today's Silver allowance includes a row that cannot safely be reclassified as a previous-day QA request.");
-
-    for (const row of sameDaySilverApprovals) {
-      const allocationIds = (Array.isArray(row.allocations) ? row.allocations : [])
-        .map((allocation) => String(allocation.packageId || ""))
-        .filter(Boolean);
-      assert.ok(
-        allocationIds.every((id) => id === String(silver._id)),
-        "A current-day request spans multiple packages; stopped before changing its timestamp.",
-      );
+    for (const row of sameDayApprovals) {
+      const allocations = Array.isArray(row.allocations) ? row.allocations : [];
+      if (allocations.some((allocation) => allocation.packageId) &&
+          allocations.some((allocation) => String(allocation.packageId || "") !== String(silver._id))) {
+        throw new Error("Safety stop: an existing approved withdrawal spans multiple packages; no timestamp was changed.");
+      }
+      const priorTime = new Date(dayStart.getTime() - (dateShiftReport.length + 1) * 1000);
       const updated = await db.collection("withdrawalrequests").updateOne(
         { _id: row._id, status: "approved" },
-        { $set: { createdAt: new Date(dayStart.getTime() - 1000 * (movedDates.length + 1)) } },
+        { $set: { createdAt: priorTime } },
       );
-      assert.equal(updated.modifiedCount, 1, "Could not move an existing QA timestamp to the prior UTC day.");
+      assert.equal(updated.modifiedCount, 1, "Could not move an existing QA request to the previous UTC day.");
       movedDates.push({ _id: row._id, originalCreatedAt: row.createdAt });
-      movedRequestReport.push({
+      dateShiftReport.push({
         requestId: String(row._id),
-        previousCreatedAt: new Date(row.createdAt).toISOString(),
-        testCreatedAt: new Date(dayStart.getTime() - 1000 * movedDates.length).toISOString(),
-        amount: getPlanAmountInRequest(row, silver._id),
+        originalCreatedAt: new Date(row.createdAt).toISOString(),
+        testCreatedAt: priorTime.toISOString(),
+        amount: amountForSilver(row, silver._id),
       });
     }
 
-    const afterResetCard = await getSilverCard(silver._id);
-    assert.equal(round8(afterResetCard.account.allowance), cap, "Silver daily cap did not reset after preparing the isolated QA day.");
-    assert.equal(round8(afterResetCard.account.available), Math.min(balanceBefore.balance, cap),
-      "Silver available amount after daily reset is incorrect.");
-    const requestIdsBeforeCycle = (await db.collection("withdrawalrequests").find({ userId: user._id }).toArray())
-      .map((row) => String(row._id));
-    assert.equal(requestIdsBeforeCycle.length, baselineRequestCount, "Preparing the daily cap unexpectedly changed request count.");
+    const initialCard = await getSilverCard();
+    assert.equal(round8(initialCard.account.balance), 150, "Silver API balance does not match database balance.");
+    assert.equal(round8(initialCard.account.allowance), 100, "Expected fresh Silver allowance of 100 USDT after QA date preparation.");
+    assert.equal(round8(initialCard.account.available), 100, "Expected exactly 100 USDT available today before the first request.");
 
-    const firstRequest = await requestSilver(amount, silver._id);
-    assert.equal(firstRequest.status, 201,
-      "First Silver API withdrawal request failed: " + (firstRequest.body.message || firstRequest.status));
-    const firstRow = await db.collection("withdrawalrequests").findOne({
+    // Test 1: attempt 150 USDT. Under the specified 100-USDT daily cap this
+    // should be rejected and must not reserve funds or create a request.
+    const attempt150 = await requestSilver(150);
+    if (attempt150.status === 201) {
+      const firstRow = await db.collection("withdrawalrequests").findOne({
+        userId: user._id,
+        status: "pending",
+        packageId: silver._id,
+        type: "package",
+      }, { sort: { createdAt: -1 } });
+      assert.ok(firstRow, "API returned 201 for 150 USDT but no pending Silver request was stored.");
+      cycleRequestIds.push(String(firstRow._id));
+      const after150Reservation = await silverSnapshot(user._id, silver._id);
+      assert.equal(after150Reservation.balance, 0, "Unexpectedly accepted 150-USDT request did not reserve the full amount.");
+      assert.equal(after150Reservation.locked, 150, "Unexpectedly accepted 150-USDT request did not lock 150 USDT.");
+      const reject150 = await reviewWithdrawal(firstRow._id, "reject");
+      assert.equal(reject150.status, 200, "Could not reject unexpected 150-USDT QA request.");
+      assert.equal(reject150.body?.success, true, "Admin failed to reject unexpected 150-USDT QA request.");
+      const afterReject150 = await silverSnapshot(user._id, silver._id);
+      assert.equal(afterReject150.balance, 150, "Rejecting the unexpected 150-USDT request did not restore Silver.");
+      assert.equal(afterReject150.locked, 0, "Rejecting the unexpected 150-USDT request left a lock.");
+      first150Report = {
+        attemptedAmount: 150,
+        httpStatus: attempt150.status,
+        message: attempt150.body.message || "",
+        outcome: "ACCEPTED_UNEXPECTEDLY_THEN_REJECTED_BY_QA_ADMIN",
+        balanceAfterAdminRejection: afterReject150.balance,
+        lockedAfterAdminRejection: afterReject150.locked,
+      };
+    } else {
+      const after150 = await silverSnapshot(user._id, silver._id);
+      const requestIdsAfter150 = (await db.collection("withdrawalrequests")
+        .find({ userId: user._id })
+        .sort({ createdAt: 1, _id: 1 })
+        .toArray()).map((row) => String(row._id));
+      assert.deepEqual(requestIdsAfter150, initialRequestIds, "Rejected/failed 150-USDT attempt created a request unexpectedly.");
+      assert.deepEqual(after150.rows, balanceBefore.rows, "150-USDT attempt changed Silver package balances.");
+      first150PolicyPass = attempt150.status === 409 &&
+        attempt150.body.message === "المتاح للسحب 100 USDT فقط";
+      first150Report = {
+        attemptedAmount: 150,
+        httpStatus: attempt150.status,
+        message: attempt150.body.message || "",
+        outcome: attempt150.status === 409 ? "REJECTED" : "NOT_ACCEPTED",
+        balanceUnchanged: after150.balance === 150,
+        noRequestCreated: true,
+        policyExpected: "HTTP 409 — المتاح للسحب 100 USDT فقط",
+      };
+    }
+
+    // Test 2: create a 100-USDT request, confirm reservation, then explicitly
+    // reject it through the admin API and prove the full amount returns.
+    const attempt100 = await requestSilver(100);
+    assert.equal(attempt100.status, 201,
+      "100-USDT Silver request was not created after the 150-USDT test: " + (attempt100.body.message || attempt100.status));
+    const request100 = await db.collection("withdrawalrequests").findOne({
       userId: user._id,
       status: "pending",
       packageId: silver._id,
       type: "package",
     }, { sort: { createdAt: -1 } });
-    assert.ok(firstRow, "First Silver pending request was not stored.");
-    cycleRequestIds.push(String(firstRow._id));
-    assert.equal(round8(firstRow.amount), amount, "First Silver request amount is wrong.");
-    assert.equal(round8((firstRow.allocations || []).reduce((sum, part) => sum + Number(part.amount || 0), 0)), amount,
-      "First Silver request allocations do not add up to 100 USDT.");
+    assert.ok(request100, "100-USDT Silver pending request was not stored.");
+    cycleRequestIds.push(String(request100._id));
+    assert.equal(round8(request100.amount), 100, "Admin request amount is not 100 USDT.");
+    const whilePending = await silverSnapshot(user._id, silver._id);
+    assert.equal(whilePending.balance, 50, "100-USDT request did not reduce the visible Silver balance from 150 to 50.");
+    assert.equal(whilePending.locked, 100, "100-USDT request did not lock the amount.");
+    const cardWhilePending = await getSilverCard();
+    assert.equal(round8(cardWhilePending.account.allowance), 0, "Pending 100-USDT request did not consume the daily cap.");
+    assert.equal(round8(cardWhilePending.account.available), 0, "Daily availability should be zero while 100-USDT request is pending.");
 
-    let state = await packageSnapshot(silver._id, user._id);
-    assert.equal(state.balance, round8(balanceBefore.balance - amount), "Creating the request did not reserve 100 USDT from Silver available balance.");
-    assert.equal(state.locked, amount, "Creating the request did not move 100 USDT to locked earnings.");
-    const pendingCard = await getSilverCard(silver._id);
-    assert.equal(round8(pendingCard.account.allowance), 0, "Pending Silver request did not consume today's cap.");
-    assert.equal(round8(pendingCard.account.available), 0, "Pending Silver request should leave no daily allowance.");
+    const adminReject = await reviewWithdrawal(request100._id, "reject");
+    assert.equal(adminReject.status, 200, "Admin reject API returned HTTP " + adminReject.status + ".");
+    assert.equal(adminReject.body?.success, true, "Admin did not reject the 100-USDT request: " + (adminReject.body?.message || "unknown error"));
+    const request100After = await db.collection("withdrawalrequests").findOne({ _id: request100._id });
+    assert.equal(request100After.status, "rejected", "100-USDT request did not reach rejected status.");
+    const afterReject100 = await silverSnapshot(user._id, silver._id);
+    assert.equal(afterReject100.balance, 150, "Reject did not return the 100 USDT to Silver available balance.");
+    assert.equal(afterReject100.locked, 0, "Reject left funds locked.");
+    assert.deepEqual(afterReject100.rows, balanceBefore.rows,
+      "After admin rejection, Silver account-level balances did not return exactly to their starting values.");
+    const cardAfterReject = await getSilverCard();
+    assert.equal(round8(cardAfterReject.account.allowance), 100, "Rejected request incorrectly consumed today's cap.");
+    assert.equal(round8(cardAfterReject.account.available), 100, "Available-today did not recover after the admin rejection.");
+    second100Report = {
+      attemptedAmount: 100,
+      createHttpStatus: attempt100.status,
+      requestId: String(request100._id),
+      statusAfterAdminReview: request100After.status,
+      balanceWhilePending: whilePending.balance,
+      lockedWhilePending: whilePending.locked,
+      balanceAfterReject: afterReject100.balance,
+      lockedAfterReject: afterReject100.locked,
+      availableTodayAfterReject: cardAfterReject.account.available,
+    };
 
-    const duplicatePending = await requestSilver(amount, silver._id);
-    assert.equal(duplicatePending.status, 409, "A second request was accepted while the first Silver request was pending.");
-    assert.equal(duplicatePending.body.message, "لديك طلب سحب معلق بالفعل", "Unexpected duplicate-pending rejection.");
-    assert.equal(
-      await db.collection("withdrawalrequests").countDocuments({ userId: user._id }),
-      baselineRequestCount + 1,
-      "The duplicate pending attempt created an extra request.",
-    );
+    // Test 3: the user explicitly asked for the existing Silver balance of 150
+    // to become 600 for follow-up tests. This is a clearly marked QA-only
+    // +450 fixture in arabtrade_test, not a real earning or production credit.
+    const activeAccount = activeSilver[0];
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const update = await db.collection("userpackages").updateOne(
+          {
+            _id: activeAccount._id,
+            userId: user._id,
+            packageId: silver._id,
+            status: "active",
+            lockedEarnings: 0,
+          },
+          { $inc: { availableEarnings: 450 } },
+          { session },
+        );
+        assert.equal(update.modifiedCount, 1, "Could not add the explicitly requested QA-only 450 USDT to active Silver.");
+        await db.collection("packageledgers").insertOne({
+          userId: user._id,
+          userPackageId: activeAccount._id,
+          type: "reward",
+          asset: "USDT",
+          amount: 450,
+          note: "QA ONLY — requested local test setup: +450 USDT to make Silver balance 600 for follow-up tests. Not a real reward or earning; arabtrade_test only.",
+          createdAt: new Date(),
+        }, { session });
+      });
+    } finally {
+      await session.endSession();
+    }
+    const finalSnapshot = await silverSnapshot(user._id, silver._id);
+    assert.equal(finalSnapshot.balance, 600, "Silver total balance is not exactly 600 USDT after QA setup.");
+    assert.equal(finalSnapshot.locked, 0, "Silver has locked funds after the test sequence.");
+    const finalCard = await getSilverCard();
+    assert.equal(round8(finalCard.account.balance), 600, "Withdrawal API does not show the requested 600-USDT Silver balance.");
+    assert.equal(round8(finalCard.account.allowance), 100, "QA balance preparation must not increase Silver's daily cap.");
+    assert.equal(round8(finalCard.account.available), 100, "After preparation, Silver should show 100 USDT available today and 600 USDT balance.");
 
-    const rejected = await reviewWithdrawal(firstRow._id, "reject");
-    assert.equal(rejected.status, 200, "Admin rejection endpoint returned HTTP " + rejected.status + ".");
-    assert.equal(rejected.body?.success, true, "Admin rejection failed: " + (rejected.body?.message || "unknown error"));
-    const firstAfterReview = await db.collection("withdrawalrequests").findOne({ _id: firstRow._id });
-    assert.equal(firstAfterReview.status, "rejected", "First Silver request was not rejected.");
-    state = await packageSnapshot(silver._id, user._id);
-    assert.equal(state.balance, balanceBefore.balance, "Reject did not return 100 USDT to Silver available balance.");
-    assert.equal(state.locked, 0, "Reject left Silver earnings locked.");
-    const balanceAfterReject = state.balance;
-    const afterRejectCard = await getSilverCard(silver._id);
-    assert.equal(round8(afterRejectCard.account.allowance), cap, "Rejected request incorrectly consumed the daily Silver cap.");
-    assert.equal(round8(afterRejectCard.account.available), Math.min(balanceBefore.balance, cap),
-      "Silver availability did not recover after rejection.");
+    topUpReport = {
+      sourceBalance: 150,
+      testOnlySetupIncrease: 450,
+      finalSilverBalance: finalSnapshot.balance,
+      locked: finalSnapshot.locked,
+      availableToday: finalCard.account.available,
+      dailyCapStill: finalCard.account.allowance,
+      ledgerMarker: "QA ONLY note; arabtrade_test only",
+      syntheticCredit: true,
+    };
+    completed = true;
 
-    const secondRequest = await requestSilver(amount, silver._id);
-    assert.equal(secondRequest.status, 201,
-      "Silver request after rejection failed: " + (secondRequest.body.message || secondRequest.status));
-    const secondRow = await db.collection("withdrawalrequests").findOne({
-      userId: user._id,
-      status: "pending",
-      packageId: silver._id,
-      type: "package",
-    }, { sort: { createdAt: -1 } });
-    assert.ok(secondRow, "Replacement Silver pending request was not stored.");
-    cycleRequestIds.push(String(secondRow._id));
-    assert.notEqual(String(secondRow._id), String(firstRow._id), "Replacement request reused the rejected request ID.");
-
-    state = await packageSnapshot(silver._id, user._id);
-    assert.equal(state.balance, round8(balanceBefore.balance - amount), "Second request did not reserve 100 USDT.");
-    assert.equal(state.locked, amount, "Second request did not lock exactly 100 USDT.");
-
-    const approved = await reviewWithdrawal(secondRow._id, "approve");
-    assert.equal(approved.status, 200, "Admin approval endpoint returned HTTP " + approved.status + ".");
-    assert.equal(approved.body?.success, true, "Admin approval failed: " + (approved.body?.message || "unknown error"));
-    successfulApproval = true;
-
-    const secondAfterReview = await db.collection("withdrawalrequests").findOne({ _id: secondRow._id });
-    assert.equal(secondAfterReview.status, "approved", "Second Silver request was not marked approved.");
-    state = await packageSnapshot(silver._id, user._id);
-    assert.equal(state.balance, round8(balanceBefore.balance - amount), "Approved withdrawal did not permanently reduce Silver available balance by 100 USDT.");
-    assert.equal(state.locked, 0, "Approved withdrawal left a stale Silver locked balance.");
-
-    const finalCard = await getSilverCard(silver._id);
-    assert.equal(round8(finalCard.account.balance), round8(balanceBefore.balance - amount),
-      "Final Silver card balance does not match the approved withdrawal.");
-    assert.equal(round8(finalCard.account.allowance), 0, "Approved Silver request did not consume today's entire cap.");
-    assert.equal(round8(finalCard.account.available), 0, "Final available-today amount should be zero after the 100 USDT approval.");
-
-    const overCap = await requestSilver(amount, silver._id);
-    assert.equal(overCap.status, 409, "Silver accepted another withdrawal after today's cap was used.");
-    assert.equal(overCap.body.message, "تم استنفاد حد السحب اليومي لهذه الباقة",
-      "Unexpected message after trying to exceed Silver's daily cap.");
-    state = await packageSnapshot(silver._id, user._id);
-    assert.equal(state.balance, round8(balanceBefore.balance - amount), "Rejected over-cap request unexpectedly changed Silver balance.");
-    assert.equal(state.locked, 0, "Rejected over-cap request unexpectedly locked Silver funds.");
-    assert.equal(
-      await db.collection("withdrawalrequests").countDocuments({ userId: user._id }),
-      baselineRequestCount + 2,
-      "Unexpected request count; duplicate or over-cap attempts may have created a request.",
-    );
-
-    console.log(JSON.stringify({
-      result: "PASS",
+    const report = {
+      result: first150PolicyPass ? "PASS" : "FAIL",
       database: dbName,
-      server: "isolated local Next.js API started from this working tree",
+      server: "isolated local Next.js API from this working tree",
       user: username,
       package: "Silver",
-      activationCap: cap,
-      packageBalanceBefore: balanceBefore.balance,
-      existingTodayUsageBeforeTest: usedTodayBefore,
-      previousApprovedQATimestampsMovedToPriorUtcDay: movedRequestReport,
-      syntheticPackageCredit: false,
-      directPackageBalanceWrite: false,
-      cycle: {
-        firstRequest: { amount, status: "rejected", balanceAfterReject, lockedAfterReject: 0 },
-        secondRequest: { amount, status: "approved", balanceAfterApproval: state.balance, lockedAfterApproval: 0 },
-        afterApproval: { balance: state.balance, allowanceToday: finalCard.account.allowance, availableToday: finalCard.account.available },
-        anotherWithdrawalToday: { status: overCap.status, message: overCap.body.message, requestCreated: false },
+      firstActivationCap: cap,
+      balanceAtStart: balanceBefore.balance,
+      sameDayApprovedSilverTimestampsMovedToPriorUtcDay: dateShiftReport,
+      tests: {
+        request150: first150Report,
+        request100ThenAdminReject: second100Report,
+        prepareBalanceForFollowUpTests: topUpReport,
       },
-      checks: {
-        requestReservationMovesAvailableToLocked: true,
-        duplicatePendingRequestRejected: true,
-        rejectionReturnsTheFullAmount: true,
-        approvalConsumesTheFullAmount: true,
-        approvedAndPendingRequestsConsumeDailyCap: true,
-        rejectedRequestDoesNotConsumeDailyCap: true,
-        overCapAttemptDoesNotChangeBalanceOrCreateRequest: true,
-        noSyntheticBalanceAdded: true,
+      assertions: {
+        150WasRejectedAtThe100USDTDailyCap: first150PolicyPass,
+        100RequestWasCreatedAndSentToAdminApi: true,
+        rejected100ReturnedAllFundsToSilver: true,
+        noLockedFundsRemain: finalSnapshot.locked === 0,
+        SilverBalanceIs600ForNextTests: finalSnapshot.balance === 600,
+        dailyCapRemains100: round8(finalCard.account.allowance) === 100,
       },
-      note: "This exercises the local API/accounting workflow only. It does not send USDT on-chain. Two Silver test requests are retained in arabtrade_test (one rejected, one approved).",
-    }, null, 2));
+      note: "Only arabtrade_test was modified. A QA-only +450 marker was added because explicitly requested to prepare Silver at 600. This does not send USDT on-chain. The 100-USDT request is retained as rejected. Any 150-USDT request, if unexpectedly accepted, is also rejected by the QA admin before continuing.",
+    };
+    console.log(JSON.stringify(report, null, 2));
+    if (!first150PolicyPass) process.exitCode = 1;
   } finally {
     if (logFd !== null) {
       try { fs.closeSync(logFd); } catch {}
     }
-    if (db && user) {
-      await cleanupPendingCycleRequests(user._id).catch((error) => {
-        console.error("Recovery warning:", error instanceof Error ? error.message : String(error));
+    if (db && testedUserId) {
+      await rejectPendingTestRequests().catch((error) => {
+        console.error("Recovery warning cleaning test requests:", error instanceof Error ? error.message : String(error));
       });
-      await restoreMovedDatesWhenNoApproval().catch((error) => {
+      await restoreMovedDatesOnFailure().catch((error) => {
         console.error("Recovery warning restoring QA timestamps:", error instanceof Error ? error.message : String(error));
       });
       if (adminId) {
@@ -538,7 +562,7 @@ main().catch((error) => {
   console.error(JSON.stringify({
     result: "FAIL",
     error: error instanceof Error ? error.stack || error.message : String(error),
-    note: "Only arabtrade_test is permitted. No synthetic package balance is added. If approval did not complete, any pending QA request is rejected during cleanup where possible, and adjusted timestamps are restored.",
+    note: "Only arabtrade_test is allowed. No QA top-up is made unless the 150/100 request and admin-rejection checks complete. On failure, any new pending Silver request is rejected where possible, and adjusted old QA timestamps are restored.",
   }, null, 2));
   process.exitCode = 1;
 });

@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     plans,
     requests,
     generalMinimum: Number((settings as any)?.withdrawals?.generalMinimum || 0),
+    packageReferralUnlockPercent: Number((settings as any)?.withdrawals?.packageReferralUnlockPercent ?? 50),
   });
 }
 
@@ -48,6 +49,19 @@ export async function PATCH(request: NextRequest) {
       { upsert: true }
     );
     return NextResponse.json({ success: true, generalMinimum: minimum });
+  }
+
+  if (body.action === "packageReferralUnlockPercent") {
+    const percent = Number(body.percent);
+    if (!Number.isFinite(percent) || percent < 0 || percent > 100 || Math.round(percent * 1e8) / 1e8 !== percent) {
+      return NextResponse.json({ success: false, message: "نسبة فتح السحب بالإحالات يجب أن تكون بين 0 و100" }, { status: 400 });
+    }
+    await PlatformSettings.updateOne(
+      { key: "global" },
+      { $set: { "withdrawals.packageReferralUnlockPercent": percent } },
+      { upsert: true }
+    );
+    return NextResponse.json({ success: true, packageReferralUnlockPercent: percent });
   }
 
   if (body.action === "minimum") {

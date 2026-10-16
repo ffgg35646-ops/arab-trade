@@ -282,7 +282,7 @@ export async function separateLegacyDepositsFromSpotWallet(
         balanceAfter: roundAmount(availableBefore - moveAmount),
         referenceId: marker,
         note: moveAmount > 0
-          ? "فصل الرصيد المتبقي من الإيداعات الخارجية القديمة عن أرصدة السحب العامة."
+          ? "فصل الرصيد المتبقي من الإيداعات الخارجية القديمة عن أرصدة المحفظة العامة."
           : "تمت مراجعة رصيد الإيداعات القديمة؛ لا يوجد مبلغ متاح للنقل من المحافظ العامة.",
       }], { session });
     });

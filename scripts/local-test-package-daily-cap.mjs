@@ -64,11 +64,9 @@ function sessionCookie(response) {
     .find((value) => value.startsWith("arabtrade_session="));
 }
 
-function packageAmountUsedToday(items, planId, dayStart) {
+function packageAmountUsedCumulatively(items, planId) {
   return round8(items.reduce((sum, item) => {
-    if (item.status === "rejected" || item.type === "general") return sum;
-    const created = item.createdAt ? new Date(item.createdAt).getTime() : Number.NaN;
-    if (!Number.isFinite(created) || created < dayStart.getTime()) return sum;
+    if (![ "pending", "approved" ].includes(String(item.status || "")) || item.type === "general") return sum;
     const allocations = Array.isArray(item.allocations) ? item.allocations : [];
     const hasAllocationPlanId = allocations.some((allocation) => allocation.packageId);
     if (hasAllocationPlanId) {
@@ -110,20 +108,16 @@ function referralCapacityUsed(items, packageRows) {
       activationCaps.set(packageId, round8(row.investedAmount));
     }
   }
-  const dailyTotals = new Map();
+  const totals = new Map();
   for (const item of items) {
-    if (!["pending", "approved"].includes(String(item.status || ""))) continue;
-    const createdAt = item.createdAt ? new Date(item.createdAt) : null;
-    if (!createdAt || !Number.isFinite(createdAt.getTime())) continue;
-    const day = createdAt.toISOString().slice(0, 10);
+    if (![ "pending", "approved" ].includes(String(item.status || ""))) continue;
     for (const allocation of packageAmountsForReferralUsage(item)) {
-      const key = allocation.packageId + ":" + day;
-      const row = dailyTotals.get(key) || { packageId: allocation.packageId, amount: 0 };
+      const row = totals.get(allocation.packageId) || { packageId: allocation.packageId, amount: 0 };
       row.amount = round8(row.amount + allocation.amount);
-      dailyTotals.set(key, row);
+      totals.set(allocation.packageId, row);
     }
   }
-  return round8([...dailyTotals.values()].reduce((sum, row) =>
+  return round8([...totals.values()].reduce((sum, row) =>
     sum + Math.max(0, row.amount - Number(activationCaps.get(row.packageId) || 0)), 0));
 }
 
@@ -197,7 +191,7 @@ async function main() {
     const referralRemaining = round8(Math.max(0, referralDepositTotal * referralPercent / 100 - referralCapacityUsed));
 
     const sourceDir = process.cwd();
-    isolatedDir = fs.mkdtempSync(path.join(os.tmpdir(), "arabtrade-daily-cap-qa-"));
+    isolatedDir = fs.mkdtempSync(path.join(os.tmpdir(), "arabtrade-cumulative-cap-qa-"));
     const excluded = new Set([".git", ".next", "node_modules", ".turbo", "coverage", "out"]);
     fs.cpSync(sourceDir, isolatedDir, {
       recursive: true,
@@ -211,7 +205,7 @@ async function main() {
 
     const port = await getFreePort();
     const baseUrl = "http://127.0.0.1:" + port;
-    logFile = path.join(os.tmpdir(), "arabtrade-daily-cap-" + port + ".log");
+    logFile = path.join(os.tmpdir(), "arabtrade-cumulative-cap-" + port + ".log");
     logFd = fs.openSync(logFile, "a");
     app = spawn("npm", ["run", "dev", "--", "--webpack", "--hostname", "127.0.0.1", "--port", String(port)], {
       cwd: isolatedDir,
@@ -260,8 +254,6 @@ async function main() {
       "Could not load withdrawal balances: " + (beforeResponse.body.message || beforeResponse.status));
 
     const requestResults = [];
-    const utcStart = new Date();
-    utcStart.setUTCHours(0, 0, 0, 0);
     const packageNames = [/^Bronze$/i, /^Silver$/i];
 
     for (const namePattern of packageNames) {
@@ -272,13 +264,13 @@ async function main() {
       assert.ok(rows.length > 0, "Database contains no activation records for " + plan.name);
       const firstActivation = rows.find((row) => Number(row.investedAmount || 0) > 0);
       const activationCap = round8(firstActivation?.investedAmount || 0);
-      const usedToday = packageAmountUsedToday(requestsBefore, plan._id, utcStart);
-      const dailyAllowance = round8(Math.max(0, activationCap - usedToday));
+      const alreadyWithdrawn = packageAmountUsedCumulatively(requestsBefore, plan._id);
+      const baseAllowance = round8(Math.max(0, activationCap - alreadyWithdrawn));
       const expectedReferralAllowance = referralRemaining;
-      const expectedAllowance = round8(dailyAllowance + expectedReferralAllowance);
+      const expectedAllowance = round8(baseAllowance + expectedReferralAllowance);
       const expectedAvailable = round8(Math.max(0, Math.min(Number(plan.account.balance || 0), expectedAllowance)));
-      assert.equal(round8(plan.account.dailyAllowance), dailyAllowance,
-        plan.name + " API base daily allowance does not match today's pending/approved package withdrawals.");
+      assert.equal(round8(plan.account.baseAllowance), baseAllowance,
+        plan.name + " API base allowance does not match cumulative pending/approved package withdrawals.");
       assert.equal(round8(plan.account.referralDepositTotal), referralDepositTotal,
         plan.name + " API qualifying referral deposits do not match approved active-referral deposit records.");
       assert.equal(round8(plan.account.referralUsed), referralCapacityUsed,
@@ -286,15 +278,15 @@ async function main() {
       assert.equal(round8(plan.account.referralAllowance), expectedReferralAllowance,
         plan.name + " API referral-backed allowance is incorrect.");
       assert.equal(round8(plan.account.allowance), expectedAllowance,
-        plan.name + " total API allowance does not match daily base plus remaining referral capacity.");
+        plan.name + " total API allowance does not match the remaining base plus referral capacity.");
       assert.equal(round8(plan.account.available), expectedAvailable,
         plan.name + " available amount does not match the combined withdrawal policy.");
 
       const minimum = Number(plan.minimum || 100);
       assert.ok(Number(plan.account.balance || 0) >= minimum,
-        plan.name + " balance is below the configured minimum; cannot prove the daily-cap rejection message.");
+        plan.name + " balance is below the configured minimum; cannot prove the cumulative-cap rejection message.");
       const overCapAmount = round8(Math.max(minimum, expectedAvailable + 1));
-      assert.ok(overCapAmount > expectedAvailable, "The test amount must exceed the currently available daily cap.");
+      assert.ok(overCapAmount > expectedAvailable, "The test amount must exceed the currently available cumulative withdrawal allowance.");
 
       const attempt = await api(baseUrl, "/api/withdrawals", {
         method: "POST",
@@ -305,16 +297,16 @@ async function main() {
           amount: overCapAmount,
           asset: "USDT",
           network: "TRC20",
-          payoutAddress: "QA-daily-cap-no-write-check",
+          payoutAddress: "QA-cumulative-cap-no-write-check",
         }),
       });
-      assert.equal(attempt.ok, false, plan.name + " accepted a withdrawal exceeding the daily cap.");
-      assert.equal(attempt.status, 409, plan.name + " over-cap request returned unexpected status.");
+      assert.equal(attempt.ok, false, plan.name + " accepted a withdrawal exceeding the cumulative allowance.");
+      assert.equal(attempt.status, 409, plan.name + " over-allowance request returned unexpected status.");
       const expectedMessage = expectedAvailable > 0
         ? "المتاح للسحب " + expectedAvailable + " USDT فقط"
-        : dailyAllowance <= 0 && expectedReferralAllowance <= 0
-          ? "لا يمكن طلب سحب إضافي إلا بعد وجود إحالات نشطة بإيداعات معتمدة"
-          : "تم استنفاد حد السحب اليومي لهذه الباقة";
+        : baseAllowance <= 0 && expectedReferralAllowance <= 0
+          ? "تم استنفاد حد السحب؛ يلزم وجود إحالات نشطة بإيداعات معتمدة إضافية لفتح سعة جديدة"
+          : "تم استنفاد حد السحب الأساسي لهذه الباقة";
       assert.equal(attempt.body.message, expectedMessage,
         plan.name + " returned unexpected over-cap message.");
 
@@ -342,8 +334,8 @@ async function main() {
         package: plan.name,
         activationAmount: activationCap,
         packageBalance: round8(plan.account.balance),
-        approvedOrPendingUsedToday: usedToday,
-        dailyBaseAllowance: dailyAllowance,
+        approvedOrPendingPackageWithdrawals: alreadyWithdrawn,
+        remainingBaseAllowance: baseAllowance,
         activeFundedReferrals: fundedActiveReferralCount,
         approvedReferralDepositTotal: referralDepositTotal,
         referralUnlockPercent: referralPercent,
@@ -367,7 +359,7 @@ async function main() {
       testedAtUtc: new Date().toISOString(),
       packages: requestResults,
       finalAssertions: {
-        overDailyCapRequestRejectedForBothPackages: true,
+        overAllowanceRequestRejectedForBothPackages: true,
         noWithdrawalRequestsCreated: true,
         allPackageBalancesUnchanged: true,
       },
@@ -391,7 +383,7 @@ main().catch((error) => {
   console.error(JSON.stringify({
     result: "FAIL",
     error: error instanceof Error ? error.message : String(error),
-    note: "This test adds no balance and creates no successful withdrawal. A failed precondition stops the run before any over-cap request.",
+    note: "This test adds no balance and creates no successful withdrawal. A failed precondition stops the run before any over-allowance request.",
   }, null, 2));
   process.exitCode = 1;
 });

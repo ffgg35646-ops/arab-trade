@@ -11,7 +11,6 @@ export interface IUser {
   referredBy?: mongoose.Types.ObjectId | null;
   isVerified: boolean;
   isActive: boolean;
-  hasPendingWithdrawal?: boolean;
   createdAt: Date;
   updatedAt?: Date;
 }

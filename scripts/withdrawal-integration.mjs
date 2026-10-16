@@ -157,9 +157,9 @@ try {
   assert.equal(resetMinimum.status, 200);
   log("Admin minimum change is enforced by the live withdrawals API");
 
-  const minimumBlock = await requestWithdrawal(100);
+  const minimumBlock = await requestWithdrawal(99);
   assert.equal(minimumBlock.status, 409);
-  assert.match(minimumBlock.data.message, /الحد الأدنى للسحب هو 100|رصيد سحب الباقة/);
+  assert.match(minimumBlock.data.message, /الحد الأدنى للسحب هو 100/);
   const overInitial = await requestWithdrawal(300);
   assert.equal(overInitial.status, 409);
   assert.match(overInitial.data.message, /المتاح للسحب 200/);

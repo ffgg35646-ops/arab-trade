@@ -256,7 +256,8 @@ export default function WithdrawalsPage() {
                         <p className="mt-1 font-black text-emerald-300">{money(account?.available || 0)} USDT</p>
                         <p className="mt-2 text-xs text-slate-400">المتاح من الحد الأساسي اليوم: {money(account?.dailyAllowance || 0)} USDT</p>
                         <p className="mt-1 text-xs text-slate-400">الإحالات النشطة: {account?.activeReferralCount || 0} — إيداعات معتمدة: {money(account?.referralDepositTotal || 0)} USDT</p>
-                        <p className="mt-1 text-xs text-slate-400">المتاح الإضافي بالإحالات ({money(account?.referralUnlockPercent || 0)}%): {money(account?.referralAllowance || 0)} USDT</p>
+                        <p className="mt-1 text-xs text-slate-400">المتاح الإضافي بالإحالات ({money(account?.referralUnlockPercent || 0)}% من الإيداعات المعتمدة، حد مشترك بين الباقات): {money(account?.referralAllowance || 0)} USDT</p>
+                        <p className="mt-1 text-xs text-slate-400">المستهلك من حد الإحالات: {money(account?.referralUsed || 0)} USDT</p>
                         {Number(account?.locked || 0) > 0 && <p className="mt-2 text-xs text-amber-200">محجوز: {money(account?.locked || 0)} USDT</p>}
                       </div>
                     </div>

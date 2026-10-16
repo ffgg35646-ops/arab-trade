@@ -2,6 +2,7 @@ import mongoose, { Model, Schema } from "mongoose";
 
 export interface IWithdrawalAllocation {
   userPackageId: mongoose.Types.ObjectId;
+  packageId?: mongoose.Types.ObjectId;
   amount: number;
 }
 
@@ -22,6 +23,7 @@ export interface IWithdrawalRequest {
 
 const AllocationSchema = new Schema<IWithdrawalAllocation>({
   userPackageId: { type: Schema.Types.ObjectId, ref: "UserPackage", required: true },
+  packageId: { type: Schema.Types.ObjectId, ref: "InvestmentPackage", required: false },
   amount: { type: Number, required: true, min: 0.00000001 },
 }, { _id: false });
 

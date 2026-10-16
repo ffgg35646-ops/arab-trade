@@ -130,7 +130,6 @@ async function main() {
       type: "crypto",
       enabled: true,
       depositEnabled: true,
-      withdrawalEnabled: true,
       tradingEnabled: true,
       sortOrder: i + 1,
       networks: [],

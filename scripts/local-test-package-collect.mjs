@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 
-const assert = require("node:assert/strict");
-const crypto = require("node:crypto");
-const net = require("node:net");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const { spawn } = require("node:child_process");
-const mongoose = require("mongoose");
+import assert from "node:assert/strict";
+import crypto from "node:crypto";
+import net from "node:net";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawn } from "node:child_process";
+import mongoose from "mongoose";
 
-require("@next/env").loadEnvConfig(process.cwd());
+import { loadEnvConfig } from "@next/env";
+
+loadEnvConfig(process.cwd());
 
 const originalUri = process.env.MONGODB_URI;
 if (!originalUri) throw new Error("MONGODB_URI is not configured; load the project's local env first.");

@@ -3,41 +3,22 @@
 import { useCallback, useEffect, useState } from "react";
 import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
-import { CheckCircle2, CircleDollarSign, Layers3, Wallet } from "lucide-react";
+import { CheckCircle2, Layers3, Wallet } from "lucide-react";
 
-type Account = {
-  _id: string;
-  sourceAccountIds: string[];
-  status: string;
+type PackageWithdrawal = {
   balance: number;
   locked: number;
   allowance: number;
   available: number;
+  minimum: number;
   hasAccount: boolean;
 };
-type Plan = {
-  _id: string;
-  name: string;
-  price: number;
-  minimum: number;
-  enabled: boolean;
-  account: Account | null;
-};
 type Network = { code: string; name: string };
-type Request = {
-  _id: string;
-  type: string;
-  packageId?: string | null;
-  amount: number;
-  asset?: string;
-  network?: string;
-  payoutAddress?: string;
-  status: string;
-};
+type Request = { _id: string; type: string; amount: number; status: string };
 type Data = {
   general: { available: number; minimum: number; configured: boolean };
+  packageWithdrawal: PackageWithdrawal;
   networks: Network[];
-  packages: Plan[];
   requests: Request[];
 };
 
@@ -46,9 +27,9 @@ const money = (value: number) =>
 
 export default function WithdrawalsPage() {
   const [data, setData] = useState<Data | null>(null);
-  const [amounts, setAmounts] = useState<Record<string, string>>({});
-  const [addresses, setAddresses] = useState<Record<string, string>>({});
-  const [packageNetworks, setPackageNetworks] = useState<Record<string, string>>({});
+  const [packageAmount, setPackageAmount] = useState("");
+  const [packageAddress, setPackageAddress] = useState("");
+  const [packageNetwork, setPackageNetwork] = useState("");
   const [generalAmount, setGeneralAmount] = useState("");
   const [generalAddress, setGeneralAddress] = useState("");
   const [generalNetwork, setGeneralNetwork] = useState("");
@@ -68,6 +49,10 @@ export default function WithdrawalsPage() {
         if (current && json.networks?.some((network: Network) => network.code === current)) return current;
         return json.networks?.[0]?.code || "";
       });
+      setPackageNetwork((current) => {
+        if (current && json.networks?.some((network: Network) => network.code === current)) return current;
+        return json.networks?.[0]?.code || "";
+      });
     } catch {
       setMessage("تعذر تحميل بيانات السحب");
     }
@@ -78,6 +63,7 @@ export default function WithdrawalsPage() {
   const hasPending = Boolean(data?.requests.some((item) => item.status === "pending"));
   const firstNetwork = data?.networks[0]?.code || "";
   const selectedGeneralNetwork = generalNetwork || firstNetwork;
+  const selectedPackageNetwork = packageNetwork || firstNetwork;
 
   async function submit(body: Record<string, unknown>) {
     setBusy(true);
@@ -101,22 +87,10 @@ export default function WithdrawalsPage() {
 
   function submitGeneral() {
     const amount = Number(generalAmount);
-    if (!generalAddress.trim()) {
-      setMessage("اكتب عنوان الدفع");
-      return;
-    }
-    if (!selectedGeneralNetwork) {
-      setMessage("لا توجد شبكة مفعّلة من إعدادات الأدمن");
-      return;
-    }
-    if (!data?.general.configured) {
-      setMessage("الأدمن لم يحدد الحد الأدنى للسحب العام بعد");
-      return;
-    }
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setMessage("اكتب مبلغ السحب");
-      return;
-    }
+    if (!generalAddress.trim()) return setMessage("اكتب عنوان الدفع");
+    if (!selectedGeneralNetwork) return setMessage("لا توجد شبكة مفعّلة من إعدادات الأدمن");
+    if (!data?.general.configured) return setMessage("الأدمن لم يحدد الحد الأدنى للسحب العام بعد");
+    if (!Number.isFinite(amount) || amount <= 0) return setMessage("اكتب مبلغ السحب");
     void submit({
       type: "general",
       amount,
@@ -126,39 +100,22 @@ export default function WithdrawalsPage() {
     });
   }
 
-  function submitPackage(plan: Plan) {
-    const account = plan.account;
-    const address = (addresses[plan._id] || "").trim();
-    const amount = Number(amounts[plan._id]);
-    const network = packageNetworks[plan._id] || firstNetwork;
-
-    if (!account?.hasAccount) {
-      setMessage("لا يوجد حساب سحب لهذه الباقة قبل تفعيلها");
-      return;
-    }
-    if (!address) {
-      setMessage("اكتب عنوان الدفع لهذه الباقة");
-      return;
-    }
-    if (!network) {
-      setMessage("لا توجد شبكة مفعّلة من إعدادات الأدمن");
-      return;
-    }
-    if (!Number.isFinite(amount) || amount < plan.minimum) {
-      setMessage("الحد الأدنى للسحب هو " + plan.minimum + " USDT");
-      return;
+  function submitPackages() {
+    const amount = Number(packageAmount);
+    if (!data?.packageWithdrawal.hasAccount) return setMessage("لا يوجد رصيد أرباح من الباقات حتى الآن");
+    if (!packageAddress.trim()) return setMessage("اكتب عنوان الدفع");
+    if (!selectedPackageNetwork) return setMessage("لا توجد شبكة مفعّلة من إعدادات الأدمن");
+    if (!Number.isFinite(amount) || amount < data.packageWithdrawal.minimum) {
+      return setMessage("الحد الأدنى للسحب من الباقات هو " + data.packageWithdrawal.minimum + " USDT");
     }
     void submit({
       type: "package",
-      packageId: plan._id,
       amount,
       asset: "USDT",
-      network,
-      payoutAddress: address,
+      network: selectedPackageNetwork,
+      payoutAddress: packageAddress.trim(),
     });
   }
-
-  const visiblePackages = data?.packages || [];
 
   return (
     <>
@@ -223,66 +180,66 @@ export default function WithdrawalsPage() {
             </button>
           </section>
 
-          <section className="space-y-4">
+          <section className="space-y-4 rounded-2xl border border-slate-700 bg-[#08111e] p-4 md:p-5">
             <div className="flex items-center gap-2">
               <Layers3 size={20} className="text-cyan-300" />
-              <h2 className="text-xl font-black">السحب من الباقات</h2>
+              <h2 className="text-xl font-black">السحب من أرباح الباقات</h2>
             </div>
 
-            {!data && <p className="text-sm text-slate-400">جاري تحميل الباقات…</p>}
-            {data && visiblePackages.length === 0 && <p className="rounded-xl border border-slate-700 p-4 text-slate-400">لا توجد باقات متاحة أو أرصدة سحب قديمة.</p>}
+            <p className="text-sm text-slate-400">
+              أرصدة التفعيلات والتغييرات السابقة تُدار داخليًا، ويظهر لك هنا نموذج سحب واحد فقط.
+            </p>
 
-            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
-              {visiblePackages.map((plan) => {
-                const account = plan.account;
-                const network = packageNetworks[plan._id] || firstNetwork;
-                const canWithdraw = Boolean(account?.hasAccount && account.available > 0);
-                return (
-                  <article key={plan._id} className="flex flex-col gap-4 rounded-2xl border border-slate-700 bg-[#08111e] p-4 md:p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="truncate text-lg font-black">{plan.name}</h3>
-                      </div>
-                      <div className="shrink-0 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-2 text-left">
-                        <p className="text-xs text-slate-400">الرصيد المتاح</p>
-                        <p className="mt-1 font-black text-emerald-300">{money(account?.available || 0)} USDT</p>
-                      </div>
-                    </div>
-
-                    <label className="block space-y-2 text-sm text-slate-300">
-                      <span>عنوان الدفع</span>
-                      <input type="text" autoComplete="off" value={addresses[plan._id] || ""} onChange={(event) => setAddresses((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder="أدخل عنوان محفظة الاستلام" className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500" />
-                    </label>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label className="block space-y-2 text-sm text-slate-300">
-                        <span>العملة</span>
-                        <select value="USDT" disabled className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:opacity-100">
-                          <option value="USDT">USDT</option>
-                        </select>
-                      </label>
-                      <label className="block space-y-2 text-sm text-slate-300">
-                        <span>الشبكة</span>
-                        <select value={network} onChange={(event) => setPackageNetworks((current) => ({ ...current, [plan._id]: event.target.value }))} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white">
-                          {!data?.networks.length && <option value="">لا توجد شبكات</option>}
-                          {data?.networks.map((item) => <option key={item.code} value={item.code}>{item.name} ({item.code})</option>)}
-                        </select>
-                      </label>
-                    </div>
-
-                    <input aria-label={"مبلغ السحب من " + plan.name} type="number" min={plan.minimum} step="any" value={amounts[plan._id] || ""} onChange={(event) => setAmounts((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder={"الحد الأدنى " + money(plan.minimum) + " USDT"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-400" />
-
-                    <div className="mt-auto space-y-2">
-                      <button type="button" disabled={busy || hasPending || !canWithdraw || !addresses[plan._id]?.trim() || !network} onClick={() => submitPackage(plan)} className="w-full rounded-xl bg-blue-600 px-4 py-3 font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">
-                        دفع
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-slate-700 bg-[#0b1422] p-4">
+                <p className="text-sm text-slate-400">إجمالي أرباح الباقات المتاحة بالحساب</p>
+                <p className="mt-2 text-xl font-black text-white">{data ? money(data.packageWithdrawal.balance) : "—"} USDT</p>
+              </div>
+              <div className="rounded-xl border border-slate-700 bg-[#0b1422] p-4">
+                <p className="text-sm text-slate-400">المتاح للسحب وفق حدود الباقات</p>
+                <p className="mt-2 text-xl font-black text-emerald-300">{data ? money(data.packageWithdrawal.available) : "—"} USDT</p>
+              </div>
+              <div className="rounded-xl border border-slate-700 bg-[#0b1422] p-4">
+                <p className="text-sm text-slate-400">الرصيد المحجوز لطلبات السحب</p>
+                <p className="mt-2 text-xl font-black text-amber-200">{data ? money(data.packageWithdrawal.locked) : "—"} USDT</p>
+              </div>
             </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block space-y-2 text-sm text-slate-300">
+                <span>العملة</span>
+                <select value="USDT" disabled className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:opacity-100">
+                  <option value="USDT">USDT</option>
+                </select>
+              </label>
+              <label className="block space-y-2 text-sm text-slate-300">
+                <span>الشبكة</span>
+                <select value={selectedPackageNetwork} onChange={(event) => setPackageNetwork(event.target.value)} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white">
+                  {!data?.networks.length && <option value="">لا توجد شبكات</option>}
+                  {data?.networks.map((network) => <option key={network.code} value={network.code}>{network.name} ({network.code})</option>)}
+                </select>
+              </label>
+            </div>
+
+            <label className="block space-y-2 text-sm text-slate-300">
+              <span>عنوان الدفع</span>
+              <input value={packageAddress} onChange={(event) => setPackageAddress(event.target.value)} placeholder="عنوان محفظة الاستلام" className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500" />
+            </label>
+
+            <label className="block space-y-2 text-sm text-slate-300">
+              <span>مبلغ السحب من الباقات</span>
+              <input type="number" min={data?.packageWithdrawal.minimum || undefined} step="any" value={packageAmount} onChange={(event) => setPackageAmount(event.target.value)} placeholder={"الحد الأدنى " + money(data?.packageWithdrawal.minimum || 100) + " USDT"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500" />
+            </label>
+
+            <button
+              type="button"
+              onClick={submitPackages}
+              disabled={busy || hasPending || !data?.packageWithdrawal.hasAccount || data.packageWithdrawal.available <= 0 || !selectedPackageNetwork}
+              className="w-full rounded-xl bg-blue-600 px-4 py-3 font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              طلب سحب من أرباح الباقات
+            </button>
           </section>
-
         </main>
       </div>
     </>

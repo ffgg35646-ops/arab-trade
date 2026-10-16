@@ -803,7 +803,6 @@ export default function WithdrawPage() {
                         const withdrawable = accounts.reduce((sum, account) => sum + packageMaximum(account), 0);
                         const active = accounts.some((account) => account.status === "active");
                         const activeAccounts = accounts.filter((account) => account.status === "active");
-                        const previousAccounts = accounts.filter((account) => account.status !== "active");
                         return (
                           <article key={key} className="overflow-hidden rounded-2xl border border-white/10 bg-[#08111e]">
                             <header className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 bg-white/[0.025] p-4">

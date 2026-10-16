@@ -100,7 +100,7 @@ function packageAmountsForReferralUsage(item) {
   return amount > 0 ? [{ packageId: String(item.packageId), amount }] : [];
 }
 
-function referralCapacityUsed(items, packageRows) {
+function calculateReferralCapacityUsed(items, packageRows) {
   const activationCaps = new Map();
   for (const row of packageRows) {
     const packageId = String(row.packageId);
@@ -185,7 +185,7 @@ async function main() {
       : [];
     const referralDepositTotal = round8(referralDepositRows[0]?.total || 0);
     const fundedActiveReferralCount = Number(referralDepositRows[0]?.count || 0);
-    const referralCapacityUsed = referralCapacityUsed(requestsBefore, allPackagesBefore);
+    const referralCapacityUsed = calculateReferralCapacityUsed(requestsBefore, allPackagesBefore);
     const platformSettings = await db.collection("platformsettings").findOne({ key: "global" });
     const referralPercent = Math.min(100, Math.max(0, Number(platformSettings?.withdrawals?.packageReferralUnlockPercent ?? 50)));
     const referralRemaining = round8(Math.max(0, referralDepositTotal * referralPercent / 100 - referralCapacityUsed));

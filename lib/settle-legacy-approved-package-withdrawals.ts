@@ -427,7 +427,6 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
   }).select("_id userPackageId packageAllocations amount").lean();
 
   const settledAmountByPackage = new Map<string, number>();
-  const settledRequestIdsByPackage = new Map<string, string[]>();
   // Keep active reservations separate from legacy approved requests that could
   // not be settled because older code failed to lock the amount.
   const reconciliationSafePackageIds = new Set<string>();
@@ -457,9 +456,6 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
         packageId,
         Number(((settledAmountByPackage.get(packageId) || 0) + amount).toFixed(8)),
       );
-      const ids = settledRequestIdsByPackage.get(packageId) || [];
-      ids.push(String(request._id));
-      settledRequestIdsByPackage.set(packageId, ids);
     }
   }
 

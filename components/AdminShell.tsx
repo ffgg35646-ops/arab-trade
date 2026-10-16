@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 
 type Counts = {
   deposits: number;
+  withdrawals: number;
   kyc: number;
   total: number;
 };
@@ -57,6 +58,7 @@ export default function AdminShell({
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [counts, setCounts] = useState<Counts>({
     deposits: 0,
+    withdrawals: 0,
     kyc: 0,
     total: 0,
   });
@@ -75,6 +77,7 @@ export default function AdminShell({
       if (json?.success && json?.counts) {
         setCounts({
           deposits: Number(json.counts.deposits || 0),
+          withdrawals: Number(json.counts.withdrawals || 0),
           kyc: Number(json.counts.kyc || 0),
           total: Number(json.counts.total || 0),
         });
@@ -117,6 +120,11 @@ export default function AdminShell({
       title: "طلبات الإيداع",
       count: counts.deposits,
       href: "/admin/deposits",
+    },
+    {
+      title: "طلبات السحب",
+      count: counts.withdrawals,
+      href: "/admin/withdrawals",
     },
     {
       title: "طلبات التوثيق",

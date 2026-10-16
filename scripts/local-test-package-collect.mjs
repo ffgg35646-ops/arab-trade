@@ -90,7 +90,7 @@ async function main() {
     serverUrl = baseUrl;
     serverLogFile = path.join(os.tmpdir(), "arabtrade-local-test-next-" + port + ".log");
     const logFd = fs.openSync(serverLogFile, "a");
-    app = spawn("npm", ["run", "dev", "--", "--hostname", "127.0.0.1", "--port", String(port)], {
+    app = spawn("npm", ["run", "dev", "--", "--webpack", "--hostname", "127.0.0.1", "--port", String(port)], {
       cwd: isolatedDir,
       env: { ...childEnv, PORT: String(port), TURBOREPO_ROOT: isolatedDir },
       detached: true,

@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: dailyProfit > 0
-          ? "تم جمع " + dailyProfit + " " + (current.asset || USDT_ASSET) + " وإضافتها إلى رصيد سحب هذه الباقة."
+          ? "تم جمع " + dailyProfit + " " + (current.asset || USDT_ASSET) + " وإضافتها إلى رصيد أرباح هذه الباقة."
           : "تم إغلاق دورة الجمع؛ الربح اليومي المحدد لهذه الباقة يساوي صفرًا.",
         userPackage: collected,
       });
@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
       if (activePackage) {
         return NextResponse.json({
           success: false,
-          message: "لديك باقة نشطة بالفعل. استخدم «التغيير إلى هذه الباقة» لنقل 50% من قيمة تفعيلها إلى رصيد سحب الباقة الحالية.",
+          message: "لديك باقة نشطة بالفعل. استخدم «التغيير إلى هذه الباقة» لنقل 50% من قيمة تفعيلها إلى رصيد أرباح الباقة الحالية.",
         }, { status: 409 });
       }
 
@@ -234,9 +234,7 @@ export async function POST(request: NextRequest) {
             userId: user._id, packageId: plan._id, packageName: plan.name,
             investedAmount: price, asset: USDT_ASSET, durationDays: 0, lastProfitAt: new Date(),
             status: "active", availableEarnings: 0, lockedEarnings: 0,
-            totalRealizedEarnings: 0, totalWithdrawn: 0,
-            withdrawablePrincipalCredited: true,
-            withdrawalBalanceDebt: 0, withdrawalBalanceReconciled: true,
+            totalRealizedEarnings: 0,
             cancellationRefund: 0, activatedAt: new Date(),
           }], { session });
           purchased = created[0];
@@ -282,7 +280,7 @@ export async function POST(request: NextRequest) {
       if (!plan) return NextResponse.json({ success: false, message: "الباقة الجديدة غير موجودة أو متوقفة" }, { status: 404 });
       if (!current) return NextResponse.json({ success: false, message: "الباقة الحالية ليست نشطة أو لا تخص هذا المستخدم" }, { status: 404 });
       if (Number(current.lockedEarnings || 0) > 0) {
-        return NextResponse.json({ success: false, message: "لا يمكن تغيير الباقة بينما يوجد طلب سحب من أرباحها قيد المراجعة." }, { status: 409 });
+        return NextResponse.json({ success: false, message: "لا يمكن تغيير الباقة أثناء وجود رصيد محجوز." }, { status: 409 });
       }
 
       const price = Number(plan.price);
@@ -353,7 +351,6 @@ export async function POST(request: NextRequest) {
             withdrawablePrincipalCredited: true,
             withdrawalBalanceDebt: 0,
             withdrawalBalanceReconciled: true,
-            firstWithdrawalStatus: "available",
             cancellationRefund: 0,
             activatedAt: new Date(),
           }], { session });
@@ -366,7 +363,7 @@ export async function POST(request: NextRequest) {
               type: "cancellation_refund",
               asset: cancelled.asset || USDT_ASSET,
               amount: refund,
-              note: "تغيير الباقة: استرداد 50% من قيمة تفعيل " + cancelled.packageName + " إلى رصيد سحب الباقة نفسها.",
+              note: "تغيير الباقة: استرداد 50% من قيمة تفعيل " + cancelled.packageName + " إلى رصيد أرباح الباقة نفسها.",
             },
             {
               userId: user._id,
@@ -403,7 +400,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "تم تغيير الباقة بنجاح. أُضيف 50% من قيمة تفعيل الباقة السابقة إلى رصيد سحبها الخاص، وخُصمت قيمة الباقة الجديدة من رصيد الإيداع.",
+        message: "تم تغيير الباقة بنجاح. أُضيف 50% من قيمة تفعيل الباقة السابقة إلى رصيد أرباح الباقة السابقة، وخُصمت قيمة الباقة الجديدة من رصيد الإيداع.",
         userPackage: changedPackage,
         cancellationRefund: refund,
       });
@@ -427,7 +424,7 @@ export async function POST(request: NextRequest) {
       if (Number(current.lockedEarnings || 0) > 0) {
         return NextResponse.json({
           success: false,
-          message: "لا يمكن إلغاء الباقة بينما يوجد طلب سحب من أرباحها قيد المراجعة.",
+          message: "لا يمكن إلغاء الباقة أثناء وجود رصيد محجوز.",
         }, { status: 409 });
       }
 
@@ -482,7 +479,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "تم إلغاء الباقة وإضافة " + refund + " " + current.asset + " إلى رصيد سحب الباقة نفسها. تبقى الأرباح المحققة في رصيد هذه الباقة.",
+        message: "تم إلغاء الباقة وإضافة " + refund + " " + current.asset + " إلى رصيد أرباح الباقة نفسها. تبقى الأرباح المحققة في رصيد هذه الباقة.",
         userPackage: cancelledPackage,
       });
     }

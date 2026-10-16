@@ -246,7 +246,7 @@ export default function WithdrawalsPage() {
                       <div className="shrink-0 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-2 text-left">
                         <p className="text-xs text-slate-400">إجمالي رصيد الباقة</p>
                         <p className="mt-1 font-black text-white">{money(account?.balance || 0)} USDT</p>
-                        <p className="mt-2 text-xs text-slate-400">المتاح للسحب</p>
+                        <p className="mt-2 text-xs text-slate-400">المتاح للسحب اليوم</p>
                         <p className="mt-1 font-black text-emerald-300">{money(account?.available || 0)} USDT</p>
                         {Number(account?.locked || 0) > 0 && <p className="mt-2 text-xs text-amber-200">محجوز: {money(account?.locked || 0)} USDT</p>}
                       </div>

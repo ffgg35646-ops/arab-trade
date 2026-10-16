@@ -94,17 +94,19 @@ export async function POST(request: NextRequest) {
     const price = Number(body.price);
     const durationDays = 0;
     const dailyProfit = Number(body.dailyProfit ?? (Number(body.price) / 25));
+    const withdrawalMinimum = Number(body.withdrawalMinimum ?? 100);
     const sortOrder = Number(body.sortOrder || 0);
     const enabled = body.enabled !== false;
 
     if (!name || !Number.isFinite(price) || price < 1 ||
         !Number.isFinite(dailyProfit) || dailyProfit < 0 || dailyProfit > 1000000000 ||
+        !Number.isFinite(withdrawalMinimum) || withdrawalMinimum <= 0 || withdrawalMinimum > 1000000000 ||
         !Number.isFinite(sortOrder)) {
       return NextResponse.json({ success: false, message: "تحقق من الاسم والسعر والمدة والترتيب" }, { status: 400 });
     }
 
     const item = await InvestmentPackage.create({
-      name, description, price, asset: "USDT", durationDays, dailyProfit, sortOrder, enabled,
+      name, description, price, asset: "USDT", durationDays, dailyProfit, sortOrder, enabled, withdrawalMinimum,
     });
     return NextResponse.json({ success: true, package: item }, { status: 201 });
   } catch (error) {
@@ -135,6 +137,11 @@ export async function PATCH(request: NextRequest) {
     }
     // All packages are lifetime packages; legacy duration values are ignored.
     update.durationDays = 0;
+    if (body.withdrawalMinimum !== undefined) {
+      const value = Number(body.withdrawalMinimum);
+      if (!Number.isFinite(value) || value <= 0 || value > 1000000000) return NextResponse.json({ success: false, message: "الحد الأدنى للسحب غير صالح" }, { status: 400 });
+      update.withdrawalMinimum = value;
+    }
     if (body.dailyProfit !== undefined) {
       const value = Number(body.dailyProfit);
       if (!Number.isFinite(value) || value < 0 || value > 1000000000) return NextResponse.json({ success: false, message: "الربح اليومي غير صالح" }, { status: 400 });

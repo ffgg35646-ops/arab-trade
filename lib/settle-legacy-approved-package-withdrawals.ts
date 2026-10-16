@@ -430,6 +430,7 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
   // Keep active reservations separate from legacy approved requests that could
   // not be settled because older code failed to lock the amount.
   const reconciliationSafePackageIds = new Set<string>();
+  const reconciliationBlockedPackageIds = new Set<string>();
   for (const request of liveRequests as any[]) {
     if (request.userPackageId) reconciliationSafePackageIds.add(String(request.userPackageId));
     for (const allocation of request.packageAllocations || []) {
@@ -442,16 +443,32 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
     const rows = Array.isArray(request.packageAllocations) && request.packageAllocations.length
       ? request.packageAllocations
       : [{ userPackageId: request.userPackageId, amount: fallbackAmount }];
+    const allocationTotal = rows.reduce((sum: number, row: any) => sum + Number(row.amount || 0), 0);
+    const validAllocations = rows.length > 0 &&
+      Number.isFinite(fallbackAmount) &&
+      fallbackAmount > 0 &&
+      rows.every((row: any) =>
+        mongoose.Types.ObjectId.isValid(String(row.userPackageId || "")) &&
+        Number.isFinite(Number(row.amount)) &&
+        Number(row.amount) > 0
+      ) &&
+      Math.abs(allocationTotal - fallbackAmount) <= 1e-7;
+
+    if (!validAllocations) {
+      // Corrupt historical distribution must not be used to infer a debit or
+      // silently reduce a package balance; leave those accounts untouched.
+      for (const row of rows as any[]) {
+        const packageId = String(row.userPackageId || "");
+        if (mongoose.Types.ObjectId.isValid(packageId)) reconciliationBlockedPackageIds.add(packageId);
+      }
+      const fallbackPackageId = String(request.userPackageId || "");
+      if (mongoose.Types.ObjectId.isValid(fallbackPackageId)) reconciliationBlockedPackageIds.add(fallbackPackageId);
+      continue;
+    }
 
     for (const allocation of rows as any[]) {
-      const packageId = String(allocation.userPackageId || "");
+      const packageId = String(allocation.userPackageId);
       const amount = Number(allocation.amount);
-      if (
-        !mongoose.Types.ObjectId.isValid(packageId) ||
-        !Number.isFinite(amount) ||
-        amount <= 0
-      ) continue;
-
       settledAmountByPackage.set(
         packageId,
         Number(((settledAmountByPackage.get(packageId) || 0) + amount).toFixed(8)),
@@ -462,7 +479,10 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
   for (const [packageId, requestTotal] of settledAmountByPackage) {
     // Pending/processing reservations are protected. Approved legacy requests
     // are terminal in this app and are reconciled below against their full total.
-    if (reconciliationSafePackageIds.has(packageId)) continue;
+    if (
+      reconciliationSafePackageIds.has(packageId) ||
+      reconciliationBlockedPackageIds.has(packageId)
+    ) continue;
 
     const account = await UserPackage.findOne({ _id: packageId, userId })
       .select("investedAmount cancellationRefund totalRealizedEarnings totalWithdrawn availableEarnings lockedEarnings")
@@ -585,6 +605,7 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
       packageIds.some((id: string) =>
         !mongoose.Types.ObjectId.isValid(id) ||
         reconciliationSafePackageIds.has(id) ||
+        reconciliationBlockedPackageIds.has(id) ||
         !reconciledPackageIds.has(id)
       )
     ) continue;

@@ -24,6 +24,12 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Syntax-check package withdrawal QA scripts
+        run: |
+          node --check scripts/local-test-silver-referral-withdrawal.mjs
+          node --check scripts/local-test-silver-withdrawal-cycle.mjs
+          node --check scripts/local-test-package-daily-cap.mjs
+          node --check scripts/withdrawal-integration.mjs
       - name: Start isolated MongoDB replica set
         run: |
           docker run -d --name arabtrade-mongo-test -p 27017:27017 mongo:7.0 mongod --replSet rs0 --bind_ip_all

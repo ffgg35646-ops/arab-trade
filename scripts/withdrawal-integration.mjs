@@ -120,6 +120,15 @@ try {
   const planA = await createPlan("QA " + suffix + " Gold A", 600);
   const planB = await createPlan("QA " + suffix + " Gold B", 0);
   packageAId = String(planA._id); packageBId = String(planB._id);
+  const catalogBeforeActivation = await call("/api/withdrawals", { cookie: userCookie });
+  assert.equal(catalogBeforeActivation.status, 200);
+  const initialPackageCard = catalogBeforeActivation.data.packages.find((item) => item._id === packageAId);
+  const unactivatedPackageCard = catalogBeforeActivation.data.packages.find((item) => item._id === packageBId);
+  assert.ok(initialPackageCard, "new admin package should appear in the user's withdrawal cards");
+  assert.ok(unactivatedPackageCard, "each enabled admin package needs a withdrawal card before activation");
+  assert.equal(unactivatedPackageCard.account, null, "a package with no user account starts with no withdrawable funds");
+  assert.equal(initialPackageCard.minimum, 100, "package withdrawal card uses the admin-configured minimum");
+  log("New admin packages appear as one user withdrawal card each before activation");
   const minSet = await call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie,
     body: { action: "minimum", packageId: packageAId, minimum: 125 } });
   assert.equal(minSet.status, 200);

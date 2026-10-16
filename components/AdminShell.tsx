@@ -27,6 +27,7 @@ const groups = [
     items: [
       { label: "الإيداعات", href: "/admin/deposits" },
       { label: "الباقات", href: "/admin/packages" },
+      { label: "السحوبات", href: "/admin/withdrawals" },
       { label: "وسائل الإيداع", href: "/admin/payments" },
       { label: "الأصول والشبكات", href: "/admin/assets" },
     ],

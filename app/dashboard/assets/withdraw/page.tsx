@@ -38,7 +38,7 @@ export default function WithdrawPage() {
       const result = await response.json();
       if (response.ok && result.success) {
         setData(result);
-        setPackageId((current) => current || result.packages?.find((p: PackageRow) => p.account)?. _id || "");
+        setPackageId((current) => current || result.packages?.find((p: PackageRow) => p.account)?._id || "");
         setNetwork((current) => result.networks?.some((n: Network) => n.code === current) ? current : result.networks?.[0]?.code || "");
       } else setMessage(result.message || "تعذر تحميل بيانات السحب");
     } catch { setMessage("تعذر الاتصال بالخادم"); }

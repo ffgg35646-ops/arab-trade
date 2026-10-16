@@ -1763,6 +1763,76 @@ await api("/api/wallet");
 legacyDepositBalance = await db.collection("depositbalances").findOne({ userId: user._id, asset: "USDT" });
 closeTo(legacyDepositBalance.available, 590, "v3 repair is idempotent and does not double credit");
 
+// Regression: an unresolved approved request in one account must not block
+// refund settlement for an unrelated rejected withdrawal account.
+const isolatedRepairTemplate = await db.collection("userpackages").findOne({ userId: user._id });
+assert.ok(isolatedRepairTemplate, "a package template is available for cross-account repair regression");
+const unresolvedApprovedAccountId = new mongoose.Types.ObjectId();
+const rejectedRefundAccountId = new mongoose.Types.ObjectId();
+const unresolvedApprovedRequestId = new mongoose.Types.ObjectId();
+const rejectedRefundRequestId = new mongoose.Types.ObjectId();
+const isolatedRepairAt = new Date(Date.now() - 10 * 60 * 1000);
+await db.collection("userpackages").insertMany([
+  {
+    _id: unresolvedApprovedAccountId, userId: user._id,
+    packageId: isolatedRepairTemplate.packageId,
+    packageName: "CI blocked approved account", investedAmount: 100,
+    asset: "USDT", durationDays: 0, status: "cancelled",
+    availableEarnings: 20, lockedEarnings: 0, totalRealizedEarnings: 0,
+    totalWithdrawn: 0, withdrawablePrincipalCredited: true,
+    firstWithdrawalStatus: "approved", withdrawalRequestPending: false,
+    cancellationRefund: 0, activatedAt: isolatedRepairAt,
+    lastProfitAt: isolatedRepairAt, createdAt: isolatedRepairAt, updatedAt: isolatedRepairAt,
+  },
+  {
+    _id: rejectedRefundAccountId, userId: user._id,
+    packageId: isolatedRepairTemplate.packageId,
+    packageName: "CI independent rejected refund", investedAmount: 100,
+    asset: "USDT", durationDays: 0, status: "cancelled",
+    availableEarnings: 10, lockedEarnings: 40, totalRealizedEarnings: 0,
+    totalWithdrawn: 0, withdrawablePrincipalCredited: true,
+    firstWithdrawalStatus: "available", withdrawalRequestPending: false,
+    cancellationRefund: 0, activatedAt: isolatedRepairAt,
+    lastProfitAt: isolatedRepairAt, createdAt: isolatedRepairAt, updatedAt: isolatedRepairAt,
+  },
+]);
+await db.collection("withdrawalrequests").insertMany([
+  {
+    _id: unresolvedApprovedRequestId, userId: user._id,
+    asset: "USDT", network: "TRC20", amount: 30, fee: 0, receiveAmount: 30,
+    address: "ci-unresolved-approved-address", source: "package",
+    userPackageId: unresolvedApprovedAccountId,
+    packageAllocations: [{ userPackageId: unresolvedApprovedAccountId, amount: 30 }],
+    isFirstPackageWithdrawal: false, status: "approved",
+    adminNote: "CI deliberately under-reported legacy package lock",
+    createdAt: isolatedRepairAt, updatedAt: isolatedRepairAt,
+  },
+  {
+    _id: rejectedRefundRequestId, userId: user._id,
+    asset: "USDT", network: "TRC20", amount: 40, fee: 0, receiveAmount: 40,
+    address: "ci-independent-rejected-address", source: "package",
+    userPackageId: rejectedRefundAccountId,
+    packageAllocations: [{ userPackageId: rejectedRefundAccountId, amount: 40 }],
+    isFirstPackageWithdrawal: false, status: "rejected",
+    adminNote: "CI rejected legacy refund must settle independently",
+    createdAt: isolatedRepairAt, updatedAt: isolatedRepairAt,
+  },
+]);
+ok(await api("/api/packages"), "package API repairs a rejected request outside an unresolved approved account");
+const isolatedRefundAccount = await db.collection("userpackages").findOne({ _id: rejectedRefundAccountId });
+closeTo(isolatedRefundAccount.availableEarnings, 50, "unrelated rejected account receives its refund despite another unresolved approval");
+closeTo(isolatedRefundAccount.lockedEarnings, 0, "unrelated rejected account clears its stranded lock");
+const isolatedRefundRequest = await db.collection("withdrawalrequests").findOne({ _id: rejectedRefundRequestId });
+assert.equal(isolatedRefundRequest.packageBalanceSettled, true, "unrelated rejected request is marked settled idempotently");
+const unresolvedApprovedAccount = await db.collection("userpackages").findOne({ _id: unresolvedApprovedAccountId });
+closeTo(unresolvedApprovedAccount.availableEarnings, 20, "unresolved approved account is not credited or debited by unrelated repair");
+closeTo(unresolvedApprovedAccount.lockedEarnings, 0, "unresolved approved account is preserved for investigation");
+const unresolvedApprovedRequest = await db.collection("withdrawalrequests").findOne({ _id: unresolvedApprovedRequestId });
+assert.equal(unresolvedApprovedRequest.packageBalanceSettled, undefined, "unreconciled approved request remains explicitly unsettled");
+await db.collection("packageledgers").deleteMany({ userPackageId: { $in: [unresolvedApprovedAccountId, rejectedRefundAccountId] } });
+await db.collection("withdrawalrequests").deleteMany({ _id: { $in: [unresolvedApprovedRequestId, rejectedRefundRequestId] } });
+await db.collection("userpackages").deleteMany({ _id: { $in: [unresolvedApprovedAccountId, rejectedRefundAccountId] } });
+
 // Regression: old account-level and user-level guards must not strand a rejected payout.
 const staleLockTemplate = await db.collection("userpackages").findOne({ userId: user._id });
 assert.ok(staleLockTemplate, "a package account is available for the stale-lock regression test");

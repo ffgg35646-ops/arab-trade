@@ -10,7 +10,7 @@ export async function GET() {
       enabled: true,
     })
       .select(
-        "name symbol type enabled depositEnabled withdrawalEnabled tradingEnabled sortOrder networks"
+        "name symbol type enabled depositEnabled tradingEnabled sortOrder networks"
       )
       .sort({ sortOrder: 1, symbol: 1 })
       .lean();

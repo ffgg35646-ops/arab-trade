@@ -529,9 +529,13 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
     // guess by erasing an arbitrary available balance.
     const hasLegacyPrincipalDiscrepancy =
       Math.abs(balanceDifference - investedAmount) <= epsilon;
+    const hasSettledPayoutHistory = requestTotal > epsilon;
+    const hasCashSourceHistory = realizedEarnings > epsilon || cancellationRefund > epsilon;
     const canReconcile = alreadyReconciled ||
       hasPrincipalRows ||
       hasLegacyPrincipalDiscrepancy ||
+      hasSettledPayoutHistory ||
+      hasCashSourceHistory ||
       Math.abs(balanceDifference) <= epsilon;
 
     if (!canReconcile || balanceDifference < -epsilon) {

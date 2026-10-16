@@ -57,17 +57,15 @@ async function checkPackageBalance(id, available, locked, label) {
   assert.equal(Number(row.lockedEarnings), locked, label + " lockedEarnings");
   return row;
 }
-async function getPackageState(_id) {
+async function getPackageState(id) {
   const { status, data } = await call("/api/withdrawals", { cookie: userCookie });
   assert.equal(status, 200, "withdrawal page API should load");
-  assert.ok(data.packageWithdrawal, "expected one aggregate package withdrawal balance");
-  assert.equal(data.packages, undefined, "user API must not expose a card/list per historical package");
-  return data.packageWithdrawal;
+  const plan = data.packages.find((item) => item._id === String(id));
+  assert.ok(plan?.account, "expected one package-level withdrawal card");
+  return plan.account;
 }
-async function requestWithdrawal(amount, packageId) {
-  const body = { type: "package", amount, asset: "USDT", network: "TRC20", payoutAddress: "QA-wallet-" + suffix };
-  if (packageId) body.packageId = String(packageId);
-  return call("/api/withdrawals", { method: "POST", cookie: userCookie, body });
+async function requestWithdrawal(amount, packageId = packageAId) {
+  return call("/api/withdrawals", { method: "POST", cookie: userCookie, body: { type: "package", packageId: String(packageId), amount, asset: "USDT", network: "TRC20", payoutAddress: "QA-wallet-" + suffix } });
 }
 async function requestGeneralWithdrawal(amount) {
   return call("/api/withdrawals", { method: "POST", cookie: userCookie, body: { type: "general", amount, asset: "USDT", network: "TRC20", payoutAddress: "QA-general-wallet-" + suffix } });
@@ -124,11 +122,8 @@ try {
   packageAId = String(planA._id); packageBId = String(planB._id);
   const catalogBeforeActivation = await call("/api/withdrawals", { cookie: userCookie });
   assert.equal(catalogBeforeActivation.status, 200);
-  assert.ok(catalogBeforeActivation.data.packageWithdrawal, "the user sees one combined package withdrawal form");
-  assert.equal(catalogBeforeActivation.data.packages, undefined, "the user API must not expose package-card lists or historical activations");
-  assert.equal(catalogBeforeActivation.data.packageWithdrawal.hasAccount, false, "no package balance is shown before activation");
-  assert.equal(catalogBeforeActivation.data.packageWithdrawal.available, 0, "no unactivated package has a withdrawable balance");
-  log("User withdrawals expose one aggregate package balance, not one card per package/activation");
+  assert.deepEqual(catalogBeforeActivation.data.packages, [], "unactivated catalog packages must not appear on the user's withdrawal page");
+  log("No unactivated package cards are shown to the user");
   const minSet = await call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie,
     body: { action: "minimum", packageId: packageAId, minimum: 125 } });
   assert.equal(minSet.status, 200);
@@ -167,8 +162,8 @@ try {
   assert.equal(deposit.available, 100, "changing package should spend only new package activation from deposits");
   log("Changed package; exactly $100 refund credited back to old package, deposit balance remained separate");
 
-  // Simulate many cancelled activations from repeated Silver/Gold-style switching.
-  // They must remain internal ledger rows and must never become user-facing cards.
+  // Simulate 20 cancelled activations from repeated Silver/Gold-style changes.
+  // The UI/API must still return only one balance card per actual package ID.
   const historicalActivations = Array.from({ length: 20 }, (_, index) => {
     const historicalPlanId = index % 2 === 0 ? packageAId : packageBId;
     const historicalName = index % 2 === 0 ? planA.name : planB.name;
@@ -195,14 +190,21 @@ try {
     };
   });
   await mongoose.connection.collection("userpackages").insertMany(historicalActivations);
-  log("Seeded 20 historical Silver/Gold activations in isolated CI data");
 
   const afterPackageChange = await call("/api/withdrawals", { cookie: userCookie });
   assert.equal(afterPackageChange.status, 200);
-  assert.equal(afterPackageChange.data.packages, undefined, "switching packages must never expose another user-facing package card");
-  assert.equal(afterPackageChange.data.packageWithdrawal.balance, 710, "historical package refund remains counted inside the single aggregate balance");
-  assert.equal(afterPackageChange.data.packageWithdrawal.available, 200, "historical package withdrawal allowance remains enforced internally");
-  log("Package switching does not create visible historical cards; original balance stays tracked in background");
+  assert.equal(afterPackageChange.data.packages.length, 2, "20 historic activation records must still produce just two package cards");
+  assert.deepEqual(
+    afterPackageChange.data.packages.map((item) => item._id).sort(),
+    [packageAId, packageBId].sort(),
+    "each visible card must represent a distinct catalog package ID",
+  );
+  const silverCard = afterPackageChange.data.packages.find((item) => item._id === packageAId);
+  const goldCard = afterPackageChange.data.packages.find((item) => item._id === packageBId);
+  assert.equal(silverCard.account.balance, 710, "old-package refund and earnings remain grouped under the original package");
+  assert.equal(silverCard.account.available, 200, "the old package's own withdrawal allowance is preserved");
+  assert.ok(goldCard.account.hasAccount, "the newly active package has its own card");
+  log("Twenty historic activation records produce one Silver card and one Gold card with package-specific balances");
 
   await mongoose.connection.collection("wallets").insertOne({
     userId: user._id, type: "spot", mode: "live",
@@ -233,7 +235,7 @@ try {
   assert.equal(setHigherMinimum.status, 200);
   const belowChangedMinimum = await requestWithdrawal(100);
   assert.equal(belowChangedMinimum.status, 409, "changed $125 minimum must block $100 request");
-  assert.match(belowChangedMinimum.data.message, /الحد الأدنى للسحب من الباقات هو 125/);
+  assert.match(belowChangedMinimum.data.message, /الحد الأدنى للسحب هو 125/);
   const resetMinimum = await call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie,
     body: { action: "minimum", packageId: packageAId, minimum: 100 } });
   assert.equal(resetMinimum.status, 200);
@@ -241,7 +243,7 @@ try {
 
   const minimumBlock = await requestWithdrawal(99);
   assert.equal(minimumBlock.status, 409);
-  assert.match(minimumBlock.data.message, /الحد الأدنى للسحب من الباقات هو 100/);
+  assert.match(minimumBlock.data.message, /الحد الأدنى للسحب هو 100/);
   const overInitial = await requestWithdrawal(300);
   assert.equal(overInitial.status, 409);
   assert.match(overInitial.data.message, /المتاح للسحب 200/);

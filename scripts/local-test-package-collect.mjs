@@ -9,8 +9,9 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import mongoose from "mongoose";
 
-import { loadEnvConfig } from "@next/env";
+import nextEnv from "@next/env";
 
+const { loadEnvConfig } = nextEnv;
 loadEnvConfig(process.cwd());
 
 const originalUri = process.env.MONGODB_URI;

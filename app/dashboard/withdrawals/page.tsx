@@ -106,7 +106,7 @@ export default function WithdrawalsPage() {
       return;
     }
     if (!selectedGeneralNetwork) {
-      setMessage("لا توجد شبكة مفعّلة من إعدادات الأدمن");
+      setMessage("اختر شبكة السحب");
       return;
     }
     if (!data?.general.configured) {

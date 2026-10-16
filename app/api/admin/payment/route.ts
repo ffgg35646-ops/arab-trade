@@ -16,7 +16,6 @@ export async function GET(request: NextRequest) {
     const rows = await PaymentOption.find({
       asset: USDT_ASSET,
       depositEnabled: { $ne: false },
-      kind: { $ne: "withdrawal" },
     }).sort({ createdAt: -1 }).lean();
     const seen = new Set<string>();
     const methods = rows.flatMap((item: any) => {
@@ -61,12 +60,12 @@ export async function POST(request: NextRequest) {
     const values = {
       name, asset: USDT_ASSET, network, address, minDeposit, maxDeposit,
       enabled: body.enabled === undefined ? true : Boolean(body.enabled),
-      depositEnabled: true, kind: "deposit" as const, withdrawalEnabled: false,
+      depositEnabled: true,
     };
     const method = existing
       ? await PaymentOption.findByIdAndUpdate(existing._id, { $set: values }, { new: true, runValidators: true }).lean()
       : await PaymentOption.create({
-          ...values, minWithdrawal: 0, maxWithdrawal: 0, withdrawalFee: 0, warning: "",
+          ...values,
         });
     return NextResponse.json({ success: true, message: "تم حفظ وسيلة الإيداع.", method });
   } catch (errorValue) {
@@ -107,8 +106,6 @@ export async function PATCH(request: NextRequest) {
     }
     if (body.enabled !== undefined) update.enabled = Boolean(body.enabled);
     if (body.depositEnabled !== undefined) update.depositEnabled = Boolean(body.depositEnabled);
-    update.kind = "deposit";
-    update.withdrawalEnabled = false;
 
     if (update.minDeposit !== undefined && update.maxDeposit !== undefined &&
         Number(update.maxDeposit) > 0 && Number(update.minDeposit) > Number(update.maxDeposit)) {

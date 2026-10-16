@@ -47,6 +47,7 @@ export interface IPlatformSettings {
   };
   withdrawals: {
     generalMinimum: number;
+    packageReferralUnlockPercent: number;
   };
   security: {
     sessionDays: number;
@@ -120,6 +121,7 @@ const PlatformSettingsSchema = new Schema<IPlatformSettings>(
 
     withdrawals: {
       generalMinimum: { type: Number, default: 0, min: 0 },
+      packageReferralUnlockPercent: { type: Number, default: 50, min: 0, max: 100 },
     },
 
     security: {

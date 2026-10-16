@@ -589,6 +589,30 @@ const selectedBalanceBeforeWithdrawal = packageBalancesBeforeIndependentWithdraw
 const siblingBalanceBeforeWithdrawal = packageBalancesBeforeIndependentWithdrawal.data.userPackages.find((x) => String(x._id) === String(splitAccountIds[1]));
 closeTo(selectedBalanceBeforeWithdrawal.availableEarnings, 150, "selected account API balance does not include sibling funds");
 closeTo(siblingBalanceBeforeWithdrawal.availableEarnings, 50, "sibling API balance is reported independently");
+const aggregatePackageWithdrawal = await api("/api/withdrawals", {
+  method: "POST",
+  body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 180, source: "package", userPackageId: String(splitAccountIds[0]) },
+});
+ok(aggregatePackageWithdrawal, "one package request can reserve combined cash across historical activation buckets", 201);
+const aggregateRequestId = new mongoose.Types.ObjectId(String(aggregatePackageWithdrawal.data.withdrawal._id));
+const aggregateRequestStored = await db.collection("withdrawalrequests").findOne({ _id: aggregateRequestId });
+assert.equal(aggregateRequestStored.packageAllocations.length, 2, "combined request stores one allocation per used activation bucket");
+closeTo(aggregateRequestStored.packageAllocations.reduce((sum, row) => sum + Number(row.amount || 0), 0), 180, "combined allocations equal the requested amount");
+const aggregateFirstBucket = await db.collection("userpackages").findOne({ _id: splitAccountIds[0] });
+const aggregateSecondBucket = await db.collection("userpackages").findOne({ _id: splitAccountIds[1] });
+closeTo(aggregateFirstBucket.availableEarnings + aggregateSecondBucket.availableEarnings, 20, "aggregate request removes 180 USDT from total package-family available cash");
+closeTo(aggregateFirstBucket.lockedEarnings + aggregateSecondBucket.lockedEarnings, 180, "aggregate request reserves 180 USDT across the package-family buckets");
+ok(await api("/api/admin/withdrawals", {
+  as: "admin", method: "PATCH",
+  body: { id: String(aggregateRequestId), status: "rejected", adminNote: "CI aggregate package withdrawal restoration" },
+}), "rejecting aggregate package payout restores every allocation");
+const aggregateFirstRestored = await db.collection("userpackages").findOne({ _id: splitAccountIds[0] });
+const aggregateSecondRestored = await db.collection("userpackages").findOne({ _id: splitAccountIds[1] });
+closeTo(aggregateFirstRestored.availableEarnings, 150, "aggregate rejection restores the first package bucket");
+closeTo(aggregateSecondRestored.availableEarnings, 50, "aggregate rejection restores the second package bucket");
+closeTo(aggregateFirstRestored.lockedEarnings + aggregateSecondRestored.lockedEarnings, 0, "aggregate rejection releases all package locks");
+await db.collection("withdrawalrequests").deleteOne({ _id: aggregateRequestId });
+
 const independentWithdrawal = await api("/api/withdrawals", {
   method: "POST",
   body: { asset: "USDT", network: "TRC20", address: "user-test-address", amount: 100, source: "package", userPackageId: String(splitAccountIds[0]) },

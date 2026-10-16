@@ -87,10 +87,6 @@ const UserSchema = new Schema<IUser>(
       default: true,
     },
 
-    hasPendingWithdrawal: {
-      type: Boolean,
-      default: false,
-    },
   },
   {
     timestamps: true,

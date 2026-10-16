@@ -404,7 +404,7 @@ await db.collection("userpackages").insertOne({
   status: "cancelled",
   availableEarnings: 50,
   lockedEarnings: 0,
-  totalRealizedEarnings: 0,
+  totalRealizedEarnings: 50,
   totalWithdrawn: 0,
   withdrawablePrincipalCredited: true,
   firstWithdrawalStatus: "available",

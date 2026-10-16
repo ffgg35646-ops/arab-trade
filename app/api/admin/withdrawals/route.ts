@@ -18,6 +18,8 @@ export async function GET(request: NextRequest) {
       .populate("userId", "email username")
       .populate("userPackageId", "packageName")
       .populate("packageId", "name")
+      .populate("allocations.packageId", "name")
+      .populate("allocations.userPackageId", "packageName")
       .sort({ createdAt: -1 }).limit(500).lean(),
     PlatformSettings.findOne({ key: "global" }).select("withdrawals").lean(),
   ]);

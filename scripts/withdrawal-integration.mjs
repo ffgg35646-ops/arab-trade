@@ -6,6 +6,12 @@ import mongoose from "mongoose";
 const base = process.env.TEST_BASE_URL || "http://127.0.0.1:3000";
 const mongoUri = process.env.MONGODB_URI;
 assert.ok(mongoUri, "MONGODB_URI must point to an isolated test database");
+const mongoDbName = decodeURIComponent(new URL(mongoUri).pathname.replace(/^\\/+/, ""));
+assert.equal(
+  mongoDbName,
+  "arabtrade_withdrawal_ci",
+  "Safety stop: this integration test drops its database and may run only against the dedicated arabtrade_withdrawal_ci database.",
+);
 const log = (name, detail = "PASS") => console.log(`[E2E] ${detail}: ${name}`);
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let userId, adminId, packageAId, packageBId, oldUserPackageId;

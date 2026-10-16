@@ -479,19 +479,19 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
       userId,
       userPackageId: new mongoose.Types.ObjectId(packageId),
       type: { $in: ["daily_earning", "realized_earning", "reward"] },
-    }).select("type amount").lean();
+    }).select("amount").lean();
 
-    let earningLedgerTotal = 0;
-    let rewardLedgerTotal = 0;
-    for (const row of ledgerEarnings as any[]) {
-      const amount = Number(row.amount || 0);
-      if (!Number.isFinite(amount) || amount <= 0) continue;
-      if (row.type === "reward") rewardLedgerTotal += amount;
-      else earningLedgerTotal += amount;
-    }
+    const earningLedgerTotal = (ledgerEarnings as any[]).reduce(
+      (sum: number, row: any) => {
+        const amount = Number(row.amount || 0);
+        return Number.isFinite(amount) && amount > 0 ? sum + amount : sum;
+      },
+      0,
+    );
 
-    // totalRealizedEarnings includes collected earnings; use the ledger as a
-    // fallback for releases where a legacy earning write missed that counter.
+    // Use the larger of the persisted realized-earnings counter or all credited
+    // earnings in the ledger. This includes legacy rewards without double-counting
+    // them if an older release also included rewards in totalRealizedEarnings.
     const realizedEarnings = Math.max(
       0,
       Number(account.totalRealizedEarnings || 0),
@@ -501,8 +501,7 @@ export async function settleLegacyApprovedPackageWithdrawals(userId: mongoose.Ty
       0,
       Number(account.investedAmount || 0) +
         Math.max(0, Number(account.cancellationRefund || 0)) +
-        realizedEarnings +
-        rewardLedgerTotal -
+        realizedEarnings -
         requestTotal,
     );
     const actualBalance = available + locked;

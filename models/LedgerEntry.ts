@@ -2,7 +2,6 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 export type LedgerType =
   | "deposit"
-  | "withdrawal"
   | "transfer"
   | "trade"
   | "fee"

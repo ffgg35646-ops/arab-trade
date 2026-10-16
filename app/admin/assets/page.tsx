@@ -9,15 +9,11 @@ type Network = {
   code: string;
   enabled: boolean;
   depositEnabled: boolean;
-  withdrawalEnabled: boolean;
   depositAddress: string;
   memoTag: string;
   confirmations: number;
   minDeposit: number;
   maxDeposit: number;
-  minWithdrawal: number;
-  maxWithdrawal: number;
-  withdrawalFee: number;
   warning: string;
   sortOrder: number;
 };
@@ -39,15 +35,11 @@ const emptyNetwork: Network = {
   code: "",
   enabled: true,
   depositEnabled: true,
-  withdrawalEnabled: true,
   depositAddress: "",
   memoTag: "",
   confirmations: 12,
   minDeposit: 10,
   maxDeposit: 100000,
-  minWithdrawal: 50,
-  maxWithdrawal: 50000,
-  withdrawalFee: 0,
   warning: "",
   sortOrder: 0,
 };
@@ -226,7 +218,6 @@ export default function AssetsAdminPage() {
           name: asset.name,
           enabled: asset.enabled,
           depositEnabled: asset.depositEnabled,
-          withdrawalEnabled: asset.withdrawalEnabled,
           tradingEnabled: asset.tradingEnabled,
           sortOrder: asset.sortOrder,
           networks: asset.networks || [],
@@ -475,34 +466,6 @@ export default function AssetsAdminPage() {
             />
 
             <input
-              value={network.minWithdrawal}
-              onChange={(e) =>
-                setNetwork({
-                  ...network,
-                  minWithdrawal: Number(e.target.value),
-                })
-              }
-              type="number"
-              min="0"
-              step="any"
-              placeholder="الحد الأدنى للسحب"
-              className="rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none"
-            />
-
-            <input
-              value={network.withdrawalFee}
-              onChange={(e) =>
-                setNetwork({
-                  ...network,
-                  withdrawalFee: Number(e.target.value),
-                })
-              }
-              type="number"
-              min="0"
-              step="any"
-              placeholder="رسوم السحب"
-              className="rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-3 outline-none"
-            />
           </div>
         </section>
 
@@ -647,24 +610,14 @@ export default function AssetsAdminPage() {
                               <label className="block text-xs font-bold text-slate-400">الحد الأقصى للإيداع (0 = غير محدد)
                                 <input type="number" min="0" step="any" value={Number(net.maxDeposit || 0)} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { maxDeposit: Number(e.target.value) })} className="mt-2 w-full rounded-lg border border-slate-700 bg-[#07101d] px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/40"/>
                               </label>
-                              <label className="block text-xs font-bold text-slate-400">الحد الأدنى للسحب
-                                <input type="number" min="0" step="any" value={Number(net.minWithdrawal || 0)} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { minWithdrawal: Number(e.target.value) })} className="mt-2 w-full rounded-lg border border-slate-700 bg-[#07101d] px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/40"/>
-                              </label>
-                              <label className="block text-xs font-bold text-slate-400">الحد الأقصى للسحب (0 = غير محدد)
-                                <input type="number" min="0" step="any" value={Number(net.maxWithdrawal || 0)} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { maxWithdrawal: Number(e.target.value) })} className="mt-2 w-full rounded-lg border border-slate-700 bg-[#07101d] px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/40"/>
-                              </label>
-                              <label className="block text-xs font-bold text-slate-400">رسوم السحب
-                                <input type="number" min="0" step="any" value={Number(net.withdrawalFee || 0)} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { withdrawalFee: Number(e.target.value) })} className="mt-2 w-full rounded-lg border border-slate-700 bg-[#07101d] px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/40"/>
-                              </label>
                               <label className="block text-xs font-bold text-slate-400">تنبيه يظهر للمستخدم
-                                <textarea value={net.warning || ""} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { warning: e.target.value })} rows={2} placeholder="تنبيه اختياري عن الشبكة أو السحب" className="mt-2 w-full rounded-lg border border-slate-700 bg-[#07101d] px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/40"/>
+                                <textarea value={net.warning || ""} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { warning: e.target.value })} rows={2} placeholder="تنبيه اختياري عن شبكة الإيداع" className="mt-2 w-full rounded-lg border border-slate-700 bg-[#07101d] px-3 py-2 text-sm text-white outline-none focus:border-cyan-400/40"/>
                               </label>
                             </div>
 
                             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                               <div className="flex flex-wrap gap-4 text-xs">
-                                <label className="flex items-center gap-2 text-slate-300"><input type="checkbox" checked={net.depositEnabled !== false} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { depositEnabled: e.target.checked })}/>السحب/الإيداع: السماح بالإيداع</label>
-                                <label className="flex items-center gap-2 text-slate-300"><input type="checkbox" checked={net.withdrawalEnabled !== false} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { withdrawalEnabled: e.target.checked })}/>السماح بالسحب</label>
+                                <label className="flex items-center gap-2 text-slate-300"><input type="checkbox" checked={net.depositEnabled !== false} onChange={(e) => updateLocalNetwork(asset._id, net._id, net.code, { depositEnabled: e.target.checked })}/>السماح بالإيداع</label>
                               </div>
                               <button type="button" disabled={saving === asset._id} onClick={() => void saveAssetChanges(asset)} className="rounded-lg bg-cyan-600 px-4 py-2 text-xs font-black text-slate-950 disabled:opacity-50">{saving === asset._id ? "جاري الحفظ..." : "حفظ إعدادات الشبكة"}</button>
                             </div>

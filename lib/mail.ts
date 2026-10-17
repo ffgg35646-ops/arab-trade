@@ -1,12 +1,17 @@
 import nodemailer from "nodemailer";
 
+const smtpHost = process.env.SMTP_HOST?.trim() || "smtp.gmail.com";
+const smtpPort = Number(process.env.SMTP_PORT || 465);
+const smtpUser = process.env.SMTP_USER?.trim();
+const smtpPass = process.env.SMTP_PASS;
+
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT || 465),
-  secure: Number(process.env.SMTP_PORT || 465) === 465,
+  host: smtpHost,
+  port: smtpPort,
+  secure: smtpPort === 465,
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: smtpUser,
+    pass: smtpPass,
   },
 });
 
@@ -14,7 +19,13 @@ export async function sendVerificationCode(
   email: string,
   code: string
 ) {
-  const from = process.env.MAIL_FROM || process.env.SMTP_USER;
+  if (!smtpUser || !smtpPass) {
+    throw new Error(
+      "SMTP configuration is incomplete: set SMTP_USER and SMTP_PASS in the deployment environment"
+    );
+  }
+
+  const from = process.env.MAIL_FROM || smtpUser;
 
   await transporter.sendMail({
     from,

@@ -306,10 +306,6 @@ export default function DepositPage() {
     >
       <div className="mx-auto w-full max-w-3xl">
         <header className="mb-6 text-center">
-          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-cyan-300/15 bg-cyan-300/[0.06] px-4 py-2 text-xs font-bold tracking-wide text-cyan-100">
-            <span className="h-2 w-2 rounded-full bg-cyan-300" />
-            USDT · TRC / BNB
-          </div>
           <h1 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">إيداع USDT</h1>
           <p className="mt-2 text-sm text-slate-500">اختر الشبكة وأدخل بيانات التحويل.</p>
           {loading && methods.length > 0 && <p className="mt-2 text-xs text-slate-600">تحديث بيانات الشبكات في الخلفية…</p>}
@@ -400,7 +396,6 @@ export default function DepositPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-xs font-bold text-slate-500">عنوان الإيداع</div>
-                  <div className="mt-1 font-bold text-white">{selected ? `USDT · ${networkLabel(selected.network)}` : "اختر الشبكة لعرض العنوان"}</div>
                 </div>
                 {selected?.address && (
                   <button type="button" onClick={() => void copyDepositAddress()} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-bold text-slate-200 transition hover:border-cyan-300/30">

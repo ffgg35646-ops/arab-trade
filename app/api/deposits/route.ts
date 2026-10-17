@@ -133,61 +133,44 @@ export async function POST(request: NextRequest) {
     // Do not bypass a disabled PaymentOption through a legacy Asset network.
     const paymentCandidates = await PaymentOption.find({
       asset: USDT_ASSET,
-      $or: [
-        { kind: "deposit" },
-        { kind: "both" },
-        { kind: { $exists: false } },
-      ],
-    }).lean();
-    const payment = paymentCandidates.find(
-      (item: any) => normalizePaymentNetwork(item.network) === networkCode,
+    })
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .lean();
+    const payment = (paymentCandidates as any[]).find(
+      (item: any) =>
+        normalizePaymentNetwork(item.network) === networkCode &&
+        item.enabled !== false &&
+        item.depositEnabled !== false &&
+        Boolean(String(item.address || "").trim()),
     );
 
     if (payment) {
-      if (!payment.enabled || payment.depositEnabled === false) {
-        return NextResponse.json(
-          { success: false, message: "وسيلة الإيداع متوقفة حاليًا" },
-          { status: 400 }
-        );
-      }
-      if (!String(payment.address || "").trim()) {
-        return NextResponse.json(
-          { success: false, message: "عنوان الإيداع غير متوفر لهذه الوسيلة" },
-          { status: 400 }
-        );
-      }
-      depositAddress = payment.address;
+      depositAddress = String(payment.address).trim();
       minDeposit = Number(payment.minDeposit || 0);
       maxDeposit = Number(payment.maxDeposit || 0);
     } else {
       const asset = await Asset.findOne({
         symbol: assetCode,
-        enabled: true,
-        depositEnabled: true,
+        enabled: { $ne: false },
+        depositEnabled: { $ne: false },
       }).lean();
 
       const network = asset && (asset.networks || []).find(
         (item: any) =>
           normalizePaymentNetwork(item.code) === networkCode &&
-          item.enabled &&
-          item.depositEnabled
+          item.enabled !== false &&
+          item.depositEnabled !== false &&
+          Boolean(String(item.depositAddress || "").trim())
       );
 
       if (!network) {
         return NextResponse.json(
-          { success: false, message: "وسيلة الإيداع أو الشبكة غير متاحة حاليًا" },
+          { success: false, message: "وسيلة الإيداع أو الشبكة غير متاحة حاليًا أو لا تحتوي على عنوان إيداع." },
           { status: 400 }
         );
       }
 
-      if (!String(network.depositAddress || "").trim()) {
-        return NextResponse.json(
-          { success: false, message: "عنوان الإيداع غير متوفر لهذه الشبكة" },
-          { status: 400 }
-        );
-      }
-
-      depositAddress = network.depositAddress;
+      depositAddress = String(network.depositAddress).trim();
       minDeposit = Number(network.minDeposit || 0);
       maxDeposit = Number(network.maxDeposit || 0);
     }

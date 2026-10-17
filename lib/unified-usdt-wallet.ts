@@ -17,7 +17,7 @@ export function normalizePaymentNetwork(value: unknown): PaymentNetworkCode | ""
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
 
-  if (["TRC", "TRC20", "TRON", "TRONTRC20"].includes(key)) return "TRC20";
+  if (["TRC", "TRC20", "TRON", "TRONTRC20", "TRX"].includes(key)) return "TRC20";
   if (["BNB", "BSC", "BEP20", "BNBSMARTCHAIN", "BNBSMARTCHAINBEP20"].includes(key)) return "BEP20";
   return "";
 }

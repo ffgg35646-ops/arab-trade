@@ -258,9 +258,6 @@ export default function WithdrawalsPage() {
               <input value={generalAddress} onChange={(event) => setGeneralAddress(event.target.value)} placeholder="عنوان محفظة الاستلام" className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500" />
             </label>
 
-            {!data?.general.configured && (
-              <p className="text-xs text-amber-300">السحب العام غير مفعّل حتى يحدد الأدمن الحد الأدنى من إعدادات السحوبات.</p>
-            )}
             <button type="button" onClick={submitGeneral} disabled={busy || hasPending || !data?.general.configured || !selectedGeneralNetwork} className="w-full rounded-xl bg-blue-600 px-4 py-3 font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">
               طلب سحب
             </button>

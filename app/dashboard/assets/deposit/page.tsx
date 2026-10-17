@@ -10,6 +10,13 @@ type DepositRecord = { _id?: string; id?: string; asset: string; network: string
 
 type PaymentLimits = { minDeposit: number; maxDeposit: number; minWithdrawal: number; minGeneralWithdrawal: number; maxWithdrawal: number; dailyWithdrawalLimit: number };
 
+function networkLabel(value: string) {
+  const code = String(value || "").trim().toUpperCase();
+  if (code === "TRC20" || code === "TRC" || code === "TRON") return "TRON (TRC20)";
+  if (code === "BEP20" || code === "BNB" || code === "BSC") return "BNB Smart Chain (BEP20)";
+  return value;
+}
+
 type Method = {
   _id: string;
   name: string;
@@ -69,7 +76,7 @@ export default function DepositPage() {
         fetch("/api/deposits", { credentials: "include", cache: "no-store" }),
       ]);
 
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
       setDepositsEnabled(json.depositsEnabled !== false);
       if (json.limits) {
         setLimits({
@@ -352,7 +359,7 @@ export default function DepositPage() {
                 >
                   <option value="">اختر شبكة الإيداع</option>
                   {methods.map((method) => (
-                    <option key={method._id} value={method._id}>{method.network}</option>
+                    <option key={method._id} value={method._id}>{networkLabel(method.network)}</option>
                   ))}
                 </select>
               </label>
@@ -373,7 +380,7 @@ export default function DepositPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-xs font-bold text-slate-500">عنوان الإيداع</div>
-                  <div className="mt-1 font-bold text-white">{selected ? `USDT · ${selected.network}` : "اختر الشبكة لعرض العنوان"}</div>
+                  <div className="mt-1 font-bold text-white">{selected ? `USDT · ${networkLabel(selected.network)}` : "اختر الشبكة لعرض العنوان"}</div>
                 </div>
                 {selected?.address && (
                   <button type="button" onClick={() => void copyDepositAddress()} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-bold text-slate-200 transition hover:border-cyan-300/30">

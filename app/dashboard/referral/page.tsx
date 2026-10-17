@@ -10,7 +10,6 @@ import {
   Users,
   Wallet,
   UserCheck,
-  Percent,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -239,18 +238,6 @@ export default function ReferralPage() {
                     <p className="mt-2 text-xs text-slate-600">من المستخدمين الذين دعوتهم</p>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-500">نسبة العمولة</span>
-                      <Percent size={18} className="text-cyan-300" />
-                    </div>
-                    <div className="mt-4 text-3xl font-black text-cyan-300">
-                      {data.commissionPercent}%
-                    </div>
-                    <p className="mt-2 text-xs text-slate-600">
-                      {data.enabled ? "نظام الإحالات مفعّل" : "النظام متوقف"}
-                    </p>
-                  </div>
 
                   <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5">
                     <div className="flex items-center justify-between">

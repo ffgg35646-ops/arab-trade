@@ -275,17 +275,12 @@ export default function WithdrawalsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="truncate text-lg font-black">{plan.name}</h3>
-                        {!account?.hasAccount && <p className="mt-1 text-xs text-amber-200">لم يتم تفعيل هذه الباقة بعد؛ خانة السحب جاهزة وتظهر تلقائيًا.</p>}
                       </div>
                       <div className="shrink-0 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-2 text-left">
                         <p className="text-xs text-slate-400">إجمالي رصيد الباقة</p>
                         <p className="mt-1 font-black text-white">{money(account?.balance || 0)} USDT</p>
                         <p className="mt-2 text-xs text-slate-400">المتاح للسحب الآن</p>
                         <p className="mt-1 font-black text-emerald-300">{money(account?.available || 0)} USDT</p>
-                        <p className="mt-2 text-xs text-slate-400">المتبقي من حد التفعيل الأساسي: {money(account?.baseAllowance ?? account?.dailyAllowance ?? 0)} USDT</p>
-                        <p className="mt-1 text-xs text-slate-400">الإحالات النشطة: {account?.activeReferralCount || 0} — إيداعات معتمدة: {money(account?.referralDepositTotal || 0)} USDT</p>
-                        <p className="mt-1 text-xs text-slate-400">المتاح الإضافي بالإحالات ({money(account?.referralUnlockPercent || 0)}% من الإيداعات المعتمدة، حد مشترك بين الباقات): {money(account?.referralAllowance || 0)} USDT</p>
-                        <p className="mt-1 text-xs text-slate-400">المستهلك من حد الإحالات: {money(account?.referralUsed || 0)} USDT</p>
                         {Number(account?.locked || 0) > 0 && <p className="mt-2 text-xs text-amber-200">محجوز: {money(account?.locked || 0)} USDT</p>}
                       </div>
                     </div>

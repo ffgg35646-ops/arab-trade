@@ -34,20 +34,19 @@ export async function GET(request: NextRequest) {
     const seenNetworks = new Set<string>();
     const methods = rows.flatMap((item: any) => {
       const network = normalizePaymentNetwork(item.network);
-      if (!network) return [];
-
-      const key = USDT_ASSET + ":" + network;
-      if (seenNetworks.has(key)) return [];
-      seenNetworks.add(key);
-
       const address = String(item.address || "").trim();
       if (
+        !network ||
         item.enabled === false ||
         item.depositEnabled === false ||
         !address
       ) {
         return [];
       }
+
+      const key = USDT_ASSET + ":" + network;
+      if (seenNetworks.has(key)) return [];
+      seenNetworks.add(key);
 
       return [{
         _id: String(item._id),

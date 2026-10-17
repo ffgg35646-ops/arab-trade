@@ -163,10 +163,6 @@ export default function ReferralPage() {
               </div>
             </div>
 
-            <div className={settings.enabled ? "inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.08] px-4 py-2 text-xs font-bold text-emerald-300" : "inline-flex items-center gap-2 rounded-full border border-red-400/20 bg-red-400/[0.08] px-4 py-2 text-xs font-bold text-red-300"}>
-              <span className={settings.enabled ? "h-2 w-2 rounded-full bg-emerald-400" : "h-2 w-2 rounded-full bg-red-400"} />
-              {settings.enabled ? "نظام الإحالات مفعّل" : "نظام الإحالات متوقف"}
-            </div>
           </div>
         </section>
 

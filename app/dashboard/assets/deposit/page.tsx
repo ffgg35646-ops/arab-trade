@@ -10,11 +10,22 @@ type DepositRecord = { _id?: string; id?: string; asset: string; network: string
 
 type PaymentLimits = { minDeposit: number; maxDeposit: number; minWithdrawal: number; minGeneralWithdrawal: number; maxWithdrawal: number; dailyWithdrawalLimit: number };
 
+type NetworkCode = "TRC20" | "BEP20";
+
+const NETWORK_OPTIONS: Array<{ code: NetworkCode; label: string }> = [
+  { code: "TRC20", label: "TRX (TRC20)" },
+  { code: "BEP20", label: "BNB Smart Chain (BEP20)" },
+];
+
+function normalizeNetworkCode(value: string): NetworkCode | "" {
+  const code = String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (["TRC", "TRC20", "TRON", "TRONTRC20", "TRX"].includes(code)) return "TRC20";
+  if (["BNB", "BSC", "BEP20", "BNBSMARTCHAIN", "BNBSMARTCHAINBEP20"].includes(code)) return "BEP20";
+  return "";
+}
+
 function networkLabel(value: string) {
-  const code = String(value || "").trim().toUpperCase();
-  if (code === "TRC20" || code === "TRC" || code === "TRON") return "TRON (TRC20)";
-  if (code === "BEP20" || code === "BNB" || code === "BSC") return "BNB Smart Chain (BEP20)";
-  return value;
+  return NETWORK_OPTIONS.find((option) => option.code === normalizeNetworkCode(value))?.label || value;
 }
 
 type Method = {
@@ -38,7 +49,7 @@ export default function DepositPage() {
   const [limits, setLimits] = useState<PaymentLimits>({ minDeposit: 0, maxDeposit: 0, minWithdrawal: 0, minGeneralWithdrawal: 0, maxWithdrawal: 0, dailyWithdrawalLimit: 0 });
   const [depositBalances, setDepositBalances] = useState<DepositBalance[]>([]);
   const [deposits, setDeposits] = useState<DepositRecord[]>([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedNetwork, setSelectedNetwork] = useState<NetworkCode>("TRC20");
 
   const [amount, setAmount] = useState("");
   const [txHash, setTxHash] = useState("");
@@ -112,9 +123,13 @@ export default function DepositPage() {
         : [];
 
       setMethods(rows);
-      setSelectedId((current) => rows.some((method: Method) => method._id === current)
-        ? current
-        : rows[0]?._id || "");
+      setSelectedNetwork((current) => {
+        const availableCodes = rows
+          .map((method: Method) => normalizeNetworkCode(method.network))
+          .filter(Boolean);
+        if (availableCodes.includes(current)) return current;
+        return NETWORK_OPTIONS.find((option) => availableCodes.includes(option.code))?.code || "TRC20";
+      });
     } catch (e) {
       if (!background) {
         setError(e instanceof Error ? e.message : "تعذر تحميل وسائل الإيداع");
@@ -129,9 +144,9 @@ export default function DepositPage() {
   const selected = useMemo(
     () =>
       methods.find(
-        (method) => method._id === selectedId
+        (method) => normalizeNetworkCode(method.network) === selectedNetwork
       ) || null,
-    [methods, selectedId]
+    [methods, selectedNetwork]
   );
 
   async function verifyBlockchainDeposit(item: DepositRecord) {
@@ -352,14 +367,19 @@ export default function DepositPage() {
                 الشبكة
                 <select
                   id="deposit-network"
-                  value={selectedId}
-                  onChange={(event) => setSelectedId(event.target.value)}
+                  value={selectedNetwork}
+                  onChange={(event) => setSelectedNetwork(event.target.value as NetworkCode)}
                   required
                   className="mt-2 w-full rounded-2xl border border-white/10 bg-[#050a13] px-4 py-3.5 font-bold text-white outline-none focus:border-cyan-300/40"
                 >
-                  <option value="">اختر شبكة الإيداع</option>
-                  {methods.map((method) => (
-                    <option key={method._id} value={method._id}>{networkLabel(method.network)}</option>
+                  {NETWORK_OPTIONS.map((option) => (
+                    <option
+                      key={option.code}
+                      value={option.code}
+                      disabled={!methods.some((method) => normalizeNetworkCode(method.network) === option.code)}
+                    >
+                      {option.label}
+                    </option>
                   ))}
                 </select>
               </label>

@@ -271,6 +271,7 @@ export default function WithdrawalsPage() {
               <Layers3 size={20} className="text-cyan-300" />
               <h2 className="text-xl font-black">السحب من الباقات</h2>
             </div>
+            <p className="text-sm text-slate-400">ملاحظة: إذا كان الرصيد المتاح 0، يُرجى جلب إحالات نشطة للتمكن من السحب.</p>
 
             {!data && <p className="text-sm text-slate-400">جاري تحميل الباقات…</p>}
             {data && visiblePackages.length === 0 && <p className="rounded-xl border border-slate-700 p-4 text-slate-400">لا توجد باقات لديك أرصدة سحب منها حاليًا.</p>}

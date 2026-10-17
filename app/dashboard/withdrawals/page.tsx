@@ -66,6 +66,7 @@ export default function WithdrawalsPage() {
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [addresses, setAddresses] = useState<Record<string, string>>({});
   const [packageNetworks, setPackageNetworks] = useState<Record<string, string>>({});
+  const [packageMessages, setPackageMessages] = useState<Record<string, string>>({});
   const [generalAmount, setGeneralAmount] = useState("");
   const [generalAddress, setGeneralAddress] = useState("");
   const [generalNetwork, setGeneralNetwork] = useState("");
@@ -141,6 +142,15 @@ export default function WithdrawalsPage() {
       network: selectedGeneralNetwork,
       payoutAddress: generalAddress.trim(),
     });
+  }
+
+  function handlePackageButtonClick(plan: Plan, needsActiveReferrals: boolean) {
+    if (needsActiveReferrals) {
+      setPackageMessages((current) => ({ ...current, [plan._id]: "لا توجد إحالات نشطة" }));
+      return;
+    }
+    setPackageMessages((current) => ({ ...current, [plan._id]: "" }));
+    submitPackage(plan);
   }
 
   function submitPackage(plan: Plan) {
@@ -270,6 +280,13 @@ export default function WithdrawalsPage() {
                 const account = plan.account;
                 const network = packageNetworks[plan._id] || firstNetwork;
                 const canWithdraw = Boolean(account?.hasAccount && account.available > 0);
+                const needsActiveReferrals = Boolean(
+                  account?.hasAccount &&
+                  account.balance >= plan.minimum &&
+                  account.baseAllowance <= 0 &&
+                  account.referralAllowance <= 0 &&
+                  account.activeReferralCount === 0
+                );
                 return (
                   <article key={plan._id} className="flex flex-col gap-4 rounded-2xl border border-slate-700 bg-[#08111e] p-4 md:p-5">
                     <div className="flex items-start justify-between gap-3">
@@ -309,9 +326,10 @@ export default function WithdrawalsPage() {
                     <input aria-label={"مبلغ السحب من " + plan.name} type="number" min={plan.minimum} step="any" value={amounts[plan._id] || ""} onChange={(event) => setAmounts((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder={"الحد الأدنى " + money(plan.minimum) + " USDT"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-400" />
 
                     <div className="mt-auto space-y-2">
-                      <button type="button" disabled={busy || hasPending || !canWithdraw || !addresses[plan._id]?.trim() || !network} onClick={() => submitPackage(plan)} className="w-full rounded-xl bg-blue-600 px-4 py-3 font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">
+                      <button type="button" disabled={busy || hasPending || (!needsActiveReferrals && (!canWithdraw || !addresses[plan._id]?.trim() || !network))} onClick={() => handlePackageButtonClick(plan, needsActiveReferrals)} className="w-full rounded-xl bg-blue-600 px-4 py-3 font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">
                         دفع
                       </button>
+                      {packageMessages[plan._id] && <p role="status" className="rounded-lg border border-amber-400/20 bg-amber-400/[0.06] px-3 py-2 text-sm text-amber-200">{packageMessages[plan._id]}</p>}
                     </div>
                   </article>
                 );

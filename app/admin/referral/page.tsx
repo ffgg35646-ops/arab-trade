@@ -5,7 +5,6 @@ import AdminPageFrame from "@/components/AdminPageFrame";
 import {
   CheckCircle2,
   Loader2,
-  Percent,
   Power,
   Save,
   Users,
@@ -159,7 +158,7 @@ export default function ReferralPage() {
                   إعدادات الإحالات
                 </h1>
                 <p className="mt-2 text-sm leading-7 text-slate-400">
-                  تحكم في نسبة العمولة وتشغيل نظام الإحالات من مكان واحد.
+                  تابع نشاط الإحالات وتحكم في تشغيل النظام من مكان واحد.
                 </p>
               </div>
             </div>
@@ -228,45 +227,7 @@ export default function ReferralPage() {
               </div>
             </section>
 
-            <div className="grid gap-5 lg:grid-cols-2">
-              <section className="rounded-2xl border border-white/10 bg-[#08111e] p-6 md:p-7">
-                <div className="mb-5 flex items-center gap-3">
-                  <div className="rounded-xl border border-cyan-300/15 bg-cyan-400/10 p-2.5 text-cyan-300">
-                    <Percent size={20} />
-                  </div>
-                  <div>
-                    <h2 className="font-black">نسبة عمولة الإحالة</h2>
-                    <p className="mt-1 text-xs text-slate-500">
-                      النسبة التي يعتمد عليها النظام عند احتساب العمولة.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={settings.commissionPercent}
-                    onChange={(event) =>
-                      setSettings((current) => ({
-                        ...current,
-                        commissionPercent: Number(event.target.value),
-                      }))
-                    }
-                    className="w-full rounded-xl border border-slate-700 bg-[#050a13] px-4 py-4 pl-14 text-2xl font-black outline-none transition focus:border-cyan-400/50"
-                    aria-label="نسبة عمولة الإحالة"
-                  />
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-black text-cyan-300">
-                    %
-                  </span>
-                </div>
-                <p className="mt-3 text-xs leading-6 text-slate-500">
-                  أدخل قيمة من 0 إلى 100. التعديل يُحفظ عند الضغط على زر الحفظ.
-                </p>
-              </section>
-
+            <div className="grid gap-5">
               <section className="rounded-2xl border border-white/10 bg-[#08111e] p-6 md:p-7">
                 <div className="mb-5 flex items-center gap-3">
                   <div className={settings.enabled ? "rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-2.5 text-emerald-300" : "rounded-xl border border-slate-700 bg-slate-800/60 p-2.5 text-slate-400"}>

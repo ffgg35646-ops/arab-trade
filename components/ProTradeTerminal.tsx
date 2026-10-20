@@ -473,6 +473,7 @@ export default function ProTradeTerminal() {
   const [balances, setBalances] = useState<Balance[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [personalTrades, setPersonalTrades] = useState<Trade[]>([]);
   const [asks, setAsks] = useState<BookOrder[]>([]);
   const [bids, setBids] = useState<BookOrder[]>([]);
   const [liveTicker, setLiveTicker] = useState<LiveTicker | null>(null);
@@ -492,7 +493,7 @@ export default function ProTradeTerminal() {
   const [cancellingId, setCancellingId] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [tab, setTab] = useState<"open" | "history">("open");
+  const [tab, setTab] = useState<"open" | "history" | "trades">("open");
 
   useEffect(() => {
     const querySymbol = new URLSearchParams(window.location.search).get("symbol");
@@ -758,6 +759,7 @@ export default function ProTradeTerminal() {
           walletResponse,
           ordersResponse,
           tradesResponse,
+          personalTradesResponse,
         ] = await Promise.all([
           fetch("/api/assets", { cache: "no-store" }),
           fetch("/api/wallet", {
@@ -772,13 +774,18 @@ export default function ProTradeTerminal() {
             credentials: "include",
             cache: "no-store",
           }),
+          fetch("/api/trades?limit=100", {
+            credentials: "include",
+            cache: "no-store",
+          }),
         ]);
 
-        const [assetData, walletData, orderData, tradeData] = await Promise.all([
+        const [assetData, walletData, orderData, tradeData, personalTradeData] = await Promise.all([
           assetsResponse.json().catch(() => ({})),
           walletResponse.json().catch(() => ({})),
           ordersResponse.json().catch(() => ({})),
           tradesResponse.json().catch(() => ({})),
+          personalTradesResponse.json().catch(() => ({})),
         ]);
 
         if (!assetsResponse.ok || assetData.success === false) {
@@ -803,6 +810,11 @@ export default function ProTradeTerminal() {
         }
 
         setTrades(Array.isArray(tradeData.trades) ? tradeData.trades : []);
+        setPersonalTrades(
+          personalTradesResponse.ok && personalTradeData?.success !== false && Array.isArray(personalTradeData?.trades)
+            ? personalTradeData.trades
+            : []
+        );
 
       } catch (err) {
         setError(err instanceof Error ? err.message : "حدث خطأ أثناء تحميل بيانات التداول");
@@ -1097,7 +1109,7 @@ export default function ProTradeTerminal() {
 
           <div className="border-b border-white/[0.06] bg-[#060c15]">
             <div className="flex h-12 items-center justify-between border-b border-white/[0.06] px-4">
-              <h3 className="text-sm font-semibold">آخر الصفقات</h3>
+              <h3 className="text-sm font-semibold">آخر صفقات السوق</h3>
               <span className="text-[10px] text-slate-500">
                 السعر / الكمية / الوقت
               </span>
@@ -1145,7 +1157,7 @@ export default function ProTradeTerminal() {
           </div>
 
           <div className="bg-[#060c15]">
-            <div className="flex h-14 items-center gap-7 border-b border-white/[0.06] px-5">
+            <div className="flex h-14 flex-wrap items-center gap-5 border-b border-white/[0.06] px-5">
               <button
                 onClick={() => setTab("open")}
                 className={
@@ -1167,26 +1179,64 @@ export default function ProTradeTerminal() {
               >
                 سجل الأوامر ({historyOrders.length})
               </button>
+
+              <button
+                onClick={() => setTab("trades")}
+                className={
+                  tab === "trades"
+                    ? "h-full border-b-2 border-cyan-400 text-sm font-semibold text-white"
+                    : "text-sm text-slate-500"
+                }
+              >
+                سجل التداول ({personalTrades.length})
+              </button>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[850px] text-right text-xs">
+              <table className={`w-full ${tab === "trades" ? "min-w-[700px]" : "min-w-[850px]"} text-right text-xs`}>
                 <thead className="text-slate-500">
-                  <tr className="border-b border-white/[0.05]">
-                    <th className="px-4 py-3 font-normal">الزوج</th>
-                    <th className="px-4 py-3 font-normal">النوع</th>
-                    <th className="px-4 py-3 font-normal">الجانب</th>
-                    <th className="px-4 py-3 font-normal">السعر</th>
-                    <th className="px-4 py-3 font-normal">الكمية</th>
-                    <th className="px-4 py-3 font-normal">التنفيذ</th>
-                    <th className="px-4 py-3 font-normal">الحالة</th>
-                    <th className="px-4 py-3 font-normal">الوقت</th>
-                    <th className="px-4 py-3 font-normal"></th>
-                  </tr>
+                  {tab === "trades" ? (
+                    <tr className="border-b border-white/[0.05]">
+                      <th className="px-4 py-3 font-normal">الزوج</th>
+                      <th className="px-4 py-3 font-normal">نوع العملية</th>
+                      <th className="px-4 py-3 font-normal">سعر التنفيذ</th>
+                      <th className="px-4 py-3 font-normal">الكمية</th>
+                      <th className="px-4 py-3 font-normal">قيمة الصفقة</th>
+                      <th className="px-4 py-3 font-normal">الوقت</th>
+                    </tr>
+                  ) : (
+                    <tr className="border-b border-white/[0.05]">
+                      <th className="px-4 py-3 font-normal">الزوج</th>
+                      <th className="px-4 py-3 font-normal">النوع</th>
+                      <th className="px-4 py-3 font-normal">الجانب</th>
+                      <th className="px-4 py-3 font-normal">السعر</th>
+                      <th className="px-4 py-3 font-normal">الكمية</th>
+                      <th className="px-4 py-3 font-normal">التنفيذ</th>
+                      <th className="px-4 py-3 font-normal">الحالة</th>
+                      <th className="px-4 py-3 font-normal">الوقت</th>
+                      <th className="px-4 py-3 font-normal"></th>
+                    </tr>
+                  )}
                 </thead>
 
                 <tbody>
-                  {(tab === "open" ? openOrders : historyOrders).map(
+                  {tab === "trades"
+                    ? personalTrades.map((trade, i) => (
+                        <tr
+                          key={trade._id || i}
+                          className="border-b border-white/[0.04] hover:bg-white/[0.02]"
+                        >
+                          <td className="px-4 py-3 font-medium">{trade.symbol || "—"}</td>
+                          <td className={trade.side === "buy" ? "px-4 py-3 text-emerald-400" : "px-4 py-3 text-rose-400"}>
+                            {trade.side === "buy" ? "شراء" : trade.side === "sell" ? "بيع" : "—"}
+                          </td>
+                          <td className="px-4 py-3 font-mono">{fmt(trade.price, 8)}</td>
+                          <td className="px-4 py-3 font-mono">{fmt(trade.quantity, 8)}</td>
+                          <td className="px-4 py-3 font-mono">{fmt(trade.quoteAmount, 8)}</td>
+                          <td className="px-4 py-3 text-slate-500">{time(trade.createdAt)}</td>
+                        </tr>
+                      ))
+                    : (tab === "open" ? openOrders : historyOrders).map(
                     (order, i) => (
                       <tr
                         key={order._id || i}
@@ -1274,10 +1324,18 @@ export default function ProTradeTerminal() {
                 </tbody>
               </table>
 
-              {!(tab === "open" ? openOrders : historyOrders).length && (
-                <div className="py-12 text-center text-xs text-slate-600">
-                  لا توجد أوامر
-                </div>
+              {tab === "trades" ? (
+                !loading && personalTrades.length === 0 && (
+                  <div className="py-12 text-center text-xs text-slate-600">
+                    لا توجد صفقات منفذة في حسابك حتى الآن.
+                  </div>
+                )
+              ) : (
+                !(tab === "open" ? openOrders : historyOrders).length && (
+                  <div className="py-12 text-center text-xs text-slate-600">
+                    لا توجد أوامر
+                  </div>
+                )
               )}
             </div>
           </div>

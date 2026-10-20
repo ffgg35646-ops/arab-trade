@@ -173,6 +173,7 @@ export type SubmitBinanceOrderInput = {
   feePercent: number;
   minOrderAmount: number;
   maxOrderAmount: number;
+  purpose?: "spot" | "withdrawal-conversion";
   idempotencyKey?: string;
   requestHash?: string;
   idempotencyRoute?: string;
@@ -265,6 +266,8 @@ export async function submitBinanceLiveOrder(input: SubmitBinanceOrderInput): Pr
         originalQuantity: quantity,
         filledQuantity: 0,
         status: "open",
+        purpose: input.purpose || "spot",
+        withdrawalConversionStatus: input.purpose === "withdrawal-conversion" ? "pending" : undefined,
         executionProvider: "binance",
         clientOrderId,
         reservedAmount,

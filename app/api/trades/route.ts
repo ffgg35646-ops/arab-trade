@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
 import Trade from "@/models/Trade";
+import { getBinanceRecentTrades } from "@/lib/binance-trading";
 
 export async function GET(
   request: NextRequest
@@ -72,31 +73,29 @@ export async function GET(
       );
 
     if (url.searchParams.get("market") === "true") {
-      const marketFilter: Record<string, unknown> = { mode };
-
-      if (symbol) {
-        marketFilter.symbol = symbol;
+      if (!symbol) {
+        return NextResponse.json({ success: false, message: "زوج التداول مطلوب لعرض صفقات السوق" }, { status: 400 });
       }
-
-      const marketTrades = await Trade.find(marketFilter)
-        .sort({ createdAt: -1 })
-        .limit(limit)
-        .select("symbol takerSide price quantity quoteAmount createdAt")
-        .lean();
-
-      // Market tape is public trading data. Never expose buyer/seller or order IDs here.
+      const marketTrades = await getBinanceRecentTrades(symbol, limit);
       return NextResponse.json({
         success: true,
-        trades: marketTrades.map((trade: any) => ({
-          _id: String(trade._id),
-          symbol: String(trade.symbol || ""),
-          side: trade.takerSide === "buy" || trade.takerSide === "sell" ? trade.takerSide : null,
-          price: Number(trade.price || 0),
-          quantity: Number(trade.quantity || 0),
-          quoteAmount: Number(trade.quoteAmount || 0),
-          createdAt: trade.createdAt,
-        })),
-      });
+        source: "binance",
+        trades: marketTrades.map((trade) => {
+          const price = Number(trade.price);
+          const quantity = Number(trade.qty);
+          return {
+            _id: String(trade.id),
+            externalTradeId: String(trade.id),
+            symbol,
+            side: trade.isBuyerMaker ? "sell" : "buy",
+            price,
+            quantity,
+            quoteAmount: Number.isFinite(Number(trade.quoteQty)) ? Number(trade.quoteQty) : price * quantity,
+            createdAt: new Date(trade.time).toISOString(),
+            executionProvider: "binance",
+          };
+        }),
+      }, { headers: { "Cache-Control": "no-store" } });
     }
 
     const filter: Record<
@@ -105,12 +104,9 @@ export async function GET(
     > = {
       mode,
       $or: [
-        {
-          buyerId: user._id,
-        },
-        {
-          sellerId: user._id,
-        },
+        { buyerId: user._id },
+        { sellerId: user._id },
+        { userId: user._id },
       ],
     };
 
@@ -126,14 +122,9 @@ export async function GET(
       filter.$and = [
         {
           $or: [
-            {
-              buyOrderId:
-                orderId,
-            },
-            {
-              sellOrderId:
-                orderId,
-            },
+            { buyOrderId: orderId },
+            { sellOrderId: orderId },
+            { orderId },
           ],
         },
       ];
@@ -152,13 +143,11 @@ export async function GET(
     const normalized =
       trades.map(
         (trade: any) => {
-          const isBuyer =
-            String(
-              trade.buyerId
-            ) ===
-            String(
-              user._id
-            );
+          const externalUserTrade = String(trade.userId || "") === String(user._id) &&
+            String(trade.executionProvider || "") === "binance";
+          const isBuyer = externalUserTrade
+            ? trade.side === "buy"
+            : String(trade.buyerId) === String(user._id);
 
           return {
             ...trade,
@@ -173,23 +162,17 @@ export async function GET(
                 ? "buy"
                 : "sell",
 
-            userOrderId:
-              isBuyer
-                ? String(
-                    trade.buyOrderId
-                  )
-                : String(
-                    trade.sellOrderId
-                  ),
+            userOrderId: externalUserTrade
+              ? String(trade.orderId || "")
+              : isBuyer
+                ? String(trade.buyOrderId)
+                : String(trade.sellOrderId),
 
-            counterOrderId:
-              isBuyer
-                ? String(
-                    trade.sellOrderId
-                  )
-                : String(
-                    trade.buyOrderId
-                  ),
+            counterOrderId: externalUserTrade
+              ? ""
+              : isBuyer
+                ? String(trade.sellOrderId)
+                : String(trade.buyOrderId),
           };
         }
       );

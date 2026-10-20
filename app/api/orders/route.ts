@@ -496,20 +496,18 @@ if (
       );
     }
 
-    // Add an asset record only when Binance confirms the pair exists.
-    // New asset records have deposits disabled; configuring deposits remains an explicit admin action.
+    // Only create a missing asset after Binance confirms the pair is active.
+    // Never override an administrator's disabled/tradingDisabled flags.
     for (const assetSymbol of [binancePair.baseAsset, binancePair.quoteAsset]) {
       await Asset.updateOne(
         { symbol: assetSymbol },
         {
-          $set: {
-            enabled: true,
-            tradingEnabled: true,
-          },
           $setOnInsert: {
             name: assetSymbol,
             symbol: assetSymbol,
             type: "crypto",
+            enabled: true,
+            tradingEnabled: true,
             depositEnabled: false,
             sortOrder: 99999,
             networks: [],

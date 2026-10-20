@@ -54,6 +54,7 @@ type Request = {
   reviewedAt?: string | null;
 };
 type SpotBalance = { asset: string; available: number; priceUsd?: number; valueUsd?: number };
+type PendingConversionOrder = { orderId: string; asset: string; quantity: number };
 type ConversionQuote = {
   success: boolean;
   message?: string;
@@ -107,6 +108,7 @@ export default function WithdrawalsPage() {
   const [conversionAsset, setConversionAsset] = useState("USDT");
   const [conversionQuantity, setConversionQuantity] = useState("");
   const [conversionQuote, setConversionQuote] = useState<ConversionQuote | null>(null);
+  const [conversionPendingOrder, setConversionPendingOrder] = useState<PendingConversionOrder | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -121,13 +123,15 @@ export default function WithdrawalsPage() {
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [response, walletResponse] = await Promise.all([
+      const [response, walletResponse, ordersResponse] = await Promise.all([
         fetch("/api/withdrawals", { credentials: "include", cache: "no-store" }),
         fetch("/api/wallet?mode=live", { credentials: "include", cache: "no-store" }),
+        fetch("/api/orders?purpose=withdrawal-conversion&limit=30", { credentials: "include", cache: "no-store" }),
       ]);
-      const [json, walletJson] = await Promise.all([
+      const [json, walletJson, ordersJson] = await Promise.all([
         response.json().catch(() => ({})),
         walletResponse.json().catch(() => ({})),
+        ordersResponse.json().catch(() => ({})),
       ]);
       if (walletResponse.ok && walletJson.success) {
         const rows = (walletJson.wallet?.balances || walletJson.spot?.balances || [])
@@ -152,6 +156,33 @@ export default function WithdrawalsPage() {
         if (current && json.networks?.some((network: Network) => network.code === current)) return current;
         return json.networks?.[0]?.code || "";
       });
+      const usedConversionIds = new Set<string>(
+        (json.requests || []).map((item: Request) => String(item.conversionOrderId || "")).filter(Boolean),
+      );
+      const recoverable = (ordersJson?.orders || []).find((order: any) => {
+        const orderId = String(order._id || "");
+        return orderId &&
+          !usedConversionIds.has(orderId) &&
+          order.purpose === "withdrawal-conversion" &&
+          order.executionProvider === "binance" &&
+          order.withdrawalConversionStatus === "pending" &&
+          order.side === "sell" &&
+          /USDT$/.test(String(order.symbol || "")) &&
+          ["open", "filled", "cancelled", "rejected"].includes(String(order.status || "").toLowerCase());
+      });
+      setConversionPendingOrder((current) => {
+        if (current && usedConversionIds.has(current.orderId)) return null;
+        if (current && !usedConversionIds.has(current.orderId)) return current;
+        if (!recoverable) return null;
+        const orderId = String(recoverable._id);
+        const symbol = String(recoverable.symbol || "").toUpperCase();
+        const asset = symbol.endsWith("USDT") ? symbol.slice(0, -4) : "";
+        const quantity = Number(recoverable.originalQuantity || recoverable.settledExecutedQuantity || 0);
+        if (!asset || !Number.isFinite(quantity) || quantity <= 0) return null;
+        setConversionAsset(asset);
+        setConversionQuantity(String(quantity));
+        return { orderId, asset, quantity };
+      });
     } catch {
       showMessage("تعذر تحميل بيانات السحب", "error");
     } finally {
@@ -167,6 +198,11 @@ export default function WithdrawalsPage() {
 
   useEffect(() => {
     const quantity = Number(conversionQuantity);
+    if (conversionPendingOrder) {
+      setConversionQuote(null);
+      setQuoteLoading(false);
+      return;
+    }
     if (!conversionAsset || !Number.isFinite(quantity) || quantity <= 0 || Math.round(quantity * 1e8) / 1e8 !== quantity) {
       setConversionQuote(null);
       setQuoteLoading(false);
@@ -198,7 +234,7 @@ export default function WithdrawalsPage() {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [conversionAsset, conversionQuantity]);
+  }, [conversionAsset, conversionQuantity, conversionPendingOrder]);
 
   const hasPending = Boolean(data?.requests.some((item) => item.status === "pending"));
   const selectedSpotBalance = spotBalances.find((row) => row.asset === conversionAsset);
@@ -272,20 +308,28 @@ export default function WithdrawalsPage() {
   }
 
   async function submitConvertedGeneral() {
-    const quantity = Number(conversionQuantity);
+    const pending = conversionPendingOrder;
+    const assetToSell = pending?.asset || conversionAsset;
+    const quantity = pending?.quantity ?? Number(conversionQuantity);
     const address = generalAddress.trim();
 
     if (!data?.general.configured) {
       showMessage("الأدمن لم يحدد الحد الأدنى للسحب العام بعد");
       return;
     }
-    if (!selectedSpotBalance || !Number.isFinite(quantity) || quantity <= 0 || Math.round(quantity * 1e8) / 1e8 !== quantity) {
+    if (!Number.isFinite(quantity) || quantity <= 0 || Math.round(quantity * 1e8) / 1e8 !== quantity) {
       showMessage("اختر عملة من رصيد التداول واكتب كمية صحيحة بحد أقصى 8 منازل عشرية");
       return;
     }
-    if (quantity > selectedSpotBalance.available + 1e-8) {
-      showMessage("الكمية أكبر من الرصيد المتاح من " + conversionAsset);
-      return;
+    if (!pending) {
+      if (!selectedSpotBalance) {
+        showMessage("اختر عملة موجودة في رصيد التداول");
+        return;
+      }
+      if (quantity > selectedSpotBalance.available + 1e-8) {
+        showMessage("الكمية أكبر من الرصيد المتاح من " + assetToSell);
+        return;
+      }
     }
     if (!address) {
       showMessage("اكتب عنوان الدفع قبل تنفيذ التحويل والسحب");
@@ -301,12 +345,12 @@ export default function WithdrawalsPage() {
         : "عنوان BEP20 يجب أن يبدأ بـ 0x ويتبعه 40 رقمًا سداسيًا.");
       return;
     }
-    if (!conversionQuote?.success) {
+    if (!pending && !conversionQuote?.success) {
       showMessage("انتظر تحديث سعر السوق واحصل على تقدير صالح قبل المتابعة");
       return;
     }
 
-    if (conversionAsset === "USDT") {
+    if (!pending && assetToSell === "USDT") {
       if (quantity < data.general.minimum) {
         showMessage("الحد الأدنى للسحب العام هو " + money(data.general.minimum) + " USDT");
         return;
@@ -325,11 +369,11 @@ export default function WithdrawalsPage() {
       return;
     }
 
-    if (!conversionQuote.externalExecutionConfigured) {
+    if (!pending && !conversionQuote?.externalExecutionConfigured) {
       showMessage("البيع التلقائي غير مفعّل: يلزم إعداد اتصال Binance API على الخادم. لم تُبع أي عملة.");
       return;
     }
-    if (Number(conversionQuote.estimatedAfterTradingFeeUsdt || 0) < data.general.minimum) {
+    if (!pending && Number(conversionQuote?.estimatedAfterTradingFeeUsdt || 0) < data.general.minimum) {
       showMessage("صافي حصيلة البيع المتوقع أقل من الحد الأدنى للسحب العام " + money(data.general.minimum) + " USDT. زِد الكمية قبل التنفيذ.");
       return;
     }
@@ -338,57 +382,96 @@ export default function WithdrawalsPage() {
     setMessage("");
     setMessageKind("info");
     try {
-      const orderResponse = await fetch("/api/orders", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: JSON.stringify({
-          symbol: conversionAsset + "USDT",
-          side: "sell",
-          type: "market",
-          quantity,
-        }),
-      });
+      const orderResponse = pending
+        ? await fetch("/api/orders/match", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orderId: pending.orderId, mode: "live" }),
+          })
+        : await fetch("/api/orders", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+              "Idempotency-Key": crypto.randomUUID(),
+            },
+            body: JSON.stringify({
+              symbol: assetToSell + "USDT",
+              side: "sell",
+              type: "market",
+              quantity,
+              purpose: "withdrawal-conversion",
+            }),
+          });
       const orderResult = await orderResponse.json().catch(() => ({}));
       if (!orderResponse.ok || !orderResult.success) {
-        showMessage(orderResult.message || "تعذر تنفيذ بيع العملة لدى Binance. لم يتم إنشاء طلب السحب.", "error");
+        showMessage(orderResult.message || "تعذر تنفيذ أو تحديث أمر البيع لدى Binance. لم يتم إنشاء طلب سحب.", "error");
         await load();
         return;
       }
-
       if (orderResult.executionProvider !== "binance") {
         showMessage("لم يؤكد النظام أن البيع نُفّذ لدى Binance؛ لم يتم إنشاء طلب السحب.", "error");
         await load();
         return;
       }
 
-      const orderStatus = String(orderResult.order?.status || "").toLowerCase();
-      const fills = Array.isArray(orderResult.matching?.trades) ? orderResult.matching.trades : [];
-      const convertedUsdt = Math.round(fills.reduce((sum: number, trade: any) => {
-        const gross = Math.max(0, Number(trade.quoteAmount) || 0);
-        const fee = Math.max(0, Number(trade.feeAmount) || 0);
-        return sum + Math.max(0, gross - fee);
-      }, 0) * 1e8) / 1e8;
+      const actualOrder = orderResult.order || {};
+      const conversionOrderId = String(actualOrder._id || pending?.orderId || "").trim();
+      const orderStatus = String(actualOrder.status || "").toLowerCase();
+      if (!conversionOrderId) {
+        showMessage("لم يصل مرجع أمر البيع من Binance. لم يتم إنشاء طلب سحب؛ تحقق من سجل الأوامر قبل أي محاولة جديدة.", "error");
+        await load();
+        return;
+      }
+      if (!["filled", "cancelled", "rejected"].includes(orderStatus)) {
+        setConversionPendingOrder({ orderId: conversionOrderId, asset: assetToSell, quantity });
+        showMessage(String(orderResult.message || "أمر البيع ما زال مفتوحًا لدى Binance.") + " لن نرسل أمر بيع جديدًا لنفس الكمية. اضغط متابعة التحويل لتحديث الأمر الحالي.", "info");
+        await load();
+        return;
+      }
 
-      if (convertedUsdt <= 0 || !["filled", "cancelled"].includes(orderStatus)) {
-        showMessage(String(orderResult.message || "لم يتم تأكيد حصيلة بيع قابلة للسحب بعد.") + " لم يُنشأ طلب سحب؛ افتح سجل التداول لتحديث حالة الأمر قبل إعادة المحاولة.", "info");
+      const settledGross = Math.max(0, Number(actualOrder.settledQuoteQuantity || 0));
+      const settledTradingFee = Math.max(0, Number(actualOrder.settledFeeAmount || 0));
+      const fillRows = Array.isArray(orderResult.matching?.trades) ? orderResult.matching.trades : [];
+      const fallbackProceeds = fillRows.reduce((sum: number, trade: any) => {
+        return sum + Math.max(0, (Number(trade.quoteAmount) || 0) - (Number(trade.feeAmount) || 0));
+      }, 0);
+      const settledProceeds = Math.max(0, settledGross - settledTradingFee);
+      const convertedUsdt = Math.round((settledProceeds > 0 ? settledProceeds : fallbackProceeds) * 1e8) / 1e8;
+
+      if (convertedUsdt <= 0) {
+        try {
+          await fetch("/api/withdrawals/conversion-status", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orderId: conversionOrderId, action: "dismiss-empty" }),
+          });
+        } catch {}
+        setConversionPendingOrder(null);
+        setConversionQuantity("");
+        showMessage("انتهى أمر البيع دون حصيلة منفذة؛ لن يُنشأ طلب سحب ولن نكرر أمر البيع.", "info");
         await load();
         return;
       }
       if (convertedUsdt < data.general.minimum) {
-        showMessage("تم بيع " + conversionAsset + " فعليًا، لكن صافي حصيلة البيع " + money(convertedUsdt) + " USDT أقل من الحد الأدنى للسحب. حصيلة البيع بقيت في رصيدك العام ويمكنك سحبها بعد استيفاء الحد الأدنى.", "info");
+        const resolved = await fetch("/api/withdrawals/conversion-status", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId: conversionOrderId, action: "below-minimum" }),
+        });
+        const resolvedJson = await resolved.json().catch(() => ({}));
+        if (!resolved.ok || !resolvedJson.success) {
+          setConversionPendingOrder({ orderId: conversionOrderId, asset: assetToSell, quantity });
+          showMessage(resolvedJson.message || "تم البيع لكن تعذر إغلاق متابعة التحويل. لا ترسل أمر بيع آخر.", "error");
+          await load();
+          return;
+        }
+        setConversionPendingOrder(null);
         setConversionQuantity("");
-        await load();
-        return;
-      }
-
-      const conversionOrderId = String(orderResult.order?._id || "").trim();
-      if (!conversionOrderId) {
-        showMessage("أكدت Binance البيع لكن لم يصل مرجع أمر صالح لتوثيق السحب. لم أرسل طلب سحب، وحصيلة البيع تبقى في رصيدك؛ راجع سجل التداول قبل أي إعادة محاولة.", "error");
-        setConversionQuantity("");
+        showMessage("تم بيع " + assetToSell + " لدى Binance فعليًا، لكن صافي حصيلة البيع " + money(convertedUsdt) + " USDT أقل من الحد الأدنى للسحب. بقيت الحصيلة في محفظة USDT؛ يمكنك سحبها مع بقية رصيد USDT عند بلوغ الحد الأدنى.", "info");
         await load();
         return;
       }
@@ -408,19 +491,20 @@ export default function WithdrawalsPage() {
       });
       const withdrawalResult = await withdrawalResponse.json().catch(() => ({}));
       if (!withdrawalResponse.ok || !withdrawalResult.success) {
-        showMessage("تم تأكيد بيع العملة وتحويل صافي " + money(convertedUsdt) + " USDT إلى رصيدك، لكن لم يُنشأ طلب السحب. الرصيد ما زال في محفظة التداول. السبب: " + String(withdrawalResult.message || "تعذر إنشاء الطلب"), "error");
-        setConversionQuantity("");
+        showMessage("تم تأكيد بيع العملة وتحويل صافي " + money(convertedUsdt) + " USDT إلى رصيدك، لكن لم يُنشأ طلب السحب. الرصيد ما زال في محفظة التداول. السبب: " + String(withdrawalResult.message || "تعذر إنشاء الطلب") + " يمكنك متابعة نفس أمر البيع دون إرسال بيع جديد.", "error");
+        setConversionPendingOrder({ orderId: conversionOrderId, asset: assetToSell, quantity });
         await load();
         return;
       }
 
       const fee = Math.round(convertedUsdt * 0.05 * 1e8) / 1e8;
       const payout = Math.round((convertedUsdt - fee) * 1e8) / 1e8;
-      showMessage("تم تأكيد بيع " + conversionAsset + " لدى Binance، وإنشاء طلب سحب بقيمة " + money(convertedUsdt) + " USDT. عمولة السحب " + money(fee) + " USDT، والصافي المطلوب إرساله " + money(payout) + " USDT.", "success");
+      showMessage("تم تأكيد بيع " + assetToSell + " لدى Binance، وإنشاء طلب سحب بقيمة " + money(convertedUsdt) + " USDT. عمولة السحب " + money(fee) + " USDT، والصافي المطلوب إرساله " + money(payout) + " USDT.", "success");
+      setConversionPendingOrder(null);
       setConversionQuantity("");
       await load();
     } catch {
-      showMessage("تعذر تأكيد النتيجة النهائية. لا تعِد أمر البيع فورًا؛ افتح سجل التداول والمحفظة أولًا لتجنب تكرار البيع.", "error");
+      showMessage("تعذر تأكيد النتيجة النهائية. لا ترسل أمر بيع جديدًا؛ افتح سجل التداول والمحفظة أو تابع أمر التحويل الحالي.", "error");
       await load();
     } finally {
       setBusy(false);
@@ -553,14 +637,14 @@ export default function WithdrawalsPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block space-y-2 text-sm text-slate-300">
                   <span>عملة الأرباح</span>
-                  <select value={conversionAsset} onChange={(event) => { setConversionAsset(event.target.value); setConversionQuantity(""); setConversionQuote(null); }} disabled={busy || hasPending || !spotBalances.length} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:opacity-50">
+                  <select value={conversionAsset} onChange={(event) => { setConversionAsset(event.target.value); setConversionQuantity(""); setConversionQuote(null); }} disabled={busy || hasPending || Boolean(conversionPendingOrder) || !spotBalances.length} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:opacity-50">
                     {!spotBalances.length && <option value="">لا توجد أرصدة متاحة</option>}
                     {spotBalances.map((row) => <option key={row.asset} value={row.asset}>{row.asset} — متاح {money(row.available)}</option>)}
                   </select>
                 </label>
                 <label className="block space-y-2 text-sm text-slate-300">
                   <span>الكمية المراد تحويل قيمتها</span>
-                  <input type="number" min="0.00000001" max={selectedSpotBalance?.available} step="0.00000001" value={conversionQuantity} disabled={busy || hasPending || !selectedSpotBalance} onChange={(event) => setConversionQuantity(event.target.value)} placeholder={selectedSpotBalance ? "الحد الأقصى " + money(selectedSpotBalance.available) + " " + conversionAsset : "اختر عملة أولًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:opacity-50" />
+                  <input type="number" min="0.00000001" max={selectedSpotBalance?.available} step="0.00000001" value={conversionQuantity} disabled={busy || hasPending || Boolean(conversionPendingOrder) || !selectedSpotBalance} onChange={(event) => setConversionQuantity(event.target.value)} placeholder={selectedSpotBalance ? "الحد الأقصى " + money(selectedSpotBalance.available) + " " + conversionAsset : "اختر عملة أولًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:opacity-50" />
                 </label>
               </div>
               {quoteLoading && <p className="text-xs text-cyan-200">جاري حساب القيمة بسعر السوق الحالي…</p>}
@@ -629,8 +713,8 @@ export default function WithdrawalsPage() {
             <button type="button" onClick={submitGeneral} disabled={busy || hasPending || !data?.general.configured || !selectedGeneralNetwork || !data?.networks.length} className="w-full rounded-xl bg-blue-600 px-4 py-3 font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">
               طلب سحب
             </button>
-            <button type="button" onClick={() => void submitConvertedGeneral()} disabled={busy || hasPending || !conversionQuantity || !conversionQuote?.success || !selectedGeneralNetwork || !data?.general.configured} className="w-full rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 font-black text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-40">
-              {busy ? "جارٍ تنفيذ التحويل والسحب..." : conversionAsset === "USDT" ? "طلب سحب الكمية المحددة من USDT" : "بيع " + conversionAsset + " بسعر السوق ثم طلب السحب"}
+            <button type="button" onClick={() => void submitConvertedGeneral()} disabled={busy || hasPending || (!conversionPendingOrder && (!conversionQuantity || !conversionQuote?.success)) || !selectedGeneralNetwork || !data?.general.configured} className="w-full rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 font-black text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-40">
+              {busy ? "جارٍ تنفيذ التحويل والسحب..." : conversionPendingOrder ? "متابعة أمر بيع " + conversionPendingOrder.asset + " وإنشاء السحب" : conversionAsset === "USDT" ? "طلب سحب الكمية المحددة من USDT" : "بيع " + conversionAsset + " بسعر السوق ثم طلب السحب"}
             </button>
             <p className="text-[11px] leading-5 text-slate-500">للعملات غير USDT: يُرسل أولًا أمر بيع سوق إلى Binance. لا يُنشأ طلب السحب إلا بعد تأكيد التنفيذ وقراءة حصيلة البيع. إذا تعذّر إنشاء طلب السحب بعد البيع، تظل حصيلة USDT في محفظتك.</p>
           </section>

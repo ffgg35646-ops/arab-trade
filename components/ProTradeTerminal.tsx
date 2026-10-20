@@ -875,9 +875,13 @@ export default function ProTradeTerminal() {
         throw new Error(data.message || "تعذر إنشاء الأمر");
       }
 
+      const matchedCount = Number(data?.matching?.matched || 0);
+      const orderLabel = side === "buy" ? "شراء" : "بيع";
+      const quantityLabel = Number(quantity).toLocaleString("en-US", { maximumFractionDigits: 8 });
       setMessage(
-        data.message ||
-          (side === "buy" ? "تم إنشاء أمر الشراء" : "تم إنشاء أمر البيع")
+        matchedCount > 0
+          ? `تم تنفيذ ${orderLabel} ${quantityLabel} ${baseAsset} كليًا أو جزئيًا؛ راجع سجل التداول لمعرفة الكمية المنفذة.`
+          : `تم إنشاء أمر ${orderLabel} ${quantityLabel} ${baseAsset} وهو بانتظار التنفيذ. لن تُضاف العملة إلى رصيدك إلا بعد تنفيذ الصفقة.`
       );
 
       setQuantity("");

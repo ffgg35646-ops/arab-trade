@@ -273,6 +273,8 @@ export async function POST(request: NextRequest) {
       userId: user._id,
       mode: "live",
       executionProvider: "binance",
+      purpose: "withdrawal-conversion",
+      withdrawalConversionStatus: "pending",
       side: "sell",
     }).lean();
     if (!conversionOrder) {
@@ -368,6 +370,20 @@ export async function POST(request: NextRequest) {
           userId: user._id, type: "general", amount, ...feeDetails!, ...conversionDetails, asset, network, payoutAddress, status: "pending",
         }], { session });
         createdWithdrawal = created[0];
+        if (conversionOrderId) {
+          const marked = await Order.updateOne(
+            {
+              _id: conversionOrderId,
+              userId: user._id,
+              executionProvider: "binance",
+              purpose: "withdrawal-conversion",
+              withdrawalConversionStatus: "pending",
+            },
+            { $set: { withdrawalConversionStatus: "withdrawal_created" } },
+            { session },
+          );
+          if (marked.modifiedCount !== 1) throw new Error("تمت معالجة أمر التحويل بالفعل؛ لم يتم إنشاء طلب سحب مكرر");
+        }
         return;
       }
 

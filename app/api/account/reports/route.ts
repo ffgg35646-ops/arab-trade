@@ -23,10 +23,14 @@ export async function GET(request: NextRequest) {
     const period = ["7", "30", "90", "all"].includes(requestedPeriod) ? requestedPeriod : "30";
     const from = period === "all" ? null : new Date(Date.now() - Number(period) * 24 * 60 * 60 * 1000);
     const dateFilter = from ? { createdAt: { $gte: from } } : {};
-    const tradeFilter = {
+    const tradeFilter: {
+      mode: "live";
+      $or: Array<{ buyerId?: typeof user._id; sellerId?: typeof user._id }>;
+      createdAt?: { $gte: Date };
+    } = {
       mode: "live",
       $or: [{ buyerId: user._id }, { sellerId: user._id }],
-      ...dateFilter,
+      ...(from ? { createdAt: { $gte: from } } : {}),
     };
 
     const commonPipeline = [
@@ -94,7 +98,6 @@ export async function GET(request: NextRequest) {
         ...dateFilter,
         $or: [
           { status: "filled" },
-          { status: "partially_filled" },
           { filledQuantity: { $gt: 0 } },
         ],
       }),

@@ -11,6 +11,7 @@ import { getPlatformSettings } from "@/lib/platform-settings";
 import { matchOrder } from "@/lib/matching-engine";
 import { calculateTradingFee } from "@/lib/fee-engine";
 import { migrateLegacyDepositBalancesToSpotWallet } from "@/lib/unified-usdt-wallet";
+import { consolidateFundingWalletIntoSpotWallet } from "@/lib/consolidate-funding-wallet";
 import {
   getIdempotentResponse,
   hashRequest,
@@ -310,6 +311,7 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const mode: "live" = "live";
     await migrateLegacyDepositBalancesToSpotWallet(user._id);
+    await consolidateFundingWalletIntoSpotWallet(user._id);
 
     const settings =
       await getPlatformSettings();

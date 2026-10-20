@@ -42,6 +42,7 @@ type Request = {
   feeAmount?: number;
   payoutAmount?: number;
   conversionAsset?: string | null;
+  conversionOrderId?: string | null;
   conversionQuantity?: number | null;
   conversionPrice?: number | null;
   tradingFeeAmount?: number;
@@ -384,6 +385,14 @@ export default function WithdrawalsPage() {
         return;
       }
 
+      const conversionOrderId = String(orderResult.order?._id || "").trim();
+      if (!conversionOrderId) {
+        showMessage("أكدت Binance البيع لكن لم يصل مرجع أمر صالح لتوثيق السحب. لم أرسل طلب سحب، وحصيلة البيع تبقى في رصيدك؛ راجع سجل التداول قبل أي إعادة محاولة.", "error");
+        setConversionQuantity("");
+        await load();
+        return;
+      }
+
       const withdrawalResponse = await fetch("/api/withdrawals", {
         method: "POST",
         credentials: "include",
@@ -391,6 +400,7 @@ export default function WithdrawalsPage() {
         body: JSON.stringify({
           type: "general",
           amount: convertedUsdt,
+          conversionOrderId,
           asset: "USDT",
           network: selectedGeneralNetwork,
           payoutAddress: address,
@@ -727,6 +737,12 @@ export default function WithdrawalsPage() {
                         <strong className="font-mono">{money(item.amount)} {item.asset || "USDT"}</strong>
                         <span className={item.status === "approved" ? "text-emerald-300" : item.status === "rejected" ? "text-red-300" : "text-amber-200"}>الحالة: {statusLabel}</span>
                       </div>
+                      {item.conversionAsset && (
+                        <div className="mt-2 rounded-lg border border-cyan-500/20 bg-cyan-500/[0.04] p-2 text-xs text-slate-300">
+                          <p>مصدر الرصيد: بيع {money(item.conversionQuantity || 0)} {item.conversionAsset} بسعر متوسط {money(item.conversionPrice || 0)} USDT.</p>
+                          <p className="mt-1">عمولة التداول: {money(item.tradingFeeAmount || 0)} USDT — مرجع الأمر: <span className="break-all font-mono">{item.conversionOrderId || "—"}</span></p>
+                        </div>
+                      )}
                       <div className="mt-2 rounded-lg bg-[#050a13] p-2 text-xs">
                         <div className="grid gap-1 text-slate-400 sm:grid-cols-3">
                           <p>الإجمالي المحجوز: {money(item.grossAmount ?? item.amount)} USDT</p>

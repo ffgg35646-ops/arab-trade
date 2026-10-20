@@ -4,6 +4,11 @@ const WITHDRAWAL_NETWORKS = [
   { code: "TRC20", name: "TRON" },
   { code: "BEP20", name: "BNB Smart Chain" },
 ] as const;
+const WITHDRAWAL_FEE_PERCENT = 5;
+function withdrawalAmounts(gross: number) {
+  const feeAmount = roundWithdrawal(gross * WITHDRAWAL_FEE_PERCENT / 100);
+  return { grossAmount: roundWithdrawal(gross), feePercent: WITHDRAWAL_FEE_PERCENT, feeAmount, payoutAmount: roundWithdrawal(gross - feeAmount) };
+}
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
@@ -212,6 +217,7 @@ export async function GET(request: NextRequest) {
       available: generalAvailable,
       minimum: Number(platformSettings.withdrawals?.generalMinimum || 0),
       configured: Number(platformSettings.withdrawals?.generalMinimum || 0) > 0,
+      feePercent: WITHDRAWAL_FEE_PERCENT,
     },
     networks: WITHDRAWAL_NETWORKS,
     packages,
@@ -220,6 +226,14 @@ export async function GET(request: NextRequest) {
       type: item.type || "package",
       packageId: item.packageId ? String(item.packageId) : null,
       amount: Number(item.amount),
+      grossAmount: Number(item.grossAmount ?? item.amount),
+      feePercent: Number(item.feePercent ?? 0),
+      feeAmount: Number(item.feeAmount ?? 0),
+      payoutAmount: Number(item.payoutAmount ?? item.amount),
+      conversionAsset: item.conversionAsset || null,
+      conversionQuantity: item.conversionQuantity == null ? null : Number(item.conversionQuantity),
+      conversionPrice: item.conversionPrice == null ? null : Number(item.conversionPrice),
+      tradingFeeAmount: Number(item.tradingFeeAmount ?? 0),
       asset: item.asset || "USDT",
       network: item.network,
       payoutAddress: item.payoutAddress,
@@ -244,6 +258,7 @@ export async function POST(request: NextRequest) {
   const asset = String(body.asset || "").trim().toUpperCase() as "USDT";
   const network = String(body.network || "").trim().toUpperCase();
   const payoutAddress = String(body.payoutAddress || "").trim();
+  const feeDetails = Number.isFinite(amount) && amount > 0 ? withdrawalAmounts(amount) : null;
 
   if (!Number.isFinite(amount) || amount <= 0 || roundWithdrawal(amount) !== amount) {
     return NextResponse.json({ success: false, message: "مبلغ السحب غير صالح" }, { status: 400 });
@@ -297,7 +312,7 @@ export async function POST(request: NextRequest) {
         if (reserved.modifiedCount !== 1) throw new Error("الرصيد العام تغير، حاول مجددًا");
 
         const created = await WithdrawalRequest.create([{
-          userId: user._id, type: "general", amount, asset, network, payoutAddress, status: "pending",
+          userId: user._id, type: "general", amount, ...feeDetails!, asset, network, payoutAddress, status: "pending",
         }], { session });
         createdWithdrawal = created[0];
         return;
@@ -370,6 +385,7 @@ export async function POST(request: NextRequest) {
         packageId: plan._id,
         allocations,
         amount,
+        ...feeDetails!,
         asset,
         network,
         payoutAddress,
@@ -385,14 +401,24 @@ export async function POST(request: NextRequest) {
           userId: user._id,
           type: "withdrawal",
           title: "تم استلام طلب السحب",
-          message: "تم استلام طلب سحب بقيمة " + amount + " USDT من " + sourceLabel + ". تم حجز المبلغ مؤقتًا لحين مراجعة الأدمن.",
+          message: "تم استلام طلب سحب إجمالي " + Number(createdWithdrawal.grossAmount ?? amount) + " USDT من " + sourceLabel + ". عمولة السحب " + Number(createdWithdrawal.feeAmount || 0) + " USDT، وصافي المبلغ المطلوب إرساله " + Number(createdWithdrawal.payoutAmount ?? amount) + " USDT. تم حجز الرصيد لحين مراجعة الأدمن.",
           read: false,
         });
       } catch (notificationError) {
         console.error("WITHDRAWAL REQUEST NOTIFICATION:", notificationError);
       }
     }
-    return NextResponse.json({ success: true, message: "تم إنشاء طلب السحب وحجز المبلغ" }, { status: 201 });
+    return NextResponse.json({
+      success: true,
+      message: "تم إنشاء طلب السحب. العمولة " + feeDetails!.feeAmount + " USDT، وصافي المبلغ " + feeDetails!.payoutAmount + " USDT بعد خصم 5%.",
+      withdrawal: createdWithdrawal ? {
+        _id: String(createdWithdrawal._id),
+        grossAmount: Number(createdWithdrawal.grossAmount ?? amount),
+        feePercent: Number(createdWithdrawal.feePercent ?? WITHDRAWAL_FEE_PERCENT),
+        feeAmount: Number(createdWithdrawal.feeAmount ?? feeDetails!.feeAmount),
+        payoutAmount: Number(createdWithdrawal.payoutAmount ?? feeDetails!.payoutAmount),
+      } : null,
+    }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "تعذر إنشاء الطلب";
     return NextResponse.json({

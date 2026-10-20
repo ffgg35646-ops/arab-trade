@@ -35,7 +35,6 @@ const sections = [
       ["الباقات", "/dashboard/packages"],
       ["السحب", "/dashboard/withdrawals"],
       ["التداول الفوري", "/protrade"],
-      ["الهامش", "/margin"],
       ["التمويل", "/dashboard/funding"],
     ],
   },
@@ -43,8 +42,6 @@ const sections = [
     title: "الأوامر",
     icon: ClipboardList,
     children: [
-      ["أوامر التداول", "/dashboard/orders"],
-      ["سجل الأوامر", "/dashboard/orders/history"],
       ["سجل التداول", "/dashboard/trades"],
     ],
   },

@@ -5,26 +5,26 @@ export type KycDocumentType = "passport" | "national_id";
 
 export interface IKycRequest extends Document {
   userId: mongoose.Types.ObjectId;
-
   fullName: string;
   dateOfBirth: string;
   nationality: string;
-
   documentType: KycDocumentType;
   documentNumber: string;
   issuingCountry: string;
   issueDate?: string;
   expiryDate?: string;
-
   documentPath: string;
   selfiePath: string;
-
+  identityFrontData?: Buffer;
+  identityFrontMime?: string;
+  identityBackData?: Buffer;
+  identityBackMime?: string;
+  selfieData?: Buffer;
+  selfieMime?: string;
   status: KycStatus;
   rejectionReason?: string;
-
   reviewedBy?: mongoose.Types.ObjectId;
   reviewedAt?: Date;
-
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,83 +37,38 @@ const KycRequestSchema = new Schema<IKycRequest>(
       required: true,
       index: true,
     },
-
-    fullName: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 150,
-    },
-
-    dateOfBirth: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    nationality: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 100,
-    },
-
+    // Personal fields are validated by the submission API and cleared after review.
+    fullName: { type: String, trim: true, maxlength: 150 },
+    dateOfBirth: { type: String, trim: true },
+    nationality: { type: String, trim: true, maxlength: 100 },
     documentType: {
       type: String,
       enum: ["passport", "national_id"],
-      required: true,
+      default: "national_id",
     },
-
-    documentNumber: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 100,
-    },
-
-    issuingCountry: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 100,
-    },
-
+    documentNumber: { type: String, trim: true, maxlength: 100 },
+    issuingCountry: { type: String, trim: true, maxlength: 100 },
     issueDate: String,
     expiryDate: String,
-
-    documentPath: {
-      type: String,
-      required: true,
-    },
-
-    selfiePath: {
-      type: String,
-      required: true,
-    },
-
+    documentPath: { type: String, default: "" },
+    selfiePath: { type: String, default: "" },
+    identityFrontData: { type: Buffer, select: false },
+    identityFrontMime: String,
+    identityBackData: { type: Buffer, select: false },
+    identityBackMime: String,
+    selfieData: { type: Buffer, select: false },
+    selfieMime: String,
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],
       default: "pending",
       index: true,
     },
-
-    rejectionReason: {
-      type: String,
-      trim: true,
-      maxlength: 500,
-    },
-
-    reviewedBy: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-    },
-
+    rejectionReason: { type: String, trim: true, maxlength: 500 },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: "User" },
     reviewedAt: Date,
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 KycRequestSchema.index({ userId: 1, createdAt: -1 });

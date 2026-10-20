@@ -22,7 +22,7 @@ export async function GET(
     await connectDB();
 
     const item = await KycRequest.findById(id)
-      .populate("userId", "_id name username email isVerified isActive createdAt")
+      .populate("userId", "_id name username email isVerified isActive approvalStatus rejectionReason createdAt")
       .lean();
 
     if (!item) {

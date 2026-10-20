@@ -8,7 +8,10 @@ import { rateLimit } from "@/lib/rate-limit";
 export async function POST(request: NextRequest) {
   const secretText = process.env.AUTH_SECRET;
   if (!secretText) {
-    return NextResponse.json({ success: false, message: "إعدادات تسجيل الدخول غير مكتملة على الخادم" }, { status: 503 });
+    return NextResponse.json(
+      { success: false, message: "إعدادات تسجيل الدخول غير مكتملة على الخادم" },
+      { status: 503 }
+    );
   }
   const secret = new TextEncoder().encode(secretText);
 
@@ -17,38 +20,23 @@ export async function POST(request: NextRequest) {
     request.headers.get("x-real-ip") ||
     "unknown";
 
-  const RATE_LIMIT_login = rateLimit(
-    "login:" + clientKey,
-    10,
-    60000
-  );
-
+  const RATE_LIMIT_login = rateLimit("login:" + clientKey, 10, 60000);
   if (!RATE_LIMIT_login.allowed) {
+    const retryAfter = Math.max(
+      1,
+      Math.ceil((RATE_LIMIT_login.resetAt - Date.now()) / 1000)
+    );
     return NextResponse.json(
       {
         error: "تم تجاوز عدد الطلبات المسموح بها مؤقتًا",
-        retryAfter: Math.max(
-          0,
-          Math.ceil((RATE_LIMIT_login.resetAt - Date.now()) / 1000)
-        )
+        retryAfter,
       },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": String(
-            Math.max(
-              1,
-              Math.ceil((RATE_LIMIT_login.resetAt - Date.now()) / 1000)
-            )
-          )
-        }
-      }
+      { status: 429, headers: { "Retry-After": String(retryAfter) } }
     );
   }
 
   try {
     const body = await request.json();
-
     const identifier = String(body.identifier || "").trim().toLowerCase();
     const password = String(body.password || "");
 
@@ -60,12 +48,19 @@ export async function POST(request: NextRequest) {
     }
 
     await connectDB();
-
     const user = await User.findOne({
       $or: [{ email: identifier }, { username: identifier }],
     }).select("+password");
 
     if (!user) {
+      return NextResponse.json(
+        { success: false, message: "بيانات تسجيل الدخول غير صحيحة" },
+        { status: 401 }
+      );
+    }
+
+    const passwordValid = await bcrypt.compare(password, user.password);
+    if (!passwordValid) {
       return NextResponse.json(
         { success: false, message: "بيانات تسجيل الدخول غير صحيحة" },
         { status: 401 }
@@ -79,19 +74,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!user.isActive) {
+    if (user.approvalStatus === "pending") {
       return NextResponse.json(
-        { success: false, message: "الحساب غير مفعل حاليًا" },
+        {
+          success: false,
+          message: "تم تأكيد بريدك الإلكتروني، وحسابك قيد مراجعة الإدارة. ستتمكن من الدخول بعد الموافقة.",
+        },
         { status: 403 }
       );
     }
 
-    const passwordValid = await bcrypt.compare(password, user.password);
-
-    if (!passwordValid) {
+    if (user.approvalStatus === "rejected") {
+      const reason = user.rejectionReason?.trim();
       return NextResponse.json(
-        { success: false, message: "بيانات تسجيل الدخول غير صحيحة" },
-        { status: 401 }
+        {
+          success: false,
+          message: reason
+            ? "لم تتم الموافقة على إنشاء الحساب. سبب الرفض: " + reason
+            : "لم تتم الموافقة على إنشاء الحساب. تواصل مع الدعم إذا كنت ترى أن ذلك خطأ.",
+        },
+        { status: 403 }
+      );
+    }
+
+    if (!user.isActive) {
+      return NextResponse.json(
+        { success: false, message: "الحساب غير مفعل حاليًا" },
+        { status: 403 }
       );
     }
 
@@ -123,21 +132,9 @@ export async function POST(request: NextRequest) {
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
     });
-
     return response;
   } catch (error) {
-    console.error("LOGIN ERROR TYPE:", typeof error);
-    console.error(
-      "LOGIN ERROR DETAILS:",
-      error instanceof Error
-        ? {
-            name: error.name,
-            message: error.message,
-            stack: error.stack,
-          }
-        : error
-    );
-
+    console.error("LOGIN ERROR:", error instanceof Error ? error.message : error);
     return NextResponse.json(
       { success: false, message: "حدث خطأ أثناء تسجيل الدخول" },
       { status: 500 }

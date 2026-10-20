@@ -541,6 +541,28 @@ export async function POST(
       );
     }
 
+    // Real/live spot orders go to Binance. If the exchange connection is not
+    // configured, this path returns an explicit error and never pretends an
+    // internal match is an external-market fill.
+    const liveExecution = await submitBinanceLiveOrder({
+      userId: user._id,
+      symbol,
+      side,
+      type,
+      price,
+      quantity,
+      baseAsset: binancePair.baseAsset,
+      quoteAsset: binancePair.quoteAsset,
+      pair: binancePair,
+      feePercent,
+      minOrderAmount: Number(settings.trading.minOrderAmount || 10),
+      maxOrderAmount: Number(settings.trading.maxOrderAmount || 100000),
+      idempotencyKey,
+      requestHash,
+      idempotencyRoute,
+    });
+    return NextResponse.json(liveExecution.body, { status: liveExecution.status });
+
     if (type === "market") {
       const oppositeSide = side === "buy" ? "sell" : "buy";
       const bestCounterOrder = await Order.findOne({

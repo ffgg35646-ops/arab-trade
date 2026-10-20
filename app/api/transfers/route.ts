@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
               responseBody: finalResponseBody,
             },
           },
-          { session }
+          { session: session! }
         );
         if (updated.matchedCount !== 1) {
           throw new Error("TRANSFER_IDEMPOTENCY_RECORD_NOT_FOUND");

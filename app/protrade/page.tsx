@@ -2,13 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  BarChart3,
   ChevronDown,
   Clock3,
   Maximize2,
   RefreshCw,
   Search,
-  Settings2,
   X,
 } from "lucide-react";
 
@@ -71,6 +69,18 @@ type LiveTicker = {
   price: number;
   change24h: number;
   quoteVolume: number;
+  high24h: number;
+  low24h: number;
+};
+
+type Candle = {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  closed: boolean;
 };
 
 function num(value: unknown) {
@@ -116,107 +126,216 @@ function normalizeRows(value: unknown): BookOrder[] {
     .filter((item) => item.price > 0 && item.quantity > 0);
 }
 
-function Chart({
-  symbol,
-  trades,
-  priceHistory,
-}: {
-  symbol: string;
-  trades: Trade[];
-  priceHistory: number[];
-}) {
-  const points = useMemo(() => {
-    const liveSource = priceHistory
-      .map((value) => num(value))
-      .filter((value) => value > 0);
-    const tradeSource = trades
-      .filter((trade) => String(trade.symbol || "").toUpperCase() === symbol)
-      .map((trade) => num(trade.price))
-      .filter((value) => value > 0)
-      .reverse();
-    const source = liveSource.length >= 2 ? liveSource : tradeSource;
+function Chart({ symbol }: { symbol: string }) {
+  const [interval, setIntervalValue] = useState<"1m" | "5m" | "15m" | "1h" | "4h" | "1d">("1m");
+  const [candles, setCandles] = useState<Candle[]>([]);
+  const [feed, setFeed] = useState<"connecting" | "live" | "reconnecting" | "snapshot" | "offline">("connecting");
+  const [expanded, setExpanded] = useState(false);
 
-    if (source.length < 2) return [];
+  useEffect(() => {
+    let stopped = false;
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | undefined;
+    let snapshotTimer: number | undefined;
+    let retryCount = 0;
+    let socketConnected = false;
+    const pair = symbol.trim().toUpperCase();
+    setCandles([]);
+    setFeed("connecting");
 
-    const min = Math.min(...source);
-    const max = Math.max(...source);
-    const range = max - min || max * 0.0001 || 1;
+    const mergeCandle = (next: Candle) => {
+      if (!Number.isFinite(next.time) || next.open <= 0 || next.high <= 0 || next.low <= 0 || next.close <= 0) return;
+      setCandles((previous) => {
+        const existing = previous.findIndex((item) => item.time === next.time);
+        if (existing >= 0) {
+          const updated = [...previous];
+          updated[existing] = next;
+          return updated.slice(-90);
+        }
+        return [...previous, next].sort((a, b) => a.time - b.time).slice(-90);
+      });
+    };
 
-    return source.map((value, index) => {
-      const x = (index / Math.max(source.length - 1, 1)) * 1000;
-      const y = 250 - ((value - min) / range) * 205;
-      return `${x},${y}`;
+    const parseKline = (row: any): Candle => ({
+      time: Number(row?.t ?? row?.[0]),
+      open: Number(row?.o ?? row?.[1]),
+      high: Number(row?.h ?? row?.[2]),
+      low: Number(row?.l ?? row?.[3]),
+      close: Number(row?.c ?? row?.[4]),
+      volume: Number(row?.v ?? row?.[5]),
+      closed: Boolean(row?.x ?? true),
     });
-  }, [trades, priceHistory, symbol]);
+
+    const loadSnapshot = async () => {
+      try {
+        const response = await fetch(
+          `https://api.binance.com/api/v3/klines?symbol=${encodeURIComponent(pair)}&interval=${interval}&limit=90`,
+          { cache: "no-store" }
+        );
+        if (!response.ok) throw new Error("Candle snapshot unavailable");
+        const rows = await response.json();
+        if (stopped || !Array.isArray(rows)) return;
+        setCandles(rows.map(parseKline).filter((item: Candle) => item.open > 0 && item.close > 0).slice(-90));
+        if (!socketConnected) setFeed("snapshot");
+      } catch {
+        if (!stopped && !socketConnected) setFeed("offline");
+      }
+    };
+
+    const connect = () => {
+      if (stopped) return;
+      try {
+        socket = new WebSocket(
+          `wss://stream.binance.com:9443/ws/${pair.toLowerCase()}@kline_${interval}`
+        );
+        socket.onopen = () => {
+          if (stopped) return;
+          socketConnected = true;
+          retryCount = 0;
+          setFeed("live");
+        };
+        socket.onmessage = (event) => {
+          try {
+            const message = JSON.parse(String(event.data));
+            if (stopped || !message?.k) return;
+            mergeCandle(parseKline(message.k));
+            setFeed("live");
+          } catch {
+            // Ignore malformed public market-data packets.
+          }
+        };
+        socket.onerror = () => socket?.close();
+        socket.onclose = () => {
+          socketConnected = false;
+          if (stopped) return;
+          setFeed("reconnecting");
+          const delay = Math.min(1000 * 2 ** retryCount, 15000);
+          retryCount = Math.min(retryCount + 1, 4);
+          reconnectTimer = window.setTimeout(connect, delay);
+        };
+      } catch {
+        setFeed("offline");
+        reconnectTimer = window.setTimeout(connect, 5000);
+      }
+    };
+
+    void loadSnapshot();
+    snapshotTimer = window.setInterval(() => {
+      if (!socketConnected) void loadSnapshot();
+    }, 5000);
+    connect();
+
+    return () => {
+      stopped = true;
+      socketConnected = false;
+      if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
+      if (snapshotTimer !== undefined) window.clearInterval(snapshotTimer);
+      if (socket) {
+        socket.onopen = null;
+        socket.onmessage = null;
+        socket.onerror = null;
+        socket.onclose = null;
+        socket.close();
+      }
+    };
+  }, [symbol, interval]);
+
+  const plotted = candles.slice(-70);
+  const high = plotted.length ? Math.max(...plotted.map((candle) => candle.high)) : 0;
+  const low = plotted.length ? Math.min(...plotted.map((candle) => candle.low)) : 0;
+  const range = high - low || high * 0.001 || 1;
+  const y = (price: number) => 16 + ((high - price) / range) * 218;
+  const candleStep = 960 / Math.max(plotted.length, 1);
+  const candleWidth = Math.max(3, Math.min(11, candleStep * 0.62));
 
   return (
-    <div className="relative h-[390px] w-full overflow-hidden bg-[#060c15]">
-      <div className="absolute inset-0 opacity-30">
-        {[20, 40, 60, 80].map((value) => (
-          <div
-            key={`h-${value}`}
-            className="absolute left-0 right-0 border-t border-white/[0.06]"
-            style={{ top: `${value}%` }}
-          />
-        ))}
-        {[20, 40, 60, 80].map((value) => (
-          <div
-            key={`v-${value}`}
-            className="absolute top-0 bottom-0 border-l border-white/[0.06]"
-            style={{ left: `${value}%` }}
-          />
-        ))}
-      </div>
-
-      <svg
-        viewBox="0 0 1000 250"
-        preserveAspectRatio="none"
-        className="absolute inset-x-0 top-16 h-[250px] w-full"
-      >
-        <defs>
-          <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopOpacity="0.22" />
-            <stop offset="100%" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
-        {points.length >= 2 ? (
-          <>
-            <polygon
-              points={`0,250 ${points.join(" ")} 1000,250`}
-              fill="url(#areaFill)"
-            />
-            <polyline
-              points={points.join(" ")}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              vectorEffect="non-scaling-stroke"
-              className="text-cyan-400"
-            />
-          </>
-        ) : null}
-      </svg>
-
-      {points.length < 2 ? (
-        <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-xs text-slate-500">
-          ننتظر وصول بيانات سعر حقيقية لرسم المخطط
+    <div className={expanded
+      ? "fixed inset-3 z-[100] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#060c15] shadow-2xl"
+      : "relative w-full overflow-hidden bg-[#060c15]"}>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.06] px-3 py-2">
+        <div className="flex items-center gap-1">
+          {([
+            ["1m", "1د"], ["5m", "5د"], ["15m", "15د"],
+            ["1h", "1س"], ["4h", "4س"], ["1d", "1ي"],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setIntervalValue(value)}
+              className={interval === value
+                ? "rounded-md bg-cyan-400/10 px-2.5 py-1.5 text-[11px] font-semibold text-cyan-300"
+                : "rounded-md px-2.5 py-1.5 text-[11px] text-slate-500 hover:bg-white/5 hover:text-white"}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-      ) : null}
-
-      <div className="absolute left-4 top-3 flex items-center gap-2 text-xs text-slate-400">
-        <span className="rounded-md bg-white/[0.05] px-3 py-1.5 text-white">لحظي</span>
+        <div className="flex items-center gap-3">
+          <span className={feed === "live" ? "text-[10px] text-emerald-400" : "text-[10px] text-amber-300"}>
+            {feed === "live" ? "● شموع مباشرة" : feed === "snapshot" ? "● بيانات مع تحديث احتياطي" : feed === "reconnecting" ? "● استعادة اتصال الرسم" : feed === "offline" ? "● الرسم غير متاح حاليًا" : "● جاري الاتصال"}
+          </span>
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            aria-label={expanded ? "تصغير الرسم" : "تكبير الرسم"}
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-white/5 hover:text-white"
+          >
+            {expanded ? <X size={16} /> : <Maximize2 size={16} />}
+          </button>
+        </div>
       </div>
 
-      <div className="absolute right-4 top-3 flex items-center gap-3 text-slate-400">
-        <BarChart3 size={16} />
-        <Settings2 size={16} />
-        <Maximize2 size={16} />
+      <div className={expanded ? "relative min-h-0 flex-1" : "relative h-[330px] w-full"}>
+        <svg
+          viewBox="0 0 1000 280"
+          preserveAspectRatio="none"
+          className="absolute inset-0 h-full w-full"
+          role="img"
+          aria-label={`مخطط الشموع اليابانية ${symbol} بفاصل ${interval}`}
+        >
+          {[0, 1, 2, 3, 4].map((row) => (
+            <line key={`h-${row}`} x1="0" x2="1000" y1={row * 65 + 10} y2={row * 65 + 10} stroke="currentColor" strokeOpacity="0.10" vectorEffect="non-scaling-stroke" className="text-slate-400" />
+          ))}
+          {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((column) => (
+            <line key={`v-${column}`} x1={column * 125} x2={column * 125} y1="0" y2="280" stroke="currentColor" strokeOpacity="0.08" vectorEffect="non-scaling-stroke" className="text-slate-400" />
+          ))}
+          {plotted.map((candle, index) => {
+            const x = 20 + (index + 0.5) * candleStep;
+            const rising = candle.close >= candle.open;
+            const openY = y(candle.open);
+            const closeY = y(candle.close);
+            return (
+              <g key={candle.time} className={rising ? "text-emerald-400" : "text-rose-400"}>
+                <line x1={x} x2={x} y1={y(candle.high)} y2={y(candle.low)} stroke="currentColor" strokeWidth="1.25" vectorEffect="non-scaling-stroke" />
+                <rect
+                  x={x - candleWidth / 2}
+                  y={Math.min(openY, closeY)}
+                  width={candleWidth}
+                  height={Math.max(1.5, Math.abs(closeY - openY))}
+                  fill="currentColor"
+                  stroke="currentColor"
+                  strokeWidth="0.5"
+                />
+              </g>
+            );
+          })}
+        </svg>
+        {!plotted.length ? (
+          <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-xs text-slate-500">
+            جاري تحميل بيانات الشموع الحقيقية للسوق…
+          </div>
+        ) : null}
+        {plotted.length ? (
+          <div className="absolute bottom-2 left-3 right-3 flex justify-between text-[10px] text-slate-600">
+            <span>{new Date(plotted[0].time).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}</span>
+            <span>{new Date(plotted[plotted.length - 1].time).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}</span>
+          </div>
+        ) : null}
       </div>
-
-      <div className="absolute bottom-3 left-4 right-4 flex justify-between text-[11px] text-slate-500">
-        <span>الأقدم</span>
-        <span>السعر المباشر</span>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.05] px-3 py-2 text-[10px] text-slate-500">
+        <span>{symbol} · شموع يابانية · {interval}</span>
+        <span>السوق المرجعي: Binance</span>
+        {plotted.length ? <span>أعلى {fmt(high, 4)} · أدنى {fmt(low, 4)}</span> : null}
       </div>
     </div>
   );
@@ -232,8 +351,9 @@ function OrderBook({
   currentPrice: number;
 }) {
   const visibleAsks = [...asks]
-    .sort((a, b) => num(b.price) - num(a.price))
-    .slice(0, 12);
+    .sort((a, b) => num(a.price) - num(b.price))
+    .slice(0, 12)
+    .reverse();
 
   const visibleBids = [...bids]
     .sort((a, b) => num(b.price) - num(a.price))
@@ -305,8 +425,11 @@ function OrderBook({
       </div>
 
       <div className="border-y border-white/[0.05] px-3 py-3">
-        <div className="text-base font-semibold text-cyan-400">
-          {fmt(currentPrice, 4)} <span className="text-[10px] text-slate-500">USDT</span>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div className="text-base font-semibold text-cyan-400">
+            {currentPrice > 0 ? fmt(currentPrice, 4) : "—"} <span className="text-[10px] text-slate-500">USDT</span>
+          </div>
+          <span className="text-[10px] text-slate-600">السعر المرجعي من Binance</span>
         </div>
       </div>
 
@@ -331,7 +454,6 @@ export default function ProTradePage() {
   const [asks, setAsks] = useState<BookOrder[]>([]);
   const [bids, setBids] = useState<BookOrder[]>([]);
   const [liveTicker, setLiveTicker] = useState<LiveTicker | null>(null);
-  const [priceHistory, setPriceHistory] = useState<number[]>([]);
   const [priceFeedStatus, setPriceFeedStatus] = useState<"connecting" | "live" | "reconnecting" | "offline" | "snapshot">("connecting");
   const [orderBookFeedStatus, setOrderBookFeedStatus] = useState<"connecting" | "live" | "reconnecting" | "polling">("connecting");
 
@@ -361,7 +483,6 @@ export default function ProTradePage() {
     let socketConnected = false;
     const pair = symbol.trim().toUpperCase();
     setLiveTicker(null);
-    setPriceHistory([]);
     setPriceFeedStatus("connecting");
 
     const applyTicker = (payload: any, fromSocket = false) => {
@@ -376,8 +497,9 @@ export default function ProTradePage() {
         price: priceValue,
         change24h: Number.isFinite(changeValue) ? changeValue : 0,
         quoteVolume: Number.isFinite(volumeValue) ? volumeValue : 0,
+        high24h: Number(payload?.h ?? payload?.highPrice) || 0,
+        low24h: Number(payload?.l ?? payload?.lowPrice) || 0,
       });
-      setPriceHistory((previous) => [...previous, priceValue].slice(-180));
       setPriceFeedStatus(fromSocket || socketConnected ? "live" : "snapshot");
     };
 
@@ -521,13 +643,6 @@ export default function ProTradePage() {
     };
   }, [symbol, tradingMode]);
 
-  const selectedAsset = useMemo(() => {
-    const base = symbol.replace(/USDT$/i, "").toUpperCase();
-    return assets.find(
-      (a) => String(a.symbol || "").toUpperCase() === base
-    );
-  }, [assets, symbol]);
-
   const baseAsset = symbol.replace(/USDT$/i, "").toUpperCase();
   const quoteAsset = "USDT";
 
@@ -535,20 +650,19 @@ export default function ProTradePage() {
     if (liveTicker?.symbol === symbol && num(liveTicker.price) > 0) {
       return num(liveTicker.price);
     }
-
     const last = trades.find((trade) => String(trade.symbol || "").toUpperCase() === symbol && num(trade.price) > 0);
     if (last) return num(last.price);
-
     const ask = asks.find((item) => num(item.price) > 0);
     if (ask) return num(ask.price);
+    return 0;
+  }, [liveTicker, symbol, trades, asks]);
 
-    return num(selectedAsset?.current_price);
-  }, [liveTicker, symbol, trades, asks, selectedAsset]);
+  const marketExecutionPrice = side === "buy"
+    ? num(asks[0]?.price)
+    : num(bids[0]?.price);
 
   const marketChange =
-    liveTicker?.symbol === symbol
-      ? num(liveTicker.change24h)
-      : num(selectedAsset?.price_change_percentage_24h);
+    liveTicker?.symbol === symbol ? num(liveTicker.change24h) : null;
 
   const baseBalance =
     balances.find(
@@ -735,7 +849,7 @@ export default function ProTradePage() {
     const available =
       side === "buy" ? num(quoteBalance.available) : num(baseBalance.available);
 
-    const p = num(price) || currentPrice;
+    const p = orderType === "market" ? (marketExecutionPrice || currentPrice) : num(price) || currentPrice;
 
     if (!p) return;
 
@@ -747,14 +861,14 @@ export default function ProTradePage() {
     setQuantity(qty > 0 ? String(qty) : "");
   };
 
-  const effectiveOrderPrice = orderType === "market" ? currentPrice : num(price);
+  const effectiveOrderPrice = orderType === "market" ? (marketExecutionPrice || currentPrice) : num(price);
   const total = effectiveOrderPrice * num(quantity);
 
   const pairs = useMemo(() => {
     const list = assets
       .filter((a) => a.enabled !== false && a.tradingEnabled !== false)
       .map((a) => String(a.symbol || "").toUpperCase())
-      .filter(Boolean);
+      .filter((base) => Boolean(base) && base !== "USDT");
 
     return Array.from(new Set(list));
   }, [assets]);
@@ -769,7 +883,7 @@ export default function ProTradePage() {
         <InternalSidebar />
         <div className="min-w-0 flex-1">
       <div className="border-b border-white/[0.06] bg-[#07101d]">
-        <div className="flex min-h-[72px] items-center gap-5 px-5">
+        <div className="flex min-h-[72px] flex-wrap items-center gap-3 px-3 sm:px-5">
           <div className="flex min-w-[190px] items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-400">
               ₿
@@ -809,38 +923,34 @@ export default function ProTradePage() {
             </div>
           </div>
 
-          <div className="hidden items-center gap-8 lg:flex">
+          <div className="flex items-center gap-3 lg:gap-6">
             <div>
               <div className="text-xl font-semibold">
-                {currentPrice ? fmt(currentPrice, 4) : "—"}
+                {currentPrice > 0 ? fmt(currentPrice, 4) : "—"}
               </div>
               <div className="text-[10px] text-slate-500">USDT</div>
             </div>
-
             <div>
-              <div
-                className={
-                  marketChange >= 0
-                    ? "text-sm text-emerald-400"
-                    : "text-sm text-rose-400"
-                }
-              >
-                {marketChange >= 0 ? "+" : ""}
-                {fmt(marketChange, 2)}%
+              <div className={marketChange === null ? "text-sm text-slate-400" : marketChange >= 0 ? "text-sm text-emerald-400" : "text-sm text-rose-400"}>
+                {marketChange === null ? "—" : `${marketChange >= 0 ? "+" : ""}${fmt(marketChange, 2)}%`}
               </div>
               <div className="text-[10px] text-slate-500">24h</div>
             </div>
-
-            <div>
+            <div className="hidden xl:block">
               <div className="text-sm font-medium">
-                {fmt(selectedAsset?.current_price, 2)}
+                {liveTicker?.symbol === symbol && liveTicker.high24h > 0 ? fmt(liveTicker.high24h, 4) : "—"}
               </div>
-              <div className="text-[10px] text-slate-500">السعر</div>
+              <div className="text-[10px] text-slate-500">أعلى 24 ساعة</div>
             </div>
-
-            <div>
+            <div className="hidden xl:block">
               <div className="text-sm font-medium">
-                {money(liveTicker?.symbol === symbol ? liveTicker.quoteVolume : selectedAsset?.total_volume)}
+                {liveTicker?.symbol === symbol && liveTicker.low24h > 0 ? fmt(liveTicker.low24h, 4) : "—"}
+              </div>
+              <div className="text-[10px] text-slate-500">أدنى 24 ساعة</div>
+            </div>
+            <div className="hidden xl:block">
+              <div className="text-sm font-medium">
+                {money(liveTicker?.symbol === symbol ? liveTicker.quoteVolume : 0)}
               </div>
               <div className="text-[10px] text-slate-500">حجم التداول</div>
             </div>
@@ -859,9 +969,6 @@ export default function ProTradePage() {
               />
             </button>
 
-            <button className="rounded-lg border border-white/[0.08] p-2.5 text-slate-400 hover:bg-white/[0.05] hover:text-white">
-              <Settings2 size={17} />
-            </button>
           </div>
         </div>
       </div>
@@ -921,29 +1028,25 @@ export default function ProTradePage() {
             </span>
           ) : (
             <span className="rounded-full border border-emerald-400/10 bg-emerald-400/[0.06] px-3 py-1 text-[11px] font-semibold text-emerald-300">
-              حساب حقيقي
+              حساب حقيقي — تنفيذ داخلي
             </span>
           )}
         </div>
       </div>
 
+      <p className="mt-2 px-5 text-[10px] leading-5 text-slate-500">
+        السعر والمخطط مرجعهما بيانات Binance؛ دفتر الأوامر وتنفيذ الصفقات يتمان داخل عرب تريد، ولا تُرسل الأوامر إلى Binance.
+      </p>
+
       <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px]">
         <div className="min-w-0">
           <div className="grid grid-cols-1 border-b border-white/[0.06] lg:grid-cols-[minmax(0,1fr)_310px]">
             <div className="border-l border-white/[0.06]">
-              <div className="flex h-12 items-center gap-5 border-b border-white/[0.06] px-4">
-                <button className="text-sm font-medium text-white">
-                  حركة السوق
-                </button>
-                <button className="text-xs text-slate-500 hover:text-white">
-                  TradingView
-                </button>
-                <button className="text-xs text-slate-500 hover:text-white">
-                  العمق
-                </button>
+              <div className="flex h-12 items-center justify-between border-b border-white/[0.06] px-4">
+                <h3 className="text-sm font-semibold text-white">مخطط الشموع اليابانية</h3>
+                <span className="text-[10px] text-slate-500">بيانات السوق المرجعي لحظيًا</span>
               </div>
-
-              <Chart symbol={symbol} trades={trades} priceHistory={priceHistory} />
+              <Chart symbol={symbol} />
             </div>
 
             <div className="min-h-[650px]">
@@ -1212,15 +1315,15 @@ export default function ProTradePage() {
             </div>
 
             <label className="mb-2 block text-[11px] text-slate-500">
-              {orderType === "market" ? "السعر التقريبي الحالي" : "سعر الأمر"}
+              {orderType === "market" ? (side === "buy" ? "أفضل سعر بيع في الدفتر" : "أفضل سعر شراء في الدفتر") : "سعر الأمر"}
             </label>
             <div className="mb-4 flex h-11 items-center rounded-lg border border-white/[0.08] bg-[#050a13] px-3 focus-within:border-cyan-400/50">
               <input
-                value={orderType === "market" ? (currentPrice > 0 ? String(currentPrice) : "") : price}
+                value={orderType === "market" ? (marketExecutionPrice > 0 ? String(marketExecutionPrice) : "") : price}
                 onChange={(event) => setPrice(event.target.value)}
                 disabled={orderType === "market"}
                 inputMode="decimal"
-                placeholder={currentPrice > 0 ? String(currentPrice) : "0.00"}
+                placeholder={orderType === "market" && marketExecutionPrice <= 0 ? "لا توجد سيولة مقابلة" : currentPrice > 0 ? String(currentPrice) : "0.00"}
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none disabled:text-slate-500"
               />
               <span className="text-[11px] text-slate-500">USDT</span>
@@ -1253,7 +1356,7 @@ export default function ProTradePage() {
 
             <div className="mb-5 flex items-center justify-between text-xs">
               <span className="text-slate-500">
-                {orderType === "market" ? "القيمة التقديرية حسب السعر المباشر" : "إجمالي الأمر"}
+                {orderType === "market" ? "القيمة التقديرية حسب أفضل سعر متاح" : "إجمالي الأمر"}
               </span>
               <span className="font-medium">{total > 0 ? `${money(total)} USDT` : "—"}</span>
             </div>
@@ -1266,7 +1369,8 @@ export default function ProTradePage() {
                 loading ||
                 !Number(quantity) ||
                 Number(quantity) <= 0 ||
-                (orderType === "limit" && (!Number(price) || Number(price) <= 0))
+                (orderType === "limit" && (!Number(price) || Number(price) <= 0)) ||
+                (orderType === "market" && marketExecutionPrice <= 0)
               }
               className={side === "buy"
                 ? "w-full rounded-lg bg-emerald-500 py-3 text-sm font-semibold text-[#03100a] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
@@ -1276,7 +1380,9 @@ export default function ProTradePage() {
             </button>
 
             <div className="mt-3 text-center text-[10px] leading-5 text-slate-600">
-              أوامر Limit تنتظر السعر المحدد؛ وأوامر Market تحاول التنفيذ على السيولة المتاحة في دفتر أوامر عرب تريد.
+              {orderType === "market" && marketExecutionPrice <= 0
+                ? "لا توجد سيولة مقابلة حاليًا في دفتر عرب تريد؛ لن يُرسل الأمر حتى يظهر عرض مقابل."
+                : "أوامر Limit تنتظر السعر المحدد؛ وأوامر Market تُنفَّذ على أفضل السيولة المتاحة في دفتر عرب تريد، وقد تُنفَّذ جزئيًا عند نقص السيولة."}
             </div>
           </div>
 

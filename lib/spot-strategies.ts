@@ -346,12 +346,16 @@ export async function createSpotStrategy(input: {
   if (stopLossPrice !== undefined && (!Number.isFinite(stopLossPrice) || stopLossPrice <= 0 || stopLossPrice >= entryPrice)) {
     throw new Error("وقف الخسارة يجب أن يكون أقل من سعر الدخول.");
   }
+  const minOrderAmount = Number(settings.trading.minOrderAmount || 10);
+  const maxOrderAmount = Number(settings.trading.maxOrderAmount || 100000);
+  const feePercent = Math.max(0, Number(settings.trading.defaultFeePercent || 0));
+  const minBudgetIncludingFee = minOrderAmount * (1 + feePercent / 100) + 0.01;
   if (!Number.isFinite(quoteBudget) ||
-      quoteBudget < Number(settings.trading.minOrderAmount || 10) ||
-      quoteBudget > Number(settings.trading.maxOrderAmount || 100000)) {
-    throw new Error("ميزانية الصفقة يجب أن تكون بين " +
-      Number(settings.trading.minOrderAmount || 10) + " و" +
-      Number(settings.trading.maxOrderAmount || 100000) + " " + pair.quoteAsset + ".");
+      quoteBudget < minBudgetIncludingFee ||
+      quoteBudget > maxOrderAmount * (1 + feePercent / 100)) {
+    throw new Error("ميزانية الصفقة يجب أن تكون على الأقل " +
+      minBudgetIncludingFee.toFixed(2) + " " + pair.quoteAsset +
+      " لتغطية الحد الأدنى للأمر والرسوم، وألا تتجاوز الحد الأعلى المسموح به.");
   }
   if (!Number.isInteger(maxCycles) || maxCycles < 1 || maxCycles > 100) {
     throw new Error("عدد دورات التداول يجب أن يكون من 1 إلى 100.");
@@ -408,7 +412,7 @@ export async function executeManualStrategyAction(
 export async function startSpotStrategy(strategy: any) {
   if (!strategy) throw new Error("الاستراتيجية غير موجودة.");
   if (strategy.status === "completed") throw new Error("اكتملت الاستراتيجية بالفعل؛ أنشئ استراتيجية جديدة لتحديد قواعد جديدة.");
-  if (!isBinanceLiveTradingConfigured()) throw new Error("التداول الحقيقي عبر Binance غير مفعّل.");
+  await assertLiveSpotAvailable(strategy);
   strategy.status = "running";
   strategy.startedAt = new Date();
   strategy.stoppedAt = null;
@@ -449,13 +453,12 @@ export async function runAllSpotStrategies() {
   })
     .select("_id")
     .sort({ updatedAt: 1 })
-    .limit(50)
+    .limit(10)
     .lean();
 
-  const results = [];
-  for (const item of eligible) {
-    results.push(await processStrategy(String(item._id)));
-  }
+  const results = await Promise.all(
+    eligible.map((item) => processStrategy(String(item._id))),
+  );
 
   return {
     found: eligible.length,

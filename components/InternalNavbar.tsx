@@ -11,28 +11,7 @@ import {
   UserCircle,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-
-const menus = [
-  {
-    title: "تداول",
-    items: [
-      ["التداول الفوري", "/protrade"],
-      ["التداول الاحترافي", "/protrade/pro"],
-      ["التداول بالهامش", "/margin"],
-      ["إدارة الأوامر", "/dashboard/orders"],
-      ["سجل الأوامر", "/dashboard/orders/history"],
-      ["سجل التداول", "/dashboard/trades"],
-    ],
-  },
-  {
-    title: "العقود الآجلة",
-    items: [
-      ["العقود الآجلة", "/futures"],
-      ["تداول العقود", "/trading/futures"],
-    ],
-  },
-];
+import { useEffect, useState } from "react";
 
 function isActive(
   pathname: string,
@@ -52,9 +31,6 @@ export default function InternalNavbar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const [open, setOpen] =
-    useState<string | null>(null);
-
   const [mobile, setMobile] =
     useState(false);
 
@@ -64,9 +40,6 @@ export default function InternalNavbar() {
   ] = useState(0);
 
   const [depositBalanceSummary, setDepositBalanceSummary] = useState("0 USDT");
-
-  const ref =
-    useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -156,32 +129,6 @@ export default function InternalNavbar() {
   }, []);
 
   useEffect(() => {
-    const onClick = (
-      event: MouseEvent
-    ) => {
-      if (
-        !ref.current?.contains(
-          event.target as Node
-        )
-      ) {
-        setOpen(null);
-      }
-    };
-
-    document.addEventListener(
-      "mousedown",
-      onClick
-    );
-
-    return () =>
-      document.removeEventListener(
-        "mousedown",
-        onClick
-      );
-  }, []);
-
-  useEffect(() => {
-    setOpen(null);
     setMobile(false);
   }, [pathname]);
 
@@ -223,7 +170,6 @@ export default function InternalNavbar() {
 
   return (
     <header
-      ref={ref}
       dir="rtl"
       className="sticky top-0 z-50 border-b border-white/10 bg-[#050a13]/95 backdrop-blur-xl"
     >
@@ -291,88 +237,16 @@ export default function InternalNavbar() {
             الأسواق
           </Link>
 
-          {menus.map(
-            (menu) => {
-              const menuActive =
-                menu.items.some(
-                  ([, href]) =>
-                    isActive(
-                      pathname,
-                      href
-                    )
-                );
-
-              return (
-                <div
-                  key={menu.title}
-                  className="relative"
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setOpen(
-                        (value) =>
-                          value ===
-                          menu.title
-                            ? null
-                            : menu.title
-                      )
-                    }
-                    className={`flex items-center gap-1 rounded-xl px-3 py-2 text-sm transition ${
-                      open ===
-                        menu.title ||
-                      menuActive
-                        ? "bg-white/5 text-white"
-                        : "text-slate-300 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    {menu.title}
-                    <ChevronDown
-                      size={14}
-                    />
-                  </button>
-
-                  {open ===
-                    menu.title && (
-                    <div className="absolute right-0 top-full pt-2">
-                      <div className="w-64 overflow-hidden rounded-2xl border border-white/10 bg-[#07101d] p-2 shadow-2xl shadow-black/40">
-                        {menu.items.map(
-                          ([
-                            label,
-                            href,
-                          ]) => (
-                            <Link
-                              key={`${label}-${href}`}
-                              href={
-                                href
-                              }
-                              onClick={() =>
-                                setOpen(
-                                  null
-                                )
-                              }
-                              className={`block rounded-xl px-3 py-3 text-xs transition ${
-                                isActive(
-                                  pathname,
-                                  href
-                                )
-                                  ? "bg-blue-500/10 text-cyan-300"
-                                  : "text-slate-400 hover:bg-white/5 hover:text-white"
-                              }`}
-                            >
-                              {
-                                label
-                              }
-                            </Link>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            }
-          )}
+          <Link
+            href="/protrade"
+            className={`rounded-xl px-3 py-2 text-sm transition ${
+              isActive(pathname, "/protrade")
+                ? "bg-blue-500/10 text-cyan-300"
+                : "text-slate-300 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            التداول
+          </Link>
         </nav>
 
         {/* Right actions */}
@@ -510,49 +384,17 @@ export default function InternalNavbar() {
               الأسواق
             </Link>
 
-            {menus.map(
-              (menu) => (
-                <div
-                  key={menu.title}
-                  className="rounded-2xl border border-white/5 bg-white/[0.015] p-1"
-                >
-                  <div className="px-3 py-2 text-[10px] font-bold text-slate-600">
-                    {menu.title}
-                  </div>
-
-                  {menu.items.map(
-                    ([
-                      label,
-                      href,
-                    ]) => (
-                      <Link
-                        key={`${label}-${href}`}
-                        href={
-                          href
-                        }
-                        onClick={() =>
-                          setMobile(
-                            false
-                          )
-                        }
-                        className={`block rounded-xl px-3 py-3 text-sm transition ${
-                          isActive(
-                            pathname,
-                            href
-                          )
-                            ? "bg-blue-500/10 text-cyan-300"
-                            : "text-slate-400 hover:bg-white/5 hover:text-white"
-                        }`}
-                      >
-                        {
-                          label
-                        }
-                      </Link>
-                    )
-                  )}
-                </div>
-              )
-            )}
+            <Link
+              href="/protrade"
+              onClick={() => setMobile(false)}
+              className={`rounded-xl px-3 py-3 text-sm transition ${
+                isActive(pathname, "/protrade")
+                  ? "bg-blue-500/10 text-cyan-300"
+                  : "text-slate-300 hover:bg-white/5"
+              }`}
+            >
+              التداول
+            </Link>
 
             <div className="grid grid-cols-1 gap-2">
               <Link href="/dashboard/assets/deposit" onClick={() => setMobile(false)} className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-3">

@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     const settings = await getPlatformSettings();
     const tradingFeePercent = Math.min(100, Math.max(0, Number(settings.trading?.defaultFeePercent || 0)));
     const marketValueUsdt = round8(quantity * price);
-    const estimatedTradingFeeUsdt = round8(calculateTradingFee(marketValueUsdt, tradingFeePercent));
+    const estimatedTradingFeeUsdt = asset === "USDT" ? 0 : round8(calculateTradingFee(marketValueUsdt, tradingFeePercent));
     const estimatedAfterTradingFeeUsdt = round8(Math.max(0, marketValueUsdt - estimatedTradingFeeUsdt));
     const withdrawalFeePercent = 5;
     const estimatedWithdrawalFeeUsdt = round8(estimatedAfterTradingFeeUsdt * withdrawalFeePercent / 100);

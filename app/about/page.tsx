@@ -1,8 +1,12 @@
 import Link from "next/link";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { ArrowRight, BarChart3, ShieldCheck, Zap } from "lucide-react";
 
 export default function AboutPage() {
   return (
+    <>
+      <Navbar />
     <main className="arabtrade-auth-hero min-h-screen overflow-hidden px-4 py-28 text-white">
 
       <div className="arabtrade-auth-coins" aria-hidden="true">
@@ -102,5 +106,7 @@ export default function AboutPage() {
 
       </div>
     </main>
+      <Footer />
+    </>
   );
 }

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 export const dynamic = "force-dynamic";
 import { getPlatformSettings } from "@/lib/platform-settings";
@@ -23,6 +25,8 @@ export default async function ContactPage() {
     settings.support?.email || "";
 
   return (
+    <>
+      <Navbar />
     <main className="arabtrade-auth-hero min-h-screen overflow-hidden px-4 py-28 text-white">
       <div className="arabtrade-auth-coins" aria-hidden="true">
         <span className="arabtrade-auth-coin">₿</span>
@@ -202,5 +206,7 @@ export default async function ContactPage() {
 
       </div>
     </main>
+      <Footer />
+    </>
   );
 }

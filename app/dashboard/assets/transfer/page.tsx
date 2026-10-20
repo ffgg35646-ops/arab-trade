@@ -1,5 +1,3 @@
-"use client";
-
 import { redirect } from "next/navigation";
 
 /** Legacy route: internal funding/spot transfers are retired. */

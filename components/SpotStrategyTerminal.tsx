@@ -86,6 +86,13 @@ export default function SpotStrategyTerminal() {
   const loadStrategies = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
+      // Manual strategies only need browser-side checking while this screen is open.
+      // The endpoint never submits orders; it only moves manual rules into signal states.
+      await fetch("/api/trading-strategies/watch", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+      }).catch(() => null);
       const response = await fetch("/api/trading-strategies", {
         credentials: "include",
         cache: "no-store",
@@ -444,7 +451,7 @@ export default function SpotStrategyTerminal() {
 
         <div className="mt-8 rounded-xl border border-amber-400/15 bg-amber-400/[0.03] p-4 text-xs leading-6 text-slate-400">
           <div className="mb-1 flex items-center gap-2 font-bold text-amber-200"><ShieldAlert size={15} /> متطلبات التشغيل الآلي</div>
-          يعمل البوت في الخلفية عبر وظيفة مجدولة آمنة، ولا يعتمد على بقاء الصفحة مفتوحة. يلزم ضبط CRON_SECRET وتفعيل مجدول كل دقيقة في الاستضافة. على Vercel، التكرار كل دقيقة يحتاج خطة Pro؛ خطة Hobby تسمح بجدولة مرة يوميًا فقط. لا تُشغّل البوت الحقيقي قبل التأكد من مفاتيح Binance وصلاحية Spot Trading ورصيدك المتاح.
+          الإشارات اليدوية تُحدّث أثناء فتح هذه الشاشة، ولا ترسل أوامر إلا بعد تأكيدك. البوت الآلي يعمل في الخلفية عبر GitHub Actions كل 5 دقائق ولا يحتاج إلى بقاء المتصفح مفتوحًا؛ لتفعيله اضبط متغير الاستضافة SPOT_STRATEGY_RUNNER_ENABLED=true، ومتغير GitHub Actions ARAB_TRADE_BASE_URL (أصل الموقع HTTPS) والسر CRON_SECRET (بنفس القيمة السرية في الاستضافة). إذا لم تكتمل هذه الإعدادات، سيرفض النظام تشغيل البوت بدل إظهار أنه يعمل وهو غير مهيأ. لا تُشغّل التداول الحقيقي قبل التأكد من مفاتيح Binance وصلاحية Spot Trading ورصيدك المتاح.
         </div>
       </div>
     </main>

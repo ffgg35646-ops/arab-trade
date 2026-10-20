@@ -466,7 +466,7 @@ export async function runUserManualSpotStrategies(userId: mongoose.Types.ObjectI
 export async function runAllSpotStrategies() {
   const now = new Date();
   const botRunnerEnabled = process.env.SPOT_STRATEGY_RUNNER_ENABLED === "true";
-  const activityFilter = botRunnerEnabled
+  const activityFilter: any = botRunnerEnabled
     ? {
         $or: [
           { status: "running" },

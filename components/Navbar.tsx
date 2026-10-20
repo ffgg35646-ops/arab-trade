@@ -8,7 +8,7 @@ import { useState } from "react";
 const links = [
   { href: "/", label: "الرئيسية" },
   { href: "/markets", label: "الأسواق" },
-  { href: "/trading", label: "التداول" },
+  { href: "/trading/spot", label: "التداول" },
   { href: "/about", label: "عن الموقع" },
   { href: "/contact", label: "تواصل معنا" },
 ];

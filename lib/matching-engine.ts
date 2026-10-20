@@ -878,6 +878,16 @@ export async function matchOrder(
         order.filledQuantity || 0
       ) + fillQty;
 
+    if (order.type === "market") {
+      order.quoteAmount = Number(
+        (Number(order.quoteAmount || 0) + quoteAmount).toFixed(12)
+      );
+      const filledQuantity = Number(order.filledQuantity || 0);
+      if (filledQuantity > 0) {
+        order.price = Number((order.quoteAmount / filledQuantity).toFixed(12));
+      }
+    }
+
     if (
       !Number.isFinite(
         Number(order.originalQuantity)

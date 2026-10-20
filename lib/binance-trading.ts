@@ -122,10 +122,25 @@ async function signedRequest<T>(
 export async function getBinancePublicPrice(symbol: string): Promise<number> {
   const normalized = String(symbol || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (!/^[A-Z0-9]{5,25}$/.test(normalized)) throw new BinanceTradingError("زوج التداول غير صالح", 400);
-  const data = await fetchBinanceJson<{ symbol?: string; price?: string }>(
-    "ticker/price?symbol=" + encodeURIComponent(normalized),
-    2,
-  );
+  let response: Response;
+  try {
+    // Quote the same environment that will receive the signed order. This
+    // avoids pricing a Testnet order with the live exchange's price.
+    response = await fetch(
+      tradingBaseUrl() + "/api/v3/ticker/price?symbol=" + encodeURIComponent(normalized),
+      {
+        cache: "no-store",
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+  } catch {
+    throw new BinanceTradingError("تعذر الحصول على سعر الزوج من بيئة تنفيذ Binance المختارة", 502);
+  }
+  if (!response.ok) {
+    throw new BinanceTradingError("Binance لا يوفر سعرًا لهذا الزوج في بيئة التنفيذ المختارة", 502);
+  }
+  const data = await response.json() as { symbol?: string; price?: string };
   const price = Number(data?.price);
   if (!Number.isFinite(price) || price <= 0) throw new BinanceTradingError("سعر السوق غير متاح لهذا الزوج", 502);
   return price;

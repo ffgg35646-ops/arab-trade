@@ -45,7 +45,8 @@ export async function consolidateFundingWalletIntoSpotWallet(
         locked: Math.max(0, Number(row.locked || 0)),
       })).filter((row: WalletRow) => Boolean(row.asset));
 
-      const spotRows = (existingSpot?.balances || []).map((row: any) => ({
+      const rawSpotRows = existingSpot?.balances || [];
+      const spotRows = rawSpotRows.map((row: any) => ({
         asset: String(row.asset || "").trim().toUpperCase(),
         available: Math.max(0, Number(row.available || 0)),
         locked: Math.max(0, Number(row.locked || 0)),
@@ -67,9 +68,12 @@ export async function consolidateFundingWalletIntoSpotWallet(
         (row) => row.available > 0 || row.locked > 0,
       );
       const hasDuplicateSpotAssets = new Set(spotRows.map((row) => row.asset)).size !== spotRows.length;
+      const hasNonCanonicalSpotAsset = rawSpotRows.some(
+        (row: any) => String(row.asset || "") !== String(row.asset || "").trim().toUpperCase(),
+      );
 
-      // No source balance and no duplicate spot rows means there is nothing to repair.
-      if (!hasFundingValue && !hasDuplicateSpotAssets) return;
+      // Normalize duplicate/mixed-case assets as well as migrating old funding balances.
+      if (!hasFundingValue && !hasDuplicateSpotAssets && !hasNonCanonicalSpotAsset) return;
 
       let spot = existingSpot;
       if (!spot) {

@@ -469,6 +469,8 @@ export default function ProTradeTerminal() {
   const [availablePairs, setAvailablePairs] = useState<SpotMarketPair[]>([]);
   const [pairFeedLoading, setPairFeedLoading] = useState(true);
   const [pairFeedError, setPairFeedError] = useState("");
+  const [executionConfigured, setExecutionConfigured] = useState(false);
+  const [executionTestnet, setExecutionTestnet] = useState(false);
   const [pairReload, setPairReload] = useState(0);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -518,6 +520,8 @@ export default function ProTradeTerminal() {
         }
         if (!active) return;
         const nextPairs = data.pairs as SpotMarketPair[];
+        setExecutionConfigured(Boolean(data.execution?.configured));
+        setExecutionTestnet(Boolean(data.execution?.testnet));
         setAvailablePairs(nextPairs);
         setPairFeedError("");
         setSymbol((current) => {
@@ -1110,14 +1114,23 @@ export default function ProTradeTerminal() {
       <div className="border-b border-white/[0.06] bg-[#07101d] px-5 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-xs font-semibold text-slate-300">التداول الفوري</span>
-          <span className="rounded-full border border-emerald-400/10 bg-emerald-400/[0.06] px-3 py-1 text-[11px] font-semibold text-emerald-300">
-            السوق الحقيقي · دفتر أوامر Binance
+          <span className={executionConfigured
+            ? "rounded-full border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-1 text-[11px] font-semibold text-emerald-300"
+            : "rounded-full border border-amber-400/20 bg-amber-400/[0.06] px-3 py-1 text-[11px] font-semibold text-amber-200"}>
+            {executionConfigured
+              ? executionTestnet ? "اتصال Binance Testnet" : "تنفيذ Spot متصل بـ Binance"
+              : "أسعار حية — تنفيذ Binance غير مهيأ"}
           </span>
         </div>
       </div>
 
       <p className="mt-2 px-5 text-[10px] leading-5 text-slate-500">
-        السعر والمخطط ودفتر أوامر السوق وآخر الصفقات المعروضة من Binance. تنبيه: إرسال أوامر الشراء والبيع في هذه النسخة ما زال يستخدم مطابقة عرب تريد الداخلية ولا يُرسل إلى Binance؛ لذلك لا تعتبره تداولًا خارجيًا حقيقيًا.
+        السعر والمخطط ودفتر أوامر السوق وآخر الصفقات المعروضة من Binance.
+        {executionConfigured
+          ? executionTestnet
+            ? " أوامر الشراء والبيع تُرسل إلى حساب Binance Testnet للاختبار، وليست تداولًا بأموال حقيقية."
+            : " أوامر الشراء والبيع تُرسل إلى حساب Binance المرتبط. تأكد من كفاية أرصدة حساب المنصة ومطابقتها لأرصدة المستخدمين."
+          : " التداول الحقيقي متوقف حتى يضبط الأدمن BINANCE_API_KEY وBINANCE_API_SECRET ويفعّل BINANCE_LIVE_TRADING_ENABLED على الخادم. لن ينفذ الموقع أمرًا داخليًا بديلًا."}
       </p>
 
       <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px]">

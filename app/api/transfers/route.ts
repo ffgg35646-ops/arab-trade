@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { requireVerifiedIdentity } from "@/lib/require-kyc";
 import { connectDB } from "@/lib/mongodb";
-import { migrateLegacyDepositBalancesToSpotWallet } from "@/lib/unified-usdt-wallet";
 import { getIdempotentResponse, hashRequest } from "@/lib/idempotency";
 import IdempotencyKey from "@/models/IdempotencyKey";
 import Notification from "@/models/Notification";
@@ -93,7 +92,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await migrateLegacyDepositBalancesToSpotWallet(user._id);
 
     session = await mongoose.startSession();
     let finalResponseBody: Record<string, unknown> | null = null;

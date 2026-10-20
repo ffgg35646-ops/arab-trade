@@ -4,7 +4,7 @@ import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
 import { ArrowDownRight, ArrowUpRight, RefreshCw, ShieldCheck, X } from "lucide-react";
 type Pair = { symbol:string; baseAsset:string; quoteAsset:string; lastPrice:number };
-type Position = { _id?:string; symbol?:string; side?:string; quantity?:number; entryPrice?:number; leverage?:number; margin?:number; pnl?:number; status?:string; createdAt?:string };
+type Position = { _id?:string; symbol?:string; side?:string; quantity?:number; entryPrice?:number; markPrice?:number; leverage?:number; margin?:number; pnl?:number; status?:string; createdAt?:string };
 function fmt(value:unknown,digits=4){const n=Number(value);return Number.isFinite(n)?n.toLocaleString("en-US",{maximumFractionDigits:digits}):"—";}
 export default function MarginPage(){
  const [pairs,setPairs]=useState<Pair[]>([]); const [positions,setPositions]=useState<Position[]>([]);

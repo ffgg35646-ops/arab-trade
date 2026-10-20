@@ -28,6 +28,7 @@ const TradeSchema = new Schema<ITrade>(
     },
 
     symbol: { type: String, required: true, index: true },
+    takerSide: { type: String, enum: ["buy", "sell"] },
     buyOrderId: { type: Schema.Types.ObjectId, ref: "Order", required: true, index: true },
     sellOrderId: { type: Schema.Types.ObjectId, ref: "Order", required: true, index: true },
     buyerId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },

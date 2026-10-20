@@ -3,6 +3,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 export interface ITrade extends Document {
   mode: "demo" | "live";
   symbol: string;
+  takerSide?: "buy" | "sell";
   buyOrderId: mongoose.Types.ObjectId;
   sellOrderId: mongoose.Types.ObjectId;
   buyerId: mongoose.Types.ObjectId;

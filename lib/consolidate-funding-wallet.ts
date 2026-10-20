@@ -27,10 +27,17 @@ export async function consolidateFundingWalletIntoSpotWallet(
 
   try {
     await session.withTransaction(async () => {
-      const [funding, existingSpot] = await Promise.all([
-        Wallet.findOne({ userId, type: "funding", mode: "live" }).session(session),
-        Wallet.findOne({ userId, type: "spot", mode: "live" }).session(session),
-      ]);
+      // MongoDB transactions must execute operations sequentially on a session.
+      const funding = await Wallet.findOne({
+        userId,
+        type: "funding",
+        mode: "live",
+      }).session(session);
+      const existingSpot = await Wallet.findOne({
+        userId,
+        type: "spot",
+        mode: "live",
+      }).session(session);
 
       const fundingRows = (funding?.balances || []).map((row: any) => ({
         asset: String(row.asset || "").trim().toUpperCase(),
@@ -151,10 +158,10 @@ export async function consolidateFundingWalletIntoSpotWallet(
                 mode: "live",
                 type: "transfer",
                 amount: Number((-row.available).toFixed(12)),
-                balanceBefore: before.available + row.available,
-                balanceAfter: before.available,
+                balanceBefore: row.available,
+                balanceAfter: 0,
                 referenceId,
-                note: "دمج الرصيد المتاح من محفظة التمويل القديمة إلى محفظة التداول",
+                note: "إخراج الرصيد المتاح من محفظة التمويل القديمة أثناء الدمج",
               },
               {
                 userId,

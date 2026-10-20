@@ -880,26 +880,24 @@ export default function ProTradeTerminal() {
         throw new Error(data.message || "تعذر إنشاء الأمر");
       }
 
-      const matchedCount = Number(data?.matching?.matched || 0);
+      // Live Spot orders must be confirmed as Binance orders. Never present an
+      // internal/legacy matching-engine response as a real exchange execution.
+      if (data.executionProvider !== "binance") {
+        await loadAll(true);
+        throw new Error(
+          "لم يؤكد الخادم إرسال الأمر إلى Binance؛ لم يتم اعتماد العملية كصفقة حقيقية. راجع سجل الأوامر قبل إعادة المحاولة لتجنب تكرار الطلب."
+        );
+      }
+
       const matchedQuantity = Array.isArray(data?.matching?.trades)
         ? data.matching.trades.reduce((sum: number, trade: any) => sum + Math.max(0, Number(trade?.quantity) || 0), 0)
         : 0;
-      const orderLabel = side === "buy" ? "شراء" : "بيع";
-      const quantityLabel = Number(quantity).toLocaleString("en-US", { maximumFractionDigits: 8 });
       const executedLabel = matchedQuantity.toLocaleString("en-US", { maximumFractionDigits: 8 });
-      if (data.executionProvider === "binance") {
-        setMessage(String(data.message || (
-          matchedCount > 0 && matchedQuantity > 0
-            ? `أكدت Binance تنفيذ ${executedLabel} ${baseAsset}.`
-            : "تم إرسال الأمر إلى Binance؛ راجع سجل الأوامر للحالة المؤكدة."
-        )));
-      } else {
-        setMessage(
-          matchedCount > 0 && matchedQuantity > 0
-            ? `تم تنفيذ ${orderLabel} ${executedLabel} ${baseAsset} داخل دفتر عرب تريد الداخلي؛ هذا ليس تنفيذًا لدى Binance.`
-            : `تم إنشاء أمر ${orderLabel} ${quantityLabel} ${baseAsset} داخل عرب تريد فقط، ولم تُنفذ صفقة بعد. هذا الأمر لم يُرسل إلى Binance.`
-        );
-      }
+      setMessage(String(data.message || (
+        matchedQuantity > 0
+          ? `أكدت Binance تنفيذ ${executedLabel} ${baseAsset}.`
+          : "تم إرسال الأمر إلى Binance؛ راجع حالة الأمر والكمية المنفذة في سجل التداول."
+      )));
 
       setQuantity("");
       await loadAll(true);
@@ -1294,7 +1292,7 @@ export default function ProTradeTerminal() {
                         </td>
 
                         <td className="px-4 py-3 text-slate-400">
-                          {order.type === "limit" ? "Limit" : order.type}
+                          {order.type === "limit" ? "محدد (Limit)" : order.type === "market" ? "سوق (Market)" : order.type}
                         </td>
 
                         <td
@@ -1491,7 +1489,7 @@ export default function ProTradeTerminal() {
             </div>
 
             <label className="mb-2 block text-[11px] text-slate-500">
-              {orderType === "market" ? (side === "buy" ? "أفضل سعر بيع في الدفتر" : "أفضل سعر شراء في الدفتر") : "سعر الأمر"}
+              {orderType === "market" ? (side === "buy" ? "أفضل سعر بيع في دفتر Binance" : "أفضل سعر شراء في دفتر Binance") : "سعر الأمر المحدد"}
             </label>
             <div className="mb-4 flex h-11 items-center rounded-lg border border-white/[0.08] bg-[#050a13] px-3 focus-within:border-cyan-400/50">
               <input
@@ -1557,8 +1555,12 @@ export default function ProTradeTerminal() {
 
             <div className="mt-3 text-center text-[10px] leading-5 text-slate-600">
               {orderType === "market" && marketExecutionPrice <= 0
-                ? "لا توجد سيولة مقابلة حاليًا في دفتر عرب تريد؛ لن يُرسل الأمر حتى يظهر عرض مقابل."
-                : "أوامر Limit تنتظر السعر المحدد؛ وأوامر Market تُنفَّذ على أفضل السيولة المتاحة في دفتر عرب تريد، وقد تُنفَّذ جزئيًا عند نقص السيولة."}
+                ? "لا تتوفر سيولة مقابلة من Binance الآن؛ لن يُرسل أمر السوق حتى يظهر سعر قابل للتنفيذ."
+                : orderType === "market"
+                  ? "أمر السوق يُرسل إلى Binance للتنفيذ بأفضل الأسعار المتاحة الآن. قد يختلف متوسط التنفيذ عن السعر المعروض، وقد يكون التنفيذ جزئيًا عند نقص السيولة."
+                  : side === "buy"
+                    ? `شراء محدد: يُرسل الأمر إلى دفتر Binance بسعرك أو بسعر أفضل. تُحجز ${quoteAsset}، ولا تُضاف ${baseAsset} إلى الرصيد إلا بالكمية التي تنفّذ فعلًا؛ وقد يظل الأمر مفتوحًا حتى التنفيذ أو الإلغاء.`
+                    : `بيع محدد: يُرسل الأمر إلى دفتر Binance بسعرك أو بسعر أفضل. تُحجز ${baseAsset} من رصيدك حتى التنفيذ أو الإلغاء؛ ولا تُسجل الصفقة إلا بالكمية التي بيعت فعلًا.`}
             </div>
           </div>
 

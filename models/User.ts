@@ -13,7 +13,7 @@ export interface IUser {
   referredBy?: mongoose.Types.ObjectId | null;
   isVerified: boolean;
   isActive: boolean;
-  approvalStatus: AccountApprovalStatus;
+  approvalStatus?: AccountApprovalStatus;
   rejectionReason?: string;
   createdAt: Date;
   updatedAt?: Date;

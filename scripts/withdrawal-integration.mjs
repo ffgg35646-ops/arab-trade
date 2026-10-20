@@ -18,6 +18,8 @@ let userId, adminId, packageAId, packageBId, oldUserPackageId;
 let userCookie = "", adminCookie = "";
 const suffix = randomUUID().replaceAll("-", "").slice(0, 10).toLowerCase();
 const testPassword = "Withdrawal-CI-Only-2026!";
+const validTrcAddress = "T" + "A".repeat(33);
+const invalidBepAddress = "0x" + "a".repeat(40);
 
 async function call(path, { method = "GET", cookie = "", body } = {}) {
   const headers = {};
@@ -71,10 +73,10 @@ async function getPackageState(id) {
   return plan.account;
 }
 async function requestWithdrawal(amount, packageId = packageAId) {
-  return call("/api/withdrawals", { method: "POST", cookie: userCookie, body: { type: "package", packageId: String(packageId), amount, asset: "USDT", network: "TRC20", payoutAddress: "QA-wallet-" + suffix } });
+  return call("/api/withdrawals", { method: "POST", cookie: userCookie, body: { type: "package", packageId: String(packageId), amount, asset: "USDT", network: "TRC20", payoutAddress: validTrcAddress } });
 }
 async function requestGeneralWithdrawal(amount) {
-  return call("/api/withdrawals", { method: "POST", cookie: userCookie, body: { type: "general", amount, asset: "USDT", network: "TRC20", payoutAddress: "QA-general-wallet-" + suffix } });
+  return call("/api/withdrawals", { method: "POST", cookie: userCookie, body: { type: "general", amount, asset: "USDT", network: "TRC20", payoutAddress: validTrcAddress } });
 }
 async function review(requestId, action) {
   return call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie, body: { id: String(requestId), action } });
@@ -116,6 +118,26 @@ try {
   assert.equal(health.status, 200);
   assert.equal(health.data.database, "connected");
   log("Application is connected to the isolated database");
+
+  const wrongNetworkAddress = await call("/api/withdrawals", {
+    method: "POST",
+    cookie: userCookie,
+    body: {
+      type: "general",
+      amount: 100,
+      asset: "USDT",
+      network: "TRC20",
+      payoutAddress: invalidBepAddress,
+    },
+  });
+  assert.equal(wrongNetworkAddress.status, 400, "an EVM address must not be accepted on TRC20");
+  assert.match(wrongNetworkAddress.data.message, /TRC20/);
+  assert.equal(
+    await mongoose.connection.collection("withdrawalrequests").countDocuments({ userId: user._id }),
+    0,
+    "rejecting an address with the wrong network format must not create a withdrawal or reserve funds",
+  );
+  log("Rejects a BEP20-shaped address for TRC20 before creating a withdrawal request");
 
   const createPlan = async (name, dailyProfit) => {
     const res = await call("/api/admin/packages", { method: "POST", cookie: adminCookie,
@@ -292,7 +314,7 @@ try {
   const savedDestination = await latestPending();
   assert.equal(savedDestination.asset, "USDT");
   assert.equal(savedDestination.network, "TRC20");
-  assert.equal(savedDestination.payoutAddress, "QA-wallet-" + suffix);
+  assert.equal(savedDestination.payoutAddress, validTrcAddress);
   const pendingHistoryResponse = await call("/api/withdrawals", { cookie: userCookie });
   const pendingHistoryRow = pendingHistoryResponse.data.requests.find((row) => row._id === String(savedDestination._id));
   assert.ok(pendingHistoryRow?.createdAt, "user withdrawal history must expose the request date");

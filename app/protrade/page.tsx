@@ -329,7 +329,7 @@ export default function ProTradePage() {
   const [bids, setBids] = useState<BookOrder[]>([]);
   const [liveTicker, setLiveTicker] = useState<LiveTicker | null>(null);
   const [priceHistory, setPriceHistory] = useState<number[]>([]);
-  const [priceFeedStatus, setPriceFeedStatus] = useState<"connecting" | "live" | "reconnecting" | "offline">("connecting");
+  const [priceFeedStatus, setPriceFeedStatus] = useState<"connecting" | "live" | "reconnecting" | "offline" | "snapshot">("connecting");
   const [orderBookFeedStatus, setOrderBookFeedStatus] = useState<"connecting" | "live" | "reconnecting" | "polling">("connecting");
 
   const [symbol, setSymbol] = useState("BTCUSDT");
@@ -357,6 +357,9 @@ export default function ProTradePage() {
     let retryCount = 0;
     let socketConnected = false;
     const pair = symbol.trim().toUpperCase();
+    setLiveTicker(null);
+    setPriceHistory([]);
+    setPriceFeedStatus("connecting");
 
     const applyTicker = (payload: any, fromSocket = false) => {
       const priceValue = Number(payload?.c ?? payload?.lastPrice);
@@ -372,7 +375,7 @@ export default function ProTradePage() {
         quoteVolume: Number.isFinite(volumeValue) ? volumeValue : 0,
       });
       setPriceHistory((previous) => [...previous, priceValue].slice(-180));
-      if (fromSocket) setPriceFeedStatus("live");
+      setPriceFeedStatus(fromSocket || socketConnected ? "live" : "snapshot");
     };
 
     const loadSnapshot = async () => {
@@ -791,7 +794,7 @@ export default function ProTradePage() {
               <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
                 <span>التداول الفوري</span>
                 <span className={priceFeedStatus === "live" ? "text-emerald-400" : "text-amber-300"}>
-                  {priceFeedStatus === "live" ? "● سعر مباشر" : priceFeedStatus === "reconnecting" ? "● استعادة اتصال السعر" : priceFeedStatus === "offline" ? "● السعر غير متاح" : "● جاري الاتصال بالسوق"}
+                  {priceFeedStatus === "live" ? "● سعر مباشر" : priceFeedStatus === "snapshot" ? "● تحديث احتياطي كل 5 ثوانٍ" : priceFeedStatus === "reconnecting" ? "● استعادة اتصال السعر" : priceFeedStatus === "offline" ? "● السعر غير متاح" : "● جاري الاتصال بالسوق"}
                 </span>
                 <span className={orderBookFeedStatus === "live" ? "text-emerald-400" : "text-amber-300"}>
                   {orderBookFeedStatus === "live" ? "● دفتر الأوامر مباشر" : orderBookFeedStatus === "polling" ? "● تحديث دوري" : "● تحديث دفتر الأوامر"}
@@ -962,8 +965,8 @@ export default function ProTradePage() {
 
             <div className="max-h-[230px] overflow-auto">
               {trades.slice(0, 20).map((trade, i) => {
-                const isBuy =
-                  String(trade.side || "").toLowerCase() === "buy";
+                const isBuy = String(trade.side || "").toLowerCase() === "buy";
+                const isSell = String(trade.side || "").toLowerCase() === "sell";
 
                 return (
                   <div
@@ -972,7 +975,7 @@ export default function ProTradePage() {
                   >
                     <span
                       className={
-                        isBuy ? "text-emerald-400" : "text-rose-400"
+                        isBuy ? "text-emerald-400" : isSell ? "text-rose-400" : "text-slate-400"
                       }
                     >
                       {fmt(trade.price, 4)}

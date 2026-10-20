@@ -52,6 +52,8 @@ jobs:
         run: npx --yes tsx@4.20.6 test-market-step5.ts
       - name: Run spot market-sell settlement regression test
         run: npx --yes tsx@4.20.6 test-market-sell-step5.ts
+      - name: Run internal transfer atomicity test
+        run: npx --yes tsx@4.20.6 test-transfer-atomicity.ts
       - name: Start application against test database
         run: |
           npm start > /tmp/arabtrade-withdrawal-app.log 2>&1 &

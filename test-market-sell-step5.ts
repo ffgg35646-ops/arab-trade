@@ -51,7 +51,7 @@ async function main() {
 
     buyer = await User.create({
       name: "Market Sell Test Buyer",
-      username: suffix.slice(0, 25) + "b",
+      username: `msellb${Date.now()}`,
       email: `${suffix}-buyer@example.test`,
       password: "TestOnly-123456",
       referralCode: `B${Date.now()}`,
@@ -62,7 +62,7 @@ async function main() {
 
     seller = await User.create({
       name: "Market Sell Test Seller",
-      username: suffix.slice(0, 24) + "s",
+      username: `msells${Date.now()}`,
       email: `${suffix}-seller@example.test`,
       password: "TestOnly-123456",
       referralCode: `S${Date.now()}`,

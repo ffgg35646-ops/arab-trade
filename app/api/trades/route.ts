@@ -79,6 +79,33 @@ export async function GET(
         500
       );
 
+    if (url.searchParams.get("market") === "true") {
+      const marketFilter: Record<string, unknown> = { mode };
+
+      if (symbol) {
+        marketFilter.symbol = symbol;
+      }
+
+      const marketTrades = await Trade.find(marketFilter)
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .select("symbol price quantity quoteAmount createdAt")
+        .lean();
+
+      // Market tape is public trading data. Never expose buyer/seller or order IDs here.
+      return NextResponse.json({
+        success: true,
+        trades: marketTrades.map((trade: any) => ({
+          _id: String(trade._id),
+          symbol: String(trade.symbol || ""),
+          price: Number(trade.price || 0),
+          quantity: Number(trade.quantity || 0),
+          quoteAmount: Number(trade.quoteAmount || 0),
+          createdAt: trade.createdAt,
+        })),
+      });
+    }
+
     const filter: Record<
       string,
       unknown

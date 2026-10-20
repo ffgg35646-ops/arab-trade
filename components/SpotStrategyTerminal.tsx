@@ -106,12 +106,13 @@ export default function SpotStrategyTerminal() {
     let stopped = false;
     const loadPrice = async () => {
       try {
-        const response = await fetch("/api/trading/market?symbol=" + encodeURIComponent(symbol), {
+        const response = await fetch("/api/trading-strategies/price?symbol=" + encodeURIComponent(symbol), {
+          credentials: "include",
           cache: "no-store",
         });
         const data = await response.json().catch(() => ({}));
-        const price = Number(data?.ticker?.lastPrice);
-        if (!stopped && response.ok && Number.isFinite(price) && price > 0) setMarketPrice(price);
+        const price = Number(data?.price);
+        if (!stopped && response.ok && data?.success !== false && Number.isFinite(price) && price > 0) setMarketPrice(price);
       } catch {
         // Keep the most recent valid price visible when the public market feed is unavailable.
       }
@@ -230,7 +231,7 @@ export default function SpotStrategyTerminal() {
           <div className="rounded-xl border border-white/[0.08] bg-[#07101d] p-4">
             <div className="flex items-center gap-2 text-xs text-slate-400"><Activity size={15} /> سعر السوق الحالي · {symbol}</div>
             <div className="mt-2 font-mono text-2xl font-bold">{marketPrice > 0 ? number(marketPrice, 8) : "—"} <span className="text-xs text-slate-500">{quoteAsset}</span></div>
-            <p className="mt-2 text-[11px] text-slate-500">بيانات السوق من Binance Spot، وتتحدث الواجهة دوريًا.</p>
+            <p className="mt-2 text-[11px] text-slate-500">السعر من بيئة تنفيذ Binance المختارة، وتتحدث الواجهة دوريًا.</p>
           </div>
           <div className="rounded-xl border border-white/[0.08] bg-[#07101d] p-4">
             <div className="flex items-center gap-2 text-xs text-slate-400"><Bot size={15} /> أسلوب التشغيل</div>

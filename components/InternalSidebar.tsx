@@ -23,7 +23,7 @@ const sections = [
   },
   {
     title: "الأسواق",
-    href: "/markets",
+    href: "/dashboard/markets",
     icon: BarChart3,
   },
   {

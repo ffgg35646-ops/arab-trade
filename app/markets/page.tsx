@@ -140,12 +140,12 @@ export default function MarketsPage() {
                 {loading && pairs.length === 0 ? [1,2,3,4,5,6,7].map((item) => <tr key={item} className="border-b border-white/5"><td colSpan={7} className="px-4 py-4"><div className="h-5 animate-pulse rounded bg-white/5" /></td></tr>) :
                 visiblePairs.length === 0 ? <tr><td colSpan={7} className="px-4 py-16 text-center text-slate-500">{error ? "بيانات السوق غير متاحة الآن." : "لا توجد أزواج تطابق البحث."}</td></tr> :
                 visiblePairs.map((item) => <tr key={item.symbol} className="border-b border-white/5 hover:bg-cyan-400/[0.035]">
-                  <td className="px-4 py-4"><Link href={"/protrade?symbol=" + item.symbol} className="font-bold text-white hover:text-cyan-300">{item.baseAsset}<span className="text-slate-500">/{item.quoteAsset}</span></Link><div className="mt-1 text-[10px] text-slate-600">Spot · {item.tradeCount.toLocaleString("en-US")} صفقة/24س</div></td>
+                  <td className="px-4 py-4"><Link href={"/trading/spot?symbol=" + item.symbol} className="font-bold text-white hover:text-cyan-300">{item.baseAsset}<span className="text-slate-500">/{item.quoteAsset}</span></Link><div className="mt-1 text-[10px] text-slate-600">Spot · {item.tradeCount.toLocaleString("en-US")} صفقة/24س</div></td>
                   <td className="px-4 py-4 text-left font-mono tabular-nums">{price(item.lastPrice)}</td>
                   <td className={"px-4 py-4 text-left font-mono font-bold " + (item.priceChangePercent >= 0 ? "text-emerald-400" : "text-red-400")}><span className="inline-flex items-center gap-1">{item.priceChangePercent >= 0 ? <ArrowUp size={13} /> : <ArrowDown size={13} />}{item.priceChangePercent > 0 ? "+" : ""}{item.priceChangePercent.toFixed(2)}%</span></td>
                   <td className="px-4 py-4 text-left font-mono text-slate-300">{price(item.highPrice)}</td><td className="px-4 py-4 text-left font-mono text-slate-300">{price(item.lowPrice)}</td>
                   <td className="px-4 py-4 text-left font-mono text-slate-300">{compact(item.quoteVolume)} <span className="text-[10px] text-slate-600">{item.quoteAsset}</span></td>
-                  <td className="px-4 py-4 text-left"><Link href={"/protrade?symbol=" + item.symbol} className="inline-flex items-center gap-1 rounded-lg bg-cyan-400/10 px-3 py-2 text-xs font-bold text-cyan-300 hover:bg-cyan-400/20"><BarChart3 size={14} />تداول</Link></td>
+                  <td className="px-4 py-4 text-left"><Link href={"/trading/spot?symbol=" + item.symbol} className="inline-flex items-center gap-1 rounded-lg bg-cyan-400/10 px-3 py-2 text-xs font-bold text-cyan-300 hover:bg-cyan-400/20"><BarChart3 size={14} />تداول</Link></td>
                 </tr>)}
               </tbody>
             </table>

@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import PublicTradingPage from "@/components/PublicTradingPage";
 
-export default function LegacyTradingPage() {
-  redirect("/trading");
+export default function FuturesTradingPage() {
+  return <PublicTradingPage mode="futures" />;
 }

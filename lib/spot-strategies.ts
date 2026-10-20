@@ -462,11 +462,22 @@ export async function runUserManualSpotStrategies(userId: mongoose.Types.ObjectI
 
 export async function runAllSpotStrategies() {
   const now = new Date();
+  const botRunnerEnabled = process.env.SPOT_STRATEGY_RUNNER_ENABLED === "true";
+  const activityFilter = botRunnerEnabled
+    ? {
+        $or: [
+          { status: "running" },
+          { pendingOrderId: { $ne: null } },
+        ],
+      }
+    : {
+        $or: [
+          { executionMode: "manual", status: "running" },
+          { pendingOrderId: { $ne: null } },
+        ],
+      };
   const eligible = await SpotStrategy.find({
-    $or: [
-      { status: "running" },
-      { pendingOrderId: { $ne: null } },
-    ],
+    ...activityFilter,
     $and: [
       {
         $or: [

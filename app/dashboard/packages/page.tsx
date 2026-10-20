@@ -192,7 +192,7 @@ export default function UserPackagesPage() {
                   </div>
                   {Number(item.cancellationRefund || 0) > 0 && (
                     <p className="mt-3 text-xs text-cyan-200">
-                      استرداد مسجل لهذه الباقة: {money(item.cancellationRefund)} {item.asset}
+                      استرداد مسجل لهذه الباقة: {money(Number(item.cancellationRefund || 0))} {item.asset}
                     </p>
                   )}
                   {item.cancelledAt && (

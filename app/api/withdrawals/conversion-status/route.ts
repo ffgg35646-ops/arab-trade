@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     withdrawalConversionStatus: "pending",
     side: "sell",
     symbol: { $regex: /USDT$/ },
-    status: { $in: ["filled", "cancelled"] },
+    status: { $in: ["filled", "cancelled", "rejected"] },
     locksReleased: true,
   }).lean();
 

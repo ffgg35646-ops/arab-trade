@@ -280,7 +280,7 @@ export async function POST(request: NextRequest) {
     if (!conversionOrder) {
       return NextResponse.json({ success: false, message: "لم نعثر على أمر بيع مؤكد تابع لحسابك؛ لم يتم إنشاء طلب السحب." }, { status: 409 });
     }
-    if (!["filled", "cancelled"].includes(String(conversionOrder.status || "").toLowerCase()) || !conversionOrder.locksReleased) {
+    if (!["filled", "cancelled", "rejected"].includes(String(conversionOrder.status || "").toLowerCase()) || !conversionOrder.locksReleased) {
       return NextResponse.json({ success: false, message: "أمر البيع لم يصل إلى حالة نهائية مؤكدة؛ لا يمكن سحب حصيلته بعد." }, { status: 409 });
     }
     let pair;

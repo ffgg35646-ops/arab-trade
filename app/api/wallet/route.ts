@@ -255,20 +255,33 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const fundingTotalUsd =
-      fundingBalances.reduce(
-        (sum, item) =>
-          sum + item.valueUsd,
-        0
-      );
-
-    const externalDepositTotalUsd = depositBalances.reduce(
-      (sum, item) => sum + (Number(item.available || 0) + Number(item.locked || 0)) * Number(prices.get(item.asset) || 0),
-      0,
+    const fundingTotalUsd = fundingBalances.reduce(
+      (sum, item) => sum + item.valueUsd,
+      0
+    );
+    const fundingAvailableUsd = fundingBalances.reduce(
+      (sum, item) => sum + item.available * item.priceUsd,
+      0
+    );
+    const fundingLockedUsd = fundingBalances.reduce(
+      (sum, item) => sum + item.locked * item.priceUsd,
+      0
     );
 
-    // External deposits are kept separate from the trading wallet and counted once.
-    const totalAccountBalanceUsd = totalBalanceUsd + fundingTotalUsd + externalDepositTotalUsd;
+    const externalDepositAvailableUsd = depositBalances.reduce(
+      (sum, item) => sum + Number(item.available || 0) * Number(prices.get(item.asset) || 0),
+      0
+    );
+    const externalDepositLockedUsd = depositBalances.reduce(
+      (sum, item) => sum + Number(item.locked || 0) * Number(prices.get(item.asset) || 0),
+      0
+    );
+    const externalDepositTotalUsd = externalDepositAvailableUsd + externalDepositLockedUsd;
+
+    // Account totals combine spot, funding, and external deposit balances exactly once.
+    const totalAccountAvailableUsd = totalAvailableUsd + fundingAvailableUsd + externalDepositAvailableUsd;
+    const totalAccountLockedUsd = totalLockedUsd + fundingLockedUsd + externalDepositLockedUsd;
+    const totalAccountBalanceUsd = totalAccountAvailableUsd + totalAccountLockedUsd;
 
     return NextResponse.json({
       success: true,
@@ -293,6 +306,14 @@ export async function GET(request: NextRequest) {
         totalAvailableUsd,
         totalLockedUsd,
         totalBalanceUsd,
+        fundingTotalUsd,
+        fundingAvailableUsd,
+        fundingLockedUsd,
+        externalDepositTotalUsd,
+        externalDepositAvailableUsd,
+        externalDepositLockedUsd,
+        totalAccountAvailableUsd,
+        totalAccountLockedUsd,
         totalAccountBalanceUsd,
       },
 

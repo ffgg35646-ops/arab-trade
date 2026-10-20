@@ -38,6 +38,8 @@ type WalletData = {
   totalLockedUsd: number;
   totalBalanceUsd: number;
   totalAccountBalanceUsd?: number;
+  totalAccountAvailableUsd?: number;
+  totalAccountLockedUsd?: number;
 };
 
 type TransactionItem = {
@@ -87,22 +89,37 @@ function transactionTitle(type: string) {
     case "referral":
     case "referral_commission":
       return "عمولة إحالة";
+    case "transfer":
+      return "تحويل بين المحافظ";
+    case "trade":
+      return "عملية تداول";
+    case "fee":
+    case "liquidation_fee":
+    case "margin_interest":
+      return "رسوم تداول";
+    case "reward":
+      return "مكافأة";
+    case "adjustment":
+      return "تسوية رصيد";
+    case "margin_open":
+      return "فتح مركز هامش";
+    case "margin_close":
+      return "إغلاق مركز هامش";
+    case "margin_liquidation":
+      return "تصفية مركز هامش";
+    case "insurance_fund_credit":
+      return "إضافة لصندوق التأمين";
+    case "insurance_fund_debit":
+      return "خصم من صندوق التأمين";
+    case "bad_debt":
+      return "دين مستحق";
     default:
       return "حركة مالية";
   }
 }
 
-function transactionSign(type: string) {
-  return [
-    "deposit",
-    "collect",
-    "admin_credit",
-    "referral",
-    "referral_commission",
-    "withdraw_rejected",
-  ].includes(type)
-    ? "+"
-    : "-";
+function transactionSign(amount: number) {
+  return Number(amount) >= 0 ? "+" : "-";
 }
 
 export default function WalletPage() {
@@ -116,6 +133,8 @@ export default function WalletPage() {
     totalLockedUsd: 0,
     totalBalanceUsd: 0,
     totalAccountBalanceUsd: 0,
+    totalAccountAvailableUsd: 0,
+    totalAccountLockedUsd: 0,
   });
 
   const [depositBalances, setDepositBalances] = useState<SplitBalance[]>([]);
@@ -182,6 +201,12 @@ export default function WalletPage() {
   const displayedBalance = hideBalance
     ? "••••••••"
     : money(wallet.totalAccountBalanceUsd ?? wallet.totalBalanceUsd);
+
+  const displayMoney = (value: number, digits = 2) =>
+    hideBalance ? "••••••" : money(value, digits);
+
+  const displayAssetAmount = (value: number) =>
+    hideBalance ? "••••••" : assetAmount(value);
 
   if (loading) {
     return (
@@ -341,12 +366,15 @@ export default function WalletPage() {
             <section className="mb-6 grid gap-4 lg:grid-cols-2">
               <div className="rounded-2xl border border-sky-400/20 bg-sky-500/[0.06] p-5">
                 <div className="text-sm font-bold text-sky-200">رصيد الإيداع الخارجي</div>
-                <p className="mt-1 text-xs text-slate-400">الأموال التي أودعتها من خارج الموقع فقط. يُستخدم لتفعيل الباقات.</p>
+                <p className="mt-1 text-xs text-slate-400">الأموال التي أودعتها من خارج الموقع فقط. تُستخدم لتفعيل الباقات، وتُعرض منفصلة عن رصيد التداول.</p>
                 <div className="mt-4 space-y-2">
                   {depositBalances.length ? depositBalances.map((item) => (
-                    <div key={item.asset} className="flex items-center justify-between rounded-xl bg-black/20 px-3 py-2 text-sm">
+                    <div key={item.asset} className="flex items-center justify-between gap-3 rounded-xl bg-black/20 px-3 py-2 text-sm">
                       <span className="font-bold">{item.asset}</span>
-                      <span>{hideBalance ? "••••••" : assetAmount(item.available)} <span className="text-slate-500">متاح</span></span>
+                      <div className="flex flex-wrap justify-end gap-x-4 gap-y-1 text-left">
+                        <span>{displayAssetAmount(item.available)} <span className="text-slate-500">متاح</span></span>
+                        <span>{displayAssetAmount(item.locked)} <span className="text-slate-500">محجوز</span></span>
+                      </div>
                     </div>
                   )) : <p className="text-sm text-slate-500">لا يوجد رصيد إيداع خارجي متاح حاليًا.</p>}
                 </div>
@@ -359,13 +387,13 @@ export default function WalletPage() {
               <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#08111e] to-[#0b1628] p-6">
                 <div className="mb-4 flex items-center justify-between">
                   <span className="text-xs text-slate-500">
-                    القيمة الإجمالية
+                    إجمالي أصول الحساب
                   </span>
                   <Wallet size={17} className="text-cyan-300" />
                 </div>
 
                 <div className="text-2xl font-black">
-                  {money(wallet.totalBalanceUsd)}
+                  {displayMoney(wallet.totalAccountBalanceUsd ?? wallet.totalBalanceUsd)}
                   <span className="mr-2 text-xs text-slate-500">
                     USD
                   </span>
@@ -375,13 +403,13 @@ export default function WalletPage() {
               <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#08111e] to-[#0b1628] p-6">
                 <div className="mb-4 flex items-center justify-between">
                   <span className="text-xs text-slate-500">
-                    المتاح
+                    إجمالي المتاح
                   </span>
                   <ArrowDownToLine size={17} className="text-emerald-300" />
                 </div>
 
                 <div className="text-2xl font-black">
-                  {money(wallet.totalAvailableUsd)}
+                  {displayMoney(wallet.totalAccountAvailableUsd ?? wallet.totalAvailableUsd)}
                   <span className="mr-2 text-xs text-slate-500">
                     USD
                   </span>
@@ -391,13 +419,13 @@ export default function WalletPage() {
               <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#08111e] to-[#0b1628] p-6">
                 <div className="mb-4 flex items-center justify-between">
                   <span className="text-xs text-slate-500">
-                    المعلق
+                    إجمالي المحجوز
                   </span>
                   <History size={17} className="text-amber-300" />
                 </div>
 
                 <div className="text-2xl font-black">
-                  {money(wallet.totalLockedUsd)}
+                  {displayMoney(wallet.totalAccountLockedUsd ?? wallet.totalLockedUsd)}
                   <span className="mr-2 text-xs text-slate-500">
                     USD
                   </span>
@@ -522,29 +550,29 @@ export default function WalletPage() {
 
                           <td className="px-6 py-5">
                             <div className="font-mono text-sm font-bold">
-                              {assetAmount(item.total)} {item.asset}
+                              {displayAssetAmount(item.total)} {item.asset}
                             </div>
 
                             <div className="mt-1 text-[11px] text-slate-600">
-                              السعر: ${money(item.priceUsd, 8)}
+                              السعر: ${displayMoney(item.priceUsd, 8)}
                             </div>
                           </td>
 
                           <td className="px-6 py-5">
                             <span className="font-mono text-sm text-slate-300">
-                              {assetAmount(item.available)} {item.asset}
+                              {displayAssetAmount(item.available)} {item.asset}
                             </span>
                           </td>
 
                           <td className="px-6 py-5">
                             <span className="font-mono text-sm text-amber-300">
-                              {assetAmount(item.locked)} {item.asset}
+                              {displayAssetAmount(item.locked)} {item.asset}
                             </span>
                           </td>
 
                           <td className="px-6 py-5">
                             <div className="font-mono text-sm font-bold text-cyan-300">
-                              ${money(item.valueUsd, 2)}
+                              ${displayMoney(item.valueUsd, 2)}
                             </div>
                           </td>
 
@@ -588,7 +616,7 @@ export default function WalletPage() {
                 </div>
 
                 <Link
-                  href="/dashboard/transactions"
+                  href="/dashboard/account/statement"
                   className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-300 transition hover:text-white"
                 >
                   عرض الكل
@@ -613,8 +641,7 @@ export default function WalletPage() {
               ) : (
                 <div className="divide-y divide-white/5">
                   {transactions.map((item) => {
-                    const positive =
-                      transactionSign(item.type) === "+";
+                    const positive = Number(item.amount) >= 0;
 
                     return (
                       <div
@@ -661,17 +688,15 @@ export default function WalletPage() {
                             }`}
                             dir="ltr"
                           >
-                            {transactionSign(
-                              item.type
-                            )}
-                            {assetAmount(Math.abs(item.amount))}
+                            {transactionSign(item.amount)}
+                            {displayAssetAmount(Math.abs(item.amount))}
                             <span className="mr-1 text-[10px] text-slate-500">
                               {item.asset}
                             </span>
                           </div>
 
                           <div className="mt-1 text-[10px] text-cyan-400/70">
-                            ≈ ${money(item.valueUsd, 2)} USD
+                            ≈ ${displayMoney(item.valueUsd, 2)} USD
                           </div>
 
                           <div className="mt-1 text-[10px] text-slate-600">

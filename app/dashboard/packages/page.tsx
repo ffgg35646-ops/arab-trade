@@ -7,10 +7,19 @@ import { Loader2, RefreshCw, Clock3, Gift } from "lucide-react";
 
 type Plan = { _id: string; name: string; description?: string; price: number; asset: string; durationDays: number; dailyProfit?: number };
 type DepositBalance = { asset: string; available: number; locked: number };
-type UserPlan = { _id: string; packageName: string; investedAmount: number; asset: string; durationDays: number; status: string; availableEarnings: number; lockedEarnings: number; totalRealizedEarnings: number; activatedAt: string; lastProfitAt?: string; dailyProfit?: number; nextCollectAt?: string; collectWindowEndsAt?: string; collectWindowOpen?: boolean; };
+type UserPlan = { _id: string; packageId?: string; packageName: string; cancellationRefund?: number; cancelledAt?: string; investedAmount: number; asset: string; durationDays: number; status: string; availableEarnings: number; lockedEarnings: number; totalRealizedEarnings: number; activatedAt: string; lastProfitAt?: string; dailyProfit?: number; nextCollectAt?: string; collectWindowEndsAt?: string; collectWindowOpen?: boolean; };
 type LedgerRow = { _id: string; type: string; asset: string; amount: number; note?: string; createdAt: string; userPackageId?: { packageName?: string } | null };
 type Data = { packages: Plan[]; depositBalances: DepositBalance[]; userPackages: UserPlan[]; packageLedger?: LedgerRow[]; policy?: { earningsNotice?: string; cancellationNotice?: string } };
 const money = (n: number) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 }).format(Number(n || 0));
+const packageLedgerLabels: Record<string, string> = {
+  activation: "تفعيل باقة",
+  activation_withdrawable: "رصيد تفعيل قابل للسحب",
+  daily_earning: "جمع الربح اليومي",
+  realized_earning: "أرباح محققة",
+  cancellation_refund: "استرداد 50% من التفعيل",
+  refund_reclassification: "إعادة تصنيف رصيد",
+  reward: "مكافأة",
+};
 
 export default function UserPackagesPage() {
   const [data, setData] = useState<Data | null>(null);
@@ -118,6 +127,14 @@ export default function UserPackagesPage() {
               <div><h2 className="flex items-center gap-2 text-base font-black"><Clock3 size={17} className="text-cyan-300"/>دورة أرباح باقتك: {activePlan.packageName}</h2>
                 
               </div>
+              <button
+                type="button"
+                onClick={() => void action("cancel", activePlan._id)}
+                disabled={Boolean(busy) || Number(activePlan.lockedEarnings || 0) > 0}
+                className="rounded-lg border border-rose-400/20 bg-rose-400/[0.06] px-4 py-3 text-sm font-bold text-rose-200 transition hover:bg-rose-400/10 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {Number(activePlan.lockedEarnings || 0) > 0 ? "تعذّر الإلغاء أثناء حجز رصيد" : "إلغاء الباقة"}
+              </button>
               <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-center">
                 <div className="text-[11px] text-slate-400">{windowOpen ? "الوقت المتبقي للجمع" : "الوقت المتبقي لفتح الجمع"}</div>
                 <div className="mt-1 font-mono text-xl font-black text-cyan-200">{windowOpen ? formatRemaining(endsAt - clockNow) : formatRemaining(nextAt - clockNow)}</div>
@@ -130,14 +147,109 @@ export default function UserPackagesPage() {
             {windowOpen && <p className="mt-3 text-xs font-bold text-amber-200">فرصة الجمع مفتوحة الآن — تنتهي خلال {formatRemaining(endsAt - clockNow)}.</p>}
           </section>;
         })()}
+        {data?.userPackages?.length ? (
+          <section className="mt-5 rounded-xl border border-white/10 bg-[#07101d] p-4">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-black">باقاتي وأرصدة كل باقة</h2>
+                <p className="mt-1 text-xs text-slate-500">الأرباح والاستردادات تبقى في دفتر الباقة نفسها ولا تُخلط مع رصيد الإيداع.</p>
+              </div>
+              <span className="text-xs text-slate-500">عدد الباقات: {data.userPackages.length}</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {data.userPackages.map((item) => (
+                <article key={item._id} className="rounded-xl border border-white/10 bg-black/15 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h3 className="font-black">{item.packageName}</h3>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        تفعيل: {item.activatedAt ? new Date(item.activatedAt).toLocaleDateString("ar-EG") : "—"}
+                      </p>
+                    </div>
+                    <span className={item.status === "active"
+                      ? "rounded-md bg-emerald-400/10 px-2 py-1 text-[10px] font-bold text-emerald-200"
+                      : "rounded-md bg-slate-500/10 px-2 py-1 text-[10px] font-bold text-slate-400"}>
+                      {item.status === "active" ? "نشطة" : "ملغاة"}
+                    </span>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <div className="rounded-lg bg-white/[0.03] p-3">
+                      <div className="text-[10px] text-slate-500">قيمة التفعيل الأصلية</div>
+                      <div className="mt-1 text-sm font-bold">{money(item.investedAmount)} {item.asset}</div>
+                    </div>
+                    <div className="rounded-lg bg-white/[0.03] p-3">
+                      <div className="text-[10px] text-slate-500">الأرباح المتاحة</div>
+                      <div className="mt-1 text-sm font-bold text-emerald-200">{money(item.availableEarnings)} {item.asset}</div>
+                    </div>
+                    <div className="rounded-lg bg-white/[0.03] p-3">
+                      <div className="text-[10px] text-slate-500">الرصيد المحجوز</div>
+                      <div className="mt-1 text-sm font-bold text-amber-200">{money(item.lockedEarnings)} {item.asset}</div>
+                    </div>
+                    <div className="rounded-lg bg-white/[0.03] p-3">
+                      <div className="text-[10px] text-slate-500">إجمالي الأرباح المجموعة</div>
+                      <div className="mt-1 text-sm font-bold">{money(item.totalRealizedEarnings)} {item.asset}</div>
+                    </div>
+                  </div>
+                  {Number(item.cancellationRefund || 0) > 0 && (
+                    <p className="mt-3 text-xs text-cyan-200">
+                      استرداد مسجل لهذه الباقة: {money(item.cancellationRefund)} {item.asset}
+                    </p>
+                  )}
+                  {item.cancelledAt && (
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      تاريخ الإلغاء: {new Date(item.cancelledAt).toLocaleDateString("ar-EG")}
+                    </p>
+                  )}
+                  {item.status === "cancelled" && Number(item.availableEarnings || 0) > 0 && (
+                    <p className="mt-3 text-[11px] leading-5 text-slate-500">
+                      الرصيد المتاح أعلاه ما زال محسوبًا على هذه الباقة الملغاة ويمكن مراجعته في سجل السحب.
+                    </p>
+                  )}
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {data?.packageLedger?.length ? (
+          <section className="mt-5 rounded-xl border border-white/10 bg-[#07101d] p-4">
+            <div className="mb-4">
+              <h2 className="text-base font-black">سجل حركات الباقات</h2>
+              <p className="mt-1 text-xs text-slate-500">آخر الحركات المسجلة في دفتر أرباح الباقات.</p>
+            </div>
+            <div className="space-y-2">
+              {data.packageLedger.slice(0, 20).map((row) => {
+                const amount = Number(row.amount || 0);
+                const positive = amount >= 0;
+                return (
+                  <div key={row._id} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-white/[0.05] bg-black/10 p-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-bold">{packageLedgerLabels[row.type] || row.type}</div>
+                      <div className="mt-1 text-xs text-slate-400">{row.userPackageId?.packageName || "باقة"}</div>
+                      {row.note && <p className="mt-1 text-[11px] leading-5 text-slate-500">{row.note}</p>}
+                      <p className="mt-1 text-[10px] text-slate-600">
+                        {row.createdAt ? new Date(row.createdAt).toLocaleString("ar-EG") : "—"}
+                      </p>
+                    </div>
+                    <div className={positive ? "shrink-0 text-left font-mono text-sm font-bold text-emerald-200" : "shrink-0 text-left font-mono text-sm font-bold text-rose-200"}>
+                      {positive ? "+" : ""}{money(amount)} {row.asset}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
         <section className="mt-5"><h2 className="mb-3 text-base font-black">الباقات المتاحة</h2>
           {loading ? <div className="p-8 text-center text-slate-500"><Loader2 className="mx-auto animate-spin"/></div> : !data?.packages.length ? <div className="rounded-xl border border-white/10 p-6 text-center text-slate-500">لا توجد باقات مفعلة حاليًا.</div> :
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{data.packages.map((plan) => <article key={plan._id} className="flex flex-col rounded-xl border border-white/10 bg-[#07101d] p-4">
               <div className="flex items-center justify-between gap-2"><h3 className="text-base font-black">{plan.name}</h3><span className="rounded-md bg-emerald-400/10 px-2 py-1 text-[10px] text-emerald-200">تفعيل دائم</span></div>
               <div className="mt-3 text-2xl font-black">{money(plan.price)} <span className="text-xs text-cyan-300">{plan.asset}</span></div>
               <div className="mt-3 space-y-1.5 border-t border-white/10 pt-3 text-xs text-slate-400">
+                {plan.description && <p className="leading-5">{plan.description}</p>}
                 <div className="flex justify-between gap-2"><span>الربح اليومي</span><strong className="text-emerald-200">{money(Number(plan.dailyProfit || 0))} {plan.asset}</strong></div>
-                
+                <div className="flex justify-between gap-2"><span>المصدر عند التفعيل</span><strong className="text-slate-300">رصيد الإيداع</strong></div>
               </div>
               <button type="button" onClick={() => void action(activePlan ? "change" : "activate", plan._id)} disabled={Boolean(busy) || activePlan?.packageName === plan.name} className="mt-4 w-full rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50">{busy === plan._id ? "جاري التنفيذ..." : activePlan?.packageName === plan.name ? "تم التفعيل" : activePlan ? "التغيير إلى هذه الباقة" : "تفعيل الباقة"}</button>
             </article>)}</div>}

@@ -42,7 +42,6 @@ const sections = [
     children: [
       ["التداول الفوري", "/protrade"],
       ["التداول بالهامش", "/margin"],
-      ["التمويل", "/dashboard/funding"],
       ["سجل التداول", "/dashboard/trades"],
     ],
   },

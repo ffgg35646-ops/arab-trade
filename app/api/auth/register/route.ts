@@ -44,7 +44,9 @@ function hasValidImageSignature(type: string, bytes: Buffer) {
   return false;
 }
 
-async function readIdentityImage(value: FormDataEntryValue | null, label: string) {
+type IdentityImage = { data: Buffer; mime: string; size: number };
+
+async function readIdentityImage(value: FormDataEntryValue | null, label: string): Promise<IdentityImage> {
   if (!(value instanceof File) || value.size === 0) {
     throw new Error(`يجب رفع ${label}`);
   }
@@ -98,9 +100,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "تأكيد كلمة المرور غير مطابق" }, { status: 400 });
     }
 
-    let identityFront;
-    let identityBack;
-    let selfie;
+    let identityFront: IdentityImage;
+    let identityBack: IdentityImage;
+    let selfie: IdentityImage;
     try {
       identityFront = await readIdentityImage(form.get("identityFront"), "الوجه الأمامي للهوية");
       identityBack = await readIdentityImage(form.get("identityBack"), "الوجه الخلفي للهوية");

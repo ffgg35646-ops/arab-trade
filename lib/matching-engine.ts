@@ -649,6 +649,33 @@ export async function matchOrder(
         session
       );
     } else {
+      if (order.type === "market") {
+        const reserveResult = await Wallet.findOneAndUpdate(
+          {
+            userId: order.userId,
+            type: "spot",
+            mode,
+            balances: {
+              $elemMatch: {
+                asset: pair.base,
+                available: { $gte: fillQty },
+              },
+            },
+          },
+          {
+            $inc: {
+              "balances.$.available": -fillQty,
+              "balances.$.locked": fillQty,
+            },
+          },
+          { new: true, session }
+        );
+
+        if (!reserveResult) {
+          throw new Error("INSUFFICIENT_AVAILABLE_BALANCE");
+        }
+      }
+
       await debitLocked(
         order.userId,
         pair.base,
@@ -920,6 +947,13 @@ export async function matchOrder(
     trades.push(trade);
 
     matched += 1;
+  }
+
+  // A market order must never remain open after consuming available liquidity.
+  // Any unfilled remainder was not reserved and is marked cancelled.
+  if (order.type === "market" && remaining > 0 && matched > 0) {
+    order.status = "cancelled";
+    await order.save({ session });
   }
 
   return {

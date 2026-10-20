@@ -413,8 +413,11 @@ export async function startSpotStrategy(strategy: any) {
   if (!strategy) throw new Error("الاستراتيجية غير موجودة.");
   if (strategy.status === "completed") throw new Error("اكتملت الاستراتيجية بالفعل؛ أنشئ استراتيجية جديدة لتحديد قواعد جديدة.");
   await assertLiveSpotAvailable(strategy);
-  if (strategy.executionMode === "bot" && process.env.SPOT_STRATEGY_RUNNER_ENABLED !== "true") {
-    throw new Error("تشغيل البوت محجوب حتى يتم إعداد مجدول الخلفية: اضبط SPOT_STRATEGY_RUNNER_ENABLED=true في الاستضافة وأضف ARAB_TRADE_BASE_URL وCRON_SECRET إلى GitHub Actions.");
+  if (
+    strategy.executionMode === "bot" &&
+    (process.env.SPOT_STRATEGY_RUNNER_ENABLED !== "true" || !process.env.CRON_SECRET?.trim())
+  ) {
+    throw new Error("تشغيل البوت محجوب حتى يتم إعداد مجدول الخلفية: اضبط SPOT_STRATEGY_RUNNER_ENABLED=true وCRON_SECRET في الاستضافة، وأضف ARAB_TRADE_BASE_URL وCRON_SECRET إلى GitHub Actions.");
   }
   strategy.status = "running";
   strategy.startedAt = new Date();

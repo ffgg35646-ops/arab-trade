@@ -75,7 +75,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     await connectDB();
-    const kyc = await KycRequest.findById(id);
+    const kyc = await KycRequest.findById(id).select("+identityFrontData +identityBackData +selfieData");
     if (!kyc) {
       return NextResponse.json({ success: false, message: "طلب التوثيق غير موجود" }, { status: 404 });
     }

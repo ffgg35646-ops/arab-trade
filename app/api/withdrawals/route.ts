@@ -281,7 +281,12 @@ export async function POST(request: NextRequest) {
     if (!["filled", "cancelled"].includes(String(conversionOrder.status || "").toLowerCase()) || !conversionOrder.locksReleased) {
       return NextResponse.json({ success: false, message: "أمر البيع لم يصل إلى حالة نهائية مؤكدة؛ لا يمكن سحب حصيلته بعد." }, { status: 409 });
     }
-    const pair = await getBinanceSpotPair(String(conversionOrder.symbol || ""));
+    let pair;
+    try {
+      pair = await getBinanceSpotPair(String(conversionOrder.symbol || ""));
+    } catch {
+      return NextResponse.json({ success: false, message: "تعذر التحقق من زوج Binance لهذا البيع؛ لم يتم إنشاء طلب السحب." }, { status: 502 });
+    }
     if (!pair || String(pair.quoteAsset).toUpperCase() !== "USDT") {
       return NextResponse.json({ success: false, message: "أمر البيع لا يطابق زوجًا موثقًا مقابل USDT." }, { status: 409 });
     }

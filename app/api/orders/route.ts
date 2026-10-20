@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { requireVerifiedIdentity } from "@/lib/require-kyc";
+import { getBinanceSpotPair } from "@/lib/binance-market";
 import { connectDB } from "@/lib/mongodb";
 import Order from "@/models/Order";
 import Wallet from "@/models/Wallet";
@@ -52,12 +53,7 @@ export async function GET(
   request: NextRequest
 ) {
   try {
-    const requestedMode =
-      String(new URL(request.url).searchParams.get("mode") || "live")
-        .trim()
-        .toLowerCase() === "demo"
-        ? "demo"
-        : "live";
+    const requestedMode = "live";
 
     const user = await getCurrentUser(request);
 
@@ -84,27 +80,12 @@ export async function GET(
       new URL(request.url);
 
     const symbol =
-      String(
-        url.searchParams.get(
-          "symbol"
-        ) || ""
-      )
+      String(url.searchParams.get("symbol") || "")
         .trim()
-        .toUpperCase();
+        .toUpperCase()
+        .replace(/[_/\s-]/g, "");
 
-    const modeParam =
-      String(
-        url.searchParams.get(
-          "mode"
-        ) || "live"
-      )
-        .trim()
-        .toLowerCase();
-
-    const mode =
-      modeParam === "demo"
-        ? "demo"
-        : "live";
+    const mode = "live";
 
     const status =
       String(
@@ -340,21 +321,15 @@ export async function POST(
     await connectDB();
 
     const body = await request.json().catch(() => ({}));
-    const mode =
-      String(body.mode || "live").trim().toLowerCase() === "demo"
-        ? "demo"
-        : "live";
-
-    if (mode === "live") {
-      const identity = await requireVerifiedIdentity(request);
-      if (!identity.ok) {
-        return NextResponse.json(
-          { success: false, message: identity.message },
-          { status: identity.status }
-        );
-      }
-      await migrateLegacyDepositBalancesToSpotWallet(user._id);
+    const mode: "live" = "live";
+    const identity = await requireVerifiedIdentity(request);
+    if (!identity.ok) {
+      return NextResponse.json(
+        { success: false, message: identity.message },
+        { status: identity.status }
+      );
     }
+    await migrateLegacyDepositBalancesToSpotWallet(user._id);
 
     const settings =
       await getPlatformSettings();
@@ -418,11 +393,10 @@ export async function POST(
     }
 
     const symbol =
-      String(
-        body.symbol || ""
-      )
+      String(body.symbol || "")
         .trim()
-        .toUpperCase();
+        .toUpperCase()
+        .replace(/[_/\s-]/g, "");
 
     const side =
       String(
@@ -442,6 +416,7 @@ export async function POST(
 
     if (
       !symbol ||
+      !/^[A-Z0-9]{5,25}$/.test(symbol) ||
       !["buy", "sell"].includes(
         side
       ) ||
@@ -520,30 +495,45 @@ export async function POST(
       );
     }
 
-    const assets =
-      await Asset.find({
-        enabled: true,
-        tradingEnabled: true,
-      })
-        .select("symbol")
-        .lean();
-
-    const pair =
-      splitPair(
-        symbol,
-        assets.map(
-          (a) => a.symbol
-        )
-      );
-
-    if (!pair) {
+    const binancePair = await getBinanceSpotPair(symbol);
+    if (!binancePair) {
       return NextResponse.json(
-        {
-          success: false,
-          message:
-            "زوج التداول غير معروف",
-        },
+        { success: false, message: "هذا الزوج غير متاح ضمن أزواج Binance Spot النشطة." },
         { status: 400 }
+      );
+    }
+
+    // Add an asset record only when Binance confirms the pair exists.
+    // New asset records have deposits disabled; configuring deposits remains an explicit admin action.
+    for (const assetSymbol of [binancePair.baseAsset, binancePair.quoteAsset]) {
+      await Asset.updateOne(
+        { symbol: assetSymbol },
+        {
+          $setOnInsert: {
+            name: assetSymbol,
+            symbol: assetSymbol,
+            type: "crypto",
+            enabled: true,
+            depositEnabled: false,
+            tradingEnabled: true,
+            sortOrder: 99999,
+            networks: [],
+          },
+        },
+        { upsert: true }
+      );
+    }
+
+    const assets = await Asset.find({
+      enabled: true,
+      tradingEnabled: true,
+    }).select("symbol").lean();
+
+    const pair = splitPair(symbol, assets.map((asset) => asset.symbol));
+    if (!pair || pair.base !== binancePair.baseAsset || pair.quote !== binancePair.quoteAsset) {
+      return NextResponse.json(
+        { success: false, message: "إحدى عملتي هذا الزوج غير مفعّلة للتداول في إعدادات عرب تريد." },
+        { status: 403 }
       );
     }
 

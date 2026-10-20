@@ -35,12 +35,7 @@ export async function POST(
       body.id || ""
     ).trim();
 
-    const mode =
-      String(body.mode || "live")
-        .trim()
-        .toLowerCase() === "demo"
-        ? "demo"
-        : "live";
+    const mode = "live";
 
     if (!id) {
       return NextResponse.json(

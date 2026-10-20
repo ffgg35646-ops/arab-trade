@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   ChevronDown,
   ClipboardList,
   Gift,
@@ -19,6 +20,11 @@ const sections = [
     title: "الرئيسية",
     href: "/dashboard",
     icon: Home,
+  },
+  {
+    title: "الأسواق",
+    href: "/markets",
+    icon: BarChart3,
   },
   {
     title: "المحفظة",

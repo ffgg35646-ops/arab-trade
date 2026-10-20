@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   ChevronDown,
   Clock3,
@@ -71,6 +72,18 @@ type LiveTicker = {
   quoteVolume: number;
   high24h: number;
   low24h: number;
+};
+
+type SpotMarketPair = {
+  symbol: string;
+  baseAsset: string;
+  quoteAsset: string;
+  lastPrice: number;
+  priceChangePercent: number;
+  highPrice: number;
+  lowPrice: number;
+  quoteVolume: number;
+  tradeCount: number;
 };
 
 type Candle = {
@@ -345,10 +358,12 @@ function OrderBook({
   asks,
   bids,
   currentPrice,
+  quoteAsset,
 }: {
   asks: BookOrder[];
   bids: BookOrder[];
   currentPrice: number;
+  quoteAsset: string;
 }) {
   const visibleAsks = [...asks]
     .sort((a, b) => num(a.price) - num(b.price))
@@ -409,7 +424,7 @@ function OrderBook({
       </div>
 
       <div className="grid grid-cols-3 px-3 py-2 text-[10px] text-slate-500">
-        <span>السعر (USDT)</span>
+        <span>السعر ({quoteAsset})</span>
         <span className="text-right">الكمية</span>
         <span className="text-right">الإجمالي</span>
       </div>
@@ -427,7 +442,7 @@ function OrderBook({
       <div className="border-y border-white/[0.05] px-3 py-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div className="text-base font-semibold text-cyan-400">
-            {currentPrice > 0 ? fmt(currentPrice, 4) : "—"} <span className="text-[10px] text-slate-500">USDT</span>
+            {currentPrice > 0 ? fmt(currentPrice, 4) : "—"} <span className="text-[10px] text-slate-500">{quoteAsset}</span>
           </div>
           <span className="text-[10px] text-slate-600">السعر المرجعي من Binance</span>
         </div>
@@ -448,6 +463,7 @@ function OrderBook({
 
 export default function ProTradePage() {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [availablePairs, setAvailablePairs] = useState<SpotMarketPair[]>([]);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -461,7 +477,6 @@ export default function ProTradePage() {
   const [side, setSide] = useState<"buy" | "sell">("buy");
 
   const [orderType, setOrderType] = useState<"limit" | "market">("limit");
-  const tradingMode = "live" as const
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("");
 
@@ -472,6 +487,27 @@ export default function ProTradePage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [tab, setTab] = useState<"open" | "history">("open");
+
+  useEffect(() => {
+    const querySymbol = new URLSearchParams(window.location.search).get("symbol");
+    const normalized = String(querySymbol || "").trim().toUpperCase().replace(/[_/\\s-]/g, "");
+    if (/^[A-Z0-9]{5,25}$/.test(normalized)) setSymbol(normalized);
+
+    let active = true;
+    async function loadAvailablePairs() {
+      try {
+        const response = await fetch("/api/market/binance", { cache: "no-store" });
+        const data = await response.json();
+        if (active && response.ok && Array.isArray(data?.pairs)) {
+          setAvailablePairs(data.pairs);
+        }
+      } catch {
+        // Keep the currently selected market usable if the selector feed is unavailable.
+      }
+    }
+    void loadAvailablePairs();
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let stopped = false;
@@ -505,12 +541,12 @@ export default function ProTradePage() {
     const loadSnapshot = async () => {
       try {
         const response = await fetch(
-          `https://api.binance.com/api/v3/ticker/24hr?symbol=${encodeURIComponent(pair)}`,
+          "/api/trading/market?symbol=" + encodeURIComponent(pair),
           { cache: "no-store" }
         );
         if (!response.ok) throw new Error("Market ticker unavailable");
-        const payload = await response.json();
-        if (!stopped) applyTicker(payload);
+        const result = await response.json();
+        if (!stopped) applyTicker(result?.ticker || result);
       } catch {
         if (!stopped && !socketConnected) setPriceFeedStatus("offline");
       }
@@ -579,7 +615,7 @@ export default function ProTradePage() {
     setBids([]);
     setAsks([]);
     setOrderBookFeedStatus("connecting");
-    const query = `symbol=${encodeURIComponent(symbol)}&mode=${tradingMode}&depth=30`;
+    const query = `symbol=${encodeURIComponent(symbol)}&depth=30`;
 
     const applyOrderBook = (payload: any) => {
       const book = payload?.orderBook ?? payload?.data ?? payload;
@@ -640,10 +676,12 @@ export default function ProTradePage() {
       window.clearInterval(fallbackTimer);
       stream?.close();
     };
-  }, [symbol, tradingMode]);
+  }, [symbol]);
 
-  const baseAsset = symbol.replace(/USDT$/i, "").toUpperCase();
-  const quoteAsset = "USDT";
+  const selectedPair = availablePairs.find((pair) => pair.symbol === symbol);
+  const inferredQuote = ["FDUSD", "USDT", "USDC", "TUSD", "USDP", "BUSD", "BIDR", "IDRT", "USDP", "DAI", "BTC", "ETH", "BNB", "TRY", "EUR", "BRL", "AUD", "GBP", "RUB"].find((item) => symbol.endsWith(item)) || "USDT";
+  const quoteAsset = selectedPair?.quoteAsset || inferredQuote;
+  const baseAsset = selectedPair?.baseAsset || symbol.slice(0, Math.max(0, symbol.length - quoteAsset.length)).toUpperCase();
 
   const currentPrice = useMemo(() => {
     if (liveTicker?.symbol === symbol && num(liveTicker.price) > 0) {
@@ -700,11 +738,11 @@ export default function ProTradePage() {
             credentials: "include",
             cache: "no-store",
           }),
-          fetch(`/api/orders?symbol=${encodeURIComponent(symbol)}&mode=${tradingMode}&limit=500`, {
+          fetch(`/api/orders?symbol=${encodeURIComponent(symbol)}&limit=500`, {
             credentials: "include",
             cache: "no-store",
           }),
-          fetch(`/api/trades?market=true&symbol=${encodeURIComponent(symbol)}&mode=${tradingMode}&limit=100`, {
+          fetch(`/api/trades?market=true&symbol=${encodeURIComponent(symbol)}&limit=100`, {
             credentials: "include",
             cache: "no-store",
           }),
@@ -747,7 +785,7 @@ export default function ProTradePage() {
         setRefreshing(false);
       }
     },
-    [symbol, tradingMode]
+    [symbol]
   );
 
   useEffect(() => {
@@ -767,9 +805,6 @@ export default function ProTradePage() {
   }, [currentPrice, price]);
 
 
-    /*
-     * التداول التجريبي والحقيقي منفصلان بالكامل عبر mode.
-     */
   const createOrder = async () => {
     setSubmitting(true);
     setError("");
@@ -788,7 +823,6 @@ export default function ProTradePage() {
           type: orderType,
           ...(orderType === "limit" ? { price: Number(price) } : {}),
           quantity: Number(quantity),
-          mode: tradingMode,
         }),
       });
 
@@ -825,7 +859,6 @@ export default function ProTradePage() {
         },
         body: JSON.stringify({
           id,
-          mode: tradingMode,
         }),
       });
 
@@ -898,13 +931,12 @@ export default function ProTradePage() {
                   }}
                   className="cursor-pointer appearance-none bg-transparent text-lg font-bold outline-none"
                 >
-                  {(pairs.length ? pairs : ["BTC"]).map((base) => (
-                    <option
-                      key={base}
-                      value={`${base}USDT`}
-                      className="bg-[#07101d]"
-                    >
-                      {base}/USDT
+                  {(availablePairs.length
+                    ? availablePairs
+                    : pairs.map((base) => ({ symbol: base + "USDT", baseAsset: base, quoteAsset: "USDT" }))
+                  ).map((pair) => (
+                    <option key={pair.symbol} value={pair.symbol} className="bg-[#07101d]">
+                      {pair.baseAsset}/{pair.quoteAsset}
                     </option>
                   ))}
                 </select>
@@ -927,7 +959,7 @@ export default function ProTradePage() {
               <div className="text-xl font-semibold">
                 {currentPrice > 0 ? fmt(currentPrice, 4) : "—"}
               </div>
-              <div className="text-[10px] text-slate-500">USDT</div>
+              <div className="text-[10px] text-slate-500">{quoteAsset}</div>
             </div>
             <div>
               <div className={marketChange === null ? "text-sm text-slate-400" : marketChange >= 0 ? "text-sm text-emerald-400" : "text-sm text-rose-400"}>
@@ -975,8 +1007,13 @@ export default function ProTradePage() {
       {(error || message) && (
         <div className="border-b border-white/[0.06] px-5 py-2">
           {error && (
-            <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-2 text-xs text-rose-300">
-              {error}
+            <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-2 text-xs text-rose-300">
+              <span>{error}</span>
+              {(/توثيق|وثّق|الهوية|التحقق/.test(error)) && (
+                <Link href="/dashboard/account/verification" className="rounded-md bg-cyan-400 px-3 py-2 font-bold text-slate-950">
+                  الانتقال إلى التوثيق
+                </Link>
+              )}
             </div>
           )}
           {!error && message && (
@@ -986,6 +1023,15 @@ export default function ProTradePage() {
           )}
         </div>
       )}
+
+      <div className="border-b border-white/[0.06] bg-[#07101d] px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-xs font-semibold text-slate-300">التداول الفوري</span>
+          <span className="rounded-full border border-emerald-400/10 bg-emerald-400/[0.06] px-3 py-1 text-[11px] font-semibold text-emerald-300">
+            بيانات سوق مباشرة · دفتر أوامر عرب تريد
+          </span>
+        </div>
+      </div>
 
       <p className="mt-2 px-5 text-[10px] leading-5 text-slate-500">
         السعر والمخطط مرجعهما بيانات Binance؛ دفتر الأوامر وتنفيذ الصفقات يتمان داخل عرب تريد، ولا تُرسل الأوامر إلى Binance.
@@ -1007,6 +1053,7 @@ export default function ProTradePage() {
                 asks={asks}
                 bids={bids}
                 currentPrice={currentPrice}
+                quoteAsset={quoteAsset}
               />
             </div>
           </div>
@@ -1206,7 +1253,7 @@ export default function ProTradePage() {
                 <div className="text-xs text-slate-500">الرصيد المتاح</div>
                 <div className="mt-1 text-sm font-semibold">
                   {side === "buy"
-                    ? `${fmt(quoteBalance.available, 4)} USDT`
+                    ? `${fmt(quoteBalance.available, 4)} ${quoteAsset}`
                     : `${fmt(baseBalance.available, 6)} ${baseAsset}`}
                 </div>
               </div>
@@ -1221,7 +1268,7 @@ export default function ProTradePage() {
                 <div className="mt-1 text-xs font-medium">{fmt(baseBalance.total, 8)}</div>
               </div>
               <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
-                <div className="text-[10px] text-slate-500">USDT</div>
+                <div className="text-[10px] text-slate-500">{quoteAsset}</div>
                 <div className="mt-1 text-xs font-medium">{fmt(quoteBalance.total, 4)}</div>
               </div>
             </div>
@@ -1279,7 +1326,7 @@ export default function ProTradePage() {
                 placeholder={orderType === "market" && marketExecutionPrice <= 0 ? "لا توجد سيولة مقابلة" : currentPrice > 0 ? String(currentPrice) : "0.00"}
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none disabled:text-slate-500"
               />
-              <span className="text-[11px] text-slate-500">USDT</span>
+              <span className="text-[11px] text-slate-500">{quoteAsset}</span>
             </div>
 
             <label className="mb-2 block text-[11px] text-slate-500">الكمية</label>
@@ -1311,7 +1358,7 @@ export default function ProTradePage() {
               <span className="text-slate-500">
                 {orderType === "market" ? "القيمة التقديرية حسب أفضل سعر متاح" : "إجمالي الأمر"}
               </span>
-              <span className="font-medium">{total > 0 ? `${money(total)} USDT` : "—"}</span>
+              <span className="font-medium">{total > 0 ? `${money(total)} ${quoteAsset}` : "—"}</span>
             </div>
 
             <button

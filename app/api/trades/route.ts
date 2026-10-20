@@ -37,7 +37,8 @@ export async function GET(
         ) || ""
       )
         .trim()
-        .toUpperCase();
+        .toUpperCase()
+        .replace(/[_/\s-]/g, "");
 
     const orderId =
       String(
@@ -46,16 +47,7 @@ export async function GET(
         ) || ""
       ).trim();
 
-    const mode =
-      String(
-        url.searchParams.get(
-          "mode"
-        ) || "live"
-      )
-        .trim()
-        .toLowerCase() === "demo"
-        ? "demo"
-        : "live";
+    const mode = "live";
 
     const requestedLimit =
       Number(

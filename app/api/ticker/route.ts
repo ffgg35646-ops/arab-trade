@@ -18,21 +18,10 @@ export async function GET(
         ) || ""
       )
         .trim()
-        .toUpperCase();
+        .toUpperCase()
+        .replace(/[_/\s-]/g, "");
 
-    const modeParam =
-      String(
-        url.searchParams.get(
-          "mode"
-        ) || "live"
-      )
-        .trim()
-        .toLowerCase();
-
-    const mode =
-      modeParam === "demo"
-        ? "demo"
-        : "live";
+    const mode = "live";
 
     if (!symbol) {
       return NextResponse.json(

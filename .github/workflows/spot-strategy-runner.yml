@@ -1,0 +1,43 @@
+name: Spot strategy runner
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arab-trade-spot-strategy-runner
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Check price strategies
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Trigger the authenticated production runner
+        shell: bash
+        env:
+          ARAB_TRADE_BASE_URL: ${{ vars.ARAB_TRADE_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${ARAB_TRADE_BASE_URL:-}" || -z "${CRON_SECRET:-}" ]]; then
+            echo "::warning::Set GitHub Actions variable ARAB_TRADE_BASE_URL and secret CRON_SECRET before enabling automated spot bots."
+            exit 0
+          fi
+
+          BASE_URL="${ARAB_TRADE_BASE_URL%/}"
+          if [[ ! "$BASE_URL" =~ ^https://[^/]+$ ]]; then
+            echo "::error::ARAB_TRADE_BASE_URL must be an HTTPS origin without a path."
+            exit 1
+          fi
+
+          curl --fail --silent --show-error \
+            --connect-timeout 10 --max-time 55 --retry 1 --retry-delay 2 \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "$BASE_URL/api/cron/spot-strategies"

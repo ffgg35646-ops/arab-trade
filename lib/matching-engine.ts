@@ -715,6 +715,7 @@ export async function matchOrder(
           {
             mode,
             symbol: order.symbol,
+            takerSide: order.side,
 
             buyOrderId:
               order.side === "buy"

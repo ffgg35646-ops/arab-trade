@@ -213,14 +213,20 @@ async function processStrategy(strategyId: string) {
   const strategy: any = await SpotStrategy.findOneAndUpdate(
     {
       _id: strategyId,
-      $or: [
-        { runLockUntil: null },
-        { runLockUntil: { $exists: false } },
-        { runLockUntil: { $lte: now } },
-      ],
-      $or: [
-        { status: "running" },
-        { pendingOrderId: { $ne: null } },
+      $and: [
+        {
+          $or: [
+            { runLockUntil: null },
+            { runLockUntil: { $exists: false } },
+            { runLockUntil: { $lte: now } },
+          ],
+        },
+        {
+          $or: [
+            { status: "running" },
+            { pendingOrderId: { $ne: null } },
+          ],
+        },
       ],
     },
     { $set: { runLockUntil: lockUntil } },

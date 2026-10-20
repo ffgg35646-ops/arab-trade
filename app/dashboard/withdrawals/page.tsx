@@ -37,6 +37,14 @@ type Request = {
   type: string;
   packageId?: string | null;
   amount: number;
+  grossAmount?: number;
+  feePercent?: number;
+  feeAmount?: number;
+  payoutAmount?: number;
+  conversionAsset?: string | null;
+  conversionQuantity?: number | null;
+  conversionPrice?: number | null;
+  tradingFeeAmount?: number;
   asset?: string;
   network?: string;
   payoutAddress?: string;
@@ -52,7 +60,7 @@ type Data = {
     packageAvailable: number;
     packageLocked: number;
   };
-  general: { available: number; minimum: number; configured: boolean };
+  general: { available: number; minimum: number; configured: boolean; feePercent?: number };
   networks: Network[];
   packages: Plan[];
   requests: Request[];
@@ -324,9 +332,20 @@ export default function WithdrawalsPage() {
                   <strong className="text-xl font-black text-white">{data ? money(data.general.available) : "—"} USDT</strong>
                 </div>
                 <label className="block space-y-2 text-sm text-slate-300">
-                  <span>مبلغ السحب</span>
+                  <span>مبلغ السحب قبل العمولة (USDT)</span>
                   <input type="number" min={data?.general.minimum || undefined} max={data?.general.available} step="0.00000001" value={generalAmount} disabled={busy || hasPending || !data?.general.configured} onChange={(event) => setGeneralAmount(event.target.value)} placeholder={data?.general.configured ? "الحد الأدنى " + money(data.general.minimum) + " USDT" : "الحد الأدنى يحدده الأدمن"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
                 </label>
+                <div className="rounded-lg border border-slate-700 bg-[#050a13] p-3 text-sm">
+                  <div className="flex items-center justify-between gap-3 text-slate-400">
+                    <span>عمولة السحب ({data?.general.feePercent ?? 5}%)</span>
+                    <strong className="text-amber-200">{money(Math.round(Math.max(0, Number(generalAmount) || 0) * (Number(data?.general.feePercent ?? 5) / 100) * 1e8) / 1e8)} USDT</strong>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className="text-slate-300">صافي المبلغ الذي سيُرسل</span>
+                    <strong className="text-emerald-300">{money(Math.max(0, Number(generalAmount) || 0) - Math.round(Math.max(0, Number(generalAmount) || 0) * (Number(data?.general.feePercent ?? 5) / 100) * 1e8) / 1e8)} USDT</strong>
+                  </div>
+                  <p className="mt-2 text-[11px] text-slate-500">تُخصم العمولة من المبلغ الإجمالي، ولا يُرسل إلا الصافي الموضح.</p>
+                </div>
               </div>
             </div>
 
@@ -397,7 +416,11 @@ export default function WithdrawalsPage() {
                       </label>
                     </div>
 
-                    <input aria-label={"مبلغ السحب من " + plan.name} type="number" min={plan.minimum} max={account?.available} step="0.00000001" disabled={busy || hasPending || !canWithdraw} value={amounts[plan._id] || ""} onChange={(event) => setAmounts((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder={"الحد الأدنى " + money(plan.minimum) + " USDT"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-50" />
+                    <input aria-label={"مبلغ السحب من " + plan.name} type="number" min={plan.minimum} max={account?.available} step="0.00000001" disabled={busy || hasPending || !canWithdraw} value={amounts[plan._id] || ""} onChange={(event) => setAmounts((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder={"الحد الأدنى " + money(plan.minimum) + " USDT قبل العمولة"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-50" />
+                    <div className="rounded-lg border border-slate-700 bg-[#050a13] p-3 text-xs">
+                      <div className="flex justify-between gap-2 text-slate-400"><span>عمولة السحب (5%)</span><span className="text-amber-200">{money(Math.round(Math.max(0, Number(amounts[plan._id]) || 0) * 0.05 * 1e8) / 1e8)} USDT</span></div>
+                      <div className="mt-2 flex justify-between gap-2"><span className="text-slate-300">صافي المبلغ المرسل</span><strong className="text-emerald-300">{money(Math.max(0, Number(amounts[plan._id]) || 0) - Math.round(Math.max(0, Number(amounts[plan._id]) || 0) * 0.05 * 1e8) / 1e8)} USDT</strong></div>
+                    </div>
 
                     <div className="mt-auto space-y-2">
                       <button type="button" disabled={busy || hasPending || (!needsActiveReferrals && (!canWithdraw || !addresses[plan._id]?.trim() || !network))} onClick={() => handlePackageButtonClick(plan, needsActiveReferrals)} className="w-full rounded-xl bg-blue-600 px-4 py-3 font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">
@@ -437,6 +460,13 @@ export default function WithdrawalsPage() {
                         <strong>{item.type === "general" ? "السحب العام" : plan?.name || "السحب من الباقات"}</strong>
                         <strong className="font-mono">{money(item.amount)} {item.asset || "USDT"}</strong>
                         <span className={item.status === "approved" ? "text-emerald-300" : item.status === "rejected" ? "text-red-300" : "text-amber-200"}>الحالة: {statusLabel}</span>
+                      </div>
+                      <div className="mt-2 rounded-lg bg-[#050a13] p-2 text-xs">
+                        <div className="grid gap-1 text-slate-400 sm:grid-cols-3">
+                          <p>الإجمالي المحجوز: {money(item.grossAmount ?? item.amount)} USDT</p>
+                          <p>العمولة: {money(item.feeAmount ?? 0)} USDT</p>
+                          <p className="text-emerald-300">الصافي المطلوب إرساله: {money(item.payoutAmount ?? item.amount)} USDT</p>
+                        </div>
                       </div>
                       <div className="mt-2 grid gap-1 text-xs text-slate-400 sm:grid-cols-2">
                         <p>الشبكة: {item.network || "—"}</p>

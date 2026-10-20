@@ -1103,13 +1103,13 @@ export default function ProTradeTerminal() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-xs font-semibold text-slate-300">التداول الفوري</span>
           <span className="rounded-full border border-emerald-400/10 bg-emerald-400/[0.06] px-3 py-1 text-[11px] font-semibold text-emerald-300">
-            بيانات سوق مباشرة · دفتر أوامر عرب تريد
+            السوق الحقيقي · دفتر أوامر Binance
           </span>
         </div>
       </div>
 
       <p className="mt-2 px-5 text-[10px] leading-5 text-slate-500">
-        السعر والمخطط مرجعهما بيانات Binance؛ دفتر الأوامر وتنفيذ الصفقات يتمان داخل عرب تريد، ولا تُرسل الأوامر إلى Binance.
+        السعر والمخطط ودفتر الأوامر وآخر صفقات السوق من Binance. تنفيذ الأوامر الخارجية يحتاج إعداد ربط حساب Binance؛ لا يُعد ظهور سعر مباشر دليلًا على تنفيذ صفقة.
       </p>
 
       <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px]">

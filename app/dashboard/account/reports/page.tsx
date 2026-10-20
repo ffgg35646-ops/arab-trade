@@ -111,10 +111,10 @@ export default function FinancialReportsPage() {
       current.amount += amount;
       if (balance.valueUsd !== undefined && Number.isFinite(Number(balance.valueUsd))) {
         current.valueUsd += n(balance.valueUsd);
-        current.priceUsd = n(balance.priceUsd);
+        current.priceUsd = n(balance.priceUsd) > 0 ? n(balance.priceUsd) : null;
       } else if (balance.priceUsd !== undefined) {
         current.valueUsd += amount * n(balance.priceUsd);
-        current.priceUsd = n(balance.priceUsd);
+        current.priceUsd = n(balance.priceUsd) > 0 ? n(balance.priceUsd) : null;
       }
       byAsset.set(asset, current);
     }

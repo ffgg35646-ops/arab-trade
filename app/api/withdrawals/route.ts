@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import Order from "@/models/Order";
+import { getBinanceSpotPair } from "@/lib/binance-market";
 
 const WITHDRAWAL_NETWORKS = [
   { code: "TRC20", name: "TRON" },
@@ -231,6 +233,7 @@ export async function GET(request: NextRequest) {
       feeAmount: Number(item.feeAmount ?? 0),
       payoutAmount: Number(item.payoutAmount ?? item.amount),
       conversionAsset: item.conversionAsset || null,
+      conversionOrderId: item.conversionOrderId ? String(item.conversionOrderId) : null,
       conversionQuantity: item.conversionQuantity == null ? null : Number(item.conversionQuantity),
       conversionPrice: item.conversionPrice == null ? null : Number(item.conversionPrice),
       tradingFeeAmount: Number(item.tradingFeeAmount ?? 0),
@@ -254,10 +257,51 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const type = body.type === "general" ? "general" : "package";
   const packageId = String(body.packageId || "").trim();
-  const amount = Number(body.amount);
+  let amount = Number(body.amount);
   const asset = String(body.asset || "").trim().toUpperCase() as "USDT";
   const network = String(body.network || "").trim().toUpperCase();
   const payoutAddress = String(body.payoutAddress || "").trim();
+  const conversionOrderId = String(body.conversionOrderId || "").trim();
+  let conversionDetails: Record<string, unknown> = {};
+
+  if (conversionOrderId) {
+    if (type !== "general" || !mongoose.isValidObjectId(conversionOrderId)) {
+      return NextResponse.json({ success: false, message: "مرجع تحويل العملة غير صالح" }, { status: 400 });
+    }
+    const conversionOrder: any = await Order.findOne({
+      _id: conversionOrderId,
+      userId: user._id,
+      mode: "live",
+      executionProvider: "binance",
+      side: "sell",
+    }).lean();
+    if (!conversionOrder) {
+      return NextResponse.json({ success: false, message: "لم نعثر على أمر بيع مؤكد تابع لحسابك؛ لم يتم إنشاء طلب السحب." }, { status: 409 });
+    }
+    if (!["filled", "cancelled"].includes(String(conversionOrder.status || "").toLowerCase()) || !conversionOrder.locksReleased) {
+      return NextResponse.json({ success: false, message: "أمر البيع لم يصل إلى حالة نهائية مؤكدة؛ لا يمكن سحب حصيلته بعد." }, { status: 409 });
+    }
+    const pair = await getBinanceSpotPair(String(conversionOrder.symbol || ""));
+    if (!pair || String(pair.quoteAsset).toUpperCase() !== "USDT") {
+      return NextResponse.json({ success: false, message: "أمر البيع لا يطابق زوجًا موثقًا مقابل USDT." }, { status: 409 });
+    }
+    const conversionQuantity = roundWithdrawal(Number(conversionOrder.settledExecutedQuantity || 0));
+    const grossQuote = roundWithdrawal(Number(conversionOrder.settledQuoteQuantity || 0));
+    const tradingFeeAmount = roundWithdrawal(Number(conversionOrder.settledFeeAmount || 0));
+    const proceeds = roundWithdrawal(Math.max(0, grossQuote - tradingFeeAmount));
+    if (conversionQuantity <= 0 || grossQuote <= 0 || proceeds <= 0) {
+      return NextResponse.json({ success: false, message: "أمر البيع لا يحتوي على حصيلة مؤكدة قابلة للسحب." }, { status: 409 });
+    }
+    amount = proceeds;
+    conversionDetails = {
+      conversionAsset: String(pair.baseAsset).toUpperCase(),
+      conversionOrderId: conversionOrder._id,
+      conversionQuantity,
+      conversionPrice: roundWithdrawal(grossQuote / conversionQuantity),
+      tradingFeeAmount,
+    };
+  }
+
   const feeDetails = Number.isFinite(amount) && amount > 0 ? withdrawalAmounts(amount) : null;
 
   if (!Number.isFinite(amount) || amount <= 0 || roundWithdrawal(amount) !== amount) {
@@ -292,6 +336,10 @@ export async function POST(request: NextRequest) {
     await session.withTransaction(async () => {
       const existing = await WithdrawalRequest.findOne({ userId: user._id, status: "pending" }).session(session);
       if (existing) throw new Error("لديك طلب سحب معلق بالفعل");
+      if (conversionOrderId) {
+        const alreadyUsed = await WithdrawalRequest.findOne({ conversionOrderId }).session(session).lean();
+        if (alreadyUsed) throw new Error("تم استخدام حصيلة أمر البيع هذا في طلب سحب سابق");
+      }
 
       if (type === "general") {
         const settings = await getPlatformSettings();
@@ -312,7 +360,7 @@ export async function POST(request: NextRequest) {
         if (reserved.modifiedCount !== 1) throw new Error("الرصيد العام تغير، حاول مجددًا");
 
         const created = await WithdrawalRequest.create([{
-          userId: user._id, type: "general", amount, ...feeDetails!, asset, network, payoutAddress, status: "pending",
+          userId: user._id, type: "general", amount, ...feeDetails!, ...conversionDetails, asset, network, payoutAddress, status: "pending",
         }], { session });
         createdWithdrawal = created[0];
         return;

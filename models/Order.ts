@@ -21,6 +21,8 @@ export interface IOrder {
   filledQuantity?: number;
 
   status: "open" | "cancelled" | "filled" | "rejected";
+  purpose?: "spot" | "withdrawal-conversion";
+  withdrawalConversionStatus?: "pending" | "withdrawal_created" | "below_minimum" | "dismissed";
   executionProvider?: "internal" | "binance";
   externalOrderId?: number;
   clientOrderId?: string;
@@ -118,6 +120,8 @@ const OrderSchema = new Schema<IOrder>(
       default: "open",
       index: true,
     },
+    purpose: { type: String, enum: ["spot", "withdrawal-conversion"], default: "spot", index: true },
+    withdrawalConversionStatus: { type: String, enum: ["pending", "withdrawal_created", "below_minimum", "dismissed"], required: false, index: true },
     executionProvider: { type: String, enum: ["internal", "binance"], default: "internal", index: true },
     externalOrderId: { type: Number },
     clientOrderId: { type: String, index: true },

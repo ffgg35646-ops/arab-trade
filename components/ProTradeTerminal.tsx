@@ -883,11 +883,19 @@ export default function ProTradeTerminal() {
       const orderLabel = side === "buy" ? "شراء" : "بيع";
       const quantityLabel = Number(quantity).toLocaleString("en-US", { maximumFractionDigits: 8 });
       const executedLabel = matchedQuantity.toLocaleString("en-US", { maximumFractionDigits: 8 });
-      setMessage(
-        matchedCount > 0 && matchedQuantity > 0
-          ? `تم تنفيذ ${orderLabel} ${executedLabel} ${baseAsset} داخل دفتر عرب تريد الداخلي؛ هذا ليس تنفيذًا لدى Binance.`
-          : `تم إنشاء أمر ${orderLabel} ${quantityLabel} ${baseAsset} داخل عرب تريد فقط، ولم تُنفذ صفقة بعد. هذا الأمر لم يُرسل إلى Binance.`
-      );
+      if (data.executionProvider === "binance") {
+        setMessage(String(data.message || (
+          matchedCount > 0 && matchedQuantity > 0
+            ? `أكدت Binance تنفيذ ${executedLabel} ${baseAsset}.`
+            : "تم إرسال الأمر إلى Binance؛ راجع سجل الأوامر للحالة المؤكدة."
+        )));
+      } else {
+        setMessage(
+          matchedCount > 0 && matchedQuantity > 0
+            ? `تم تنفيذ ${orderLabel} ${executedLabel} ${baseAsset} داخل دفتر عرب تريد الداخلي؛ هذا ليس تنفيذًا لدى Binance.`
+            : `تم إنشاء أمر ${orderLabel} ${quantityLabel} ${baseAsset} داخل عرب تريد فقط، ولم تُنفذ صفقة بعد. هذا الأمر لم يُرسل إلى Binance.`
+        );
+      }
 
       setQuantity("");
       await loadAll(true);

@@ -330,18 +330,14 @@ export async function POST(
     "/api/orders";
 
   try {
-    const user =
-      await getCurrentUser(request);
-
-    if (!user) {
+    const identity = await requireVerifiedIdentity(request);
+    if (!identity.ok) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "غير مسجل الدخول",
-        },
-        { status: 401 }
+        { success: false, message: identity.message },
+        { status: identity.status }
       );
     }
+    const user = identity.user;
 
     idempotencyUserId = user._id;
 
@@ -441,7 +437,7 @@ export async function POST(
         body.type || "limit"
       ) as "limit" | "market";
 
-    const price =
+    let price =
       Number(body.price);
 
     const quantity =
@@ -552,6 +548,35 @@ export async function POST(
         },
         { status: 400 }
       );
+    }
+
+    if (type === "market") {
+      const oppositeSide = side === "buy" ? "sell" : "buy";
+      const bestCounterOrder = await Order.findOne({
+        symbol,
+        mode,
+        side: oppositeSide,
+        type: "limit",
+        status: "open",
+        quantity: { $gt: 0 },
+        userId: { $ne: user._id },
+      })
+        .sort({ price: side === "buy" ? 1 : -1, createdAt: 1 })
+        .select("price")
+        .lean();
+
+      if (!bestCounterOrder || !(Number(bestCounterOrder.price) > 0)) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "لا توجد سيولة مقابلة حاليًا لتنفيذ أمر السوق. جرّب أمرًا محددًا أو أعد المحاولة لاحقًا.",
+          },
+          { status: 409 }
+        );
+      }
+
+      // Price is informational for market orders; fills use each counter-order price.
+      price = Number(bestCounterOrder.price);
     }
 
     session =
@@ -743,6 +768,10 @@ export async function POST(
             session ?? undefined
           );
 
+        if (type === "market" && matchingResult.matched <= 0) {
+          throw new Error("NO_MARKET_LIQUIDITY");
+        }
+
         // -------------------------------------------------
         // Read final order INSIDE transaction so the saved
         // idempotency response is exactly what was committed.
@@ -911,6 +940,16 @@ export async function POST(
       "ORDERS POST:",
       error
     );
+
+    if (error?.message === "NO_MARKET_LIQUIDITY") {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "لم تعد هناك سيولة مقابلة كافية لتنفيذ أمر السوق. لم يتم خصم أي رصيد.",
+        },
+        { status: 409 }
+      );
+    }
 
     if (
       error?.message ===

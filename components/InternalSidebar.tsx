@@ -71,7 +71,7 @@ export default function InternalSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({
     المحفظة: true,
-    التداول الفوري: true,
+    "التداول الفوري": true,
     الحساب: false,
   });
 

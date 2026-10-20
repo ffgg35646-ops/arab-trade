@@ -1,31 +1,9 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import { jwtVerify } from "jose";
-
-const secretText = process.env.AUTH_SECRET;
-
-export default async function ProTradeLayout({
+export default function ProTradeLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  if (!secretText) {
-    redirect("/login");
-  }
-
-  const cookieStore = await cookies();
-  const session = cookieStore.get("arabtrade_session")?.value;
-
-  if (!session) {
-    redirect("/login");
-  }
-
-  try {
-    const secret = new TextEncoder().encode(secretText);
-    await jwtVerify(session, secret);
-  } catch {
-    redirect("/login");
-  }
-
+  // The trading terminal and public market data are viewable without an account.
+  // Trading APIs independently require an authenticated, eligible user.
   return children;
 }

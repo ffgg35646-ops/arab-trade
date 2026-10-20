@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   let accountForRollback: any = null;
-  let oldAccountState: { isActive: boolean; approvalStatus: string; rejectionReason?: string } | null = null;
+  let oldAccountState: { isActive: boolean; approvalStatus: "pending"; rejectionReason?: string } | null = null;
 
   try {
     const admin = await requireAdminLeader(request);
@@ -90,7 +90,7 @@ export async function PATCH(request: NextRequest) {
       accountForRollback = applicant;
       oldAccountState = {
         isActive: applicant.isActive,
-        approvalStatus: applicant.approvalStatus,
+        approvalStatus: "pending",
         rejectionReason: applicant.rejectionReason,
       };
 

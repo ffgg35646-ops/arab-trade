@@ -1,109 +1,77 @@
 import { NextRequest } from "next/server";
-import { connectDB } from "@/lib/mongodb";
-import { buildOrderBook } from "@/lib/orderbook";
+import { fetchBinanceJson } from "@/lib/binance-market";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
-  request: NextRequest
-) {
-  const url =
-    new URL(request.url);
+type DepthSnapshot = {
+  lastUpdateId: number;
+  bids: [string, string][];
+  asks: [string, string][];
+};
 
-  const symbol =
-    String(
-      url.searchParams.get(
-        "symbol"
-      ) || ""
-    )
-      .trim()
-      .toUpperCase()
-      .replace(/[_/\s-]/g, "");
+function toRows(rows: [string, string][]) {
+  return (Array.isArray(rows) ? rows : [])
+    .map(([priceText, quantityText]) => {
+      const price = Number(priceText);
+      const quantity = Number(quantityText);
+      return { price, quantity, amount: price * quantity, total: price * quantity };
+    })
+    .filter((row) => Number.isFinite(row.price) && row.price > 0 && Number.isFinite(row.quantity) && row.quantity > 0);
+}
 
-  const mode = "live";
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url);
+  const symbol = String(url.searchParams.get("symbol") || "").trim().toUpperCase().replace(/[_/\s-]/g, "");
+  const requestedDepth = Number(url.searchParams.get("depth") || 20);
+  const depth = Math.min(100, Math.max(5, Number.isFinite(requestedDepth) ? Math.floor(requestedDepth) : 20));
 
-  const depth =
-    Number(
-      url.searchParams.get(
-        "depth"
-      ) || 20
-    );
-
-  if (!symbol) {
-    return new Response(
-      "symbol required",
-      {
-        status: 400,
-      }
-    );
+  if (!/^[A-Z0-9]{5,25}$/.test(symbol)) {
+    return new Response("invalid symbol", { status: 400 });
   }
 
-  const encoder =
-    new TextEncoder();
-
+  const encoder = new TextEncoder();
   let stopped = false;
-
-  const stream =
-    new ReadableStream({
-      async start(controller) {
-        try {
-          await connectDB();
-
-          while (!stopped) {
-            const data =
-              await buildOrderBook(
-                symbol,
-                mode,
-                depth
-              );
-
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify(
-                  data
-                )}\n\n`
-              )
-            );
-
-            await new Promise(
-              (resolve) =>
-                setTimeout(
-                  resolve,
-                  1000
-                )
-            );
-          }
-        } catch (error) {
-          console.error(
-            "ORDERBOOK STREAM:",
-            error
-          );
-
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        while (!stopped) {
           try {
-            controller.error(
-              error
+            const snapshot = await fetchBinanceJson<DepthSnapshot>(
+              "depth?symbol=" + encodeURIComponent(symbol) + "&limit=" + depth,
+              1,
             );
-          } catch {}
+            controller.enqueue(encoder.encode("data: " + JSON.stringify({
+              source: "binance",
+              updatedAt: Date.now(),
+              lastUpdateId: snapshot.lastUpdateId,
+              bids: toRows(snapshot.bids),
+              asks: toRows(snapshot.asks),
+            }) + "\n\n"));
+          } catch (error) {
+            console.error("BINANCE ORDERBOOK STREAM SNAPSHOT:", error);
+            controller.enqueue(encoder.encode("event: market-error\ndata: " + JSON.stringify({
+              source: "binance",
+              message: "تعذر تحديث دفتر Binance مؤقتًا",
+              updatedAt: Date.now(),
+            }) + "\n\n"));
+          }
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         }
-      },
+      } catch (error) {
+        try { controller.error(error); } catch {}
+      }
+    },
+    cancel() {
+      stopped = true;
+    },
+  });
 
-      cancel() {
-        stopped = true;
-      },
-    });
-
-  return new Response(
-    stream,
-    {
-      headers: {
-        "Content-Type":
-          "text/event-stream",
-        "Cache-Control":
-          "no-cache, no-transform",
-        Connection: "keep-alive",
-        "X-Accel-Buffering":
-          "no",
-      },
-    }
-  );
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }

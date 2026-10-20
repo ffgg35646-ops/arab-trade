@@ -113,13 +113,13 @@ async function writeUserLedger(
   userId: mongoose.Types.ObjectId,
   asset: string,
   amount: number,
+  balanceBefore: number,
+  balanceAfter: number,
   referenceId: string,
   note: string,
   entryType: "trade" | "fee" = "trade",
 ) {
   if (!Number.isFinite(amount) || Math.abs(amount) < 1e-12) return;
-  const after = await totalWalletBalance(session, userId, asset);
-  const before = round8(after - amount);
   await LedgerEntry.create([{
     userId,
     scope: "user",
@@ -127,8 +127,8 @@ async function writeUserLedger(
     mode: "live",
     type: entryType,
     amount,
-    balanceBefore: before,
-    balanceAfter: after,
+    balanceBefore: round8(balanceBefore),
+    balanceAfter: round8(balanceAfter),
     referenceId,
     note,
   }], { session });
@@ -188,7 +188,8 @@ export async function submitBinanceLiveOrder(input: SubmitBinanceOrderInput): Pr
   const symbol = input.symbol.toUpperCase();
   const base = input.baseAsset.toUpperCase();
   const quote = input.quoteAsset.toUpperCase();
-  const lot = filterFor(input.pair, "LOT_SIZE") || filterFor(input.pair, "MARKET_LOT_SIZE");
+  const lot = (input.type === "market" ? filterFor(input.pair, "MARKET_LOT_SIZE") : filterFor(input.pair, "LOT_SIZE")) ||
+    filterFor(input.pair, "LOT_SIZE") || filterFor(input.pair, "MARKET_LOT_SIZE");
   const step = lot?.stepSize || "0.00000001";
   const minQty = Number(lot?.minQty || 0);
   const maxQty = Number(lot?.maxQty || Number.MAX_SAFE_INTEGER);
@@ -419,21 +420,23 @@ export async function reconcileBinanceLiveOrder(orderId: string, supplied?: Bina
       const deltaQuote = round8(executedQuote - previousQuote);
       const deltaFee = calculateTradingFee(deltaQuote, Number(order.feePercent || 0));
       const referenceId = "BINANCE:" + String(order._id) + ":" + executedQty.toFixed(8);
+      const baseBefore = await totalWalletBalance(session, order.userId, base);
+      const quoteBefore = await totalWalletBalance(session, order.userId, quote);
 
       if (deltaQuote > 0 || deltaFee > 0 || deltaQty > 0) {
         if (order.side === "buy") {
           await changeWalletBalance(session, order.userId, quote, 0, -(deltaQuote + deltaFee));
           if (deltaQty > 0) await changeWalletBalance(session, order.userId, base, deltaQty, 0);
-          if (deltaQty > 0) await writeUserLedger(session, order.userId, base, deltaQty, referenceId, "شراء Spot منفذ عبر Binance");
-          if (deltaQuote > 0) await writeUserLedger(session, order.userId, quote, -deltaQuote, referenceId, "قيمة شراء Spot عبر Binance");
-          if (deltaFee > 0) await writeUserLedger(session, order.userId, quote, -deltaFee, referenceId, "عمولة تداول Spot", "fee");
+          if (deltaQty > 0) await writeUserLedger(session, order.userId, base, deltaQty, baseBefore, round8(baseBefore + deltaQty), referenceId, "شراء Spot منفذ عبر Binance");
+          if (deltaQuote > 0) await writeUserLedger(session, order.userId, quote, -deltaQuote, quoteBefore, round8(quoteBefore - deltaQuote), referenceId, "قيمة شراء Spot عبر Binance");
+          if (deltaFee > 0) await writeUserLedger(session, order.userId, quote, -deltaFee, round8(quoteBefore - deltaQuote), round8(quoteBefore - deltaQuote - deltaFee), referenceId, "عمولة تداول Spot", "fee");
         } else {
           if (deltaQty > 0) await changeWalletBalance(session, order.userId, base, 0, -deltaQty);
           const credit = Math.max(0, round8(deltaQuote - deltaFee));
           if (credit > 0) await changeWalletBalance(session, order.userId, quote, credit, 0);
-          if (deltaQty > 0) await writeUserLedger(session, order.userId, base, -deltaQty, referenceId, "بيع Spot منفذ عبر Binance");
-          if (deltaQuote > 0) await writeUserLedger(session, order.userId, quote, deltaQuote, referenceId, "حصيلة بيع Spot عبر Binance");
-          if (deltaFee > 0) await writeUserLedger(session, order.userId, quote, -deltaFee, referenceId, "عمولة تداول Spot", "fee");
+          if (deltaQty > 0) await writeUserLedger(session, order.userId, base, -deltaQty, baseBefore, round8(baseBefore - deltaQty), referenceId, "بيع Spot منفذ عبر Binance");
+          if (deltaQuote > 0) await writeUserLedger(session, order.userId, quote, deltaQuote, quoteBefore, round8(quoteBefore + deltaQuote), referenceId, "حصيلة بيع Spot عبر Binance");
+          if (deltaFee > 0) await writeUserLedger(session, order.userId, quote, -deltaFee, round8(quoteBefore + deltaQuote), round8(quoteBefore + deltaQuote - deltaFee), referenceId, "عمولة تداول Spot", "fee");
         }
         await writeSystemTradingFee(session, deltaFee, quote, referenceId);
       }

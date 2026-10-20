@@ -89,7 +89,7 @@ export async function GET(
       const marketTrades = await Trade.find(marketFilter)
         .sort({ createdAt: -1 })
         .limit(limit)
-        .select("symbol price quantity quoteAmount createdAt")
+        .select("symbol takerSide price quantity quoteAmount createdAt")
         .lean();
 
       // Market tape is public trading data. Never expose buyer/seller or order IDs here.
@@ -98,6 +98,7 @@ export async function GET(
         trades: marketTrades.map((trade: any) => ({
           _id: String(trade._id),
           symbol: String(trade.symbol || ""),
+          side: trade.takerSide === "buy" || trade.takerSide === "sell" ? trade.takerSide : null,
           price: Number(trade.price || 0),
           quantity: Number(trade.quantity || 0),
           quoteAmount: Number(trade.quoteAmount || 0),

@@ -18,10 +18,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const identity = await requireVerifiedIdentity(request);
-    if (!identity.ok || !identity.user) {
+    if (!identity.ok) {
       return NextResponse.json(
-        { success: false, message: identity.message || "غير مصرح" },
-        { status: identity.status || 401 }
+        { success: false, message: identity.message },
+        { status: identity.status }
       );
     }
     const user = identity.user;
@@ -48,41 +48,44 @@ export async function POST(request: NextRequest) {
       !["spot", "funding"].includes(to) ||
       from === to ||
       !Number.isFinite(rawAmount) ||
-      rawAmount <= 0 ||
-      !Number.isFinite(Number(rawAmount.toFixed(12))) ||
-      Number(rawAmount.toFixed(12)) !== rawAmount
+      rawAmount <= 0
     ) {
       return NextResponse.json(
-        { success: false, message: "بيانات التحويل غير صحيحة أو أن دقة المبلغ تتجاوز 12 منزلة عشرية" },
+        { success: false, message: "بيانات التحويل غير صحيحة" },
         { status: 400 }
       );
     }
 
     const amount = Number(rawAmount.toFixed(12));
-    const normalizedRequest = { asset, amount, from, to };
-    requestHash = hashRequest(normalizedRequest);
-
-    if (idempotencyKey.length > 200 || /[\u0000-\u001F\u007F]/.test(idempotencyKey)) {
+    if (!Number.isFinite(amount) || amount <= 0 || amount !== rawAmount) {
       return NextResponse.json(
-        { success: false, message: "مفتاح تكرار الطلب غير صالح" },
+        { success: false, message: "دقة مبلغ التحويل يجب ألا تتجاوز 12 منزلة عشرية" },
         { status: 400 }
       );
     }
 
+    if (idempotencyKey.length > 200) {
+      return NextResponse.json(
+        { success: false, message: "مفتاح أمان التحويل غير صالح" },
+        { status: 400 }
+      );
+    }
+
+    const requestHashValue = hashRequest({ asset, amount, from, to });
+    requestHash = requestHashValue;
+
     if (idempotencyKey) {
       const existing = await getIdempotentResponse(user._id, TRANSFER_ROUTE, idempotencyKey);
       if (existing) {
-        if (existing.requestHash !== requestHash) {
+        if (existing.requestHash !== requestHashValue) {
           return NextResponse.json(
             { success: false, message: "مفتاح الطلب مستخدم مع بيانات تحويل مختلفة" },
             { status: 409 }
           );
         }
-
         if (existing.responseStatus !== 202 && existing.responseBody) {
           return NextResponse.json(existing.responseBody, { status: existing.responseStatus });
         }
-
         return NextResponse.json(
           { success: false, message: "التحويل قيد المعالجة؛ أعد المحاولة بنفس المفتاح" },
           { status: 409 }
@@ -90,14 +93,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Migrate legacy balances before the atomic transfer transaction.
     await migrateLegacyDepositBalancesToSpotWallet(user._id);
 
     session = await mongoose.startSession();
     let finalResponseBody: Record<string, unknown> | null = null;
-    let finalResponseStatus = 201;
+    const finalResponseStatus = 201;
 
     await session.withTransaction(async () => {
+      finalResponseBody = null;
       if (idempotencyKey) {
         try {
           await IdempotencyKey.create(
@@ -105,7 +108,7 @@ export async function POST(request: NextRequest) {
               userId: user._id,
               key: idempotencyKey,
               route: TRANSFER_ROUTE,
-              requestHash,
+              requestHash: requestHashValue,
               responseStatus: 202,
               responseBody: { success: true, pending: true },
             }],
@@ -159,7 +162,7 @@ export async function POST(request: NextRequest) {
       throw new Error("TRANSFER_RESPONSE_NOT_CREATED");
     }
 
-    // Notification delivery is ancillary; it must not turn a committed transfer into a false failure.
+    // Notification delivery is ancillary: it must not turn a committed transfer into a false failure.
     await Notification.create({
       userId: user._id,
       type: "account",
@@ -216,8 +219,6 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   } finally {
-    if (session) {
-      await session.endSession();
-    }
+    if (session) await session.endSession();
   }
 }

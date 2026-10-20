@@ -142,8 +142,7 @@ export default function StatementPage() {
   const totals = useMemo(() => {
     const incoming = filteredEntries.filter((entry) => entry.direction === "in").length;
     const outgoing = filteredEntries.filter((entry) => entry.direction === "out").length;
-    const fees = filteredEntries.filter((entry) => entry.type === "رسوم تداول")
-      .reduce((sum, entry) => sum + entry.amount, 0);
+    const fees = filteredEntries.filter((entry) => entry.type === "رسوم تداول").length;
     return { count: filteredEntries.length, incoming, outgoing, fees };
   }, [filteredEntries]);
 
@@ -214,9 +213,9 @@ export default function StatementPage() {
             <div className="mt-2 text-xs text-slate-600">عدد الحركات وليس مجموع عملات مختلفة</div>
           </div>
           <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5">
-            <div className="mb-3 text-sm text-slate-500">رسوم التداول الظاهرة</div>
-            <div className="text-2xl font-bold">{loading ? "—" : formatNumber(totals.fees, 8)}</div>
-            <div className="mt-2 text-xs text-slate-600">قد تتضمن أصول رسوم مختلفة؛ راجع عمود الأصل لكل حركة</div>
+            <div className="mb-3 text-sm text-slate-500">عدد حركات الرسوم</div>
+            <div className="text-2xl font-bold">{loading ? "—" : formatNumber(totals.fees, 0)}</div>
+            <div className="mt-2 text-xs text-slate-600">يُعرض مبلغ كل رسوم بعملتها في سجل الحركات</div>
           </div>
         </section>
 

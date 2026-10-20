@@ -15,6 +15,7 @@ export type PendingRegistration = {
   passwordHash: string;
   otpHash: string;
   referralCode?: string;
+  registrationId: string;
   expiresAt: number;
 };
 
@@ -28,6 +29,5 @@ export async function encryptPending(data: PendingRegistration) {
 
 export async function decryptPending(token: string) {
   const { payload } = await jwtDecrypt(token, await getSecret());
-
   return payload as unknown as PendingRegistration;
 }

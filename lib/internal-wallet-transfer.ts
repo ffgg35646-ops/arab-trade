@@ -164,6 +164,6 @@ export async function executeInternalWalletTransfer(input: {
     from,
     to,
     status: "completed",
-    createdAt: transfer.createdAt,
+    createdAt: transfer.createdAt ?? new Date(),
   };
 }

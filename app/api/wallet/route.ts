@@ -6,6 +6,7 @@ import DepositBalance from "@/models/DepositBalance";
 
 import LedgerEntry from "@/models/LedgerEntry";
 import { normalizeDepositBalanceRows, separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
+import { consolidateFundingWalletIntoSpotWallet } from "@/lib/consolidate-funding-wallet";
 
 const BINANCE_API = "https://api.binance.com";
 
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
     const mode = String(requestedMode || "live").toLowerCase() === "demo" ? "demo" : "live";
     if (mode === "live") {
       await separateLegacyDepositsFromSpotWallet(user._id);
+      await consolidateFundingWalletIntoSpotWallet(user._id);
     }
 
     const [wallets, rawDepositBalances] = await Promise.all([
@@ -278,7 +280,7 @@ export async function GET(request: NextRequest) {
     );
     const externalDepositTotalUsd = externalDepositAvailableUsd + externalDepositLockedUsd;
 
-    // Account totals combine spot, funding, and external deposit balances exactly once.
+    // Account totals combine spot and external deposit balances exactly once; legacy funding is consolidated into spot.
     const totalAccountAvailableUsd = totalAvailableUsd + fundingAvailableUsd + externalDepositAvailableUsd;
     const totalAccountLockedUsd = totalLockedUsd + fundingLockedUsd + externalDepositLockedUsd;
     const totalAccountBalanceUsd = totalAccountAvailableUsd + totalAccountLockedUsd;

@@ -789,9 +789,11 @@ export async function POST(
         finalResponseBody = {
           success: true,
           message:
-            matchingResult.matched > 0
-              ? "تم إنشاء الأمر وتنفيذ المطابقات المتاحة"
-              : "تم إنشاء الأمر",
+            type === "market" && latestOrder.status === "cancelled" && matchingResult.matched > 0
+              ? "تم تنفيذ الكمية المتاحة من أمر السوق وإلغاء الكمية المتبقية تلقائيًا."
+              : matchingResult.matched > 0
+                ? "تم إنشاء الأمر وتنفيذ المطابقات المتاحة"
+                : "تم إنشاء الأمر",
           order: latestOrder,
           matching: {
             matched:

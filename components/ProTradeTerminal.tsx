@@ -496,9 +496,14 @@ export default function ProTradeTerminal() {
   const [tab, setTab] = useState<"open" | "history" | "trades">("open");
 
   useEffect(() => {
-    const querySymbol = new URLSearchParams(window.location.search).get("symbol");
+    const params = new URLSearchParams(window.location.search);
+    const querySymbol = params.get("symbol");
     const normalized = String(querySymbol || "").trim().toUpperCase().replace(/[_/\\s-]/g, "");
+    const requestedTab = params.get("tab");
     if (/^[A-Z0-9]{5,25}$/.test(normalized)) setSymbol(normalized);
+    if (requestedTab === "trades") setTab("trades");
+    else if (requestedTab === "history") setTab("history");
+    else if (requestedTab === "open") setTab("open");
 
     let active = true;
     setPairFeedLoading(true);

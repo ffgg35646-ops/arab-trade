@@ -351,8 +351,9 @@ function OrderBook({
   currentPrice: number;
 }) {
   const visibleAsks = [...asks]
-    .sort((a, b) => num(b.price) - num(a.price))
-    .slice(0, 12);
+    .sort((a, b) => num(a.price) - num(b.price))
+    .slice(0, 12)
+    .reverse();
 
   const visibleBids = [...bids]
     .sort((a, b) => num(b.price) - num(a.price))
@@ -424,8 +425,11 @@ function OrderBook({
       </div>
 
       <div className="border-y border-white/[0.05] px-3 py-3">
-        <div className="text-base font-semibold text-cyan-400">
-          {fmt(currentPrice, 4)} <span className="text-[10px] text-slate-500">USDT</span>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div className="text-base font-semibold text-cyan-400">
+            {currentPrice > 0 ? fmt(currentPrice, 4) : "—"} <span className="text-[10px] text-slate-500">USDT</span>
+          </div>
+          <span className="text-[10px] text-slate-600">السعر المرجعي من Binance</span>
         </div>
       </div>
 
@@ -875,7 +879,7 @@ export default function ProTradePage() {
         <InternalSidebar />
         <div className="min-w-0 flex-1">
       <div className="border-b border-white/[0.06] bg-[#07101d]">
-        <div className="flex min-h-[72px] items-center gap-5 px-5">
+        <div className="flex min-h-[72px] flex-wrap items-center gap-3 px-3 sm:px-5">
           <div className="flex min-w-[190px] items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-400">
               ₿
@@ -915,7 +919,7 @@ export default function ProTradePage() {
             </div>
           </div>
 
-          <div className="hidden items-center gap-8 lg:flex">
+          <div className="flex items-center gap-3 lg:gap-6">
             <div>
               <div className="text-xl font-semibold">
                 {currentPrice > 0 ? fmt(currentPrice, 4) : "—"}
@@ -928,19 +932,19 @@ export default function ProTradePage() {
               </div>
               <div className="text-[10px] text-slate-500">24h</div>
             </div>
-            <div>
+            <div className="hidden xl:block">
               <div className="text-sm font-medium">
                 {liveTicker?.symbol === symbol && liveTicker.high24h > 0 ? fmt(liveTicker.high24h, 4) : "—"}
               </div>
               <div className="text-[10px] text-slate-500">أعلى 24 ساعة</div>
             </div>
-            <div>
+            <div className="hidden xl:block">
               <div className="text-sm font-medium">
                 {liveTicker?.symbol === symbol && liveTicker.low24h > 0 ? fmt(liveTicker.low24h, 4) : "—"}
               </div>
               <div className="text-[10px] text-slate-500">أدنى 24 ساعة</div>
             </div>
-            <div>
+            <div className="hidden xl:block">
               <div className="text-sm font-medium">
                 {money(liveTicker?.symbol === symbol ? liveTicker.quoteVolume : 0)}
               </div>

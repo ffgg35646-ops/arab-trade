@@ -1,0 +1,38 @@
+name: Arab Trade Build Check
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: TypeScript and Next.js production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production app
+        run: npm run build
+        env:
+          AUTH_SECRET: build-only-placeholder-not-for-deployment
+          MONGODB_URI: mongodb://127.0.0.1:27017/arabtrade
+          NEXT_TELEMETRY_DISABLED: "1"

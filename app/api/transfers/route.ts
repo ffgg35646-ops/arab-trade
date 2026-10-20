@@ -5,9 +5,66 @@ import { connectDB } from "@/lib/mongodb";
 import { getIdempotentResponse, hashRequest } from "@/lib/idempotency";
 import IdempotencyKey from "@/models/IdempotencyKey";
 import Notification from "@/models/Notification";
+import Transfer from "@/models/Transfer";
+import { getCurrentUser } from "@/lib/current-user";
 import { executeInternalWalletTransfer } from "@/lib/internal-wallet-transfer";
 
 const TRANSFER_ROUTE = "/api/transfers";
+
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json(
+        { success: false, message: "غير مسجل الدخول" },
+        { status: 401 }
+      );
+    }
+
+    await connectDB();
+
+    const params = new URL(request.url).searchParams;
+    const wallet = String(params.get("wallet") || "").trim().toLowerCase();
+    const requestedLimit = Number(params.get("limit") || 20);
+    const limit = Math.min(
+      Math.max(Number.isFinite(requestedLimit) ? Math.floor(requestedLimit) : 20, 1),
+      50
+    );
+
+    const filter: Record<string, unknown> = { userId: user._id };
+    if (wallet === "funding") {
+      filter.$or = [{ from: "funding" }, { to: "funding" }];
+    } else if (wallet === "spot") {
+      filter.$or = [{ from: "spot" }, { to: "spot" }];
+    }
+
+    const transfers = await Transfer.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select("asset amount from to status createdAt")
+      .lean();
+
+    return NextResponse.json({
+      success: true,
+      transfers: transfers.map((transfer: any) => ({
+        id: String(transfer._id),
+        asset: String(transfer.asset || "").toUpperCase(),
+        amount: Number(transfer.amount || 0),
+        from: transfer.from,
+        to: transfer.to,
+        status: transfer.status,
+        createdAt: transfer.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error("TRANSFERS GET:", error);
+    return NextResponse.json(
+      { success: false, message: "تعذر تحميل سجل التحويلات" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   let session: mongoose.ClientSession | null = null;

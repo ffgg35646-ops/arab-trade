@@ -34,14 +34,15 @@ const sections = [
       ["الإيداع", "/dashboard/assets/deposit"],
       ["الباقات", "/dashboard/packages"],
       ["السحب", "/dashboard/withdrawals"],
-      ["التمويل", "/dashboard/funding"],
     ],
   },
   {
-    title: "التداول الفوري",
+    title: "التداول",
     icon: ClipboardList,
     children: [
       ["التداول الفوري", "/protrade"],
+      ["التداول بالهامش", "/margin"],
+      ["التمويل", "/dashboard/funding"],
       ["سجل التداول", "/dashboard/trades"],
     ],
   },
@@ -71,7 +72,7 @@ export default function InternalSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({
     المحفظة: true,
-    "التداول الفوري": true,
+    التداول: true,
     الحساب: false,
   });
 
@@ -98,6 +99,8 @@ export default function InternalSidebar() {
             type="button"
             onClick={() => setCollapsed((value) => !value)}
             className="rounded-xl p-2 text-slate-500 hover:bg-white/5 hover:text-white"
+            aria-label={collapsed ? "توسيع القائمة الجانبية" : "طي القائمة الجانبية"}
+            title={collapsed ? "توسيع القائمة الجانبية" : "طي القائمة الجانبية"}
           >
             <PanelLeftClose
               size={17}
@@ -106,16 +109,16 @@ export default function InternalSidebar() {
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-2.5">
+        <nav aria-label="القائمة الجانبية للحساب" className="flex-1 overflow-y-auto p-2.5">
           <div className="space-y-1">
             {sections.map((section) => {
               const Icon = section.icon;
               const sectionActive = section.href
                 ? active(section.href)
-                : false;
+                : Boolean(section.children?.some(([, href]) => active(href)));
 
               if (section.children) {
-                const expanded = open[section.title];
+                const expanded = open[section.title] ?? false;
 
                 return (
                   <div key={section.title}>
@@ -127,6 +130,7 @@ export default function InternalSidebar() {
                           [section.title]: !old[section.title],
                         }))
                       }
+                      aria-expanded={expanded}
                       className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition ${
                         expanded || sectionActive
                           ? "text-white"
@@ -157,6 +161,7 @@ export default function InternalSidebar() {
                           <Link
                             key={href}
                             href={href}
+                            aria-current={active(href) ? "page" : undefined}
                             className={`block rounded-md px-3 py-2 text-xs transition ${
                               active(href)
                                 ? "bg-blue-500/15 font-semibold text-cyan-300"
@@ -176,6 +181,7 @@ export default function InternalSidebar() {
                 <Link
                   key={section.title}
                   href={section.href!}
+                  aria-current={sectionActive ? "page" : undefined}
                   className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${
                     sectionActive
                       ? "bg-blue-500/15 font-semibold text-cyan-300"

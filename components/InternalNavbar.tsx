@@ -32,13 +32,6 @@ const menus = [
       ["تداول العقود", "/trading/futures"],
     ],
   },
-  {
-    title: "كسب",
-    items: [
-      ["نظرة عامة", "/earn"],
-      ["المكافآت", "/dashboard/rewards"],
-    ],
-  },
 ];
 
 function isActive(

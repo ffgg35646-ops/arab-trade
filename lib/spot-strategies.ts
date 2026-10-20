@@ -413,6 +413,9 @@ export async function startSpotStrategy(strategy: any) {
   if (!strategy) throw new Error("الاستراتيجية غير موجودة.");
   if (strategy.status === "completed") throw new Error("اكتملت الاستراتيجية بالفعل؛ أنشئ استراتيجية جديدة لتحديد قواعد جديدة.");
   await assertLiveSpotAvailable(strategy);
+  if (strategy.executionMode === "bot" && process.env.SPOT_STRATEGY_RUNNER_ENABLED !== "true") {
+    throw new Error("تشغيل البوت محجوب حتى يتم إعداد مجدول الخلفية: اضبط SPOT_STRATEGY_RUNNER_ENABLED=true في الاستضافة وأضف ARAB_TRADE_BASE_URL وCRON_SECRET إلى GitHub Actions.");
+  }
   strategy.status = "running";
   strategy.startedAt = new Date();
   strategy.stoppedAt = null;
@@ -432,6 +435,29 @@ export async function pauseSpotStrategy(strategy: any) {
     : "تم إيقاف الاستراتيجية مؤقتًا. لن تبدأ صفقات جديدة.");
   await strategy.save();
   return strategy;
+}
+
+export async function runUserManualSpotStrategies(userId: mongoose.Types.ObjectId) {
+  const eligible = await SpotStrategy.find({
+    userId,
+    executionMode: "manual",
+    status: "running",
+    phase: { $in: ["waiting_to_buy", "holding"] },
+  })
+    .select("_id")
+    .sort({ updatedAt: 1 })
+    .limit(10)
+    .lean();
+
+  const results = await Promise.all(
+    eligible.map((item) => processStrategy(String(item._id))),
+  );
+
+  return {
+    found: eligible.length,
+    processed: results.filter((item: any) => item.processed).length,
+    results,
+  };
 }
 
 export async function runAllSpotStrategies() {

@@ -21,6 +21,15 @@ export interface IOrder {
   filledQuantity?: number;
 
   status: "open" | "cancelled" | "filled" | "rejected";
+  executionProvider?: "internal" | "binance";
+  externalOrderId?: number;
+  clientOrderId?: string;
+  reservedAmount?: number;
+  releasedAmount?: number;
+  settledExecutedQuantity?: number;
+  settledQuoteQuantity?: number;
+  settledFeeAmount?: number;
+  feePercent?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -106,6 +115,15 @@ const OrderSchema = new Schema<IOrder>(
       default: "open",
       index: true,
     },
+    executionProvider: { type: String, enum: ["internal", "binance"], default: "internal", index: true },
+    externalOrderId: { type: Number },
+    clientOrderId: { type: String, index: true },
+    reservedAmount: { type: Number, min: 0, default: 0 },
+    releasedAmount: { type: Number, min: 0, default: 0 },
+    settledExecutedQuantity: { type: Number, min: 0, default: 0 },
+    settledQuoteQuantity: { type: Number, min: 0, default: 0 },
+    settledFeeAmount: { type: Number, min: 0, default: 0 },
+    feePercent: { type: Number, min: 0, max: 100, default: 0 },
   },
   {
     timestamps: true,

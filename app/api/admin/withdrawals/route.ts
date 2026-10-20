@@ -8,6 +8,23 @@ import InvestmentPackage from "@/models/InvestmentPackage";
 import Wallet from "@/models/Wallet";
 import PlatformSettings from "@/models/PlatformSettings";
 import Notification from "@/models/Notification";
+import LedgerEntry from "@/models/LedgerEntry";
+
+async function recordWithdrawalFee(row: any, session: mongoose.ClientSession) {
+  const amount = Number(row.feeAmount || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  const referenceId = "withdrawal-fee:" + String(row._id);
+  const exists = await LedgerEntry.findOne({ scope: "system", systemAccount: "withdrawal-fees", asset: "USDT", mode: "live", referenceId }).session(session).lean();
+  if (exists) return;
+  const previous = await LedgerEntry.findOne({ scope: "system", systemAccount: "withdrawal-fees", asset: "USDT", mode: "live" }).sort({ createdAt: -1 }).session(session).lean();
+  const before = Number(previous?.balanceAfter || 0);
+  const after = Number((before + amount).toFixed(8));
+  await LedgerEntry.create([{
+    scope: "system", systemAccount: "withdrawal-fees", asset: "USDT", mode: "live",
+    type: "fee", amount, balanceBefore: before, balanceAfter: after, referenceId,
+    note: "عمولة سحب 5% للطلب " + String(row._id),
+  }], { session });
+}
 
 export async function GET(request: NextRequest) {
   const admin = await requireAdminLeader(request);
@@ -103,6 +120,7 @@ export async function PATCH(request: NextRequest) {
           );
           if (returned.modifiedCount !== 1) throw new Error("تعذر إرجاع مبلغ السحب العام؛ لم يتم اعتماد المراجعة");
         }
+        if (!rejecting) await recordWithdrawalFee(row, session);
         return;
       }
 
@@ -124,6 +142,7 @@ export async function PATCH(request: NextRequest) {
         );
         if (updated.modifiedCount !== 1) throw new Error("تعذر مطابقة رصيد الباقة المحجوز؛ لم تتغير المراجعة");
       }
+      if (!rejecting) await recordWithdrawalFee(row, session);
     });
 
     if (processedWithdrawal) {
@@ -139,8 +158,8 @@ export async function PATCH(request: NextRequest) {
           type: "withdrawal",
           title: approved ? "تم قبول طلب السحب" : "تم رفض طلب السحب",
           message: approved
-            ? "وافق الأدمن على طلب سحب " + Number(processedWithdrawal.amount || 0) + " USDT من " + sourceLabel + "، وتم خصم المبلغ من الرصيد المحجوز."
-            : "رفض الأدمن طلب سحب " + Number(processedWithdrawal.amount || 0) + " USDT من " + sourceLabel + "، وتم إرجاع المبلغ إلى رصيد السحب الخاص به.",
+            ? "وافق الأدمن على طلب السحب من " + sourceLabel + ". إجمالي المبلغ المحجوز " + Number(processedWithdrawal.grossAmount ?? processedWithdrawal.amount ?? 0) + " USDT، والعمولة " + Number(processedWithdrawal.feeAmount || 0) + " USDT، وصافي المبلغ المطلوب إرساله " + Number(processedWithdrawal.payoutAmount ?? processedWithdrawal.amount ?? 0) + " USDT."
+            : "رفض الأدمن طلب سحب " + Number(processedWithdrawal.amount || 0) + " USDT من " + sourceLabel + "، وتم إرجاع المبلغ كاملًا إلى رصيد السحب الخاص به.",
           read: false,
         });
       } catch (notificationError) {

@@ -299,6 +299,8 @@ export default function WithdrawalsPage() {
               <h2 className="text-xl font-black">السحب العام</h2>
             </div>
 
+            <p className="rounded-xl border border-emerald-400/15 bg-emerald-400/[0.04] p-3 text-sm leading-6 text-emerald-100">السحب العام مرتبط برصيد USDT المتاح في محفظة التداول. بعد تنفيذ بيع العملة مقابل USDT تُضاف حصيلة البيع بعد رسوم التداول إلى هذا الرصيد، ويمكن طلب سحبها من هنا. أرباح الباقات تظل منفصلة وتُسحب من قسم الباقات.</p>
+
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="grid gap-3 rounded-xl border border-slate-700 bg-[#0b1422] p-4 sm:grid-cols-2">
                 <label className="block space-y-2 text-sm text-slate-300">

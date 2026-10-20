@@ -287,7 +287,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      depositBalances: depositBalances.map((item: any) => ({ asset: String(item.asset || "").toUpperCase(), available: Number(item.available || 0), locked: Number(item.locked || 0) })),
+      depositBalances: depositBalances.map((item: any) => { const asset = String(item.asset || "").toUpperCase(); const available = Number(item.available || 0); const locked = Number(item.locked || 0); const priceUsd = Number(prices.get(asset) || 0); return { asset, available, locked, total: available + locked, priceUsd, valueUsd: (available + locked) * priceUsd }; }),
 
       wallet: {
         type: "spot",

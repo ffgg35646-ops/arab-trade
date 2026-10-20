@@ -12,7 +12,16 @@ export interface IWithdrawalRequest {
   userPackageId?: mongoose.Types.ObjectId;
   packageId?: mongoose.Types.ObjectId;
   allocations?: IWithdrawalAllocation[];
+  /** Gross amount held from the user's withdrawal balance. */
   amount: number;
+  grossAmount?: number;
+  feePercent?: number;
+  feeAmount?: number;
+  payoutAmount?: number;
+  conversionAsset?: string;
+  conversionQuantity?: number;
+  conversionPrice?: number;
+  tradingFeeAmount?: number;
   asset: "USDT";
   network: string;
   payoutAddress: string;
@@ -34,6 +43,14 @@ const schema = new Schema<IWithdrawalRequest>({
   packageId: { type: Schema.Types.ObjectId, ref: "InvestmentPackage", required: false, index: true },
   allocations: { type: [AllocationSchema], default: [] },
   amount: { type: Number, required: true, min: 0.00000001 },
+  grossAmount: { type: Number, min: 0 },
+  feePercent: { type: Number, min: 0, max: 100 },
+  feeAmount: { type: Number, min: 0 },
+  payoutAmount: { type: Number, min: 0 },
+  conversionAsset: { type: String, uppercase: true, trim: true },
+  conversionQuantity: { type: Number, min: 0 },
+  conversionPrice: { type: Number, min: 0 },
+  tradingFeeAmount: { type: Number, min: 0 },
   asset: { type: String, enum: ["USDT"], required: true, default: "USDT" },
   network: { type: String, required: true, trim: true },
   payoutAddress: { type: String, required: true, trim: true, minlength: 3, maxlength: 200 },

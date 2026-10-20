@@ -1,5 +1,7 @@
 import mongoose, { Schema, Model } from "mongoose";
 
+export type AccountApprovalStatus = "pending" | "approved" | "rejected";
+
 export interface IUser {
   arabTradeId?: number;
   name: string;
@@ -11,6 +13,8 @@ export interface IUser {
   referredBy?: mongoose.Types.ObjectId | null;
   isVerified: boolean;
   isActive: boolean;
+  approvalStatus: AccountApprovalStatus;
+  rejectionReason?: string;
   createdAt: Date;
   updatedAt?: Date;
 }
@@ -23,7 +27,6 @@ const UserSchema = new Schema<IUser>(
       sparse: true,
       index: true,
     },
-
     name: {
       type: String,
       required: true,
@@ -31,7 +34,6 @@ const UserSchema = new Schema<IUser>(
       minlength: 2,
       maxlength: 60,
     },
-
     username: {
       type: String,
       required: true,
@@ -42,7 +44,6 @@ const UserSchema = new Schema<IUser>(
       maxlength: 30,
       match: /^[a-z0-9_]+$/,
     },
-
     email: {
       type: String,
       required: true,
@@ -50,49 +51,50 @@ const UserSchema = new Schema<IUser>(
       lowercase: true,
       trim: true,
     },
-
     password: {
       type: String,
       required: true,
       select: false,
     },
-
     role: {
       type: String,
       enum: ["user", "admin", "admin_leader"],
       default: "user",
       index: true,
     },
-
     referralCode: {
       type: String,
       required: true,
       unique: true,
       index: true,
     },
-
     referredBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
       default: null,
     },
-
     isVerified: {
       type: Boolean,
       default: true,
     },
-
     isActive: {
       type: Boolean,
       default: true,
     },
-
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "approved",
+      index: true,
+    },
+    rejectionReason: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+    },
   },
-  {
-    timestamps: true,
-  }
-)
-
+  { timestamps: true }
+);
 
 const User: Model<IUser> =
   mongoose.models.User ||

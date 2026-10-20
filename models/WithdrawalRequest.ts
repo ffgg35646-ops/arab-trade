@@ -19,6 +19,7 @@ export interface IWithdrawalRequest {
   feeAmount?: number;
   payoutAmount?: number;
   conversionAsset?: string;
+  conversionOrderId?: mongoose.Types.ObjectId;
   conversionQuantity?: number;
   conversionPrice?: number;
   tradingFeeAmount?: number;
@@ -48,6 +49,7 @@ const schema = new Schema<IWithdrawalRequest>({
   feeAmount: { type: Number, min: 0 },
   payoutAmount: { type: Number, min: 0 },
   conversionAsset: { type: String, uppercase: true, trim: true },
+  conversionOrderId: { type: Schema.Types.ObjectId, ref: "Order", required: false },
   conversionQuantity: { type: Number, min: 0 },
   conversionPrice: { type: Number, min: 0 },
   tradingFeeAmount: { type: Number, min: 0 },

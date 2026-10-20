@@ -464,6 +464,9 @@ function OrderBook({
 export default function ProTradePage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [availablePairs, setAvailablePairs] = useState<SpotMarketPair[]>([]);
+  const [pairFeedLoading, setPairFeedLoading] = useState(true);
+  const [pairFeedError, setPairFeedError] = useState("");
+  const [pairReload, setPairReload] = useState(0);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -494,20 +497,40 @@ export default function ProTradePage() {
     if (/^[A-Z0-9]{5,25}$/.test(normalized)) setSymbol(normalized);
 
     let active = true;
+    setPairFeedLoading(true);
+
     async function loadAvailablePairs() {
       try {
         const response = await fetch("/api/market/binance", { cache: "no-store" });
-        const data = await response.json();
-        if (active && response.ok && Array.isArray(data?.pairs)) {
-          setAvailablePairs(data.pairs);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data?.success !== true || !Array.isArray(data?.pairs) || data.pairs.length === 0) {
+          throw new Error(data?.message || "لم تصل قائمة أزواج التداول من Binance. اضغط إعادة تحميل الأزواج.");
         }
-      } catch {
-        // Keep the currently selected market usable if the selector feed is unavailable.
+        if (!active) return;
+        const nextPairs = data.pairs as SpotMarketPair[];
+        setAvailablePairs(nextPairs);
+        setPairFeedError("");
+        setSymbol((current) => {
+          if (nextPairs.some((pair) => pair.symbol === current)) return current;
+          if (normalized && nextPairs.some((pair) => pair.symbol === normalized)) return normalized;
+          return nextPairs.find((pair) => pair.symbol === "BTCUSDT")?.symbol || nextPairs[0].symbol;
+        });
+      } catch (error) {
+        if (active) {
+          setPairFeedError(error instanceof Error ? error.message : "تعذر تحميل أزواج التداول.");
+        }
+      } finally {
+        if (active) setPairFeedLoading(false);
       }
     }
+
     void loadAvailablePairs();
-    return () => { active = false; };
-  }, []);
+    const timer = window.setInterval(() => void loadAvailablePairs(), 60000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [pairReload]);
 
   useEffect(() => {
     let stopped = false;
@@ -772,7 +795,7 @@ export default function ProTradePage() {
         } else {
           setOrders([]);
           if (ordersResponse.status === 403 || ordersResponse.status === 401) {
-            setError(orderData.message || "سجّل الدخول ووثّق حسابك لعرض سجل الأوامر والتداول.");
+            setError(orderData.message || "سجّل الدخول لعرض سجل الأوامر والتداول.");
           }
         }
 
@@ -931,19 +954,20 @@ export default function ProTradePage() {
                   }}
                   className="cursor-pointer appearance-none bg-transparent text-lg font-bold outline-none"
                 >
-                  {(availablePairs.length
-                    ? availablePairs
-                    : pairs.map((base) => ({ symbol: base + "USDT", baseAsset: base, quoteAsset: "USDT" }))
-                  ).map((pair) => (
+                  {availablePairs.length ? availablePairs.map((pair) => (
                     <option key={pair.symbol} value={pair.symbol} className="bg-[#07101d]">
                       {pair.baseAsset}/{pair.quoteAsset}
                     </option>
-                  ))}
+                  )) : (
+                    <option value={symbol} disabled className="bg-[#07101d]">
+                      {pairFeedLoading ? "جاري تحميل أزواج التداول..." : "تعذر تحميل الأزواج — أعد المحاولة"}
+                    </option>
+                  )}
                 </select>
                 <ChevronDown size={15} className="text-slate-500" />
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
-                <span>التداول الفوري</span>
+                <span>التداول الفوري · {availablePairs.length.toLocaleString("en-US")} زوج</span>
                 <span className={priceFeedStatus === "live" ? "text-emerald-400" : "text-amber-300"}>
                   {priceFeedStatus === "live" ? "● سعر مباشر" : priceFeedStatus === "snapshot" ? "● تحديث احتياطي كل 5 ثوانٍ" : priceFeedStatus === "reconnecting" ? "● استعادة اتصال السعر" : priceFeedStatus === "offline" ? "● السعر غير متاح" : "● جاري الاتصال بالسوق"}
                 </span>
@@ -1003,6 +1027,16 @@ export default function ProTradePage() {
           </div>
         </div>
       </div>
+
+      {pairFeedError && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-400/20 bg-amber-400/5 px-5 py-3 text-xs text-amber-200">
+          <span>{pairFeedError}</span>
+          <button type="button" onClick={() => setPairReload((value) => value + 1)} disabled={pairFeedLoading} className="inline-flex items-center gap-2 rounded-lg border border-amber-300/20 px-3 py-2 font-semibold hover:bg-amber-300/10 disabled:opacity-50">
+            <RefreshCw size={14} className={pairFeedLoading ? "animate-spin" : ""} />
+            إعادة تحميل الأزواج
+          </button>
+        </div>
+      )}
 
       {(error || message) && (
         <div className="border-b border-white/[0.06] px-5 py-2">

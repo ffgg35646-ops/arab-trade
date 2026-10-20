@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
-import { requireVerifiedIdentity } from "@/lib/require-kyc";
 import { getBinanceSpotPair } from "@/lib/binance-market";
 import { connectDB } from "@/lib/mongodb";
 import Order from "@/models/Order";
@@ -53,8 +52,6 @@ export async function GET(
   request: NextRequest
 ) {
   try {
-    const requestedMode = "live";
-
     const user = await getCurrentUser(request);
 
     if (!user) {
@@ -62,16 +59,6 @@ export async function GET(
         { success: false, message: "غير مسجل الدخول" },
         { status: 401 }
       );
-    }
-
-    if (requestedMode === "live") {
-      const kycGuard = await requireVerifiedIdentity(request);
-      if (!kycGuard.ok) {
-        return NextResponse.json(
-          { success: false, message: kycGuard.message },
-          { status: kycGuard.status }
-        );
-      }
     }
 
     await connectDB();
@@ -322,13 +309,6 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}));
     const mode: "live" = "live";
-    const identity = await requireVerifiedIdentity(request);
-    if (!identity.ok) {
-      return NextResponse.json(
-        { success: false, message: identity.message },
-        { status: identity.status }
-      );
-    }
     await migrateLegacyDepositBalancesToSpotWallet(user._id);
 
     const settings =
@@ -509,13 +489,15 @@ export async function POST(
       await Asset.updateOne(
         { symbol: assetSymbol },
         {
+          $set: {
+            enabled: true,
+            tradingEnabled: true,
+          },
           $setOnInsert: {
             name: assetSymbol,
             symbol: assetSymbol,
             type: "crypto",
-            enabled: true,
             depositEnabled: false,
-            tradingEnabled: true,
             sortOrder: 99999,
             networks: [],
           },

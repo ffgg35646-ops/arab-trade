@@ -25,7 +25,10 @@ export interface IOrder {
   externalOrderId?: number;
   clientOrderId?: string;
   reservedAmount?: number;
+  reservedAsset?: string;
   releasedAmount?: number;
+  locksReleased?: boolean;
+  lastExecutionError?: string;
   settledExecutedQuantity?: number;
   settledQuoteQuantity?: number;
   settledFeeAmount?: number;
@@ -119,7 +122,10 @@ const OrderSchema = new Schema<IOrder>(
     externalOrderId: { type: Number },
     clientOrderId: { type: String, index: true },
     reservedAmount: { type: Number, min: 0, default: 0 },
+    reservedAsset: { type: String, uppercase: true },
     releasedAmount: { type: Number, min: 0, default: 0 },
+    locksReleased: { type: Boolean, default: false },
+    lastExecutionError: { type: String, maxlength: 240 },
     settledExecutedQuantity: { type: Number, min: 0, default: 0 },
     settledQuoteQuantity: { type: Number, min: 0, default: 0 },
     settledFeeAmount: { type: Number, min: 0, default: 0 },

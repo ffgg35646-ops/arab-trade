@@ -327,7 +327,7 @@ export default function SpotStrategyTerminal() {
                 <Wallet size={15} className="ml-2 text-slate-600" />
                 <input value={quoteBudget} onChange={(e) => setQuoteBudget(e.target.value)} required type="number" min="0.00000001" step="any" className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none" />
               </span>
-              <span className="mt-1 block text-[10px] text-slate-600">ميزانية الصفقة الواحدة قبل احتساب الرسوم الفعلية.</span>
+              <span className="mt-1 block text-[10px] text-slate-600">ميزانية قصوى تشمل احتياطيًا تقريبيًا للرسوم؛ قد يقل الإنفاق النهائي قليلًا بسبب تقريب الكمية.</span>
             </label>
 
             <label className="block text-xs text-slate-400">

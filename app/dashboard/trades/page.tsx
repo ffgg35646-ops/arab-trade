@@ -1,7 +1,8 @@
 "use client";
 
 import { RefreshCw, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 
 import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
@@ -15,6 +16,7 @@ type Trade = {
   createdAt?: string;
   buyerId: string;
   sellerId: string;
+  side?: "buy" | "sell";
 };
 
 function formatNumber(value: number) {
@@ -41,8 +43,8 @@ export default function TradesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function load() {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError("");
 
     try {
@@ -67,11 +69,15 @@ export default function TradesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [symbol]);
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+    const refreshTimer = window.setInterval(() => {
+      void load(true);
+    }, 10000);
+    return () => window.clearInterval(refreshTimer);
+  }, [load]);
 
   return (
     <div
@@ -90,7 +96,7 @@ export default function TradesPage() {
             <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <div className="mb-2 text-xs font-medium text-slate-500">
-                  التداول / الصفقات
+                  التداول الفوري / سجل التداول
                 </div>
 
                 <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
@@ -102,17 +108,25 @@ export default function TradesPage() {
                 </p>
               </div>
 
-              <button
-                onClick={load}
-                disabled={loading}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 text-sm font-medium text-slate-200 transition hover:bg-white/[0.08] disabled:opacity-50"
-              >
-                <RefreshCw
-                  size={16}
-                  className={loading ? "animate-spin" : ""}
-                />
-                تحديث
-              </button>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/protrade"
+                  className="inline-flex h-11 items-center justify-center rounded-xl bg-cyan-400 px-5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                >
+                  العودة للتداول الفوري
+                </Link>
+                <button
+                  onClick={() => load()}
+                  disabled={loading}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-5 text-sm font-medium text-slate-200 transition hover:bg-white/[0.08] disabled:opacity-50"
+                >
+                  <RefreshCw
+                    size={16}
+                    className={loading ? "animate-spin" : ""}
+                  />
+                  تحديث
+                </button>
+              </div>
             </div>
 
             {/* Stats */}
@@ -214,6 +228,10 @@ export default function TradesPage() {
                       </th>
 
                       <th className="px-5 py-4 font-medium">
+                        نوع العملية
+                      </th>
+
+                      <th className="px-5 py-4 font-medium">
                         سعر التنفيذ
                       </th>
 
@@ -240,6 +258,12 @@ export default function TradesPage() {
                         <td className="px-5 py-4">
                           <span className="font-semibold text-white">
                             {trade.symbol}
+                          </span>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <span className={trade.side === "buy" ? "rounded-md bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-400" : trade.side === "sell" ? "rounded-md bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-400" : "text-xs text-slate-500"}>
+                            {trade.side === "buy" ? "شراء" : trade.side === "sell" ? "بيع" : "—"}
                           </span>
                         </td>
 

@@ -34,14 +34,14 @@ const sections = [
       ["الإيداع", "/dashboard/assets/deposit"],
       ["الباقات", "/dashboard/packages"],
       ["السحب", "/dashboard/withdrawals"],
-      ["التداول الفوري", "/protrade"],
       ["التمويل", "/dashboard/funding"],
     ],
   },
   {
-    title: "الأوامر",
+    title: "التداول الفوري",
     icon: ClipboardList,
     children: [
+      ["التداول الفوري", "/protrade"],
       ["سجل التداول", "/dashboard/trades"],
     ],
   },
@@ -71,7 +71,7 @@ export default function InternalSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({
     المحفظة: true,
-    الأوامر: true,
+    التداول الفوري: true,
     الحساب: false,
   });
 

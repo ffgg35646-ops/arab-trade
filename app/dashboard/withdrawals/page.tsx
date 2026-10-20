@@ -68,6 +68,7 @@ type ConversionQuote = {
   estimatedWithdrawalFeeUsdt?: number;
   estimatedPayoutUsdt?: number;
   disclaimer?: string;
+  externalExecutionConfigured?: boolean;
 };
 type Data = {
   summary: {
@@ -267,6 +268,153 @@ export default function WithdrawalsPage() {
       network: selectedGeneralNetwork,
       payoutAddress: generalAddress.trim(),
     });
+  }
+
+  async function submitConvertedGeneral() {
+    const quantity = Number(conversionQuantity);
+    const address = generalAddress.trim();
+
+    if (!data?.general.configured) {
+      showMessage("الأدمن لم يحدد الحد الأدنى للسحب العام بعد");
+      return;
+    }
+    if (!selectedSpotBalance || !Number.isFinite(quantity) || quantity <= 0 || Math.round(quantity * 1e8) / 1e8 !== quantity) {
+      showMessage("اختر عملة من رصيد التداول واكتب كمية صحيحة بحد أقصى 8 منازل عشرية");
+      return;
+    }
+    if (quantity > selectedSpotBalance.available + 1e-8) {
+      showMessage("الكمية أكبر من الرصيد المتاح من " + conversionAsset);
+      return;
+    }
+    if (!address) {
+      showMessage("اكتب عنوان الدفع قبل تنفيذ التحويل والسحب");
+      return;
+    }
+    if (!selectedGeneralNetwork) {
+      showMessage("اختر شبكة السحب");
+      return;
+    }
+    if (!isValidPayoutAddress(selectedGeneralNetwork, address)) {
+      showMessage(selectedGeneralNetwork === "TRC20"
+        ? "عنوان TRC20 يجب أن يكون عنوان TRON بطول 34 حرفًا يبدأ بـ T."
+        : "عنوان BEP20 يجب أن يبدأ بـ 0x ويتبعه 40 رقمًا سداسيًا.");
+      return;
+    }
+    if (!conversionQuote?.success) {
+      showMessage("انتظر تحديث سعر السوق واحصل على تقدير صالح قبل المتابعة");
+      return;
+    }
+
+    if (conversionAsset === "USDT") {
+      if (quantity < data.general.minimum) {
+        showMessage("الحد الأدنى للسحب العام هو " + money(data.general.minimum) + " USDT");
+        return;
+      }
+      if (quantity > data.general.available) {
+        showMessage("الرصيد العام المتاح للسحب هو " + money(data.general.available) + " USDT فقط");
+        return;
+      }
+      void submit({
+        type: "general",
+        amount: quantity,
+        asset: "USDT",
+        network: selectedGeneralNetwork,
+        payoutAddress: address,
+      });
+      return;
+    }
+
+    if (!conversionQuote.externalExecutionConfigured) {
+      showMessage("البيع التلقائي غير مفعّل: يلزم إعداد اتصال Binance API على الخادم. لم تُبع أي عملة.");
+      return;
+    }
+    if (Number(conversionQuote.estimatedAfterTradingFeeUsdt || 0) < data.general.minimum) {
+      showMessage("صافي حصيلة البيع المتوقع أقل من الحد الأدنى للسحب العام " + money(data.general.minimum) + " USDT. زِد الكمية قبل التنفيذ.");
+      return;
+    }
+
+    setBusy(true);
+    setMessage("");
+    setMessageKind("info");
+    try {
+      const orderResponse = await fetch("/api/orders", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          symbol: conversionAsset + "USDT",
+          side: "sell",
+          type: "market",
+          quantity,
+        }),
+      });
+      const orderResult = await orderResponse.json().catch(() => ({}));
+      if (!orderResponse.ok || !orderResult.success) {
+        showMessage(orderResult.message || "تعذر تنفيذ بيع العملة لدى Binance. لم يتم إنشاء طلب السحب.", "error");
+        await load();
+        return;
+      }
+
+      if (orderResult.executionProvider !== "binance") {
+        showMessage("لم يؤكد النظام أن البيع نُفّذ لدى Binance؛ لم يتم إنشاء طلب السحب.", "error");
+        await load();
+        return;
+      }
+
+      const orderStatus = String(orderResult.order?.status || "").toLowerCase();
+      const fills = Array.isArray(orderResult.matching?.trades) ? orderResult.matching.trades : [];
+      const convertedUsdt = Math.round(fills.reduce((sum: number, trade: any) => {
+        const gross = Math.max(0, Number(trade.quoteAmount) || 0);
+        const fee = Math.max(0, Number(trade.feeAmount) || 0);
+        return sum + Math.max(0, gross - fee);
+      }, 0) * 1e8) / 1e8;
+
+      if (convertedUsdt <= 0 || !["filled", "cancelled"].includes(orderStatus)) {
+        showMessage(String(orderResult.message || "لم يتم تأكيد حصيلة بيع قابلة للسحب بعد.") + " لم يُنشأ طلب سحب؛ افتح سجل التداول لتحديث حالة الأمر قبل إعادة المحاولة.", "info");
+        await load();
+        return;
+      }
+      if (convertedUsdt < data.general.minimum) {
+        showMessage("تم بيع " + conversionAsset + " فعليًا، لكن صافي حصيلة البيع " + money(convertedUsdt) + " USDT أقل من الحد الأدنى للسحب. حصيلة البيع بقيت في رصيدك العام ويمكنك سحبها بعد استيفاء الحد الأدنى.", "info");
+        setConversionQuantity("");
+        await load();
+        return;
+      }
+
+      const withdrawalResponse = await fetch("/api/withdrawals", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "general",
+          amount: convertedUsdt,
+          asset: "USDT",
+          network: selectedGeneralNetwork,
+          payoutAddress: address,
+        }),
+      });
+      const withdrawalResult = await withdrawalResponse.json().catch(() => ({}));
+      if (!withdrawalResponse.ok || !withdrawalResult.success) {
+        showMessage("تم تأكيد بيع العملة وتحويل صافي " + money(convertedUsdt) + " USDT إلى رصيدك، لكن لم يُنشأ طلب السحب. الرصيد ما زال في محفظة التداول. السبب: " + String(withdrawalResult.message || "تعذر إنشاء الطلب"), "error");
+        setConversionQuantity("");
+        await load();
+        return;
+      }
+
+      const fee = Math.round(convertedUsdt * 0.05 * 1e8) / 1e8;
+      const payout = Math.round((convertedUsdt - fee) * 1e8) / 1e8;
+      showMessage("تم تأكيد بيع " + conversionAsset + " لدى Binance، وإنشاء طلب سحب بقيمة " + money(convertedUsdt) + " USDT. عمولة السحب " + money(fee) + " USDT، والصافي المطلوب إرساله " + money(payout) + " USDT.", "success");
+      setConversionQuantity("");
+      await load();
+    } catch {
+      showMessage("تعذر تأكيد النتيجة النهائية. لا تعِد أمر البيع فورًا؛ افتح سجل التداول والمحفظة أولًا لتجنب تكرار البيع.", "error");
+      await load();
+    } finally {
+      setBusy(false);
+    }
   }
 
   function handlePackageButtonClick(plan: Plan, needsActiveReferrals: boolean) {
@@ -471,6 +619,10 @@ export default function WithdrawalsPage() {
             <button type="button" onClick={submitGeneral} disabled={busy || hasPending || !data?.general.configured || !selectedGeneralNetwork || !data?.networks.length} className="w-full rounded-xl bg-blue-600 px-4 py-3 font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">
               طلب سحب
             </button>
+            <button type="button" onClick={() => void submitConvertedGeneral()} disabled={busy || hasPending || !conversionQuantity || !conversionQuote?.success || !selectedGeneralNetwork || !data?.general.configured} className="w-full rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 font-black text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-40">
+              {busy ? "جارٍ تنفيذ التحويل والسحب..." : conversionAsset === "USDT" ? "طلب سحب الكمية المحددة من USDT" : "بيع " + conversionAsset + " بسعر السوق ثم طلب السحب"}
+            </button>
+            <p className="text-[11px] leading-5 text-slate-500">للعملات غير USDT: يُرسل أولًا أمر بيع سوق إلى Binance. لا يُنشأ طلب السحب إلا بعد تأكيد التنفيذ وقراءة حصيلة البيع. إذا تعذّر إنشاء طلب السحب بعد البيع، تظل حصيلة USDT في محفظتك.</p>
           </section>
 
           <section className="space-y-4">

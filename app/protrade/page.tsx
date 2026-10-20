@@ -461,8 +461,7 @@ export default function ProTradePage() {
   const [side, setSide] = useState<"buy" | "sell">("buy");
 
   const [orderType, setOrderType] = useState<"limit" | "market">("limit");
-  const [tradingMode, setTradingMode] =
-    useState<"demo" | "live">("demo");
+  const tradingMode = "live" as const
   const [price, setPrice] = useState("");
   const [quantity, setQuantity] = useState("");
 
@@ -697,7 +696,7 @@ export default function ProTradePage() {
           tradesResponse,
         ] = await Promise.all([
           fetch("/api/assets", { cache: "no-store" }),
-          fetch(tradingMode === "demo" ? "/api/demo/wallet" : "/api/wallet", {
+          fetch("/api/wallet", {
             credentials: "include",
             cache: "no-store",
           }),
@@ -987,52 +986,6 @@ export default function ProTradePage() {
           )}
         </div>
       )}
-
-      <div className="border-b border-white/[0.06] bg-[#07101d] px-5 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-400">
-              وضع التداول
-            </span>
-
-            <div className="flex rounded-lg border border-white/[0.08] bg-white/[0.02] p-1">
-              <button
-                type="button"
-                onClick={() => setTradingMode("demo")}
-                className={
-                  tradingMode === "demo"
-                    ? "rounded-md bg-cyan-400/10 px-4 py-2 text-xs font-bold text-cyan-300"
-                    : "rounded-md px-4 py-2 text-xs text-slate-500 hover:text-white"
-                }
-              >
-                تجريبي
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setTradingMode("live")}
-                className={
-                  tradingMode === "live"
-                    ? "rounded-md bg-emerald-400/10 px-4 py-2 text-xs font-bold text-emerald-300"
-                    : "rounded-md px-4 py-2 text-xs text-slate-500 hover:text-white"
-                }
-              >
-                حقيقي
-              </button>
-            </div>
-          </div>
-
-          {tradingMode === "demo" ? (
-            <span className="rounded-full border border-cyan-400/10 bg-cyan-400/[0.06] px-3 py-1 text-[11px] font-semibold text-cyan-300">
-              حساب تجريبي — لا توجد أموال حقيقية
-            </span>
-          ) : (
-            <span className="rounded-full border border-emerald-400/10 bg-emerald-400/[0.06] px-3 py-1 text-[11px] font-semibold text-emerald-300">
-              حساب حقيقي — تنفيذ داخلي
-            </span>
-          )}
-        </div>
-      </div>
 
       <p className="mt-2 px-5 text-[10px] leading-5 text-slate-500">
         السعر والمخطط مرجعهما بيانات Binance؛ دفتر الأوامر وتنفيذ الصفقات يتمان داخل عرب تريد، ولا تُرسل الأوامر إلى Binance.

@@ -44,8 +44,7 @@ export default function BottomNavigation() {
     pathname.startsWith("/margin/") ||
     pathname === "/futures" ||
     pathname.startsWith("/futures/") ||
-    pathname === "/trading" ||
-    pathname.startsWith("/trading/");
+    false;
 
   if (internalWorkspace) return null;
 

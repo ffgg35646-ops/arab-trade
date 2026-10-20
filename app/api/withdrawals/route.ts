@@ -17,6 +17,7 @@ import DepositRequest from "@/models/DepositRequest";
 import PlatformSettings from "@/models/PlatformSettings";
 import Notification from "@/models/Notification";
 import { separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
+import { consolidateFundingWalletIntoSpotWallet } from "@/lib/consolidate-funding-wallet";
 import {
   roundWithdrawal,
   withdrawalAllowance,
@@ -37,9 +38,9 @@ function validPayoutAddress(network: string, address: string) {
 }
 
 function getUsdtAvailable(wallet: { balances?: Array<{ asset?: string; available?: number }> } | null) {
-  return roundWithdrawal(Number(
-    wallet?.balances?.find((balance) => String(balance.asset || "").toUpperCase() === "USDT")?.available || 0
-  ));
+  return roundWithdrawal((wallet?.balances || []).reduce((sum, balance) =>
+    sum + (String(balance.asset || "").trim().toUpperCase() === "USDT" ? Number(balance.available || 0) : 0),
+  0));
 }
 
 function packageRequestAllocations(item: any) {
@@ -126,6 +127,7 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
   await connectDB();
   await separateLegacyDepositsFromSpotWallet(user._id);
+  await consolidateFundingWalletIntoSpotWallet(user._id);
 
   const [plans, sourceAccounts, requests, wallet, platformSettings, referralStats] = await Promise.all([
     InvestmentPackage.find({}).select("name price withdrawalMinimum enabled sortOrder").sort({ sortOrder: 1, price: 1 }).lean(),
@@ -233,6 +235,7 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ success: false, message: "غير مسجل الدخول" }, { status: 401 });
   await connectDB();
   await separateLegacyDepositsFromSpotWallet(user._id);
+  await consolidateFundingWalletIntoSpotWallet(user._id);
 
   const body = await request.json().catch(() => ({}));
   const type = body.type === "general" ? "general" : "package";

@@ -939,14 +939,26 @@ export default function ProTradeTerminal() {
   const effectiveOrderPrice = orderType === "market" ? (marketExecutionPrice || currentPrice) : num(price);
   const total = effectiveOrderPrice * num(quantity);
 
-  const pairs = useMemo(() => {
-    const list = assets
-      .filter((a) => a.enabled !== false && a.tradingEnabled !== false)
-      .map((a) => String(a.symbol || "").toUpperCase())
-      .filter((base) => Boolean(base) && base !== "USDT");
+  const selectableBaseAssets = useMemo(() => {
+    const names = availablePairs
+      .filter((pair) => pair.baseAsset && pair.quoteAsset)
+      .map((pair) => pair.baseAsset.toUpperCase());
+    return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
+  }, [availablePairs]);
 
-    return Array.from(new Set(list));
-  }, [assets]);
+  const selectBaseAsset = (base: string) => {
+    const candidates = availablePairs.filter((pair) => pair.baseAsset.toUpperCase() === base);
+    const preferred = candidates.find((pair) => pair.quoteAsset === "USDT")
+      || candidates.find((pair) => pair.quoteAsset === "USDC")
+      || candidates[0];
+    if (preferred) {
+      setSymbol(preferred.symbol);
+      setPrice("");
+      setQuantity("");
+      setError("");
+      setMessage("");
+    }
+  };
 
   return (
     <main
@@ -1235,9 +1247,9 @@ export default function ProTradeTerminal() {
                           <td className={trade.side === "buy" ? "px-4 py-3 text-emerald-400" : "px-4 py-3 text-rose-400"}>
                             {trade.side === "buy" ? "شراء" : trade.side === "sell" ? "بيع" : "—"}
                           </td>
-                          <td className="px-4 py-3 font-mono">{fmt(trade.price, 8)}</td>
-                          <td className="px-4 py-3 font-mono">{fmt(trade.quantity, 8)}</td>
-                          <td className="px-4 py-3 font-mono">{fmt(trade.quoteAmount, 8)}</td>
+                          <td className="px-4 py-3 font-mono">{fmt(trade.price ?? 0, 8)}</td>
+                          <td className="px-4 py-3 font-mono">{fmt(trade.quantity ?? 0, 8)}</td>
+                          <td className="px-4 py-3 font-mono">{fmt(trade.quoteAmount ?? (num(trade.price) * num(trade.quantity)), 8)}</td>
                           <td className="px-4 py-3 text-slate-500">{time(trade.createdAt)}</td>
                         </tr>
                       ))
@@ -1268,11 +1280,11 @@ export default function ProTradeTerminal() {
                         </td>
 
                         <td className="px-4 py-3">
-                          {fmt(order.price, 4)}
+                          {num(order.price) > 0 ? fmt(order.price, 4) : order.type === "market" ? "سوق" : "—"}
                         </td>
 
                         <td className="px-4 py-3">
-                          {fmt(order.originalQuantity ?? order.quantity, 6)}
+                          {fmt(order.originalQuantity ?? order.quantity ?? order.filledQuantity ?? 0, 8)}
                         </td>
 
                         <td className="px-4 py-3">
@@ -1289,7 +1301,7 @@ export default function ProTradeTerminal() {
                               />
                             </div>
                             <span className="text-[10px] text-slate-500">
-                              {fmt(order.fillPercent, 1)}%
+                              {num(order.fillPercent).toFixed(1)}%
                             </span>
                           </div>
                         </td>
@@ -1353,8 +1365,8 @@ export default function ProTradeTerminal() {
                 <div className="text-xs text-slate-500">الرصيد المتاح</div>
                 <div className="mt-1 text-sm font-semibold">
                   {side === "buy"
-                    ? `${fmt(quoteBalance.available, 4)} ${quoteAsset}`
-                    : `${fmt(baseBalance.available, 6)} ${baseAsset}`}
+                    ? `${fmt(quoteBalance.available ?? 0, 4)} ${quoteAsset}`
+                    : `${fmt(baseBalance.available ?? 0, 8)} ${baseAsset}`}
                 </div>
               </div>
               <div className="rounded-lg bg-white/[0.04] p-2 text-slate-400">
@@ -1365,16 +1377,34 @@ export default function ProTradeTerminal() {
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
                 <div className="text-[10px] text-slate-500">{baseAsset}</div>
-                <div className="mt-1 text-xs font-medium">{fmt(baseBalance.total, 8)}</div>
+                <div className="mt-1 text-xs font-medium">{fmt(baseBalance.total ?? 0, 8)}</div>
               </div>
               <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
                 <div className="text-[10px] text-slate-500">{quoteAsset}</div>
-                <div className="mt-1 text-xs font-medium">{fmt(quoteBalance.total, 4)}</div>
+                <div className="mt-1 text-xs font-medium">{fmt(quoteBalance.total ?? 0, 4)}</div>
               </div>
             </div>
           </div>
 
           <div className="border-b border-white/[0.06] p-4">
+            <div className="mb-3">
+              <label htmlFor="spot-base-asset" className="mb-2 block text-xs text-slate-500">اختيار العملة</label>
+              <div className="relative">
+                <select
+                  id="spot-base-asset"
+                  value={baseAsset}
+                  onChange={(event) => selectBaseAsset(event.target.value)}
+                  disabled={!selectableBaseAssets.length}
+                  className="w-full appearance-none rounded-lg border border-white/[0.08] bg-[#050a13] px-3 py-3 pl-9 text-sm font-semibold text-white outline-none focus:border-cyan-400/50 disabled:opacity-50"
+                >
+                  {selectableBaseAssets.length ? selectableBaseAssets.map((asset) => (
+                    <option key={asset} value={asset} className="bg-[#07101d]">{asset}</option>
+                  )) : <option value={baseAsset}>{baseAsset}</option>}
+                </select>
+                <ChevronDown size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              </div>
+            </div>
+
             <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-white/[0.035] p-1">
               <button
                 type="button"

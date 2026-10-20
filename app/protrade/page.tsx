@@ -493,6 +493,8 @@ export default function ProTradePage() {
         price: priceValue,
         change24h: Number.isFinite(changeValue) ? changeValue : 0,
         quoteVolume: Number.isFinite(volumeValue) ? volumeValue : 0,
+        high24h: Number(payload?.h ?? payload?.highPrice) || 0,
+        low24h: Number(payload?.l ?? payload?.lowPrice) || 0,
       });
       setPriceFeedStatus(fromSocket || socketConnected ? "live" : "snapshot");
     };
@@ -637,13 +639,6 @@ export default function ProTradePage() {
     };
   }, [symbol, tradingMode]);
 
-  const selectedAsset = useMemo(() => {
-    const base = symbol.replace(/USDT$/i, "").toUpperCase();
-    return assets.find(
-      (a) => String(a.symbol || "").toUpperCase() === base
-    );
-  }, [assets, symbol]);
-
   const baseAsset = symbol.replace(/USDT$/i, "").toUpperCase();
   const quoteAsset = "USDT";
 
@@ -651,20 +646,15 @@ export default function ProTradePage() {
     if (liveTicker?.symbol === symbol && num(liveTicker.price) > 0) {
       return num(liveTicker.price);
     }
-
     const last = trades.find((trade) => String(trade.symbol || "").toUpperCase() === symbol && num(trade.price) > 0);
     if (last) return num(last.price);
-
     const ask = asks.find((item) => num(item.price) > 0);
     if (ask) return num(ask.price);
-
-    return num(selectedAsset?.current_price);
-  }, [liveTicker, symbol, trades, asks, selectedAsset]);
+    return 0;
+  }, [liveTicker, symbol, trades, asks]);
 
   const marketChange =
-    liveTicker?.symbol === symbol
-      ? num(liveTicker.change24h)
-      : num(selectedAsset?.price_change_percentage_24h);
+    liveTicker?.symbol === symbol ? num(liveTicker.change24h) : null;
 
   const baseBalance =
     balances.find(
@@ -851,7 +841,7 @@ export default function ProTradePage() {
     const available =
       side === "buy" ? num(quoteBalance.available) : num(baseBalance.available);
 
-    const p = num(price) || currentPrice;
+    const p = orderType === "market" ? currentPrice : num(price) || currentPrice;
 
     if (!p) return;
 
@@ -928,35 +918,31 @@ export default function ProTradePage() {
           <div className="hidden items-center gap-8 lg:flex">
             <div>
               <div className="text-xl font-semibold">
-                {currentPrice ? fmt(currentPrice, 4) : "—"}
+                {currentPrice > 0 ? fmt(currentPrice, 4) : "—"}
               </div>
               <div className="text-[10px] text-slate-500">USDT</div>
             </div>
-
             <div>
-              <div
-                className={
-                  marketChange >= 0
-                    ? "text-sm text-emerald-400"
-                    : "text-sm text-rose-400"
-                }
-              >
-                {marketChange >= 0 ? "+" : ""}
-                {fmt(marketChange, 2)}%
+              <div className={marketChange === null ? "text-sm text-slate-400" : marketChange >= 0 ? "text-sm text-emerald-400" : "text-sm text-rose-400"}>
+                {marketChange === null ? "—" : `${marketChange >= 0 ? "+" : ""}${fmt(marketChange, 2)}%`}
               </div>
               <div className="text-[10px] text-slate-500">24h</div>
             </div>
-
             <div>
               <div className="text-sm font-medium">
-                {fmt(selectedAsset?.current_price, 2)}
+                {liveTicker?.symbol === symbol && liveTicker.high24h > 0 ? fmt(liveTicker.high24h, 4) : "—"}
               </div>
-              <div className="text-[10px] text-slate-500">السعر</div>
+              <div className="text-[10px] text-slate-500">أعلى 24 ساعة</div>
             </div>
-
             <div>
               <div className="text-sm font-medium">
-                {money(liveTicker?.symbol === symbol ? liveTicker.quoteVolume : selectedAsset?.total_volume)}
+                {liveTicker?.symbol === symbol && liveTicker.low24h > 0 ? fmt(liveTicker.low24h, 4) : "—"}
+              </div>
+              <div className="text-[10px] text-slate-500">أدنى 24 ساعة</div>
+            </div>
+            <div>
+              <div className="text-sm font-medium">
+                {money(liveTicker?.symbol === symbol ? liveTicker.quoteVolume : 0)}
               </div>
               <div className="text-[10px] text-slate-500">حجم التداول</div>
             </div>
@@ -1034,28 +1020,24 @@ export default function ProTradePage() {
             </span>
           ) : (
             <span className="rounded-full border border-emerald-400/10 bg-emerald-400/[0.06] px-3 py-1 text-[11px] font-semibold text-emerald-300">
-              حساب حقيقي
+              حساب حقيقي — تنفيذ داخلي
             </span>
           )}
         </div>
       </div>
 
+      <p className="mt-2 px-5 text-[10px] leading-5 text-slate-500">
+        السعر والمخطط مرجعهما بيانات Binance؛ دفتر الأوامر وتنفيذ الصفقات يتمان داخل عرب تريد، ولا تُرسل الأوامر إلى Binance.
+      </p>
+
       <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px]">
         <div className="min-w-0">
           <div className="grid grid-cols-1 border-b border-white/[0.06] lg:grid-cols-[minmax(0,1fr)_310px]">
             <div className="border-l border-white/[0.06]">
-              <div className="flex h-12 items-center gap-5 border-b border-white/[0.06] px-4">
-                <button className="text-sm font-medium text-white">
-                  حركة السوق
-                </button>
-                <button className="text-xs text-slate-500 hover:text-white">
-                  TradingView
-                </button>
-                <button className="text-xs text-slate-500 hover:text-white">
-                  العمق
-                </button>
+              <div className="flex h-12 items-center justify-between border-b border-white/[0.06] px-4">
+                <h3 className="text-sm font-semibold text-white">مخطط الشموع اليابانية</h3>
+                <span className="text-[10px] text-slate-500">بيانات السوق المرجعي لحظيًا</span>
               </div>
-
               <Chart symbol={symbol} />
             </div>
 

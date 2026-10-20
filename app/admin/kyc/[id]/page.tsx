@@ -159,34 +159,44 @@ export default function KycDetailPage({ params }: { params: Promise<{ id: string
                 </div>
               </div>
 
-              <div className="grid content-start gap-4 md:grid-cols-2 xl:grid-cols-1">
-                <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-4">
-                  <div className="mb-3 font-black">الوجه الأمامي للهوية</div>
-                  <img
-                    src={imageUrl("document")}
-                    alt="الوجه الأمامي للهوية"
-                    className="max-h-[420px] w-full rounded-xl border border-slate-800 bg-black object-contain"
-                  />
-                </div>
+              {item.status === "pending" ? (
+                <div className="grid content-start gap-4 md:grid-cols-2 xl:grid-cols-1">
+                  <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-4">
+                    <div className="mb-3 font-black">الوجه الأمامي للهوية</div>
+                    <img
+                      src={imageUrl("document")}
+                      alt="الوجه الأمامي للهوية"
+                      className="max-h-[420px] w-full rounded-xl border border-slate-800 bg-black object-contain"
+                    />
+                  </div>
 
-                <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-4">
-                  <div className="mb-3 font-black">الوجه الخلفي للهوية</div>
-                  <img
-                    src={imageUrl("documentBack")}
-                    alt="الوجه الخلفي للهوية"
-                    className="max-h-[420px] w-full rounded-xl border border-slate-800 bg-black object-contain"
-                  />
-                </div>
+                  <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-4">
+                    <div className="mb-3 font-black">الوجه الخلفي للهوية</div>
+                    {item.identityBackMime ? (
+                      <img
+                        src={imageUrl("documentBack")}
+                        alt="الوجه الخلفي للهوية"
+                        className="max-h-[420px] w-full rounded-xl border border-slate-800 bg-black object-contain"
+                      />
+                    ) : (
+                      <p className="text-sm text-slate-500">لا توجد صورة للوجه الخلفي في طلب التوثيق القديم.</p>
+                    )}
+                  </div>
 
-                <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-4 md:col-span-2 xl:col-span-1">
-                  <div className="mb-3 font-black">صورة الشخص وهو ممسك بالهوية</div>
-                  <img
-                    src={imageUrl("selfie")}
-                    alt="صورة الشخص وهو ممسك بالهوية"
-                    className="max-h-[420px] w-full rounded-xl border border-slate-800 bg-black object-contain"
-                  />
+                  <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-4 md:col-span-2 xl:col-span-1">
+                    <div className="mb-3 font-black">صورة الشخص وهو ممسك بالهوية</div>
+                    <img
+                      src={imageUrl("selfie")}
+                      alt="صورة الشخص وهو ممسك بالهوية"
+                      className="max-h-[420px] w-full rounded-xl border border-slate-800 bg-black object-contain"
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-5 text-sm leading-7 text-slate-400">
+                  تمت مراجعة الطلب وحُذفت صور الهوية بعد القرار للحفاظ على خصوصية البيانات.
+                </div>
+              )}
             </div>
 
             {item.status === "pending" ? (

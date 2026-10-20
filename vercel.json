@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/package-earnings",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/spot-strategies",
+      "schedule": "* * * * *"
     }
   ]
 }

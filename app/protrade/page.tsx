@@ -117,9 +117,11 @@ function normalizeRows(value: unknown): BookOrder[] {
 }
 
 function Chart({
+  symbol,
   trades,
   priceHistory,
 }: {
+  symbol: string;
   trades: Trade[];
   priceHistory: number[];
 }) {
@@ -128,6 +130,7 @@ function Chart({
       .map((value) => num(value))
       .filter((value) => value > 0);
     const tradeSource = trades
+      .filter((trade) => String(trade.symbol || "").toUpperCase() === symbol)
       .map((trade) => num(trade.price))
       .filter((value) => value > 0)
       .reverse();
@@ -144,7 +147,7 @@ function Chart({
       const y = 250 - ((value - min) / range) * 205;
       return `${x},${y}`;
     });
-  }, [trades, priceHistory]);
+  }, [trades, priceHistory, symbol]);
 
   return (
     <div className="relative h-[390px] w-full overflow-hidden bg-[#060c15]">
@@ -452,6 +455,9 @@ export default function ProTradePage() {
     let stopped = false;
     let streamConnected = false;
     let stream: EventSource | null = null;
+    setBids([]);
+    setAsks([]);
+    setOrderBookFeedStatus("connecting");
     const query = `symbol=${encodeURIComponent(symbol)}&mode=${tradingMode}&depth=30`;
 
     const applyOrderBook = (payload: any) => {
@@ -530,7 +536,7 @@ export default function ProTradePage() {
       return num(liveTicker.price);
     }
 
-    const last = trades.find((trade) => num(trade.price) > 0);
+    const last = trades.find((trade) => String(trade.symbol || "").toUpperCase() === symbol && num(trade.price) > 0);
     if (last) return num(last.price);
 
     const ask = asks.find((item) => num(item.price) > 0);
@@ -834,7 +840,7 @@ export default function ProTradePage() {
 
             <div>
               <div className="text-sm font-medium">
-                {money(selectedAsset?.total_volume)}
+                {money(liveTicker?.symbol === symbol ? liveTicker.quoteVolume : selectedAsset?.total_volume)}
               </div>
               <div className="text-[10px] text-slate-500">حجم التداول</div>
             </div>
@@ -937,7 +943,7 @@ export default function ProTradePage() {
                 </button>
               </div>
 
-              <Chart trades={trades} priceHistory={priceHistory} />
+              <Chart symbol={symbol} trades={trades} priceHistory={priceHistory} />
             </div>
 
             <div className="min-h-[650px]">

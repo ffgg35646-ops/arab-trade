@@ -885,8 +885,8 @@ export default function ProTradeTerminal() {
       const executedLabel = matchedQuantity.toLocaleString("en-US", { maximumFractionDigits: 8 });
       setMessage(
         matchedCount > 0 && matchedQuantity > 0
-          ? `تم تنفيذ ${orderLabel} ${executedLabel} ${baseAsset} فعليًا؛ الكمية المنفذة موضحة في سجل التداول.`
-          : `تم إنشاء أمر ${orderLabel} ${quantityLabel} ${baseAsset} فقط، ولم تُنفذ أي صفقة بعد. الأمر ينتظر وجود أمر مقابل؛ لذلك لم تُضف ${baseAsset} إلى رصيدك حتى الآن.`
+          ? `تم تنفيذ ${orderLabel} ${executedLabel} ${baseAsset} داخل دفتر عرب تريد الداخلي؛ هذا ليس تنفيذًا لدى Binance.`
+          : `تم إنشاء أمر ${orderLabel} ${quantityLabel} ${baseAsset} داخل عرب تريد فقط، ولم تُنفذ صفقة بعد. هذا الأمر لم يُرسل إلى Binance.`
       );
 
       setQuantity("");
@@ -1109,7 +1109,7 @@ export default function ProTradeTerminal() {
       </div>
 
       <p className="mt-2 px-5 text-[10px] leading-5 text-slate-500">
-        السعر والمخطط ودفتر الأوامر وآخر صفقات السوق من Binance. تنفيذ الأوامر الخارجية يحتاج إعداد ربط حساب Binance؛ لا يُعد ظهور سعر مباشر دليلًا على تنفيذ صفقة.
+        السعر والمخطط ودفتر أوامر السوق وآخر الصفقات المعروضة من Binance. تنبيه: إرسال أوامر الشراء والبيع في هذه النسخة ما زال يستخدم مطابقة عرب تريد الداخلية ولا يُرسل إلى Binance؛ لذلك لا تعتبره تداولًا خارجيًا حقيقيًا.
       </p>
 
       <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px]">

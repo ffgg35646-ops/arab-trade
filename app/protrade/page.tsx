@@ -657,6 +657,10 @@ export default function ProTradePage() {
     return 0;
   }, [liveTicker, symbol, trades, asks]);
 
+  const marketExecutionPrice = side === "buy"
+    ? num(asks[0]?.price)
+    : num(bids[0]?.price);
+
   const marketChange =
     liveTicker?.symbol === symbol ? num(liveTicker.change24h) : null;
 
@@ -845,7 +849,7 @@ export default function ProTradePage() {
     const available =
       side === "buy" ? num(quoteBalance.available) : num(baseBalance.available);
 
-    const p = orderType === "market" ? currentPrice : num(price) || currentPrice;
+    const p = orderType === "market" ? (marketExecutionPrice || currentPrice) : num(price) || currentPrice;
 
     if (!p) return;
 
@@ -857,14 +861,14 @@ export default function ProTradePage() {
     setQuantity(qty > 0 ? String(qty) : "");
   };
 
-  const effectiveOrderPrice = orderType === "market" ? currentPrice : num(price);
+  const effectiveOrderPrice = orderType === "market" ? (marketExecutionPrice || currentPrice) : num(price);
   const total = effectiveOrderPrice * num(quantity);
 
   const pairs = useMemo(() => {
     const list = assets
       .filter((a) => a.enabled !== false && a.tradingEnabled !== false)
       .map((a) => String(a.symbol || "").toUpperCase())
-      .filter(Boolean);
+      .filter((base) => Boolean(base) && base !== "USDT");
 
     return Array.from(new Set(list));
   }, [assets]);
@@ -1311,15 +1315,15 @@ export default function ProTradePage() {
             </div>
 
             <label className="mb-2 block text-[11px] text-slate-500">
-              {orderType === "market" ? "السعر التقريبي الحالي" : "سعر الأمر"}
+              {orderType === "market" ? (side === "buy" ? "أفضل سعر بيع في الدفتر" : "أفضل سعر شراء في الدفتر") : "سعر الأمر"}
             </label>
             <div className="mb-4 flex h-11 items-center rounded-lg border border-white/[0.08] bg-[#050a13] px-3 focus-within:border-cyan-400/50">
               <input
-                value={orderType === "market" ? (currentPrice > 0 ? String(currentPrice) : "") : price}
+                value={orderType === "market" ? (marketExecutionPrice > 0 ? String(marketExecutionPrice) : "") : price}
                 onChange={(event) => setPrice(event.target.value)}
                 disabled={orderType === "market"}
                 inputMode="decimal"
-                placeholder={currentPrice > 0 ? String(currentPrice) : "0.00"}
+                placeholder={orderType === "market" && marketExecutionPrice <= 0 ? "لا توجد سيولة مقابلة" : currentPrice > 0 ? String(currentPrice) : "0.00"}
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none disabled:text-slate-500"
               />
               <span className="text-[11px] text-slate-500">USDT</span>
@@ -1352,7 +1356,7 @@ export default function ProTradePage() {
 
             <div className="mb-5 flex items-center justify-between text-xs">
               <span className="text-slate-500">
-                {orderType === "market" ? "القيمة التقديرية حسب السعر المباشر" : "إجمالي الأمر"}
+                {orderType === "market" ? "القيمة التقديرية حسب أفضل سعر متاح" : "إجمالي الأمر"}
               </span>
               <span className="font-medium">{total > 0 ? `${money(total)} USDT` : "—"}</span>
             </div>
@@ -1365,7 +1369,8 @@ export default function ProTradePage() {
                 loading ||
                 !Number(quantity) ||
                 Number(quantity) <= 0 ||
-                (orderType === "limit" && (!Number(price) || Number(price) <= 0))
+                (orderType === "limit" && (!Number(price) || Number(price) <= 0)) ||
+                (orderType === "market" && marketExecutionPrice <= 0)
               }
               className={side === "buy"
                 ? "w-full rounded-lg bg-emerald-500 py-3 text-sm font-semibold text-[#03100a] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
@@ -1375,7 +1380,9 @@ export default function ProTradePage() {
             </button>
 
             <div className="mt-3 text-center text-[10px] leading-5 text-slate-600">
-              أوامر Limit تنتظر السعر المحدد؛ وأوامر Market تحاول التنفيذ على السيولة المتاحة في دفتر أوامر عرب تريد.
+              {orderType === "market" && marketExecutionPrice <= 0
+                ? "لا توجد سيولة مقابلة حاليًا في دفتر عرب تريد؛ لن يُرسل الأمر حتى يظهر عرض مقابل."
+                : "أوامر Limit تنتظر السعر المحدد؛ وأوامر Market تُنفَّذ على أفضل السيولة المتاحة في دفتر عرب تريد، وقد تُنفَّذ جزئيًا عند نقص السيولة."}
             </div>
           </div>
 

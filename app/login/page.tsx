@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, UserRound } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 
@@ -15,6 +15,14 @@ export default function LoginPage() {
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("verified") === "1") {
+      setNotice("تم تأكيد بريدك الإلكتروني بنجاح. طلب إنشاء حسابك الآن قيد مراجعة الإدارة، وسيُتاح تسجيل الدخول بعد الموافقة.");
+    }
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -83,6 +91,12 @@ export default function LoginPage() {
               سجّل دخولك إلى حسابك في عرب تريد
             </p>
           </div>
+
+          {notice && (
+            <div role="status" className="mb-5 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm leading-6 text-cyan-200">
+              {notice}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>

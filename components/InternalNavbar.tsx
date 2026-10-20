@@ -39,13 +39,6 @@ const menus = [
       ["المكافآت", "/dashboard/rewards"],
     ],
   },
-  {
-    title: "المزيد",
-    items: [
-      ["الإحالة", "/dashboard/referral"],
-      ["API", "/dashboard/account/api"],
-    ],
-  },
 ];
 
 function isActive(

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
-import { CheckCircle2, CircleDollarSign, Layers3, Wallet } from "lucide-react";
+import { AlertCircle, CheckCircle2, CircleDollarSign, Layers3, RefreshCw, Wallet } from "lucide-react";
 
 type Account = {
   _id: string;
@@ -61,6 +61,12 @@ type Data = {
 const money = (value: number) =>
   Number(value || 0).toLocaleString("en-US", { maximumFractionDigits: 8 });
 
+function isValidPayoutAddress(network: string, address: string) {
+  if (network === "TRC20") return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address);
+  if (network === "BEP20") return /^0x[a-fA-F0-9]{40}$/.test(address);
+  return false;
+}
+
 export default function WithdrawalsPage() {
   const [data, setData] = useState<Data | null>(null);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
@@ -71,14 +77,22 @@ export default function WithdrawalsPage() {
   const [generalAddress, setGeneralAddress] = useState("");
   const [generalNetwork, setGeneralNetwork] = useState("");
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageKind, setMessageKind] = useState<"success" | "error" | "info">("info");
+
+  function showMessage(text: string, kind: "success" | "error" | "info" = "error") {
+    setMessage(text);
+    setMessageKind(kind);
+  }
 
   const load = useCallback(async () => {
+    setRefreshing(true);
     try {
       const response = await fetch("/api/withdrawals", { credentials: "include", cache: "no-store" });
-      const json = await response.json();
+      const json = await response.json().catch(() => ({}));
       if (!response.ok || !json.success) {
-        setMessage(json.message || "تعذر تحميل بيانات السحب");
+        showMessage(json.message || "تعذر تحميل بيانات السحب", "error");
         return;
       }
       setData(json as Data);
@@ -87,11 +101,17 @@ export default function WithdrawalsPage() {
         return json.networks?.[0]?.code || "";
       });
     } catch {
-      setMessage("تعذر تحميل بيانات السحب");
+      showMessage("تعذر تحميل بيانات السحب", "error");
+    } finally {
+      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    const timer = window.setInterval(() => void load(), 20000);
+    return () => window.clearInterval(timer);
+  }, [load]);
 
   const hasPending = Boolean(data?.requests.some((item) => item.status === "pending"));
   const firstNetwork = data?.networks[0]?.code || "";
@@ -100,6 +120,7 @@ export default function WithdrawalsPage() {
   async function submit(body: Record<string, unknown>) {
     setBusy(true);
     setMessage("");
+    setMessageKind("info");
     try {
       const response = await fetch("/api/withdrawals", {
         method: "POST",
@@ -107,11 +128,15 @@ export default function WithdrawalsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const result = await response.json();
-      setMessage(result.message || (response.ok ? "تم إرسال طلب السحب" : "تعذر إنشاء الطلب"));
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        showMessage(result.message || "تعذر إنشاء طلب السحب", "error");
+      } else {
+        showMessage(result.message || "تم إرسال طلب السحب بنجاح", "success");
+      }
       await load();
     } catch {
-      setMessage("تعذر الاتصال");
+      showMessage("تعذر الاتصال بخدمة السحب", "error");
     } finally {
       setBusy(false);
     }
@@ -120,19 +145,33 @@ export default function WithdrawalsPage() {
   function submitGeneral() {
     const amount = Number(generalAmount);
     if (!generalAddress.trim()) {
-      setMessage("اكتب عنوان الدفع");
+      showMessage("اكتب عنوان الدفع");
       return;
     }
     if (!selectedGeneralNetwork) {
-      setMessage("اختر شبكة السحب");
+      showMessage("اختر شبكة السحب");
       return;
     }
     if (!data?.general.configured) {
-      setMessage("الأدمن لم يحدد الحد الأدنى للسحب العام بعد");
+      showMessage("الأدمن لم يحدد الحد الأدنى للسحب العام بعد");
       return;
     }
     if (!Number.isFinite(amount) || amount <= 0) {
-      setMessage("اكتب مبلغ السحب");
+      showMessage("اكتب مبلغ سحب صحيحًا");
+      return;
+    }
+    if (amount < data.general.minimum) {
+      showMessage("الحد الأدنى للسحب العام هو " + money(data.general.minimum) + " USDT");
+      return;
+    }
+    if (amount > data.general.available) {
+      showMessage("الرصيد العام المتاح للسحب هو " + money(data.general.available) + " USDT فقط");
+      return;
+    }
+    if (!isValidPayoutAddress(selectedGeneralNetwork, generalAddress.trim())) {
+      showMessage(selectedGeneralNetwork === "TRC20"
+        ? "عنوان TRC20 يجب أن يكون عنوان TRON بطول 34 حرفًا يبدأ بـ T."
+        : "عنوان BEP20 يجب أن يبدأ بـ 0x ويتبعه 40 رقمًا سداسيًا.");
       return;
     }
     void submit({
@@ -160,19 +199,33 @@ export default function WithdrawalsPage() {
     const network = packageNetworks[plan._id] || firstNetwork;
 
     if (!account?.hasAccount) {
-      setMessage("لا يوجد حساب سحب لهذه الباقة قبل تفعيلها");
+      showMessage("لا يوجد حساب سحب لهذه الباقة قبل تفعيلها");
       return;
     }
     if (!address) {
-      setMessage("اكتب عنوان الدفع لهذه الباقة");
+      showMessage("اكتب عنوان الدفع لهذه الباقة");
       return;
     }
     if (!network) {
-      setMessage("اختر شبكة السحب");
+      showMessage("اختر شبكة السحب");
       return;
     }
-    if (!Number.isFinite(amount) || amount < plan.minimum) {
-      setMessage("الحد الأدنى للسحب هو " + plan.minimum + " USDT");
+    if (!Number.isFinite(amount) || amount <= 0 || amount < plan.minimum) {
+      showMessage("الحد الأدنى للسحب هو " + plan.minimum + " USDT");
+      return;
+    }
+    if (amount > Number(account.available || 0)) {
+      showMessage("المتاح للسحب من هذه الباقة هو " + money(Number(account.available || 0)) + " USDT فقط");
+      return;
+    }
+    if (Math.round(amount * 1e8) / 1e8 !== amount) {
+      showMessage("مبلغ السحب يجب ألا يتجاوز 8 منازل عشرية");
+      return;
+    }
+    if (!isValidPayoutAddress(network, address)) {
+      showMessage(network === "TRC20"
+        ? "عنوان TRC20 يجب أن يكون عنوان TRON بطول 34 حرفًا يبدأ بـ T."
+        : "عنوان BEP20 يجب أن يبدأ بـ 0x ويتبعه 40 رقمًا سداسيًا.");
       return;
     }
     void submit({
@@ -193,7 +246,16 @@ export default function WithdrawalsPage() {
       <div className="mx-auto flex max-w-[1700px]">
         <InternalSidebar />
         <main dir="rtl" className="min-h-screen min-w-0 flex-1 space-y-6 bg-[#050a13] p-4 text-white md:p-6">
-          <h1 className="text-2xl font-black">السحب</h1>
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-black">السحب</h1>
+              <p className="mt-1 text-xs text-slate-500">بيانات الطلبات والأرصدة تتحدث تلقائيًا.</p>
+            </div>
+            <button type="button" onClick={() => void load()} disabled={refreshing || busy} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-2.5 text-sm font-bold text-slate-200 transition hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-50">
+              <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+              تحديث
+            </button>
+          </header>
 
           {data && (
             <section className="space-y-3 rounded-2xl border border-cyan-400/20 bg-[#08111e] p-4 md:p-5">
@@ -212,9 +274,22 @@ export default function WithdrawalsPage() {
           )}
 
           {message && (
-            <div role="status" className="flex items-start gap-2 rounded-xl border border-slate-700 bg-[#0b1422] p-3 text-sm text-slate-200">
-              <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-cyan-300" />
+            <div role={messageKind === "error" ? "alert" : "status"} className={`flex items-start gap-2 rounded-xl border p-3 text-sm ${
+              messageKind === "success"
+                ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-200"
+                : messageKind === "error"
+                  ? "border-red-500/20 bg-red-500/5 text-red-200"
+                  : "border-amber-400/20 bg-amber-400/[0.04] text-amber-100"
+            }`}>
+              {messageKind === "error"
+                ? <AlertCircle size={18} className="mt-0.5 shrink-0 text-red-300" />
+                : <CheckCircle2 size={18} className={`mt-0.5 shrink-0 ${messageKind === "success" ? "text-emerald-300" : "text-amber-200"}`} />}
               <span>{message}</span>
+            </div>
+          )}
+          {hasPending && (
+            <div role="status" className="rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-3 text-sm text-amber-100">
+              لديك طلب سحب قيد المراجعة. لن يمكن إرسال طلب آخر حتى يراجع الأدمن الطلب الحالي.
             </div>
           )}
 
@@ -234,7 +309,7 @@ export default function WithdrawalsPage() {
                 </label>
                 <label className="block space-y-2 text-sm text-slate-300">
                   <span>الشبكة</span>
-                  <select value={selectedGeneralNetwork} onChange={(event) => setGeneralNetwork(event.target.value)} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white">
+                  <select value={selectedGeneralNetwork} onChange={(event) => setGeneralNetwork(event.target.value)} disabled={busy || hasPending || !data?.networks.length} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:cursor-not-allowed disabled:opacity-50">
                     {!data?.networks.length && <option value="">لا توجد شبكات</option>}
                     {data?.networks.map((network) => <option key={network.code} value={network.code}>{network.name} ({network.code})</option>)}
                   </select>
@@ -248,17 +323,17 @@ export default function WithdrawalsPage() {
                 </div>
                 <label className="block space-y-2 text-sm text-slate-300">
                   <span>مبلغ السحب</span>
-                  <input type="number" min={data?.general.minimum || undefined} step="any" value={generalAmount} onChange={(event) => setGeneralAmount(event.target.value)} placeholder={data?.general.configured ? "الحد الأدنى " + money(data.general.minimum) + " USDT" : "الحد الأدنى يحدده الأدمن"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500" />
+                  <input type="number" min={data?.general.minimum || undefined} max={data?.general.available} step="0.00000001" value={generalAmount} disabled={busy || hasPending || !data?.general.configured} onChange={(event) => setGeneralAmount(event.target.value)} placeholder={data?.general.configured ? "الحد الأدنى " + money(data.general.minimum) + " USDT" : "الحد الأدنى يحدده الأدمن"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
                 </label>
               </div>
             </div>
 
             <label className="block space-y-2 text-sm text-slate-300">
               <span>عنوان الدفع</span>
-              <input value={generalAddress} onChange={(event) => setGeneralAddress(event.target.value)} placeholder="عنوان محفظة الاستلام" className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500" />
+              <input value={generalAddress} maxLength={200} disabled={busy || hasPending} onChange={(event) => setGeneralAddress(event.target.value)} placeholder={selectedGeneralNetwork === "TRC20" ? "عنوان TRON يبدأ بـ T وطوله 34 حرفًا" : "عنوان BEP20 يبدأ بـ 0x وطوله 42 حرفًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
             </label>
 
-            <button type="button" onClick={submitGeneral} disabled={busy || hasPending || !data?.general.configured || !selectedGeneralNetwork} className="w-full rounded-xl bg-blue-600 px-4 py-3 font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">
+            <button type="button" onClick={submitGeneral} disabled={busy || hasPending || !data?.general.configured || !selectedGeneralNetwork || !data?.networks.length} className="w-full rounded-xl bg-blue-600 px-4 py-3 font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">
               طلب سحب
             </button>
           </section>
@@ -282,8 +357,7 @@ export default function WithdrawalsPage() {
                   account?.hasAccount &&
                   account.balance >= plan.minimum &&
                   account.baseAllowance <= 0 &&
-                  account.referralAllowance <= 0 &&
-                  account.activeReferralCount === 0
+                  account.referralAllowance <= 0
                 );
                 return (
                   <article key={plan._id} className="flex flex-col gap-4 rounded-2xl border border-slate-700 bg-[#08111e] p-4 md:p-5">
@@ -302,7 +376,7 @@ export default function WithdrawalsPage() {
 
                     <label className="block space-y-2 text-sm text-slate-300">
                       <span>عنوان الدفع</span>
-                      <input type="text" autoComplete="off" value={addresses[plan._id] || ""} onChange={(event) => setAddresses((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder="أدخل عنوان محفظة الاستلام" className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500" />
+                      <input type="text" autoComplete="off" maxLength={200} disabled={busy || hasPending} value={addresses[plan._id] || ""} onChange={(event) => setAddresses((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder={network === "TRC20" ? "عنوان TRON يبدأ بـ T وطوله 34 حرفًا" : "عنوان BEP20 يبدأ بـ 0x وطوله 42 حرفًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
                     </label>
 
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -314,14 +388,14 @@ export default function WithdrawalsPage() {
                       </label>
                       <label className="block space-y-2 text-sm text-slate-300">
                         <span>الشبكة</span>
-                        <select value={network} onChange={(event) => setPackageNetworks((current) => ({ ...current, [plan._id]: event.target.value }))} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white">
+                        <select value={network} onChange={(event) => setPackageNetworks((current) => ({ ...current, [plan._id]: event.target.value }))} disabled={busy || hasPending || !data?.networks.length} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:cursor-not-allowed disabled:opacity-50">
                           {!data?.networks.length && <option value="">لا توجد شبكات</option>}
                           {data?.networks.map((item) => <option key={item.code} value={item.code}>{item.name} ({item.code})</option>)}
                         </select>
                       </label>
                     </div>
 
-                    <input aria-label={"مبلغ السحب من " + plan.name} type="number" min={plan.minimum} step="any" value={amounts[plan._id] || ""} onChange={(event) => setAmounts((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder={"الحد الأدنى " + money(plan.minimum) + " USDT"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-400" />
+                    <input aria-label={"مبلغ السحب من " + plan.name} type="number" min={plan.minimum} max={account?.available} step="0.00000001" disabled={busy || hasPending || !canWithdraw} value={amounts[plan._id] || ""} onChange={(event) => setAmounts((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder={"الحد الأدنى " + money(plan.minimum) + " USDT"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-50" />
 
                     <div className="mt-auto space-y-2">
                       <button type="button" disabled={busy || hasPending || (!needsActiveReferrals && (!canWithdraw || !addresses[plan._id]?.trim() || !network))} onClick={() => handlePackageButtonClick(plan, needsActiveReferrals)} className="w-full rounded-xl bg-blue-600 px-4 py-3 font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">

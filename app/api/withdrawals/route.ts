@@ -30,6 +30,12 @@ function allowedNetwork(network: string) {
   return WITHDRAWAL_NETWORKS.some((option) => option.code === network);
 }
 
+function validPayoutAddress(network: string, address: string) {
+  if (network === "TRC20") return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address);
+  if (network === "BEP20") return /^0x[a-fA-F0-9]{40}$/.test(address);
+  return false;
+}
+
 function getUsdtAvailable(wallet: { balances?: Array<{ asset?: string; available?: number }> } | null) {
   return roundWithdrawal(Number(
     wallet?.balances?.find((balance) => String(balance.asset || "").toUpperCase() === "USDT")?.available || 0
@@ -245,6 +251,17 @@ export async function POST(request: NextRequest) {
   }
   if (payoutAddress.length < 3 || payoutAddress.length > 200) {
     return NextResponse.json({ success: false, message: "عنوان الدفع غير صحيح" }, { status: 400 });
+  }
+  if (!validPayoutAddress(network, payoutAddress)) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: network === "TRC20"
+          ? "عنوان السحب لا يطابق صيغة TRC20: يجب أن يكون عنوان TRON بطول 34 حرفًا يبدأ بـ T."
+          : "عنوان السحب لا يطابق صيغة BEP20: يجب أن يبدأ بـ 0x ويتبعه 40 رقمًا سداسيًا.",
+      },
+      { status: 400 }
+    );
   }
   if (type === "package" && !mongoose.isValidObjectId(packageId)) {
     return NextResponse.json({ success: false, message: "الباقة غير صحيحة" }, { status: 400 });

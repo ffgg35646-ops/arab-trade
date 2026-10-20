@@ -3,6 +3,7 @@ import { releaseOrderLock } from "@/lib/matching-engine";
 import { connectDB } from "@/lib/mongodb";
 import Order from "@/models/Order";
 import { getCurrentUser } from "@/lib/current-user";
+import { cancelBinanceLiveOrder } from "@/lib/binance-live-orders";
 
 export async function POST(
   request: NextRequest
@@ -46,6 +47,31 @@ export async function POST(
         },
         { status: 400 }
       );
+    }
+
+    const externalOrder = await Order.findOne({
+      _id: id,
+      userId: user._id,
+      mode,
+      executionProvider: "binance",
+      status: "open",
+    }).select("_id").lean();
+
+    if (externalOrder) {
+      try {
+        const cancelled = await cancelBinanceLiveOrder(String(externalOrder._id), user._id);
+        return NextResponse.json({
+          success: true,
+          message: "تم إرسال الإلغاء إلى Binance وتحديث حالة الأمر حسب رد السوق.",
+          order: cancelled.order,
+        });
+      } catch (externalError) {
+        console.error("BINANCE ORDER CANCEL:", externalError);
+        return NextResponse.json({
+          success: false,
+          message: externalError instanceof Error ? externalError.message : "تعذر إلغاء الأمر لدى Binance.",
+        }, { status: 502 });
+      }
     }
 
     /*

@@ -482,6 +482,7 @@ export default function ProTradeTerminal() {
 
   const [symbol, setSymbol] = useState("BTCUSDT");
   const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [assetMenuOpen, setAssetMenuOpen] = useState(false);
 
   const [orderType, setOrderType] = useState<"limit" | "market">("limit");
   const [price, setPrice] = useState("");
@@ -876,12 +877,16 @@ export default function ProTradeTerminal() {
       }
 
       const matchedCount = Number(data?.matching?.matched || 0);
+      const matchedQuantity = Array.isArray(data?.matching?.trades)
+        ? data.matching.trades.reduce((sum: number, trade: any) => sum + Math.max(0, Number(trade?.quantity) || 0), 0)
+        : 0;
       const orderLabel = side === "buy" ? "شراء" : "بيع";
       const quantityLabel = Number(quantity).toLocaleString("en-US", { maximumFractionDigits: 8 });
+      const executedLabel = matchedQuantity.toLocaleString("en-US", { maximumFractionDigits: 8 });
       setMessage(
-        matchedCount > 0
-          ? `تم تنفيذ ${orderLabel} ${quantityLabel} ${baseAsset} كليًا أو جزئيًا؛ راجع سجل التداول لمعرفة الكمية المنفذة.`
-          : `تم إنشاء أمر ${orderLabel} ${quantityLabel} ${baseAsset} وهو بانتظار التنفيذ. لن تُضاف العملة إلى رصيدك إلا بعد تنفيذ الصفقة.`
+        matchedCount > 0 && matchedQuantity > 0
+          ? `تم تنفيذ ${orderLabel} ${executedLabel} ${baseAsset} فعليًا؛ الكمية المنفذة موضحة في سجل التداول.`
+          : `تم إنشاء أمر ${orderLabel} ${quantityLabel} ${baseAsset} فقط، ولم تُنفذ أي صفقة بعد. الأمر ينتظر وجود أمر مقابل؛ لذلك لم تُضف ${baseAsset} إلى رصيدك حتى الآن.`
       );
 
       setQuantity("");
@@ -1391,44 +1396,60 @@ export default function ProTradeTerminal() {
           </div>
 
           <div className="border-b border-white/[0.06] p-4">
-            <div className="mb-3">
-              <label htmlFor="spot-base-asset" className="mb-2 block text-xs text-slate-500">اختيار العملة</label>
-              <div className="relative">
-                <select
-                  id="spot-base-asset"
-                  value={baseAsset}
-                  onChange={(event) => selectBaseAsset(event.target.value)}
-                  disabled={!selectableBaseAssets.length}
-                  className="w-full appearance-none rounded-lg border border-white/[0.08] bg-[#050a13] px-3 py-3 pl-9 text-sm font-semibold text-white outline-none focus:border-cyan-400/50 disabled:opacity-50"
-                >
-                  {selectableBaseAssets.length ? selectableBaseAssets.map((asset) => (
-                    <option key={asset} value={asset} className="bg-[#07101d]">{asset}</option>
-                  )) : <option value={baseAsset}>{baseAsset}</option>}
-                </select>
-                <ChevronDown size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-              </div>
-            </div>
-
             <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-white/[0.035] p-1">
               <button
                 type="button"
-                onClick={() => setSide("buy")}
+                onClick={() => {
+                  setSide("buy");
+                  setAssetMenuOpen((open) => !open);
+                }}
+                aria-expanded={assetMenuOpen}
+                aria-haspopup="listbox"
                 className={side === "buy"
-                  ? "rounded-md bg-emerald-500/15 py-2.5 text-sm font-semibold text-emerald-400"
-                  : "rounded-md py-2.5 text-sm text-slate-500 hover:text-white"}
+                  ? "flex items-center justify-center gap-1 rounded-md bg-emerald-500/15 py-2.5 text-sm font-semibold text-emerald-400"
+                  : "flex items-center justify-center gap-1 rounded-md py-2.5 text-sm text-slate-500 hover:text-white"}
               >
-                شراء {baseAsset}
+                شراء {baseAsset} <ChevronDown size={14} />
               </button>
               <button
                 type="button"
-                onClick={() => setSide("sell")}
+                onClick={() => {
+                  setSide("sell");
+                  setAssetMenuOpen((open) => !open);
+                }}
+                aria-expanded={assetMenuOpen}
+                aria-haspopup="listbox"
                 className={side === "sell"
-                  ? "rounded-md bg-rose-500/15 py-2.5 text-sm font-semibold text-rose-400"
-                  : "rounded-md py-2.5 text-sm text-slate-500 hover:text-white"}
+                  ? "flex items-center justify-center gap-1 rounded-md bg-rose-500/15 py-2.5 text-sm font-semibold text-rose-400"
+                  : "flex items-center justify-center gap-1 rounded-md py-2.5 text-sm text-slate-500 hover:text-white"}
               >
-                بيع {baseAsset}
+                بيع {baseAsset} <ChevronDown size={14} />
               </button>
             </div>
+
+            {assetMenuOpen && (
+              <div role="listbox" aria-label="اختيار عملة التداول" className="mb-4 max-h-56 overflow-y-auto rounded-lg border border-white/[0.10] bg-[#050a13] p-1 shadow-xl">
+                {selectableBaseAssets.map((asset) => (
+                  <button
+                    key={asset}
+                    type="button"
+                    role="option"
+                    aria-selected={asset === baseAsset}
+                    onClick={() => {
+                      selectBaseAsset(asset);
+                      setAssetMenuOpen(false);
+                    }}
+                    className={asset === baseAsset
+                      ? "flex w-full items-center justify-between rounded-md bg-cyan-400/10 px-3 py-2.5 text-right text-sm font-semibold text-cyan-300"
+                      : "flex w-full items-center justify-between rounded-md px-3 py-2.5 text-right text-sm text-slate-300 hover:bg-white/[0.06]"}
+                  >
+                    <span>{asset}</span>
+                    {asset === baseAsset ? <span className="text-[10px]">✓ مختارة</span> : null}
+                  </button>
+                ))}
+                {!selectableBaseAssets.length && <div className="px-3 py-2 text-xs text-slate-500">لا توجد عملات متاحة</div>}
+              </div>
+            )}
 
             <div className="mb-4">
               <label className="mb-2 block text-xs text-slate-500">نوع الأمر</label>

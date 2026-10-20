@@ -4,10 +4,15 @@ export interface ITrade extends Document {
   mode: "demo" | "live";
   symbol: string;
   takerSide?: "buy" | "sell";
-  buyOrderId: mongoose.Types.ObjectId;
-  sellOrderId: mongoose.Types.ObjectId;
-  buyerId: mongoose.Types.ObjectId;
-  sellerId: mongoose.Types.ObjectId;
+  side?: "buy" | "sell";
+  executionProvider?: "internal" | "binance";
+  userId?: mongoose.Types.ObjectId;
+  orderId?: mongoose.Types.ObjectId;
+  externalTradeId?: string;
+  buyOrderId?: mongoose.Types.ObjectId;
+  sellOrderId?: mongoose.Types.ObjectId;
+  buyerId?: mongoose.Types.ObjectId;
+  sellerId?: mongoose.Types.ObjectId;
   price: number;
   quantity: number;
   quoteAmount: number;
@@ -29,10 +34,15 @@ const TradeSchema = new Schema<ITrade>(
 
     symbol: { type: String, required: true, index: true },
     takerSide: { type: String, enum: ["buy", "sell"] },
-    buyOrderId: { type: Schema.Types.ObjectId, ref: "Order", required: true, index: true },
-    sellOrderId: { type: Schema.Types.ObjectId, ref: "Order", required: true, index: true },
-    buyerId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    sellerId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    side: { type: String, enum: ["buy", "sell"] },
+    executionProvider: { type: String, enum: ["internal", "binance"], default: "internal", index: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User", required: false, index: true },
+    orderId: { type: Schema.Types.ObjectId, ref: "Order", required: false, index: true },
+    externalTradeId: { type: String, required: false, index: true },
+    buyOrderId: { type: Schema.Types.ObjectId, ref: "Order", required: false, index: true },
+    sellOrderId: { type: Schema.Types.ObjectId, ref: "Order", required: false, index: true },
+    buyerId: { type: Schema.Types.ObjectId, ref: "User", required: false, index: true },
+    sellerId: { type: Schema.Types.ObjectId, ref: "User", required: false, index: true },
     price: { type: Number, required: true, min: 0 },
     quantity: { type: Number, required: true, min: 0 },
     quoteAmount: { type: Number, required: true, min: 0 },

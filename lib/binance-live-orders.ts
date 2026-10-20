@@ -115,6 +115,7 @@ async function writeUserLedger(
   amount: number,
   referenceId: string,
   note: string,
+  entryType: "trade" | "fee" = "trade",
 ) {
   if (!Number.isFinite(amount) || Math.abs(amount) < 1e-12) return;
   const after = await totalWalletBalance(session, userId, asset);
@@ -124,7 +125,7 @@ async function writeUserLedger(
     scope: "user",
     asset: asset.toUpperCase(),
     mode: "live",
-    type: amount < 0 ? "trade" : "trade",
+    type: entryType,
     amount,
     balanceBefore: before,
     balanceAfter: after,
@@ -266,6 +267,7 @@ export async function submitBinanceLiveOrder(input: SubmitBinanceOrderInput): Pr
         executionProvider: "binance",
         clientOrderId,
         reservedAmount,
+        reservedAsset: reserveAsset,
         releasedAmount: 0,
         settledExecutedQuantity: 0,
         settledQuoteQuantity: 0,
@@ -367,9 +369,7 @@ async function rejectAndRelease(orderId: string, reason: string) {
     await session.withTransaction(async () => {
       const order: any = await Order.findById(orderId).session(session);
       if (!order || order.locksReleased) return;
-      const reserveAsset = order.side === "buy"
-        ? String(order.symbol).slice(-4)
-        : String(order.symbol).slice(0, -4);
+      const reserveAsset = String(order.reservedAsset || (order.side === "buy" ? String(order.symbol).slice(-4) : String(order.symbol).slice(0, -4)));
       await changeWalletBalance(session, order.userId, reserveAsset, Number(order.reservedAmount || 0), -Number(order.reservedAmount || 0));
       order.status = "rejected";
       order.locksReleased = true;
@@ -393,6 +393,9 @@ export async function reconcileBinanceLiveOrder(orderId: string, supplied?: Bina
     external = await queryBinanceSpotOrder(String(existing.symbol), String(existing.clientOrderId));
   }
 
+  const { getBinanceSpotPair } = await import("@/lib/binance-market");
+  const pairResponse = await getBinanceSpotPair(String(existing.symbol));
+  if (!pairResponse) throw new Error("BINANCE_PAIR_NOT_FOUND");
   const session = await mongoose.startSession();
   let outOrder: any = null;
   const fills: any[] = [];
@@ -405,11 +408,6 @@ export async function reconcileBinanceLiveOrder(orderId: string, supplied?: Bina
         return;
       }
 
-      const pairResponse: any = await (async () => {
-        const { getBinanceSpotPair } = await import("@/lib/binance-market");
-        return getBinanceSpotPair(String(order.symbol));
-      })();
-      if (!pairResponse) throw new Error("BINANCE_PAIR_NOT_FOUND");
       const base = String(pairResponse.baseAsset).toUpperCase();
       const quote = String(pairResponse.quoteAsset).toUpperCase();
       const previousQty = Number(order.settledExecutedQuantity || 0);
@@ -422,27 +420,20 @@ export async function reconcileBinanceLiveOrder(orderId: string, supplied?: Bina
       const deltaFee = calculateTradingFee(deltaQuote, Number(order.feePercent || 0));
       const referenceId = "BINANCE:" + String(order._id) + ":" + executedQty.toFixed(8);
 
-      const walletBefore = deltaQty > 0 || deltaQuote > 0
-        ? {
-            base: await totalWalletBalance(session, order.userId, base),
-            quote: await totalWalletBalance(session, order.userId, quote),
-          }
-        : null;
-
       if (deltaQuote > 0 || deltaFee > 0 || deltaQty > 0) {
         if (order.side === "buy") {
           await changeWalletBalance(session, order.userId, quote, 0, -(deltaQuote + deltaFee));
           if (deltaQty > 0) await changeWalletBalance(session, order.userId, base, deltaQty, 0);
           if (deltaQty > 0) await writeUserLedger(session, order.userId, base, deltaQty, referenceId, "شراء Spot منفذ عبر Binance");
           if (deltaQuote > 0) await writeUserLedger(session, order.userId, quote, -deltaQuote, referenceId, "قيمة شراء Spot عبر Binance");
-          if (deltaFee > 0) await writeUserLedger(session, order.userId, quote, -deltaFee, referenceId, "عمولة تداول Spot");
+          if (deltaFee > 0) await writeUserLedger(session, order.userId, quote, -deltaFee, referenceId, "عمولة تداول Spot", "fee");
         } else {
           if (deltaQty > 0) await changeWalletBalance(session, order.userId, base, 0, -deltaQty);
           const credit = Math.max(0, round8(deltaQuote - deltaFee));
           if (credit > 0) await changeWalletBalance(session, order.userId, quote, credit, 0);
           if (deltaQty > 0) await writeUserLedger(session, order.userId, base, -deltaQty, referenceId, "بيع Spot منفذ عبر Binance");
           if (deltaQuote > 0) await writeUserLedger(session, order.userId, quote, deltaQuote, referenceId, "حصيلة بيع Spot عبر Binance");
-          if (deltaFee > 0) await writeUserLedger(session, order.userId, quote, -deltaFee, referenceId, "عمولة تداول Spot");
+          if (deltaFee > 0) await writeUserLedger(session, order.userId, quote, -deltaFee, referenceId, "عمولة تداول Spot", "fee");
         }
         await writeSystemTradingFee(session, deltaFee, quote, referenceId);
       }

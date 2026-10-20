@@ -4,6 +4,7 @@ import {
   isActiveBinanceSpotPair,
   type BinanceSpotSymbol,
 } from "@/lib/binance-market";
+import { isBinanceLiveTradingConfigured } from "@/lib/binance-trading";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,11 @@ export async function GET() {
       updatedAt: Date.now(),
       count: pairs.length,
       quotes: [...new Set(pairs.map((pair) => pair.quoteAsset))].sort(),
+      execution: {
+        provider: "binance",
+        configured: isBinanceLiveTradingConfigured(),
+        testnet: process.env.BINANCE_TRADE_TESTNET === "true",
+      },
       pairs,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

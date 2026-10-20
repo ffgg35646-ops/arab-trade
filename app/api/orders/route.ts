@@ -176,6 +176,11 @@ export async function GET(
       filter.type = type;
     }
 
+    const purpose = String(url.searchParams.get("purpose") || "").trim();
+    if (purpose === "spot" || purpose === "withdrawal-conversion") {
+      filter.purpose = purpose;
+    }
+
     const orders =
       await Order.find(filter)
         .sort({
@@ -541,6 +546,7 @@ if (
       quoteAsset: binancePair.quoteAsset,
       pair: binancePair,
       feePercent,
+      purpose: body.purpose === "withdrawal-conversion" ? "withdrawal-conversion" : "spot",
       minOrderAmount: Number(settings.trading.minOrderAmount || 10),
       maxOrderAmount: Number(settings.trading.maxOrderAmount || 100000),
       idempotencyKey,

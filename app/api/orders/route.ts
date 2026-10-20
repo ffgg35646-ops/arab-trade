@@ -77,6 +77,24 @@ export async function GET(
 
     const mode = "live";
 
+    if (isBinanceLiveTradingConfigured()) {
+      const staleBefore = new Date(Date.now() - 10000);
+      const pendingExternalOrders = await Order.find({
+        userId: user._id,
+        mode: "live",
+        executionProvider: "binance",
+        status: "open",
+        updatedAt: { $lte: staleBefore },
+      }).select("_id").sort({ updatedAt: 1 }).limit(5).lean();
+      await Promise.all(pendingExternalOrders.map(async (item: any) => {
+        try {
+          await reconcileBinanceLiveOrder(String(item._id));
+        } catch (syncError) {
+          console.error("BINANCE ORDER SYNC:", String(item._id), syncError);
+        }
+      }));
+    }
+
     const status =
       String(
         url.searchParams.get(

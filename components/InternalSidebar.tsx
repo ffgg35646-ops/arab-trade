@@ -63,7 +63,6 @@ const sections = [
     icon: ShieldCheck,
     children: [
       ["الملف الشخصي", "/dashboard/account"],
-      ["التوثيق", "/dashboard/account/verification"],
       ["كشف الحساب", "/dashboard/account/statement"],
       ["التقارير المالية", "/dashboard/account/reports"],
     ],

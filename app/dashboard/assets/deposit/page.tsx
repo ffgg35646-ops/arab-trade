@@ -164,8 +164,8 @@ export default function DepositPage() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.success) {
-        if (json.confirmed === false) {
-          setMessage(`لم يتم تأكيد الإيداع بعد: ${Number(json.confirmations || 0)} من ${Number(json.requiredConfirmations || 1)} تأكيدات. يمكنك المحاولة مجددًا لاحقًا.`);
+        if (json.reason === "confirmations_pending") {
+          setMessage(`المعاملة مطابقة، لكن التأكيدات ما زالت ${Number(json.confirmations || 0)} من ${Number(json.requiredConfirmations || 1)}. يمكنك المحاولة مجددًا لاحقًا.`);
         } else {
           throw new Error(json.message || "تعذر التحقق من الإيداع");
         }

@@ -317,9 +317,14 @@ export async function submitBinanceLiveOrder(input: SubmitBinanceOrderInput): Pr
     try {
       exchangeOrder = await queryBinanceSpotOrder(symbol, clientOrderId);
     } catch (queryError: any) {
+      // Only an explicit Binance 4xx rejection proves the order was not placed.
+      // A missing query result after a timeout/5xx is ambiguous: keep funds locked
+      // rather than releasing funds while an exchange-side order may still exist.
       const definitelyNotPlaced =
-        (placementError instanceof BinanceTradingError && placementError.status < 500 && placementError.code !== undefined) ||
-        (queryError instanceof BinanceTradingError && [-2011, -2013].includes(Number(queryError.code)));
+        placementError instanceof BinanceTradingError &&
+        placementError.status >= 400 &&
+        placementError.status < 500 &&
+        placementError.code !== undefined;
       if (definitelyNotPlaced) {
         await rejectAndRelease(String(orderId), String(placementError?.message || "رفض Binance الأمر"));
         const body = { success: false, message: String(placementError?.message || "رفض Binance الأمر") };

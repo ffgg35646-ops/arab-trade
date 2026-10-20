@@ -52,6 +52,23 @@ type Request = {
   createdAt?: string;
   reviewedAt?: string | null;
 };
+type SpotBalance = { asset: string; available: number; priceUsd?: number; valueUsd?: number };
+type ConversionQuote = {
+  success: boolean;
+  message?: string;
+  asset?: string;
+  quantity?: number;
+  available?: number;
+  priceUsdt?: number;
+  marketValueUsdt?: number;
+  tradingFeePercent?: number;
+  estimatedTradingFeeUsdt?: number;
+  estimatedAfterTradingFeeUsdt?: number;
+  withdrawalFeePercent?: number;
+  estimatedWithdrawalFeeUsdt?: number;
+  estimatedPayoutUsdt?: number;
+  disclaimer?: string;
+};
 type Data = {
   summary: {
     totalBalance: number;
@@ -84,6 +101,11 @@ export default function WithdrawalsPage() {
   const [generalAmount, setGeneralAmount] = useState("");
   const [generalAddress, setGeneralAddress] = useState("");
   const [generalNetwork, setGeneralNetwork] = useState("");
+  const [spotBalances, setSpotBalances] = useState<SpotBalance[]>([]);
+  const [conversionAsset, setConversionAsset] = useState("USDT");
+  const [conversionQuantity, setConversionQuantity] = useState("");
+  const [conversionQuote, setConversionQuote] = useState<ConversionQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState("");
@@ -97,8 +119,28 @@ export default function WithdrawalsPage() {
   const load = useCallback(async () => {
     setRefreshing(true);
     try {
-      const response = await fetch("/api/withdrawals", { credentials: "include", cache: "no-store" });
-      const json = await response.json().catch(() => ({}));
+      const [response, walletResponse] = await Promise.all([
+        fetch("/api/withdrawals", { credentials: "include", cache: "no-store" }),
+        fetch("/api/wallet?mode=live", { credentials: "include", cache: "no-store" }),
+      ]);
+      const [json, walletJson] = await Promise.all([
+        response.json().catch(() => ({})),
+        walletResponse.json().catch(() => ({})),
+      ]);
+      if (walletResponse.ok && walletJson.success) {
+        const rows = (walletJson.wallet?.balances || walletJson.spot?.balances || [])
+          .map((row: any) => ({
+            asset: String(row.asset || "").toUpperCase(),
+            available: Number(row.available || 0),
+            priceUsd: Number(row.priceUsd || 0),
+            valueUsd: Number(row.valueUsd || 0),
+          }))
+          .filter((row: SpotBalance) => row.asset && Number.isFinite(row.available) && row.available > 0);
+        setSpotBalances(rows);
+        setConversionAsset((current) => rows.some((row: SpotBalance) => row.asset === current)
+          ? current
+          : (rows.find((row: SpotBalance) => row.asset !== "USDT")?.asset || rows[0]?.asset || "USDT"));
+      }
       if (!response.ok || !json.success) {
         showMessage(json.message || "تعذر تحميل بيانات السحب", "error");
         return;
@@ -121,7 +163,43 @@ export default function WithdrawalsPage() {
     return () => window.clearInterval(timer);
   }, [load]);
 
+  useEffect(() => {
+    const quantity = Number(conversionQuantity);
+    if (!conversionAsset || !Number.isFinite(quantity) || quantity <= 0 || Math.round(quantity * 1e8) / 1e8 !== quantity) {
+      setConversionQuote(null);
+      setQuoteLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setQuoteLoading(true);
+      try {
+        const params = new URLSearchParams({ asset: conversionAsset, quantity: String(quantity) });
+        const response = await fetch("/api/withdrawals/quote?" + params.toString(), {
+          credentials: "include",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!controller.signal.aborted) {
+          setConversionQuote(result as ConversionQuote);
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setConversionQuote({ success: false, message: "تعذر تحديث تقدير السعر الحالي." });
+        }
+      } finally {
+        if (!controller.signal.aborted) setQuoteLoading(false);
+      }
+    }, 350);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [conversionAsset, conversionQuantity]);
+
   const hasPending = Boolean(data?.requests.some((item) => item.status === "pending"));
+  const selectedSpotBalance = spotBalances.find((row) => row.asset === conversionAsset);
   const firstNetwork = data?.networks[0]?.code || "";
   const selectedGeneralNetwork = generalNetwork || firstNetwork;
 
@@ -308,6 +386,42 @@ export default function WithdrawalsPage() {
             </div>
 
             <p className="rounded-xl border border-emerald-400/15 bg-emerald-400/[0.04] p-3 text-sm leading-6 text-emerald-100">السحب العام مرتبط برصيد USDT المتاح في محفظة التداول. بعد تنفيذ بيع العملة مقابل USDT تُضاف حصيلة البيع بعد رسوم التداول إلى هذا الرصيد، ويمكن طلب سحبها من هنا. أرباح الباقات تظل منفصلة وتُسحب من قسم الباقات.</p>
+
+            <section className="space-y-3 rounded-xl border border-cyan-500/20 bg-[#0b1422] p-4">
+              <div>
+                <h3 className="font-bold">تقدير تحويل أرباح العملات إلى USDT</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-400">اختر عملة موجودة في رصيد التداول وحدد الكمية. السعر من سوق Binance، وستظهر قيمة السوق وعمولة التداول التقديرية ثم عمولة السحب 5%. هذه معاينة فقط: لا تبيع العملة ولا تنشئ طلب سحب تلقائيًا.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block space-y-2 text-sm text-slate-300">
+                  <span>عملة الأرباح</span>
+                  <select value={conversionAsset} onChange={(event) => { setConversionAsset(event.target.value); setConversionQuantity(""); setConversionQuote(null); }} disabled={busy || hasPending || !spotBalances.length} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:opacity-50">
+                    {!spotBalances.length && <option value="">لا توجد أرصدة متاحة</option>}
+                    {spotBalances.map((row) => <option key={row.asset} value={row.asset}>{row.asset} — متاح {money(row.available)}</option>)}
+                  </select>
+                </label>
+                <label className="block space-y-2 text-sm text-slate-300">
+                  <span>الكمية المراد تحويل قيمتها</span>
+                  <input type="number" min="0.00000001" max={selectedSpotBalance?.available} step="0.00000001" value={conversionQuantity} disabled={busy || hasPending || !selectedSpotBalance} onChange={(event) => setConversionQuantity(event.target.value)} placeholder={selectedSpotBalance ? "الحد الأقصى " + money(selectedSpotBalance.available) + " " + conversionAsset : "اختر عملة أولًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:opacity-50" />
+                </label>
+              </div>
+              {quoteLoading && <p className="text-xs text-cyan-200">جاري حساب القيمة بسعر السوق الحالي…</p>}
+              {conversionQuote && (
+                conversionQuote.success ? (
+                  <div className="space-y-2 rounded-lg border border-slate-700 bg-[#050a13] p-3">
+                    <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
+                      <div><p className="text-slate-400">سعر {conversionAsset}</p><p className="mt-1 font-bold">{money(conversionQuote.priceUsdt || 0)} USDT</p></div>
+                      <div><p className="text-slate-400">القيمة السوقية التقديرية</p><p className="mt-1 font-bold">{money(conversionQuote.marketValueUsdt || 0)} USDT</p></div>
+                      <div><p className="text-slate-400">عمولة التداول التقديرية ({conversionQuote.tradingFeePercent || 0}%)</p><p className="mt-1 font-bold text-amber-200">{money(conversionQuote.estimatedTradingFeeUsdt || 0)} USDT</p></div>
+                      <div><p className="text-slate-400">بعد عمولة التداول</p><p className="mt-1 font-bold">{money(conversionQuote.estimatedAfterTradingFeeUsdt || 0)} USDT</p></div>
+                      <div><p className="text-slate-400">عمولة السحب (5%)</p><p className="mt-1 font-bold text-amber-200">{money(conversionQuote.estimatedWithdrawalFeeUsdt || 0)} USDT</p></div>
+                      <div><p className="text-slate-400">صافي السحب التقديري</p><p className="mt-1 text-lg font-black text-emerald-300">{money(conversionQuote.estimatedPayoutUsdt || 0)} USDT</p></div>
+                    </div>
+                    <p className="text-[11px] leading-5 text-slate-500">{conversionQuote.disclaimer || "السعر تقديري وقد يتغير قبل التنفيذ."}</p>
+                  </div>
+                ) : <p role="alert" className="rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 text-sm text-rose-200">{conversionQuote.message || "تعذر حساب القيمة"}</p>
+              )}
+            </section>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="grid gap-3 rounded-xl border border-slate-700 bg-[#0b1422] p-4 sm:grid-cols-2">

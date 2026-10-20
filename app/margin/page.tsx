@@ -1,5 +1,55 @@
-import { redirect } from "next/navigation";
-
-export default function LegacyTradingPage() {
-  redirect("/trading");
+"use client";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import InternalNavbar from "@/components/InternalNavbar";
+import InternalSidebar from "@/components/InternalSidebar";
+import { ArrowDownRight, ArrowUpRight, RefreshCw, ShieldCheck, X } from "lucide-react";
+type Pair = { symbol:string; baseAsset:string; quoteAsset:string; lastPrice:number };
+type Position = { _id?:string; symbol?:string; side?:string; quantity?:number; entryPrice?:number; leverage?:number; margin?:number; pnl?:number; status?:string; createdAt?:string };
+function fmt(value:unknown,digits=4){const n=Number(value);return Number.isFinite(n)?n.toLocaleString("en-US",{maximumFractionDigits:digits}):"—";}
+export default function MarginPage(){
+ const [pairs,setPairs]=useState<Pair[]>([]); const [positions,setPositions]=useState<Position[]>([]);
+ const [symbol,setSymbol]=useState("BTCUSDT"); const [side,setSide]=useState<"long"|"short">("long");
+ const [margin,setMargin]=useState("25"); const [leverage,setLeverage]=useState("2");
+ const [loading,setLoading]=useState(true); const [submitting,setSubmitting]=useState(false); const [closing,setClosing]=useState("");
+ const [refreshing,setRefreshing]=useState(false); const [error,setError]=useState(""); const [notice,setNotice]=useState("");
+ const load=useCallback(async(manual=false)=>{
+  if(manual)setRefreshing(true);
+  try{
+   const [pr,mr]=await Promise.all([fetch("/api/margin/positions",{credentials:"include",cache:"no-store"}),fetch("/api/market/binance",{cache:"no-store"})]);
+   const [pd,md]=await Promise.all([pr.json().catch(()=>({})),mr.json().catch(()=>({}))]);
+   if(!pr.ok)throw new Error(pd?.message||pd?.error||"تعذر تحميل مراكز الهامش.");
+   setPositions(Array.isArray(pd.positions)?pd.positions:[]);
+   if(mr.ok&&md.success&&Array.isArray(md.pairs)){setPairs(md.pairs);if(md.pairs.length&&!md.pairs.some((p:Pair)=>p.symbol===symbol))setSymbol(md.pairs.some((p:Pair)=>p.symbol==="BTCUSDT")?"BTCUSDT":md.pairs[0].symbol);}
+   setError("");
+  }catch(e){setError(e instanceof Error?e.message:"تعذر تحديث بيانات الهامش.");}
+  finally{setLoading(false);setRefreshing(false);}
+ },[symbol]);
+ useEffect(()=>{void load();const id=window.setInterval(()=>void load(),10000);return()=>window.clearInterval(id);},[load]);
+ const open=useMemo(()=>positions.filter(p=>p.status==="open"),[positions]);
+ const closed=useMemo(()=>positions.filter(p=>p.status!=="open"),[positions]);
+ const pair=pairs.find(p=>p.symbol===symbol); const notional=Number(margin)*Number(leverage);
+ const quantity=pair&&pair.lastPrice>0?notional/pair.lastPrice:0;
+ async function openPosition(){
+  setSubmitting(true);setError("");setNotice("");
+  try{const r=await fetch("/api/margin/open",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({symbol,side,margin:Number(margin),leverage:Number(leverage)})});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw new Error(d.message||d.error||"تعذر فتح مركز الهامش.");setNotice(d.message||"تم فتح مركز الهامش.");await load(true);}
+  catch(e){setError(e instanceof Error?e.message:"تعذر فتح مركز الهامش.");}finally{setSubmitting(false);}
+ }
+ async function closePosition(id:string){
+  setClosing(id);setError("");setNotice("");
+  try{const r=await fetch("/api/margin/close",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw new Error(d.message||d.error||"تعذر إغلاق المركز.");setNotice(d.message||"تم إغلاق مركز الهامش.");await load(true);}
+  catch(e){setError(e instanceof Error?e.message:"تعذر إغلاق المركز.");}finally{setClosing("");}
+ }
+ return <main dir="rtl" className="min-h-screen bg-[#050a13] text-white"><InternalNavbar/><div className="mx-auto flex max-w-[1700px]"><InternalSidebar/><section className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8"><div className="mx-auto max-w-[1300px]">
+ <div className="mb-6 flex flex-wrap items-end justify-between gap-4"><div><div className="mb-2 flex items-center gap-2 text-xs font-bold text-cyan-300"><ShieldCheck size={15}/> مساحة الحساب الداخلية</div><h1 className="text-3xl font-black">التداول بالهامش</h1><p className="mt-3 max-w-3xl text-sm leading-7 text-slate-400">إدارة مراكز الهامش داخل حسابك. فتح المراكز يتطلب التحقق من الهوية ورصيد USDT متاحًا؛ الأسعار المرجعية من Binance Spot وليست أوامر مرسلة إلى Binance.</p></div><button type="button" disabled={refreshing} onClick={()=>void load(true)} className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-sm font-bold disabled:opacity-50"><RefreshCw size={15} className={refreshing?"animate-spin":""}/> تحديث</button></div>
+ {error?<div role="alert" className="mb-4 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300">{error}</div>:null}{notice?<div role="status" className="mb-4 rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-4 text-sm text-emerald-300">{notice}</div>:null}
+ <div className="mb-6 grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-white/10 bg-[#07101d] p-5"><div className="text-xs text-slate-400">المراكز المفتوحة</div><div className="mt-2 text-2xl font-black">{open.length}</div></div><div className="rounded-2xl border border-white/10 bg-[#07101d] p-5"><div className="text-xs text-slate-400">الهامش المحجوز</div><div className="mt-2 text-2xl font-black">{fmt(open.reduce((s,p)=>s+Number(p.margin||0),0),2)} USDT</div></div><div className="rounded-2xl border border-white/10 bg-[#07101d] p-5"><div className="text-xs text-slate-400">PnL المسجل للمراكز المفتوحة</div><div className="mt-2 text-2xl font-black">{fmt(open.reduce((s,p)=>s+Number(p.pnl||0),0),4)} USDT</div></div></div>
+ <section className="mb-6 rounded-2xl border border-white/10 bg-[#07101d] p-5"><h2 className="text-lg font-black">فتح مركز هامش</h2><p className="mt-2 text-xs leading-6 text-slate-500">سيرفض الخادم الطلب إذا لم يكن الحساب موثقًا أو الرصيد غير كافٍ. الرافعة تضخم الأرباح والخسائر.</p><div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+ <label className="text-xs text-slate-400">زوج التداول<select value={symbol} onChange={e=>setSymbol(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#050a13] px-3 py-3 text-sm text-white">{pairs.map(p=><option key={p.symbol} value={p.symbol}>{p.baseAsset}/{p.quoteAsset}</option>)}</select></label>
+ <label className="text-xs text-slate-400">اتجاه المركز<select value={side} onChange={e=>setSide(e.target.value as "long"|"short")} className="mt-2 w-full rounded-xl border border-white/10 bg-[#050a13] px-3 py-3 text-sm text-white"><option value="long">شراء / Long</option><option value="short">بيع / Short</option></select></label>
+ <label className="text-xs text-slate-400">الهامش (USDT)<input type="number" min="0.01" step="any" inputMode="decimal" value={margin} onChange={e=>setMargin(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#050a13] px-3 py-3 text-sm text-white"/></label>
+ <label className="text-xs text-slate-400">الرافعة المالية<select value={leverage} onChange={e=>setLeverage(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-[#050a13] px-3 py-3 text-sm text-white">{[1,2,3,5,10,20,25,50,75,100,125].map(n=><option key={n} value={n}>{n}x</option>)}</select></label></div>
+ <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-4"><div className="text-xs leading-6 text-slate-400">القيمة الاسمية التقديرية: <b className="text-white">{fmt(notional,2)} USDT</b> · الكمية التقديرية: <b className="text-white">{fmt(quantity,8)}</b> · السعر: <b className="text-white">{fmt(pair?.lastPrice,6)} {pair?.quoteAsset||""}</b></div><button type="button" onClick={()=>void openPosition()} disabled={submitting||loading||!pair||!Number.isFinite(Number(margin))||Number(margin)<=0||Number(leverage)<1||Number(leverage)>125} className="rounded-xl bg-cyan-400 px-5 py-3 text-sm font-black text-[#06111b] disabled:cursor-not-allowed disabled:opacity-40">{submitting?"جارٍ فتح المركز...":side==="long"?"فتح مركز Long":"فتح مركز Short"}</button></div></section>
+ <section className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-[#07101d]"><div className="border-b border-white/10 p-5"><h2 className="font-black">المراكز المفتوحة</h2></div><div className="overflow-x-auto"><table className="w-full min-w-[780px] text-sm"><thead className="text-xs text-slate-500"><tr><th className="px-4 py-4 text-right">الزوج</th><th className="px-4 py-4">الاتجاه</th><th className="px-4 py-4">سعر الدخول</th><th className="px-4 py-4">الكمية</th><th className="px-4 py-4">الرافعة</th><th className="px-4 py-4">الهامش</th><th className="px-4 py-4">PnL</th><th className="px-4 py-4">إجراء</th></tr></thead><tbody>{open.map(p=><tr key={p._id} className="border-t border-white/5"><td className="px-4 py-4 font-bold">{p.symbol}</td><td className={"px-4 py-4 font-bold "+(p.side==="long"?"text-emerald-400":"text-rose-400")}>{p.side==="long"?<span className="inline-flex items-center gap-1"><ArrowUpRight size={14}/>Long</span>:<span className="inline-flex items-center gap-1"><ArrowDownRight size={14}/>Short</span>}</td><td className="px-4 py-4 font-mono">{fmt(p.entryPrice,6)}</td><td className="px-4 py-4 font-mono">{fmt(p.quantity,8)}</td><td className="px-4 py-4">{fmt(p.leverage,0)}x</td><td className="px-4 py-4 font-mono">{fmt(p.margin,2)} USDT</td><td className="px-4 py-4 font-mono">{fmt(p.pnl,4)}</td><td className="px-4 py-4"><button type="button" onClick={()=>p._id&&void closePosition(p._id)} disabled={!p._id||closing===p._id} className="inline-flex items-center gap-1 rounded-lg border border-rose-400/20 px-3 py-2 text-xs font-bold text-rose-300 disabled:opacity-50">{closing===p._id?<RefreshCw size={13} className="animate-spin"/>:<X size={13}/>} إغلاق</button></td></tr>)}</tbody></table></div>{!open.length?<div className="py-12 text-center text-sm text-slate-500">{loading?"جارٍ تحميل المراكز...":"لا توجد مراكز هامش مفتوحة."}</div>:null}</section>
+ <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#07101d]"><div className="border-b border-white/10 p-5"><h2 className="font-black">سجل المراكز المغلقة</h2></div>{closed.length?<div className="overflow-x-auto"><table className="w-full min-w-[550px] text-sm"><thead className="text-xs text-slate-500"><tr><th className="px-4 py-4 text-right">الزوج</th><th className="px-4 py-4">الاتجاه</th><th className="px-4 py-4">الهامش</th><th className="px-4 py-4">PnL</th><th className="px-4 py-4">الحالة</th></tr></thead><tbody>{closed.map(p=><tr key={p._id} className="border-t border-white/5"><td className="px-4 py-4">{p.symbol}</td><td className="px-4 py-4">{p.side}</td><td className="px-4 py-4">{fmt(p.margin,2)} USDT</td><td className="px-4 py-4">{fmt(p.pnl,4)}</td><td className="px-4 py-4 text-slate-400">مغلق</td></tr>)}</tbody></table></div>:<div className="py-10 text-center text-sm text-slate-500">لا يوجد سجل مراكز مغلقة.</div>}</section>
+ </div></section></div></main>;
 }

@@ -224,11 +224,11 @@ export default function InternalNavbar() {
           </Link>
 
           <Link
-            href="/markets"
+            href="/dashboard/markets"
             className={`rounded-xl px-3 py-2 text-sm transition ${
               isActive(
                 pathname,
-                "/markets"
+                "/dashboard/markets"
               )
                 ? "bg-blue-500/10 text-cyan-300"
                 : "text-slate-300 hover:bg-white/5 hover:text-white"
@@ -253,7 +253,7 @@ export default function InternalNavbar() {
         <div className="mr-auto flex items-center gap-2">
 
           <Link
-            href="/markets"
+            href="/dashboard/markets"
             className="hidden rounded-xl border border-white/10 p-2.5 text-slate-300 transition hover:bg-white/5 hover:text-white md:flex"
             aria-label="الأسواق والبحث"
             title="الأسواق"
@@ -368,14 +368,14 @@ export default function InternalNavbar() {
             </Link>
 
             <Link
-              href="/markets"
+              href="/dashboard/markets"
               onClick={() =>
                 setMobile(false)
               }
               className={`rounded-xl px-3 py-3 text-sm transition ${
                 isActive(
                   pathname,
-                  "/markets"
+                  "/dashboard/markets"
                 )
                   ? "bg-blue-500/10 text-cyan-300"
                   : "text-slate-300 hover:bg-white/5"

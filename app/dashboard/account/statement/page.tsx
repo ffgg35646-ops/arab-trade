@@ -9,560 +9,285 @@ import {
   RefreshCw,
   Search,
   Wallet,
+  LoaderCircle,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
-type Balance = {
-  asset: string;
-  free?: number;
-  locked?: number;
-  total?: number;
-};
-
-type WalletResponse = {
-  wallet?: {
-    balances?: Balance[];
-  };
-  spot?: {
-    balances?: Balance[];
-  };
-  funding?: {
-    balances?: Balance[];
-  };
-};
-
-type Order = {
-  _id?: string;
-  id?: string;
-  symbol: string;
-  side: "buy" | "sell";
-  type?: string;
-  status?: string;
-  price?: number;
-  quantity?: number;
-  originalQuantity?: number;
-  filledQuantity?: number;
-  remainingQuantity?: number;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-type Trade = {
-  _id?: string;
-  id?: string;
-  symbol: string;
-  side?: "buy" | "sell";
-  price?: number;
-  quantity?: number;
-  quoteQuantity?: number;
-  fee?: number;
-  feeAsset?: string;
-  createdAt?: string;
-};
-
+type Direction = "in" | "out" | "neutral";
 type Entry = {
   id: string;
   date: string;
   type: string;
   asset: string;
   amount: number;
-  direction: "in" | "out" | "neutral";
+  direction: Direction;
   status: string;
   detail: string;
+  source: string;
+};
+type StatementResponse = {
+  success?: boolean;
+  message?: string;
+  entries?: Entry[];
+  hasMore?: boolean;
+  limit?: number;
+};
+type WalletResponse = {
+  wallet?: {
+    totalAccountBalanceUsd?: number;
+    totalBalanceUsd?: number;
+  };
 };
 
-function n(value: unknown) {
-  const x = Number(value);
-  return Number.isFinite(x) ? x : 0;
+function n(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatNumber(value: number, digits = 8) {
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: digits,
-  }).format(value);
+function formatNumber(value: number, digits = 8): string {
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: digits }).format(value);
 }
 
-function formatDate(value?: string) {
+function formatDate(value?: string): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-
   return new Intl.DateTimeFormat("ar-EG", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
 }
 
-function splitSymbol(symbol: string) {
-  const clean = String(symbol || "").toUpperCase();
-  const quotes = ["USDT", "USDC", "FDUSD", "BTC", "ETH", "BNB"];
-  const quote = quotes.find((q) => clean.endsWith(q));
-  if (!quote) return { base: clean, quote: "" };
-  return {
-    base: clean.slice(0, -quote.length),
-    quote,
-  };
+function csvCell(value: unknown): string {
+  return '"' + String(value ?? "").replaceAll('"', '""') + '"';
 }
 
 export default function StatementPage() {
-  const [balances, setBalances] = useState<Balance[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [trades, setTrades] = useState<Trade[]>([]);
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [accountValueUsd, setAccountValueUsd] = useState(0);
   const [asset, setAsset] = useState("ALL");
   const [kind, setKind] = useState("ALL");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState("");
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const fetchStatement = useCallback(async (before?: string, append = false) => {
+    if (append) setLoadingMore(true);
+    else setLoading(true);
     setError("");
 
     try {
-      const [walletRes, ordersRes, tradesRes] = await Promise.all([
-        fetch("/api/wallet", { cache: "no-store" }),
-        fetch("/api/orders?limit=500", { cache: "no-store" }),
-        fetch("/api/trades?limit=500", { cache: "no-store" }),
+      const params = new URLSearchParams({ limit: "500" });
+      if (before) params.set("before", before);
+
+      const [statementRes, walletRes] = await Promise.all([
+        fetch("/api/account/statement?" + params.toString(), { cache: "no-store" }),
+        append ? Promise.resolve(null) : fetch("/api/wallet", { cache: "no-store" }),
       ]);
 
-      if (!walletRes.ok || !ordersRes.ok || !tradesRes.ok) {
-        throw new Error("تعذر تحميل بيانات الحساب");
+      const data: StatementResponse = await statementRes.json();
+      if (!statementRes.ok || !data.success) {
+        throw new Error(data.message || "تعذر تحميل كشف الحساب");
       }
 
-      const wallet: WalletResponse = await walletRes.json();
-      const ordersData = await ordersRes.json();
-      const tradesData = await tradesRes.json();
+      const nextEntries = Array.isArray(data.entries) ? data.entries : [];
+      setEntries((current) => {
+        if (!append) return nextEntries;
+        const seen = new Set(current.map((entry) => entry.id));
+        return [...current, ...nextEntries.filter((entry) => !seen.has(entry.id))];
+      });
+      setHasMore(Boolean(data.hasMore));
 
-      const walletBalances =
-        wallet.wallet?.balances ||
-        wallet.spot?.balances ||
-        [];
-
-      setBalances(Array.isArray(walletBalances) ? walletBalances : []);
-      setOrders(
-        Array.isArray(ordersData?.orders)
-          ? ordersData.orders
-          : Array.isArray(ordersData?.data)
-            ? ordersData.data
-            : []
-      );
-      setTrades(
-        Array.isArray(tradesData?.trades)
-          ? tradesData.trades
-          : Array.isArray(tradesData?.data)
-            ? tradesData.data
-            : []
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "حدث خطأ أثناء تحميل البيانات");
+      if (walletRes) {
+        const walletData: WalletResponse = await walletRes.json();
+        if (!walletRes.ok) throw new Error("تعذر تحميل قيمة أصول الحساب");
+        setAccountValueUsd(n(walletData.wallet?.totalAccountBalanceUsd ?? walletData.wallet?.totalBalanceUsd));
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "حدث خطأ أثناء تحميل كشف الحساب");
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    void fetchStatement();
+  }, [fetchStatement]);
 
-  const assets = useMemo(() => {
-    const set = new Set<string>();
+  const assets = useMemo(
+    () => Array.from(new Set(entries.map((entry) => entry.asset).filter(Boolean))).sort(),
+    [entries],
+  );
+  const kinds = useMemo(
+    () => Array.from(new Set(entries.map((entry) => entry.type).filter(Boolean))).sort(),
+    [entries],
+  );
 
-    balances.forEach((b) => {
-      if (b.asset) set.add(b.asset.toUpperCase());
+  const filteredEntries = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    return entries.filter((entry) => {
+      if (asset !== "ALL" && entry.asset !== asset) return false;
+      if (kind !== "ALL" && entry.type !== kind) return false;
+      if (query && ![entry.asset, entry.type, entry.detail, entry.status].some((value) =>
+        String(value || "").toLocaleLowerCase().includes(query)
+      )) return false;
+      return true;
     });
+  }, [entries, asset, kind, search]);
 
-    trades.forEach((t) => {
-      const { base, quote } = splitSymbol(t.symbol);
-      if (base) set.add(base);
-      if (quote) set.add(quote);
-    });
-
-    orders.forEach((o) => {
-      const { base, quote } = splitSymbol(o.symbol);
-      if (base) set.add(base);
-      if (quote) set.add(quote);
-    });
-
-    return Array.from(set).sort();
-  }, [balances, orders, trades]);
-
-  const entries = useMemo<Entry[]>(() => {
-    const result: Entry[] = [];
-
-    for (const trade of trades) {
-      const { base, quote } = splitSymbol(trade.symbol);
-      const quantity = n(trade.quantity);
-      const price = n(trade.price);
-      const quoteQuantity =
-        n(trade.quoteQuantity) || quantity * price;
-
-      const side = trade.side === "buy" ? "شراء" : "بيع";
-
-      result.push({
-        id: `trade-${trade._id || trade.id || Math.random()}`,
-        date: trade.createdAt || "",
-        type: "تداول",
-        asset: quote || base,
-        amount: quoteQuantity,
-        direction: "neutral",
-        status: "مكتمل",
-        detail: `${side} ${quantity} ${base}${price ? ` بسعر ${formatNumber(price, 8)}` : ""}`,
-      });
-
-      if (trade.fee && n(trade.fee) > 0) {
-        result.push({
-          id: `fee-${trade._id || trade.id || Math.random()}`,
-          date: trade.createdAt || "",
-          type: "رسوم تداول",
-          asset: trade.feeAsset || quote || "USDT",
-          amount: n(trade.fee),
-          direction: "out",
-          status: "مكتمل",
-          detail: "رسوم تنفيذ الصفقة",
-        });
-      }
-    }
-
-    for (const order of orders) {
-      const filled = n(order.filledQuantity);
-
-      if (filled <= 0) continue;
-
-      const { base, quote } = splitSymbol(order.symbol);
-      const value = filled * n(order.price);
-
-      result.push({
-        id: `order-${order._id || order.id || `${order.symbol}-${order.createdAt}`}`,
-        date: order.updatedAt || order.createdAt || "",
-        type: order.side === "buy" ? "شراء" : "بيع",
-        asset: quote || base,
-        amount: value,
-        direction: order.side === "buy" ? "out" : "in",
-        status: "مكتمل",
-        detail: `${order.side === "buy" ? "شراء" : "بيع"} ${formatNumber(filled)} ${base}`,
-      });
-    }
-
-    return result
-      .sort(
-        (a, b) =>
-          new Date(b.date).getTime() - new Date(a.date).getTime()
-      )
-      .filter((entry) => {
-        if (asset !== "ALL" && entry.asset !== asset) return false;
-        if (kind !== "ALL" && entry.type !== kind) return false;
-
-        const q = search.trim().toLowerCase();
-        if (
-          q &&
-          !entry.asset.toLowerCase().includes(q) &&
-          !entry.detail.toLowerCase().includes(q) &&
-          !entry.type.toLowerCase().includes(q)
-        ) {
-          return false;
-        }
-
-        return true;
-      });
-  }, [trades, orders, asset, kind, search]);
-
-  const stats = useMemo(() => {
-    const totalTrading = trades.reduce(
-      (sum, t) =>
-        sum +
-        (n(t.quoteQuantity) || n(t.quantity) * n(t.price)),
-      0
-    );
-
-    const fees = trades.reduce((sum, t) => sum + n(t.fee), 0);
-
-    const totalAssets = balances.reduce(
-      (sum, b) => sum + n(b.total ?? n(b.free) + n(b.locked)),
-      0
-    );
-
-    return {
-      totalTrading,
-      fees,
-      totalAssets,
-    };
-  }, [balances, trades]);
+  const totals = useMemo(() => {
+    const incoming = filteredEntries.filter((entry) => entry.direction === "in").length;
+    const outgoing = filteredEntries.filter((entry) => entry.direction === "out").length;
+    const fees = filteredEntries.filter((entry) => entry.type === "رسوم تداول")
+      .reduce((sum, entry) => sum + entry.amount, 0);
+    return { count: filteredEntries.length, incoming, outgoing, fees };
+  }, [filteredEntries]);
 
   const exportCsv = () => {
-    const header = [
-      "Date",
-      "Type",
-      "Asset",
-      "Amount",
-      "Status",
-      "Details",
-    ];
-
-    const rows = entries.map((e) => [
-      e.date,
-      e.type,
-      e.asset,
-      e.amount,
-      e.status,
-      e.detail,
+    const header = ["Date", "Type", "Asset", "Amount", "Direction", "Status", "Details", "Source"];
+    const rows = filteredEntries.map((entry) => [
+      entry.date, entry.type, entry.asset, entry.amount, entry.direction, entry.status, entry.detail, entry.source,
     ]);
+    const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = "arabtrade-account-statement.csv";
+    anchor.click();
+    URL.revokeObjectURL(objectUrl);
+  };
 
-    const csv = [header, ...rows]
-      .map((row) =>
-        row
-          .map((value) => `"${String(value).replaceAll('"', '""')}"`)
-          .join(",")
-      )
-      .join("\n");
-
-    const blob = new Blob(["\ufeff" + csv], {
-      type: "text/csv;charset=utf-8;",
-    });
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "arabtrade-account-statement.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+  const loadMore = () => {
+    const oldest = entries.reduce<string | null>((value, entry) => {
+      if (!entry.date) return value;
+      if (!value || new Date(entry.date).getTime() < new Date(value).getTime()) return entry.date;
+      return value;
+    }, null);
+    if (oldest) void fetchStatement(oldest, true);
   };
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#050a13] text-white">
       <Navbar />
-
       <main className="mx-auto max-w-[1500px] px-4 py-8 lg:px-8">
         <div className="mb-7 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="mb-2 text-xs font-medium text-cyan-400">
-              الحساب
-            </div>
+            <div className="mb-2 text-xs font-medium text-cyan-400">الحساب</div>
             <h1 className="text-2xl font-bold">كشف الحساب</h1>
             <p className="mt-2 text-sm text-slate-500">
-              سجل تفصيلي لحركات التداول والرسوم والأرصدة المرتبطة بحسابك.
+              سجل موحّد لحركات التداول والإيداع والسحب والتحويلات وأرباح الباقات والرسوم.
             </p>
           </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={load}
-              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-slate-300 hover:bg-white/[0.06]"
-            >
-              <RefreshCw size={16} />
-              تحديث
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => void fetchStatement()} disabled={loading}
+              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-slate-300 hover:bg-white/[0.06] disabled:opacity-50">
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> تحديث
             </button>
-
-            <button
-              onClick={exportCsv}
-              className="flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-cyan-300"
-            >
-              <Download size={16} />
-              تصدير CSV
+            <button onClick={exportCsv} disabled={filteredEntries.length === 0}
+              className="flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-cyan-300 disabled:opacity-50">
+              <Download size={16} /> تصدير CSV
             </button>
           </div>
         </div>
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5">
-            <div className="mb-4 flex items-center gap-2 text-sm text-slate-500">
-              <Wallet size={17} />
-              قيمة الأصول المسجلة
-            </div>
-            <div className="text-2xl font-bold">
-              {loading ? "—" : formatNumber(stats.totalAssets, 8)}
-            </div>
-            <div className="mt-2 text-xs text-slate-600">
-              حسب أرصدة الحساب المتاحة
-            </div>
-          </div>
+        {error && <div role="alert" className="mb-5 rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-300">{error}</div>}
 
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5">
-            <div className="mb-4 text-sm text-slate-500">
-              إجمالي حجم التداول
-            </div>
-            <div className="text-2xl font-bold">
-              {loading ? "—" : formatNumber(stats.totalTrading, 2)}
-            </div>
-            <div className="mt-2 text-xs text-slate-600">
-              من الصفقات المسجلة في الحساب
-            </div>
+            <div className="mb-3 flex items-center gap-2 text-sm text-slate-500"><Wallet size={17} /> قيمة أصول الحساب التقريبية</div>
+            <div className="text-2xl font-bold">{loading ? "—" : formatNumber(accountValueUsd, 2) + " USDT"}</div>
+            <div className="mt-2 text-xs text-slate-600">محوّلة إلى قيمة تقريبية بالدولار/USDT حسب أسعار السوق المتاحة</div>
           </div>
-
           <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5">
-            <div className="mb-4 text-sm text-slate-500">
-              إجمالي الرسوم
-            </div>
-            <div className="text-2xl font-bold">
-              {loading ? "—" : formatNumber(stats.fees, 8)}
-            </div>
-            <div className="mt-2 text-xs text-slate-600">
-              الرسوم التي سجلها محرك التداول
-            </div>
+            <div className="mb-3 text-sm text-slate-500">الحركات المعروضة</div>
+            <div className="text-2xl font-bold">{loading ? "—" : formatNumber(totals.count, 0)}</div>
+            <div className="mt-2 text-xs text-slate-600">بعد تطبيق البحث والفلاتر</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5">
+            <div className="mb-3 text-sm text-slate-500">حركات واردة مكتملة</div>
+            <div className="text-2xl font-bold text-emerald-400">{loading ? "—" : formatNumber(totals.incoming, 0)}</div>
+            <div className="mt-2 text-xs text-slate-600">عدد الحركات وليس مجموع عملات مختلفة</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5">
+            <div className="mb-3 text-sm text-slate-500">رسوم التداول الظاهرة</div>
+            <div className="text-2xl font-bold">{loading ? "—" : formatNumber(totals.fees, 8)}</div>
+            <div className="mt-2 text-xs text-slate-600">قد تتضمن أصول رسوم مختلفة؛ راجع عمود الأصل لكل حركة</div>
           </div>
         </section>
-
-        {error && (
-          <div className="mt-5 rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-300">
-            {error}
-          </div>
-        )}
 
         <section className="mt-6 rounded-2xl border border-white/10 bg-[#07101d]">
           <div className="flex flex-col gap-3 border-b border-white/10 p-4 lg:flex-row">
             <div className="relative flex-1">
-              <Search
-                size={16}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600"
-              />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="بحث في كشف الحساب..."
-                className="w-full rounded-xl border border-white/10 bg-black/20 py-3 pl-4 pr-10 text-sm outline-none placeholder:text-slate-600 focus:border-cyan-400/40"
-              />
+              <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)}
+                placeholder="ابحث في كشف الحساب..." aria-label="البحث في كشف الحساب"
+                className="w-full rounded-xl border border-white/10 bg-black/20 py-3 pl-4 pr-10 text-sm outline-none placeholder:text-slate-600 focus:border-cyan-400/40" />
             </div>
-
             <label className="relative">
-              <select
-                value={asset}
-                onChange={(e) => setAsset(e.target.value)}
-                className="appearance-none rounded-xl border border-white/10 bg-black/20 py-3 pl-10 pr-4 text-sm text-slate-300 outline-none"
-              >
-                <option value="ALL">كل الأصول</option>
-                {assets.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
+              <span className="sr-only">تصفية حسب الأصل</span>
+              <select value={asset} onChange={(event) => setAsset(event.target.value)}
+                className="appearance-none rounded-xl border border-white/10 bg-[#07101d] py-3 pl-10 pr-4 text-sm text-slate-300 outline-none">
+                <option value="ALL">كل الأصول</option>{assets.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
-              <ChevronDown
-                size={14}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
-              />
+              <ChevronDown size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
             </label>
-
             <label className="relative">
-              <select
-                value={kind}
-                onChange={(e) => setKind(e.target.value)}
-                className="appearance-none rounded-xl border border-white/10 bg-black/20 py-3 pl-10 pr-4 text-sm text-slate-300 outline-none"
-              >
-                <option value="ALL">كل العمليات</option>
-                <option value="تداول">تداول</option>
-                <option value="شراء">شراء</option>
-                <option value="بيع">بيع</option>
-                <option value="رسوم تداول">رسوم تداول</option>
+              <span className="sr-only">تصفية حسب نوع الحركة</span>
+              <select value={kind} onChange={(event) => setKind(event.target.value)}
+                className="appearance-none rounded-xl border border-white/10 bg-[#07101d] py-3 pl-10 pr-4 text-sm text-slate-300 outline-none">
+                <option value="ALL">كل العمليات</option>{kinds.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
-              <ChevronDown
-                size={14}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
-              />
+              <ChevronDown size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
             </label>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[850px] text-right text-sm">
-              <thead className="border-b border-white/5 bg-white/[0.015] text-xs text-slate-600">
+            <table className="w-full min-w-[950px] text-right text-sm">
+              <thead className="border-b border-white/5 bg-white/[0.015] text-xs text-slate-500">
                 <tr>
-                  <th className="px-5 py-4 font-medium">التاريخ</th>
-                  <th className="px-5 py-4 font-medium">النوع</th>
-                  <th className="px-5 py-4 font-medium">الأصل</th>
-                  <th className="px-5 py-4 font-medium">المبلغ</th>
-                  <th className="px-5 py-4 font-medium">الحالة</th>
-                  <th className="px-5 py-4 font-medium">التفاصيل</th>
+                  <th className="px-5 py-4 font-medium">التاريخ</th><th className="px-5 py-4 font-medium">نوع الحركة</th>
+                  <th className="px-5 py-4 font-medium">الأصل</th><th className="px-5 py-4 font-medium">المبلغ</th>
+                  <th className="px-5 py-4 font-medium">الحالة</th><th className="px-5 py-4 font-medium">التفاصيل</th>
                 </tr>
               </thead>
-
               <tbody>
-                {loading ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-5 py-16 text-center text-slate-600"
-                    >
-                      جاري تحميل كشف الحساب...
+                {loading ? <tr><td colSpan={6} className="px-5 py-16 text-center text-slate-500"><LoaderCircle className="mx-auto mb-2 animate-spin" size={18} />جاري تحميل الحركات...</td></tr>
+                  : filteredEntries.length === 0 ? <tr><td colSpan={6} className="px-5 py-16 text-center text-slate-500"><Wallet size={22} className="mx-auto mb-3 opacity-60" />لا توجد حركات مطابقة للفلاتر.</td></tr>
+                  : filteredEntries.map((entry) => <tr key={entry.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
+                    <td className="whitespace-nowrap px-5 py-4 text-xs text-slate-500">{formatDate(entry.date)}</td>
+                    <td className="px-5 py-4 font-medium text-slate-200">
+                      <span className="flex items-center gap-2">
+                        {entry.direction === "in" ? <ArrowDownToLine size={15} className="text-emerald-400" /> :
+                          entry.direction === "out" ? <ArrowUpFromLine size={15} className="text-red-400" /> : null}
+                        {entry.type}
+                      </span>
                     </td>
-                  </tr>
-                ) : entries.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-5 py-16 text-center"
-                    >
-                      <div className="mx-auto max-w-sm">
-                        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.04] text-slate-600">
-                          <Wallet size={20} />
-                        </div>
-                        <div className="font-medium text-slate-300">
-                          لا توجد حركات مسجلة
-                        </div>
-                        <div className="mt-2 text-xs text-slate-600">
-                          ستظهر هنا عمليات التداول والرسوم بمجرد وجود نشاط في الحساب.
-                        </div>
-                      </div>
+                    <td className="px-5 py-4 font-semibold">{entry.asset}</td>
+                    <td className={`whitespace-nowrap px-5 py-4 font-mono ${entry.direction === "in" ? "text-emerald-400" : entry.direction === "out" ? "text-red-400" : "text-slate-300"}`}>
+                      {entry.direction === "in" ? "+" : entry.direction === "out" ? "−" : ""}{formatNumber(entry.amount, 8)}
                     </td>
-                  </tr>
-                ) : (
-                  entries.map((entry) => (
-                    <tr
-                      key={entry.id}
-                      className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]"
-                    >
-                      <td className="px-5 py-4 text-xs text-slate-500">
-                        {formatDate(entry.date)}
-                      </td>
-
-                      <td className="px-5 py-4 font-medium text-slate-200">
-                        <div className="flex items-center gap-2">
-                          {entry.direction === "in" ? (
-                            <ArrowDownToLine size={15} className="text-emerald-400" />
-                          ) : entry.direction === "out" ? (
-                            <ArrowUpFromLine size={15} className="text-red-400" />
-                          ) : null}
-                          {entry.type}
-                        </div>
-                      </td>
-
-                      <td className="px-5 py-4 font-semibold">
-                        {entry.asset}
-                      </td>
-
-                      <td
-                        className={`px-5 py-4 font-mono ${
-                          entry.direction === "in"
-                            ? "text-emerald-400"
-                            : entry.direction === "out"
-                              ? "text-red-400"
-                              : "text-slate-300"
-                        }`}
-                      >
-                        {entry.direction === "in"
-                          ? "+"
-                          : entry.direction === "out"
-                            ? "-"
-                            : ""}
-                        {formatNumber(entry.amount, 8)}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <span className="rounded-lg bg-emerald-400/10 px-2.5 py-1 text-xs text-emerald-400">
-                          {entry.status}
-                        </span>
-                      </td>
-
-                      <td className="max-w-[350px] px-5 py-4 text-xs text-slate-500">
-                        {entry.detail}
-                      </td>
-                    </tr>
-                  ))
-                )}
+                    <td className="px-5 py-4"><span className={`rounded-lg px-2.5 py-1 text-xs ${entry.status === "مكتمل" ? "bg-emerald-400/10 text-emerald-400" : entry.status === "مرفوض" ? "bg-red-400/10 text-red-300" : "bg-amber-400/10 text-amber-300"}`}>{entry.status}</span></td>
+                    <td className="max-w-[420px] px-5 py-4 text-xs leading-6 text-slate-500">{entry.detail}</td>
+                  </tr>)}
               </tbody>
             </table>
           </div>
+          {hasMore && <div className="border-t border-white/5 p-4 text-center">
+            <button onClick={loadMore} disabled={loadingMore || loading}
+              className="rounded-xl border border-white/10 px-5 py-2.5 text-sm text-slate-300 hover:bg-white/5 disabled:opacity-50">
+              {loadingMore ? "جاري تحميل المزيد..." : "تحميل حركات أقدم"}
+            </button>
+          </div>}
+          <div className="border-t border-white/5 px-5 py-3 text-xs text-slate-600">
+            يعرض الكشف الحركات المسجلة في مصادر الحساب المتاحة؛ الأصول ومبالغها تظهر منفصلة ولا تُجمع كأنها عملة واحدة.
+          </div>
         </section>
       </main>
-
       <Footer />
     </div>
   );

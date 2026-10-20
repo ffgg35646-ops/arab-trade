@@ -164,8 +164,8 @@ export default function DepositPage() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.success) {
-        if (json.confirmed === false) {
-          setMessage(`لم يتم تأكيد الإيداع بعد: ${Number(json.confirmations || 0)} من ${Number(json.requiredConfirmations || 1)} تأكيدات. يمكنك المحاولة مجددًا لاحقًا.`);
+        if (json.reason === "confirmations_pending") {
+          setMessage(`المعاملة مطابقة، لكن التأكيدات ما زالت ${Number(json.confirmations || 0)} من ${Number(json.requiredConfirmations || 1)}. يمكنك المحاولة مجددًا لاحقًا.`);
         } else {
           throw new Error(json.message || "تعذر التحقق من الإيداع");
         }
@@ -219,6 +219,15 @@ export default function DepositPage() {
 
       if (!screenshot) {
         throw new Error("ارفع Screenshot للتحويل");
+      }
+      if (!["image/jpeg", "image/png", "image/webp"].includes(screenshot.type)) {
+        throw new Error("صيغة الصورة يجب أن تكون JPG أو PNG أو WEBP");
+      }
+      if (screenshot.size > 4 * 1024 * 1024) {
+        throw new Error("حجم الصورة يجب ألا يتجاوز 4MB");
+      }
+      if (txHash.length > 256 || /[\u0000-\u001F\u007F]/.test(txHash)) {
+        throw new Error("رقم المعاملة غير صالح أو أطول من الحد المسموح");
       }
 
       const numericAmount = Number(amount);
@@ -365,8 +374,9 @@ export default function DepositPage() {
                   id="deposit-network"
                   value={selectedNetwork}
                   onChange={(event) => setSelectedNetwork(event.target.value as NetworkCode)}
+                  disabled={!depositsEnabled || loading || methods.length === 0}
                   required
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-[#050a13] px-4 py-3.5 font-bold text-white outline-none focus:border-cyan-300/40"
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-[#050a13] px-4 py-3.5 font-bold text-white outline-none focus:border-cyan-300/40 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {NETWORK_OPTIONS.map((option) => (
                     <option
@@ -397,7 +407,7 @@ export default function DepositPage() {
                 <div>
                   <div className="text-xs font-bold text-slate-500">عنوان الإيداع</div>
                 </div>
-                {selected?.address && (
+                {selected?.address && depositsEnabled && (
                   <button type="button" onClick={() => void copyDepositAddress()} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-bold text-slate-200 transition hover:border-cyan-300/30">
                     {copiedAddress ? <Check size={15} /> : <Copy size={15} />}
                     {copiedAddress ? "تم النسخ" : "نسخ العنوان"}
@@ -405,7 +415,9 @@ export default function DepositPage() {
                 )}
               </div>
               <div className="mt-4 min-h-[74px] rounded-xl border border-white/[0.06] bg-[#030912] p-4 font-mono text-sm leading-6 text-cyan-100 sm:text-base">
-                {selected?.address || <span className="font-sans text-sm text-slate-600">سيظهر هنا عنوان الشبكة الذي أضافه الأدمن.</span>}
+                {!depositsEnabled
+                  ? <span className="font-sans text-sm text-amber-200">الإيداع متوقف حاليًا. لا ترسل أموالًا حتى يعاد تفعيل الخدمة.</span>
+                  : selected?.address || <span className="font-sans text-sm text-slate-600">سيظهر هنا عنوان الشبكة الذي أضافه الأدمن.</span>}
               </div>
               {selected && (
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
@@ -430,8 +442,24 @@ export default function DepositPage() {
                 id="deposit-screenshot"
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
+                disabled={!depositsEnabled || sending}
                 onChange={(event) => {
                   const file = event.target.files?.[0] || null;
+                  if (file && !["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+                    setScreenshot(null);
+                    setScreenshotPreview("");
+                    setError("صيغة الصورة يجب أن تكون JPG أو PNG أو WEBP");
+                    event.target.value = "";
+                    return;
+                  }
+                  if (file && file.size > 4 * 1024 * 1024) {
+                    setScreenshot(null);
+                    setScreenshotPreview("");
+                    setError("حجم الصورة يجب ألا يتجاوز 4MB");
+                    event.target.value = "";
+                    return;
+                  }
+                  setError("");
                   setScreenshot(file);
                   setScreenshotPreview(file ? URL.createObjectURL(file) : "");
                 }}
@@ -452,6 +480,7 @@ export default function DepositPage() {
                   id="deposit-amount"
                   value={amount}
                   onChange={(event) => setAmount(event.target.value)}
+                  disabled={!depositsEnabled || sending}
                   type="number"
                   min={Math.max(Number(selected?.minDeposit || 0), Number(limits.minDeposit || 0))}
                   max={(() => { const values = [Number(selected?.maxDeposit || 0), Number(limits.maxDeposit || 0)].filter((value) => value > 0); return values.length ? Math.min(...values) : undefined; })()}
@@ -467,6 +496,8 @@ export default function DepositPage() {
                   id="deposit-txhash"
                   value={txHash}
                   onChange={(event) => setTxHash(event.target.value)}
+                  maxLength={256}
+                  disabled={!depositsEnabled || sending}
                   placeholder="TX Hash"
                   className="mt-2 w-full rounded-2xl border border-white/10 bg-[#050a13] px-4 py-3.5 font-mono text-sm text-white outline-none focus:border-cyan-300/40"
                 />

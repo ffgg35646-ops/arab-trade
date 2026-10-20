@@ -205,49 +205,45 @@ export async function POST(
     const actualAmount =
       Number(result.amount);
 
-    const valid =
-      Boolean(
-        result.confirmed
-      ) &&
-      confirmations >=
-        requiredConfirmations &&
-      Number.isFinite(
-        actualAmount
-      ) &&
-      Math.abs(
-        actualAmount -
-          expectedAmount
-      ) <= 1e-12 &&
-      String(
-        result.txHash
-      ).toLowerCase() ===
-        String(
-          deposit.txHash
-        ).toLowerCase() &&
-      String(
-        result.asset
-      ).toUpperCase() ===
-        String(
-          deposit.asset
-        ).toUpperCase() &&
-      String(
-        result.network
-      ).toUpperCase() ===
-        String(
-          deposit.network
-        ).toUpperCase() &&
-      String(
-        result.toAddress
-      ).trim().toLowerCase() ===
-        String(
-          deposit.address
-        ).trim().toLowerCase();
+    const actualHash = String(result.txHash || "").trim().toLowerCase();
+    const expectedHash = String(deposit.txHash || "").trim().toLowerCase();
+    const actualAddress = String(result.toAddress || "").trim();
+    const expectedAddress = String(deposit.address || "").trim();
+    // Base58 TRON addresses are case-sensitive; BNB Smart Chain hex addresses are not.
+    const addressMatches = networkCode === "BEP20"
+      ? actualAddress.toLowerCase() === expectedAddress.toLowerCase()
+      : actualAddress === expectedAddress;
 
-    if (!valid) {
+    const detailsMatch =
+      Number.isFinite(actualAmount) &&
+      Math.abs(actualAmount - expectedAmount) <= 1e-12 &&
+      actualHash === expectedHash &&
+      String(result.asset || "").trim().toUpperCase() === String(deposit.asset || "").trim().toUpperCase() &&
+      normalizePaymentNetwork(result.network) === networkCode &&
+      addressMatches;
+
+    if (!detailsMatch) {
+      return NextResponse.json(
+        {
+          success: false,
+          confirmed: false,
+          credited: false,
+          reason: "transaction_mismatch",
+          message: "بيانات المعاملة على البلوكشين لا تطابق مبلغ الإيداع أو العملة أو الشبكة أو عنوان الاستقبال. راجع رقم المعاملة قبل إعادة المحاولة.",
+          confirmations,
+          requiredConfirmations,
+        },
+        { status: 422 }
+      );
+    }
+
+    if (!result.confirmed || confirmations < requiredConfirmations) {
       return NextResponse.json({
         success: false,
         confirmed: false,
         credited: false,
+        reason: "confirmations_pending",
+        message: "المعاملة مطابقة، لكنها لم تصل إلى عدد التأكيدات المطلوب بعد.",
         confirmations,
         requiredConfirmations,
       });

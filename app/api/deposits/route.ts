@@ -87,6 +87,13 @@ export async function POST(request: NextRequest) {
     const amount = Number(form.get("amount"));
     const txHash = String(form.get("txHash") || "").trim();
 
+    if (txHash.length > 256 || /[\u0000-\u001F\u007F]/.test(txHash)) {
+      return NextResponse.json(
+        { success: false, message: "رقم المعاملة غير صالح أو أطول من الحد المسموح." },
+        { status: 400 }
+      );
+    }
+
     const screenshot = form.get("screenshot");
 
     if (

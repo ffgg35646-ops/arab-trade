@@ -52,34 +52,30 @@ export async function GET(
   request: NextRequest
 ) {
   try {
-    const kycGuard =
-      await requireVerifiedIdentity(
-        request
-      );
+    const requestedMode =
+      String(new URL(request.url).searchParams.get("mode") || "live")
+        .trim()
+        .toLowerCase() === "demo"
+        ? "demo"
+        : "live";
 
-    if (!kycGuard.ok) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: kycGuard.message,
-        },
-        {
-          status: kycGuard.status,
-        }
-      );
-    }
-
-    const user =
-      await getCurrentUser(request);
+    const user = await getCurrentUser(request);
 
     if (!user) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "غير مسجل الدخول",
-        },
+        { success: false, message: "غير مسجل الدخول" },
         { status: 401 }
       );
+    }
+
+    if (requestedMode === "live") {
+      const kycGuard = await requireVerifiedIdentity(request);
+      if (!kycGuard.ok) {
+        return NextResponse.json(
+          { success: false, message: kycGuard.message },
+          { status: kycGuard.status }
+        );
+      }
     }
 
     await connectDB();
@@ -330,19 +326,35 @@ export async function POST(
     "/api/orders";
 
   try {
-    const identity = await requireVerifiedIdentity(request);
-    if (!identity.ok) {
+    const user = await getCurrentUser(request);
+
+    if (!user) {
       return NextResponse.json(
-        { success: false, message: identity.message },
-        { status: identity.status }
+        { success: false, message: "غير مسجل الدخول" },
+        { status: 401 }
       );
     }
-    const user = identity.user;
 
     idempotencyUserId = user._id;
 
     await connectDB();
-    await migrateLegacyDepositBalancesToSpotWallet(user._id);
+
+    const body = await request.json().catch(() => ({}));
+    const mode =
+      String(body.mode || "live").trim().toLowerCase() === "demo"
+        ? "demo"
+        : "live";
+
+    if (mode === "live") {
+      const identity = await requireVerifiedIdentity(request);
+      if (!identity.ok) {
+        return NextResponse.json(
+          { success: false, message: identity.message },
+          { status: identity.status }
+        );
+      }
+      await migrateLegacyDepositBalancesToSpotWallet(user._id);
+    }
 
     const settings =
       await getPlatformSettings();
@@ -360,11 +372,6 @@ export async function POST(
         { status: 403 }
       );
     }
-
-    const body =
-      await request
-        .json()
-        .catch(() => ({}));
 
     const requestHash =
       hashRequest(body);
@@ -416,16 +423,6 @@ export async function POST(
       )
         .trim()
         .toUpperCase();
-
-    const mode =
-      String(
-        body.mode || "live"
-      )
-        .trim()
-        .toLowerCase() ===
-      "demo"
-        ? "demo"
-        : "live";
 
     const side =
       String(

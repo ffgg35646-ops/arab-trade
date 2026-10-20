@@ -65,7 +65,10 @@ export async function GET(request: NextRequest) {
       return new NextResponse("Unsupported Media Type", { status: 415 });
     }
 
-    return new NextResponse(binary, {
+    const responseBody = new Uint8Array(binary.byteLength);
+    responseBody.set(binary);
+
+    return new NextResponse(responseBody, {
       status: 200,
       headers: {
         "Content-Type": contentType,

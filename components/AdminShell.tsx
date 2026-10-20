@@ -20,7 +20,7 @@ const groups = [
     title: "المستخدمون",
     items: [
       { label: "المستخدمون", href: "/admin/users" },
-      { label: "التحقق KYC", href: "/admin/kyc" },
+      { label: "طلبات توثيق المستخدمين", href: "/admin/kyc" },
     ],
   },
   {
@@ -127,7 +127,7 @@ export default function AdminShell({
       href: "/admin/withdrawals",
     },
     {
-      title: "طلبات التوثيق",
+      title: "طلبات توثيق المستخدمين",
       count: counts.kyc,
       href: "/admin/kyc",
     },

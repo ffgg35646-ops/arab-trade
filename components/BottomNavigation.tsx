@@ -35,6 +35,19 @@ const items = [
 
 export default function BottomNavigation() {
   const pathname = usePathname();
+  const internalWorkspace =
+    pathname === "/dashboard" ||
+    pathname.startsWith("/dashboard/") ||
+    pathname === "/protrade" ||
+    pathname.startsWith("/protrade/") ||
+    pathname === "/margin" ||
+    pathname.startsWith("/margin/") ||
+    pathname === "/futures" ||
+    pathname.startsWith("/futures/") ||
+    pathname === "/trading" ||
+    pathname.startsWith("/trading/");
+
+  if (internalWorkspace) return null;
 
   return (
     <div

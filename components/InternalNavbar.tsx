@@ -396,6 +396,36 @@ export default function InternalNavbar() {
               التداول
             </Link>
 
+            {/* Mobile workspace shortcuts replace the desktop sidebar on small screens. */}
+            <div className="grid grid-cols-2 gap-1 rounded-2xl border border-white/5 bg-white/[0.015] p-1">
+              {[
+                ["الباقات", "/dashboard/packages"],
+                ["السحب", "/dashboard/withdrawals"],
+                ["التمويل", "/dashboard/funding"],
+                ["أوامر التداول", "/dashboard/orders"],
+                ["سجل الأوامر", "/dashboard/orders/history"],
+                ["سجل التداول", "/dashboard/trades"],
+                ["المكافآت", "/dashboard/rewards"],
+                ["الإحالة", "/dashboard/referral"],
+                ["التوثيق", "/dashboard/account/verification"],
+                ["كشف الحساب", "/dashboard/account/statement"],
+                ["التقارير المالية", "/dashboard/account/reports"],
+              ].map(([label, href]) => (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setMobile(false)}
+                  className={`rounded-xl px-2 py-3 text-xs transition ${
+                    isActive(pathname, href)
+                      ? "bg-blue-500/10 text-cyan-300"
+                      : "text-slate-400 hover:bg-white/5 hover:text-white"
+                  }`}
+                >
+                  {label}
+                </Link>
+              ))}
+            </div>
+
             <div className="grid grid-cols-1 gap-2">
               <Link href="/dashboard/assets/deposit" onClick={() => setMobile(false)} className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-3">
                 <span className="block text-[10px] text-amber-200/80">رصيد الإيداع</span>

@@ -62,4 +62,5 @@ const schema = new Schema<IWithdrawalRequest>({
 
 schema.index({ userId: 1, status: 1 }, { unique: true, partialFilterExpression: { status: "pending" } });
 schema.index({ packageId: 1, status: 1 });
+schema.index({ conversionOrderId: 1 }, { unique: true, sparse: true });
 export default (mongoose.models.WithdrawalRequest as Model<IWithdrawalRequest>) || mongoose.model<IWithdrawalRequest>("WithdrawalRequest", schema);

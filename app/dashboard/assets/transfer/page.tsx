@@ -71,6 +71,7 @@ export default function TransferPage() {
 
       const spotRows = normalize(spot);
       const fundingRows = normalize(funding);
+      setError("");
       setSpotBalances(spotRows);
       setFundingBalances(fundingRows);
 
@@ -82,7 +83,7 @@ export default function TransferPage() {
       );
     } catch (e) {
       const messageText = e instanceof Error ? e.message : "تعذر تحميل المحافظ";
-      if (!background || (spotBalances.length === 0 && fundingBalances.length === 0)) {
+      if (!background) {
         setError(messageText);
       }
     } finally {
@@ -169,8 +170,8 @@ export default function TransferPage() {
     }
   }
 
-  const sourceAvailable = sourceBalances.reduce((sum, balance) => sum + balance.available, 0);
-  const destinationAvailable = destinationBalances.reduce((sum, balance) => sum + balance.available, 0);
+  const sourceAssetCount = sourceBalances.length;
+  const destinationAssetCount = destinationBalances.length;
 
   return (
     <>
@@ -211,8 +212,8 @@ export default function TransferPage() {
 
             <section className="mb-5 grid gap-4 sm:grid-cols-2">
               {([
-                { type: from, title: "محفظة المصدر", count: sourceAvailable, balance: selectedSourceBalance },
-                { type: to, title: "محفظة الوجهة", count: destinationAvailable, balance: selectedDestinationBalance },
+                { type: from, title: "محفظة المصدر", assetCount: sourceAssetCount, balance: selectedSourceBalance },
+                { type: to, title: "محفظة الوجهة", assetCount: destinationAssetCount, balance: selectedDestinationBalance },
               ] as const).map((item) => (
                 <div key={item.title} className="rounded-2xl border border-white/10 bg-[#07101d] p-5">
                   <div className="flex items-center justify-between gap-3">
@@ -245,7 +246,7 @@ export default function TransferPage() {
                     </div>
                   )}
                   <div className="mt-3 text-[11px] text-slate-600">
-                    مجموع الأرصدة المتاحة داخل هذه المحفظة: {formatAmount(item.count)} {asset || ""}
+                    عدد الأصول المسجلة في المحفظة: {item.assetCount}
                   </div>
                 </div>
               ))}
@@ -266,6 +267,7 @@ export default function TransferPage() {
                       const value = event.target.value as WalletType;
                       setFrom(value);
                       setTo(value === "spot" ? "funding" : "spot");
+                      setError("");
                       setAsset("");
                       setAmount("");
                       setIdempotencyKey("");
@@ -285,6 +287,7 @@ export default function TransferPage() {
                     value={to}
                     onChange={(event) => {
                       setTo(event.target.value as WalletType);
+                      setError("");
                       setIdempotencyKey("");
                       setMessage("");
                     }}
@@ -323,8 +326,8 @@ export default function TransferPage() {
                   مبلغ التحويل
                   <input
                     type="number"
-                    min="0"
-                    step="any"
+                    min="0.000000000001"
+                    step="0.000000000001"
                     value={amount}
                     onChange={(event) => {
                       setAmount(event.target.value);
@@ -343,7 +346,12 @@ export default function TransferPage() {
               </div>
 
               {loading && (
-                <div className="mt-4 text-xs text-slate-500">جاري تحميل الأرصدة في الخلفية…</div>
+                <div className="mt-4 text-xs text-slate-500">جاري تحميل الأرصدة…</div>
+              )}
+              {!loading && amount.trim() !== "" && Number.isFinite(amountValue) && amountValue > available && (
+                <div className="mt-4 rounded-xl border border-amber-400/15 bg-amber-400/[0.04] p-3 text-sm text-amber-100">
+                  المبلغ المدخل أكبر من الرصيد المتاح في {walletLabel(from)}.
+                </div>
               )}
               {!loading && sourceBalances.length === 0 && (
                 <div className="mt-4 rounded-xl border border-amber-400/15 bg-amber-400/[0.04] p-3 text-sm text-amber-100">

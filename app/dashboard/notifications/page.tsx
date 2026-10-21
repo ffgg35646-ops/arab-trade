@@ -1,8 +1,6 @@
 "use client";
 
 import { apiFetch } from "@/lib/frontend-api";
-import InternalNavbar from "@/components/InternalNavbar";
-import InternalSidebar from "@/components/InternalSidebar";
 import { Bell, CheckCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -117,10 +115,10 @@ export default function NotificationsPage() {
 
   return (
     <>
-      <InternalNavbar />
+      
 
       <div className="mx-auto flex max-w-[1700px]">
-        <InternalSidebar />
+        
 
         <main
           dir="rtl"

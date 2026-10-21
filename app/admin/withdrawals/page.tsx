@@ -58,7 +58,7 @@ type StatusFilter = "all" | "pending" | "approved" | "rejected";
 const money = (value: number | null | undefined) =>
   Number(value || 0).toLocaleString("en-US", { maximumFractionDigits: 8 });
 
-function userEmail(user: UserRef) {
+function userEmail(user: UserRef | undefined) {
   if (user && typeof user === "object") return user.email || user.username || "مستخدم";
   return typeof user === "string" ? user : "مستخدم";
 }

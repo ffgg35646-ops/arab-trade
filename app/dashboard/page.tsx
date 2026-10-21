@@ -248,9 +248,7 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-600">
-                      <span>اسم المستخدم: @{user?.username || "—"}</span>
                       <span>UID: {user?.id || "—"}</span>
-                      <span>{user?.email || "—"}</span>
                     </div>
                   </>
                 </div>
@@ -261,7 +259,6 @@ export default function DashboardPage() {
             <div className="mb-6">
               <Panel
                 title="القيمة الإجمالية"
-                description="إجمالي الحساب يجمع أرصدة USDT والعملات داخل محافظ التداول والتمويل، دون احتساب أي رصيد مرتين."
                 right={
                   <div className="flex items-center gap-2 text-xs text-slate-600">
                     USDT <Eye size={14} />
@@ -301,7 +298,7 @@ export default function DashboardPage() {
 
                     <div className="rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-4">
                       <div className="text-xs font-bold text-amber-200">
-                        رصيد الإيداع الخارجي
+                        الرصيد
                       </div>
                       <div className="mt-2 space-y-1.5">
                         {loadingWallet ? "..." : externalDepositBalances.length ? externalDepositBalances.map((item) => (

@@ -3,9 +3,6 @@
 import { RefreshCw, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import InternalNavbar from "@/components/InternalNavbar";
-import InternalSidebar from "@/components/InternalSidebar";
-
 type Order = {
   _id: string;
   symbol: string;
@@ -124,10 +121,10 @@ export default function OrderHistoryPage() {
       className="min-h-screen bg-[#050a13] text-white"
       dir="rtl"
     >
-      <InternalNavbar />
+      
 
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-[1700px]">
-        <InternalSidebar />
+        
 
         <main className="min-w-0 flex-1 p-4 md:p-6 lg:p-8">
           <div className="mx-auto max-w-[1500px]">

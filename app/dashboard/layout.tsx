@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { jwtVerify } from "jose";
+import DashboardWorkspace from "@/components/DashboardWorkspace";
 
 const secretText = process.env.AUTH_SECRET;
 
@@ -27,5 +28,5 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  return children;
+  return <DashboardWorkspace>{children}</DashboardWorkspace>;
 }

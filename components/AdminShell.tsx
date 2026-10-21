@@ -37,7 +37,6 @@ const groups = [
     title: "النظام",
     items: [
       { label: "المكافآت", href: "/admin/rewards" },
-      { label: "الإحالة", href: "/admin/referral" },
       { label: "الإشعارات", href: "/admin/notifications" },
       { label: "الدعم", href: "/admin/support" },
     ],

@@ -5,6 +5,7 @@ import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
 import { Bell, CheckCheck } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type NotificationItem = {
   _id: string;
@@ -24,6 +25,7 @@ type NotificationsResponse = {
 };
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState("");
@@ -105,6 +107,14 @@ export default function NotificationsPage() {
     }
   }
 
+  async function openNotification(item: NotificationItem) {
+    await mark(item._id);
+
+    if (item.type === "reward") {
+      router.push("/dashboard/rewards");
+    }
+  }
+
   return (
     <>
       <InternalNavbar />
@@ -176,7 +186,7 @@ export default function NotificationsPage() {
                     <button
                       type="button"
                       key={item._id}
-                      onClick={() => void mark(item._id)}
+                      onClick={() => void openNotification(item)}
                       className={`flex w-full items-start gap-4 border-b border-white/5 p-6 text-right transition hover:bg-cyan-400/[0.04] ${
                         item.read ? "opacity-60" : ""
                       }`}

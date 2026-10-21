@@ -7,6 +7,8 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Clock3,
   Filter,
@@ -100,6 +102,15 @@ export default function AdminWithdrawalsPage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [clock, setClock] = useState(() => Date.now());
+  const pageSize = 10;
+  const approvedVisibleMs = 24 * 60 * 60 * 1000;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const load = useCallback(async () => {
     setRefreshing(true);
@@ -161,16 +172,27 @@ export default function AdminWithdrawalsPage() {
     }
   }
 
+  // لا نحذف السجلات من قاعدة البيانات؛ نُخفي الطلب المقبول من واجهة الأدمن بعد 24 ساعة.
+  const visibleRequests = useMemo(() => requests.filter((request) => {
+    if (request.status !== "approved") return true;
+    const reviewedTime = request.reviewedAt
+      ? new Date(request.reviewedAt).getTime()
+      : request.createdAt
+        ? new Date(request.createdAt).getTime()
+        : Number.NaN;
+    return !Number.isFinite(reviewedTime) || clock - reviewedTime < approvedVisibleMs;
+  }), [requests, clock]);
+
   const counts = useMemo(() => ({
-    all: requests.length,
-    pending: requests.filter((request) => request.status === "pending").length,
-    approved: requests.filter((request) => request.status === "approved").length,
-    rejected: requests.filter((request) => request.status === "rejected").length,
-  }), [requests]);
+    all: visibleRequests.length,
+    pending: visibleRequests.filter((request) => request.status === "pending").length,
+    approved: visibleRequests.filter((request) => request.status === "approved").length,
+    rejected: visibleRequests.filter((request) => request.status === "rejected").length,
+  }), [visibleRequests]);
 
   const filteredRequests = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return requests.filter((request) => {
+    return visibleRequests.filter((request) => {
       if (statusFilter !== "all" && request.status !== statusFilter) return false;
       if (!normalized) return true;
       const searchable = [
@@ -184,7 +206,29 @@ export default function AdminWithdrawalsPage() {
       ].filter(Boolean).join(" ").toLowerCase();
       return searchable.includes(normalized);
     });
-  }, [requests, query, statusFilter]);
+  }, [visibleRequests, query, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, statusFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
+  const safePage = Math.min(currentPage, pageCount);
+  const pageRequests = useMemo(
+    () => filteredRequests.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredRequests, safePage],
+  );
+  const pageNumbers: (number | "ellipsis")[] = pageCount <= 7
+    ? Array.from({ length: pageCount }, (_, index) => index + 1)
+    : safePage <= 4
+      ? [1, 2, 3, 4, 5, "ellipsis", pageCount]
+      : safePage >= pageCount - 3
+        ? [1, "ellipsis", pageCount - 4, pageCount - 3, pageCount - 2, pageCount - 1, pageCount]
+        : [1, "ellipsis", safePage - 1, safePage, safePage + 1, "ellipsis", pageCount];
+
+  useEffect(() => {
+    if (currentPage > pageCount) setCurrentPage(pageCount);
+  }, [currentPage, pageCount]);
 
   const filterOptions: { value: StatusFilter; label: string; count: number }[] = [
     { value: "pending", label: "قيد المراجعة", count: counts.pending },
@@ -377,9 +421,9 @@ export default function AdminWithdrawalsPage() {
           {filteredRequests.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-5 py-14 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-800 text-slate-400"><Search size={21} /></div>
-              <h4 className="mt-4 font-bold">{requests.length === 0 ? "لا توجد طلبات سحب حتى الآن" : "لا توجد نتائج مطابقة"}</h4>
-              <p className="mt-1 max-w-md text-sm text-slate-500">{requests.length === 0 ? "ستظهر طلبات المستخدمين هنا عند إرسالها." : "غيّر فلتر الحالة أو كلمة البحث لعرض طلبات أخرى."}</p>
-              {requests.length > 0 && (query || statusFilter !== "all") && <button type="button" onClick={() => { setQuery(""); setStatusFilter("all"); }} className="mt-4 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-white/[0.04]">مسح الفلاتر</button>}
+              <h4 className="mt-4 font-bold">{visibleRequests.length === 0 ? "لا توجد طلبات سحب لعرضها" : "لا توجد نتائج مطابقة"}</h4>
+              <p className="mt-1 max-w-md text-sm text-slate-500">{visibleRequests.length === 0 ? "ستظهر طلبات المستخدمين هنا عند إرسالها. الطلبات المقبولة تختفي من هذه الصفحة بعد مرور 24 ساعة." : "غيّر فلتر الحالة أو كلمة البحث لعرض طلبات أخرى."}</p>
+              {visibleRequests.length > 0 && (query || statusFilter !== "all") && <button type="button" onClick={() => { setQuery(""); setStatusFilter("all"); }} className="mt-4 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-white/[0.04]">مسح الفلاتر</button>}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -396,7 +440,7 @@ export default function AdminWithdrawalsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
-                  {filteredRequests.map((request) => {
+                  {pageRequests.map((request) => {
                     const expanded = expandedId === request._id;
                     const pending = request.status === "pending";
                     const allocations = request.allocations || [];
@@ -499,6 +543,51 @@ export default function AdminWithdrawalsPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+            <div className="flex flex-col gap-3 border-t border-slate-800 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-slate-400">
+                عرض {filteredRequests.length === 0 ? 0 : ((safePage - 1) * pageSize) + 1}–{Math.min(safePage * pageSize, filteredRequests.length)} من {filteredRequests.length.toLocaleString("ar-EG")} نتيجة
+                <span className="mr-2 text-slate-600">· كل صفحة {pageSize} طلبات</span>
+              </p>
+              {pageCount > 1 && (
+                <nav aria-label="ترقيم صفحات طلبات السحب" className="flex flex-wrap items-center justify-center gap-1.5">
+                  <button
+                    type="button"
+                    aria-label="الصفحة السابقة"
+                    disabled={safePage <= 1}
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    className="flex h-9 items-center gap-1 rounded-lg border border-slate-700 px-2.5 text-xs font-bold text-slate-300 transition hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    <ChevronRight size={15} /> السابق
+                  </button>
+                  {pageNumbers.map((pageNumber, index) => pageNumber === "ellipsis" ? (
+                    <span key={"ellipsis-" + index} className="flex h-9 min-w-8 items-center justify-center text-slate-500">…</span>
+                  ) : (
+                    <button
+                      key={pageNumber}
+                      type="button"
+                      aria-current={safePage === pageNumber ? "page" : undefined}
+                      onClick={() => setCurrentPage(pageNumber)}
+                      className={"h-9 min-w-9 rounded-lg border px-3 text-sm font-bold transition " + (
+                        safePage === pageNumber
+                          ? "border-blue-400/40 bg-blue-500/20 text-blue-200"
+                          : "border-slate-700 bg-[#0b1422] text-slate-300 hover:bg-white/[0.05]"
+                      )}
+                    >
+                      {pageNumber.toLocaleString("ar-EG")}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    aria-label="الصفحة التالية"
+                    disabled={safePage >= pageCount}
+                    onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))}
+                    className="flex h-9 items-center gap-1 rounded-lg border border-slate-700 px-2.5 text-xs font-bold text-slate-300 transition hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    التالي <ChevronLeft size={15} />
+                  </button>
+                </nav>
+              )}
             </div>
           )}
         </section>

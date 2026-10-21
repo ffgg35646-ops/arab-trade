@@ -1,7 +1,5 @@
 "use client";
 
-import InternalNavbar from "@/components/InternalNavbar";
-import InternalSidebar from "@/components/InternalSidebar";
 import {
   Check,
   Copy,
@@ -130,9 +128,9 @@ export default function ReferralPage() {
 
   return (
     <>
-      <InternalNavbar />
+      
       <div className="mx-auto flex max-w-[1700px]">
-        <InternalSidebar />
+        
         <main dir="rtl" className="min-w-0 flex-1 bg-[#050a13] text-white">
           <div className="p-4 md:p-6 lg:p-8">
             <section className="rounded-3xl border border-white/10 bg-gradient-to-l from-blue-500/[0.14] via-[#07101d] to-cyan-400/[0.04] p-6 md:p-8">

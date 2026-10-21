@@ -6,14 +6,12 @@ import { CheckCircle2, Loader2, Package, Plus, RefreshCw, Save, ShieldAlert, X }
 
 type Plan = { _id: string; name: string; description: string; price: number; asset: string; durationDays: number; dailyProfit: number; withdrawalMinimum: number; enabled: boolean; sortOrder: number };
 type UserPackage = { _id: string; packageName: string; investedAmount: number; asset: string; status: string; availableEarnings: number; lockedEarnings: number; totalRealizedEarnings: number; activatedAt: string; userId?: { _id: string; name?: string; username?: string; email?: string } | null };
-type LedgerRow = { _id: string; type: string; asset: string; amount: number; note?: string; createdAt: string; userId?: { name?: string; username?: string; email?: string } | null; userPackageId?: { packageName?: string } | null };
 const emptyForm = { name: "", description: "", price: "", durationDays: "0", dailyProfit: "2", withdrawalMinimum: "100", sortOrder: "0", enabled: true };
 const money = (value: number) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 }).format(Number(value || 0));
 
 export default function AdminPackagesPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [accounts, setAccounts] = useState<UserPackage[]>([]);
-  const [packageLedger, setPackageLedger] = useState<LedgerRow[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -32,7 +30,6 @@ export default function AdminPackagesPage() {
       if (!res.ok || !json.success) throw new Error(json.message || "تعذر تحميل الباقات");
       setPlans(Array.isArray(json.packages) ? json.packages : []);
       setAccounts(Array.isArray(json.userPackages) ? json.userPackages : []);
-      setPackageLedger(Array.isArray(json.packageLedger) ? json.packageLedger : []);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذر تحميل الباقات");
@@ -138,12 +135,6 @@ export default function AdminPackagesPage() {
           {loading ? <div className="py-10 text-center text-slate-500"><Loader2 className="mx-auto animate-spin"/></div> : plans.length === 0 ? <div className="rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">لا توجد باقات. أنشئ أول باقة من النموذج.</div> : <div className="space-y-3">{plans.map((plan) => <div key={plan._id} className="rounded-xl border border-white/10 bg-[#050a13] p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="font-black">{plan.name}</div><div className="mt-1 text-xs text-slate-500">{money(plan.price)} USDT · تفعيل دائم · ربح يومي {money(Number(plan.dailyProfit || 0))} USDT · الحد الأدنى للسحب {money(Number(plan.withdrawalMinimum ?? 100))} USDT</div><div className="mt-2 max-w-xl text-xs leading-5 text-slate-500">{plan.description}</div></div><span className={plan.enabled ? "rounded-full bg-emerald-400/10 px-3 py-1 text-xs text-emerald-300" : "rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-400"}>{plan.enabled ? "مفعلة" : "متوقفة"}</span></div><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => editPlan(plan)} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold">تعديل</button><button type="button" onClick={() => void togglePlan(plan)} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-bold">{plan.enabled ? "إيقاف" : "تفعيل"}</button><button type="button" onClick={() => void deletePlan(plan)} className="rounded-lg border border-red-400/15 px-3 py-2 text-xs font-bold text-red-300">حذف / أرشفة</button></div></div>)}</div>}
         </section>
       </div>
-
-      <section className="rounded-2xl border border-white/10 bg-[#08111e] p-5 md:p-6">
-        <h2 className="font-black">سجل حركات جميع الباقات</h2>
-        <p className="mt-1 text-xs leading-6 text-slate-500">سجل تدقيقي للتفعيلات والاستردادات والعوائد المحققة.</p>
-        {loading ? <div className="py-6 text-center text-slate-500">جاري التحميل...</div> : packageLedger.length === 0 ? <div className="mt-4 rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">لا توجد حركات مسجلة.</div> : <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[850px] text-right text-sm"><thead><tr className="border-b border-white/10 text-xs text-slate-500"><th className="px-3 py-3">التاريخ</th><th className="px-3 py-3">المستخدم</th><th className="px-3 py-3">الباقة</th><th className="px-3 py-3">نوع الحركة</th><th className="px-3 py-3">المبلغ</th><th className="px-3 py-3">المرجع / الملاحظة</th></tr></thead><tbody>{packageLedger.map((row) => <tr key={row._id} className="border-b border-white/5"><td className="px-3 py-4 text-xs text-slate-500">{new Date(row.createdAt).toLocaleString("ar-EG", { timeZone: "Africa/Cairo" })}</td><td className="px-3 py-4"><div className="font-bold">{row.userId?.name || row.userId?.username || "مستخدم"}</div><div className="text-xs text-slate-500">{row.userId?.email || "—"}</div></td><td className="px-3 py-4">{row.userPackageId?.packageName || "—"}</td><td className="px-3 py-4 text-xs">{row.type}</td><td className={Number(row.amount) < 0 ? "px-3 py-4 font-black text-red-300" : "px-3 py-4 font-black text-emerald-300"}>{Number(row.amount) > 0 ? "+" : ""}{money(row.amount)} {row.asset}</td><td className="max-w-72 px-3 py-4 text-xs text-slate-400">{row.note || "—"}</td></tr>)}</tbody></table></div>}
-      </section>
 
       <section className="rounded-2xl border border-cyan-300/15 bg-[#07101d] p-5 md:p-6">
         <h2 className="font-black">تسجيل عائد محقق</h2><p className="mt-1 text-xs leading-6 text-slate-500">لا تستخدمه إلا لمبلغ محقق فعليًا ومدعوم بتسوية مالية، مع ذكر المرجع أو السبب.</p>

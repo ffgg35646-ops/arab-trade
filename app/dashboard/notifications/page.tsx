@@ -2,7 +2,7 @@
 
 import { apiFetch } from "@/lib/frontend-api";
 import { Bell, CheckCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type NotificationItem = {
@@ -28,6 +28,7 @@ export default function NotificationsPage() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const hasLoadedOnce = useRef(false);
 
   async function load() {
     try {
@@ -50,16 +51,19 @@ export default function NotificationsPage() {
         : [];
 
       setItems(notifications);
+      hasLoadedOnce.current = true;
       setUnreadCount(Number(data.unreadCount || 0));
       setError("");
     } catch (error) {
       console.error("USER NOTIFICATIONS ERROR:", error);
 
-      setError(
-        error instanceof Error
-          ? error.message
-          : "تعذر تحميل الإشعارات"
-      );
+      if (!hasLoadedOnce.current) {
+        setError(
+          error instanceof Error
+            ? error.message
+            : "تعذر تحميل الإشعارات"
+        );
+      }
     } finally {
       setLoading(false);
     }

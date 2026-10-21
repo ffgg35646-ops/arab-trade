@@ -10,7 +10,8 @@
 }
 
 html {
-  scroll-behavior: smooth;
+  /* Keep page navigation immediate; smooth scrolling makes route changes feel delayed. */
+  scroll-behavior: auto;
 }
 
 body {

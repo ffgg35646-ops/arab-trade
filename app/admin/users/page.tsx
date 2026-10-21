@@ -305,9 +305,7 @@ export default function UsersPage() {
                     <th className="px-4 py-4">ArabTrade ID</th>
                     <th className="px-4 py-4">المستخدم</th>
                     <th className="px-4 py-4">البريد</th>
-                    <th className="px-4 py-4">الصلاحية</th>
                     <th className="px-4 py-4">الحالة</th>
-                    <th className="px-4 py-4">التوثيق</th>
                     <th className="px-4 py-4">رصيد الإيداع الخارجي</th>
                     <th className="px-4 py-4">عدد السحوبات</th>
                     <th className="px-4 py-4">إجمالي المبلغ المسحوب</th>
@@ -341,10 +339,6 @@ export default function UsersPage() {
                         {user.email}
                       </td>
 
-                      <td className="px-4 py-4 text-slate-300">
-                        {user.role}
-                      </td>
-
                       <td className="px-4 py-4">
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-bold ${
@@ -355,10 +349,6 @@ export default function UsersPage() {
                         >
                           {user.isActive ? "نشط" : "محظور"}
                         </span>
-                      </td>
-
-                      <td className="px-4 py-4 text-slate-300">
-                        {user.isVerified ? "موثق" : "غير موثق"}
                       </td>
 
                       <td className="px-4 py-4 text-sky-200">
@@ -423,7 +413,7 @@ export default function UsersPage() {
                     </tr>
                     {expandedReferralIds[String(user._id)] ? (
                       <tr className="border-b border-slate-800/70 bg-[#07101b]">
-                        <td colSpan={13} className="px-4 py-4">
+                        <td colSpan={11} className="px-4 py-4">
                           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                             <div className="font-black text-cyan-200">
                               الإحالات النشطة للمستخدم: {user.name || user.username}

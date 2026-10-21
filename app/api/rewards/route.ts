@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     // so do not derive reward counts from the unrelated general-wallet LedgerEntry.
     const claimedFilter = {
       userId: user._id,
-      status: "claimed",
+      status: "claimed" as const,
     };
 
     const [claimedCount, claimedRewards, totalsByAsset] = await Promise.all([

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
   ChevronDown,
+  CircleDollarSign,
   LogOut,
   Search,
   Wallet,
@@ -40,6 +41,42 @@ export default function InternalNavbar() {
   ] = useState(0);
 
   const [depositBalanceSummary, setDepositBalanceSummary] = useState("0 USDT");
+  const [withdrawalBalanceSummary, setWithdrawalBalanceSummary] = useState("0.00 USDT");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadWithdrawalBalance() {
+      try {
+        const response = await fetch("/api/withdrawals/balance", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!data?.success || cancelled) return;
+
+        const amount = Number(data.withdrawalBalance);
+        if (!Number.isFinite(amount) || amount < 0) return;
+
+        setWithdrawalBalanceSummary(
+          amount.toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 8,
+          }) + " USDT"
+        );
+      } catch {
+        // Keep the last known withdrawal balance if the request fails.
+      }
+    }
+
+    void loadWithdrawalBalance();
+    const timer = window.setInterval(() => void loadWithdrawalBalance(), 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -279,6 +316,17 @@ export default function InternalNavbar() {
             </Link>
           </div>
 
+          <div className="hidden max-w-[190px] items-center xl:flex">
+            <Link
+              href="/dashboard/withdrawals"
+              className="max-w-[190px] rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] px-2 py-2 transition hover:bg-cyan-300/[0.1] xl:px-3"
+              title="إجمالي رصيد السحب المتاح من السحب العام والباقات، باستثناء المبالغ المحجوزة لطلبات السحب"
+            >
+              <span className="block text-[10px] text-cyan-200/80">رصيد السحب</span>
+              <span className="block max-w-[170px] truncate text-xs font-black text-cyan-100">{withdrawalBalanceSummary}</span>
+            </Link>
+          </div>
+
           <Link
             href="/dashboard/notifications"
             onClick={() =>
@@ -448,10 +496,14 @@ export default function InternalNavbar() {
               ))}
             </div>
 
-            <div className="grid grid-cols-1 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Link href="/dashboard/assets/deposit" onClick={() => setMobile(false)} className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-3">
                 <span className="block text-[10px] text-amber-200/80">رصيد الإيداع</span>
                 <span className="mt-1 block break-words text-xs font-black leading-5 text-amber-100">{depositBalanceSummary}</span>
+              </Link>
+              <Link href="/dashboard/withdrawals" onClick={() => setMobile(false)} className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-3" title="الرصيد المتاح من السحب العام والباقات، بعد استبعاد المبالغ المحجوزة لطلبات السحب">
+                <span className="block text-[10px] text-cyan-200/80">رصيد السحب</span>
+                <span className="mt-1 block break-words text-xs font-black leading-5 text-cyan-100">{withdrawalBalanceSummary}</span>
               </Link>
             </div>
 

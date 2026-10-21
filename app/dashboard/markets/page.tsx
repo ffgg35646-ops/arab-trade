@@ -3,9 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, BarChart3, RefreshCw, Search } from "lucide-react";
-import InternalNavbar from "@/components/InternalNavbar";
-import InternalSidebar from "@/components/InternalSidebar";
-
 type MarketPair = {
   symbol: string; baseAsset: string; quoteAsset: string; status: string;
   lastPrice: number; priceChangePercent: number; highPrice: number; lowPrice: number;
@@ -93,9 +90,9 @@ export default function MarketsPage() {
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#050a13] text-white">
-      <InternalNavbar />
+      
       <div className="mx-auto flex max-w-[1700px]">
-        <InternalSidebar />
+        
         <section className="min-w-0 flex-1">
     <main dir="rtl" className="min-h-screen bg-[#050a13] px-3 py-6 text-white sm:px-5 lg:px-8">
       <div className="mx-auto max-w-[1500px]">

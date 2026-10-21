@@ -585,22 +585,6 @@ export default function WithdrawalsPage() {
             </button>
           </header>
 
-          {data && (
-            <section className="space-y-3 rounded-2xl border border-cyan-400/20 bg-[#08111e] p-4 md:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-black">الرصيد المجمل</h2>
-                <strong className="text-2xl font-black text-cyan-200">{money(data.summary.totalBalance)} USDT</strong>
-              </div>
-              <p className="text-xs text-slate-400">الإجمالي = الرصيد العام + أرصدة جميع الباقات، بما فيها المبالغ المحجوزة. رصيد الإيداع منفصل وغير داخل في الإجمالي.</p>
-              <div className="grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-lg bg-white/[0.03] p-3"><span className="text-slate-400">الرصيد العام المتاح</span><div className="mt-1 font-bold">{money(data.summary.generalAvailable)} USDT</div></div>
-                <div className="rounded-lg bg-white/[0.03] p-3"><span className="text-slate-400">السحب العام المحجوز</span><div className="mt-1 font-bold">{money(data.summary.generalLocked)} USDT</div></div>
-                <div className="rounded-lg bg-white/[0.03] p-3"><span className="text-slate-400">أرصدة الباقات المتاحة</span><div className="mt-1 font-bold">{money(data.summary.packageAvailable)} USDT</div></div>
-                <div className="rounded-lg bg-white/[0.03] p-3"><span className="text-slate-400">أرصدة الباقات المحجوزة</span><div className="mt-1 font-bold">{money(data.summary.packageLocked)} USDT</div></div>
-              </div>
-            </section>
-          )}
-
           {message && (
             <div role={messageKind === "error" ? "alert" : "status"} className={`flex items-start gap-2 rounded-xl border p-3 text-sm ${
               messageKind === "success"

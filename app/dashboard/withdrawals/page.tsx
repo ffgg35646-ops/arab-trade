@@ -86,8 +86,8 @@ export default function WithdrawalsPage() {
     setMessageKind(kind);
   }
 
-  const load = useCallback(async () => {
-    setRefreshing(true);
+  const load = useCallback(async (showRefreshing = true) => {
+    if (showRefreshing) setRefreshing(true);
     try {
       const response = await fetch("/api/withdrawals", { credentials: "include", cache: "no-store" });
       const json = await response.json().catch(() => ({}));
@@ -103,13 +103,13 @@ export default function WithdrawalsPage() {
     } catch {
       showMessage("تعذر تحميل بيانات السحب", "error");
     } finally {
-      setRefreshing(false);
+      if (showRefreshing) setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     void load();
-    const timer = window.setInterval(() => void load(), 20000);
+    const timer = window.setInterval(() => void load(false), 20000);
     return () => window.clearInterval(timer);
   }, [load]);
 

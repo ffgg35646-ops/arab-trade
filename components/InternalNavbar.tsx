@@ -28,6 +28,58 @@ function isActive(
   );
 }
 
+type NavigationCacheEntry = {
+  data?: unknown;
+  updatedAt: number;
+  pending?: Promise<unknown>;
+};
+
+const NAVIGATION_CACHE_TTL_MS = 15_000;
+const navigationJsonCache = new Map<string, NavigationCacheEntry>();
+
+function clearNavigationJsonCache() {
+  navigationJsonCache.clear();
+}
+
+async function fetchNavigationJson<T>(key: string, url: string): Promise<T> {
+  let entry = navigationJsonCache.get(key);
+
+  if (
+    entry?.data !== undefined &&
+    Date.now() - entry.updatedAt < NAVIGATION_CACHE_TTL_MS
+  ) {
+    return entry.data as T;
+  }
+
+  if (entry?.pending) return entry.pending as Promise<T>;
+
+  if (!entry) {
+    entry = { updatedAt: 0 };
+    navigationJsonCache.set(key, entry);
+  }
+
+  const currentEntry = entry;
+  const request = (async () => {
+    const response = await fetch(url, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`تعذر تحميل بيانات شريط التنقل: ${key}`);
+    return (await response.json()) as T;
+  })();
+
+  currentEntry.pending = request;
+  try {
+    const data = await request;
+    currentEntry.data = data;
+    currentEntry.updatedAt = Date.now();
+    return data;
+  } finally {
+    if (currentEntry.pending === request) currentEntry.pending = undefined;
+  }
+}
+
+
 export default function InternalNavbar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -48,12 +100,7 @@ export default function InternalNavbar() {
 
     async function loadWithdrawalBalance() {
       try {
-        const response = await fetch("/api/withdrawals/balance", {
-          credentials: "include",
-          cache: "no-store",
-        });
-        if (!response.ok) return;
-        const data = await response.json();
+        const data = await fetchNavigationJson<any>("withdrawal-balance", "/api/withdrawals/balance");
         if (!data?.success || cancelled) return;
 
         const amount = Number(data.withdrawalBalance);
@@ -71,7 +118,7 @@ export default function InternalNavbar() {
     }
 
     void loadWithdrawalBalance();
-    const timer = window.setInterval(() => void loadWithdrawalBalance(), 5000);
+    const timer = window.setInterval(() => void loadWithdrawalBalance(), NAVIGATION_CACHE_TTL_MS);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -83,17 +130,7 @@ export default function InternalNavbar() {
 
     async function loadNotificationCount() {
       try {
-        const res = await fetch(
-          "/api/notifications",
-          {
-            credentials: "include",
-            cache: "no-store",
-          }
-        );
-
-        if (!res.ok) return;
-
-        const json = await res.json();
+        const json = await fetchNavigationJson<any>("notifications", "/api/notifications");
 
         if (!cancelled) {
           setUnreadNotifications(
@@ -117,7 +154,7 @@ export default function InternalNavbar() {
         () => {
           void loadNotificationCount();
         },
-        5000
+        NAVIGATION_CACHE_TTL_MS
       );
 
     return () => {
@@ -131,12 +168,7 @@ export default function InternalNavbar() {
 
     async function loadBalances() {
       try {
-        const response = await fetch("/api/wallet", {
-          credentials: "include",
-          cache: "no-store",
-        });
-        if (!response.ok) return;
-        const data = await response.json();
+        const data = await fetchNavigationJson<any>("wallet", "/api/wallet");
         if (!data?.success || cancelled) return;
 
         const depositBalances = Array.isArray(data.depositBalances) ? data.depositBalances : [];
@@ -158,7 +190,7 @@ export default function InternalNavbar() {
     }
 
     void loadBalances();
-    const timer = window.setInterval(() => void loadBalances(), 5000);
+    const timer = window.setInterval(() => void loadBalances(), NAVIGATION_CACHE_TTL_MS);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -179,6 +211,7 @@ export default function InternalNavbar() {
         }
       );
     } finally {
+      clearNavigationJsonCache();
       router.replace("/login");
       router.refresh();
     }

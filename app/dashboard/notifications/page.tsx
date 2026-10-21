@@ -39,8 +39,6 @@ export default function NotificationsPage() {
 
       const data = await response.json().catch(() => ({}));
 
-      console.log("USER NOTIFICATIONS RESPONSE:", data);
-
       if (!response.ok || data?.success !== true) {
         throw new Error(
           data?.message || "تعذر تحميل الإشعارات"
@@ -72,7 +70,7 @@ export default function NotificationsPage() {
 
     const timer = window.setInterval(() => {
       void load();
-    }, 3000);
+    }, 15000);
 
     return () => window.clearInterval(timer);
   }, []);

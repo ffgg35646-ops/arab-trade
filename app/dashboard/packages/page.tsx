@@ -15,6 +15,7 @@ export default function UserPackagesPage() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [pendingChangePackageId, setPendingChangePackageId] = useState<string | null>(null);
   const [clockNow, setClockNow] = useState(0);
 
   const load = useCallback(async () => {
@@ -57,9 +58,15 @@ export default function UserPackagesPage() {
     };
   }, []);
 
-  async function action(kind: "activate" | "cancel" | "change" | "collect", id: string) {
+  async function action(kind: "activate" | "cancel" | "change" | "collect", id: string, confirmed = false) {
     if (kind === "cancel" && !window.confirm("إلغاء هذه الباقة سيضيف 50% من قيمة التفعيل إلى رصيد أرباح هذه الباقة نفسها، وستبقى الأرباح المحققة في رصيدها. هل تريد المتابعة؟")) return;
-    if (kind === "change" && (!activePlan || !window.confirm("تغيير الباقة سيضيف 50% من قيمة تفعيل الباقة الحالية إلى رصيد أرباح الباقة الحالية نفسها، وتظل الأرباح المجمعة فيها. وسيُخصم سعر الباقة الجديدة من رصيد الإيداع. إذا لم يكفِ رصيد الإيداع فلن تتغير الباقة أو الأرصدة. هل تريد المتابعة؟"))) return;
+    if (kind === "change") {
+      if (!activePlan) return;
+      if (!confirmed) {
+        setPendingChangePackageId(id);
+        return;
+      }
+    }
     setBusy(id); setError(""); setMessage("");
     try {
       const body = kind === "collect"
@@ -99,6 +106,52 @@ export default function UserPackagesPage() {
         </section>
         {message && <div role="status" className="mt-5 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.07] p-4 text-sm text-emerald-300">{message}</div>}
         {error && <div role="alert" className="mt-5 rounded-xl border border-red-400/20 bg-red-400/[0.07] p-4 text-sm text-red-300">{error}</div>}
+
+        {pendingChangePackageId && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" dir="rtl">
+            <section
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="change-package-title"
+              aria-describedby="change-package-description"
+              className="w-full max-w-lg overflow-hidden rounded-2xl border border-cyan-300/20 bg-[#08111e] shadow-2xl shadow-black/50"
+            >
+              <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-300/20 bg-amber-300/10 text-amber-200">
+                  <span className="text-xl font-black">!</span>
+                </div>
+                <div>
+                  <h2 id="change-package-title" className="text-base font-black text-white">تأكيد تغيير الباقة</h2>
+                  <p className="mt-1 text-xs text-slate-400">يرجى مراجعة تفاصيل العملية قبل المتابعة.</p>
+                </div>
+              </div>
+              <div id="change-package-description" className="px-5 py-5 text-sm leading-8 text-slate-200">
+                تغيير الباقة سيضيف 50% من قيمة تفعيل الباقة الحالية إلى رصيد أرباح الباقة الحالية نفسها، وتظل الأرباح المجمعة فيها. وسيُخصم سعر الباقة الجديدة من رصيد الإيداع. إذا لم يكفِ رصيد الإيداع فلن تتغير الباقة أو الأرصدة. هل تريد المتابعة؟
+              </div>
+              <div className="flex flex-col-reverse gap-2 border-t border-white/10 bg-black/10 px-5 py-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setPendingChangePackageId(null)}
+                  className="rounded-xl border border-white/10 px-5 py-2.5 text-sm font-bold text-slate-300 transition hover:bg-white/5 hover:text-white"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(busy)}
+                  onClick={() => {
+                    const packageId = pendingChangePackageId;
+                    setPendingChangePackageId(null);
+                    void action("change", packageId, true);
+                  }}
+                  className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  تأكيد تغيير الباقة
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
         {activePlan && (() => {
           const scheduledNextAt = activePlan.nextCollectAt ? new Date(activePlan.nextCollectAt).getTime() : 0;
           const scheduledEndsAt = activePlan.collectWindowEndsAt ? new Date(activePlan.collectWindowEndsAt).getTime() : 0;

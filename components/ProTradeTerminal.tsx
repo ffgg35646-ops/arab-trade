@@ -492,7 +492,6 @@ export default function ProTradeTerminal() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -853,59 +852,9 @@ export default function ProTradeTerminal() {
   }, [currentPrice, price]);
 
 
-  const createOrder = async () => {
-    setSubmitting(true);
+  const createOrder = () => {
     setError("");
-    setMessage("");
-
-    try {
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: {
-        "Idempotency-Key": crypto.randomUUID(),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          symbol,
-          side,
-          type: orderType,
-          ...(orderType === "limit" ? { price: Number(price) } : {}),
-          quantity: Number(quantity),
-        }),
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok || data.success === false) {
-        throw new Error(data.message || "تعذر إنشاء الأمر");
-      }
-
-      // Live Spot orders must be confirmed as Binance orders. Never present an
-      // internal/legacy matching-engine response as a real exchange execution.
-      if (data.executionProvider !== "binance") {
-        await loadAll(true);
-        throw new Error(
-          "لم يؤكد الخادم إرسال الأمر إلى Binance؛ لم يتم اعتماد العملية كصفقة حقيقية. راجع سجل الأوامر قبل إعادة المحاولة لتجنب تكرار الطلب."
-        );
-      }
-
-      const matchedQuantity = Array.isArray(data?.matching?.trades)
-        ? data.matching.trades.reduce((sum: number, trade: any) => sum + Math.max(0, Number(trade?.quantity) || 0), 0)
-        : 0;
-      const executedLabel = matchedQuantity.toLocaleString("en-US", { maximumFractionDigits: 8 });
-      setMessage(String(data.message || (
-        matchedQuantity > 0
-          ? `أكدت Binance تنفيذ ${executedLabel} ${baseAsset}.`
-          : "تم إرسال الأمر إلى Binance؛ راجع حالة الأمر والكمية المنفذة في سجل التداول."
-      )));
-
-      setQuantity("");
-      await loadAll(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "تعذر إنشاء الأمر");
-    } finally {
-      setSubmitting(false);
-    }
+    setMessage("سيتم تشغيل التداول قريبًا.");
   };
 
   const cancelOrder = async (id: string) => {
@@ -1102,7 +1051,9 @@ export default function ProTradeTerminal() {
             </div>
           )}
           {!error && message && (
-            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs text-emerald-300">
+            <div className={message === "سيتم تشغيل التداول قريبًا."
+              ? "rounded-lg border border-amber-400/20 bg-amber-400/10 px-4 py-2 text-xs text-amber-200"
+              : "rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs text-emerald-300"}>
               {message}
             </div>
           )}
@@ -1535,20 +1486,12 @@ export default function ProTradeTerminal() {
 
             <button
               type="button"
-              onClick={() => void createOrder()}
-              disabled={
-                submitting ||
-                loading ||
-                !Number(quantity) ||
-                Number(quantity) <= 0 ||
-                (orderType === "limit" && (!Number(price) || Number(price) <= 0)) ||
-                (orderType === "market" && marketExecutionPrice <= 0)
-              }
+              onClick={createOrder}
               className={side === "buy"
                 ? "w-full rounded-lg bg-emerald-500 py-3 text-sm font-semibold text-[#03100a] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
                 : "w-full rounded-lg bg-rose-500 py-3 text-sm font-semibold text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-40"}
             >
-              {submitting ? "جارٍ إرسال الأمر..." : side === "buy" ? `شراء ${baseAsset}` : `بيع ${baseAsset}`}
+              {side === "buy" ? `شراء ${baseAsset}` : `بيع ${baseAsset}`}
             </button>
 
             <div className="mt-3 text-center text-[10px] leading-5 text-slate-600">

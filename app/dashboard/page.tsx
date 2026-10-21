@@ -1,19 +1,13 @@
 "use client";
-import { apiFetch } from "@/lib/frontend-api";
-
 import Link from "next/link";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
-  Eye,
   UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
-import {
-  Panel,
-} from "@/components/dashboard/AccountUI";
 
 type UserData = {
   id: string;
@@ -36,38 +30,18 @@ type MarketItem = {
   priceChangePercent?: number | string;
 };
 
-type WalletBalance = {
-  asset?: string;
-  available?: number | string;
-  locked?: number | string;
-};
-
-type ExternalDepositBalance = {
-  asset: string;
-  available: number;
-  locked: number;
-};
-
 export default function DashboardPage() {
   const [user, setUser] = useState<UserData | null>(null);
   const [markets, setMarkets] = useState<MarketItem[]>([]);
-  const [walletBalances, setWalletBalances] = useState<WalletBalance[]>([]);
-  const [externalDepositBalances, setExternalDepositBalances] = useState<ExternalDepositBalance[]>([]);
-  const [accountTotalUsd, setAccountTotalUsd] = useState<number | null>(null);
-  const [loadingWallet, setLoadingWallet] = useState(true);
 
   useEffect(() => {
     let active = true;
 
     async function load() {
       try {
-        const [userRes, marketRes, walletRes] = await Promise.all([
+        const [userRes, marketRes] = await Promise.all([
           fetch("/api/auth/me", { cache: "no-store" }),
           fetch("/api/market", { cache: "no-store" }),
-          fetch("/api/wallet", {
-            credentials: "include",
-            cache: "no-store",
-          }),
         ]);
 
         if (!active) return;
@@ -82,31 +56,8 @@ export default function DashboardPage() {
           setMarkets(Array.isArray(data?.coins) ? data.coins : []);
         }
 
-        if (walletRes.ok) {
-          const data = await walletRes.json();
-          setWalletBalances(
-            data?.spot?.balances ??
-            data?.wallet?.balances ??
-            []
-          );
-          setExternalDepositBalances(
-            Array.isArray(data?.depositBalances)
-              ? data.depositBalances.map((item: ExternalDepositBalance) => ({
-                  asset: String(item.asset || "").trim().toUpperCase(),
-                  available: Number(item.available || 0),
-                  locked: Number(item.locked || 0),
-                })).filter((item: ExternalDepositBalance) => item.asset)
-              : []
-          );
-          const canonicalTotal = Number(data?.wallet?.totalAccountBalanceUsd);
-          setAccountTotalUsd(Number.isFinite(canonicalTotal) ? canonicalTotal : null);
-        }
       } catch (error) {
         console.error("Dashboard load error:", error);
-      } finally {
-        if (active) {
-          setLoadingWallet(false);
-        }
       }
     }
 
@@ -126,81 +77,6 @@ export default function DashboardPage() {
     () => markets.slice(0, 6),
     [markets]
   );
-
-  const marketPrices = useMemo(() => {
-    const map = new Map<string, number>();
-
-    for (const item of markets) {
-      const symbol = String(item.symbol || "")
-        .trim()
-        .toUpperCase();
-
-      const price = Number(
-        item.current_price ??
-        item.lastPrice ??
-        item.price
-      );
-
-      if (
-        symbol &&
-        Number.isFinite(price) &&
-        price >= 0
-      ) {
-        map.set(symbol, price);
-      }
-    }
-
-    // USDT مرجع 1 دولار
-    map.set("USDT", 1);
-
-    return map;
-  }, [markets]);
-
-  const portfolio = useMemo(() => {
-    let totalValueUsd = 0;
-    let availableValueUsd = 0;
-    let lockedValueUsd = 0;
-
-    for (const balance of walletBalances) {
-      const asset = String(balance.asset || "")
-        .trim()
-        .toUpperCase();
-
-      const available = Number(balance.available || 0);
-      const locked = Number(balance.locked || 0);
-      const price = marketPrices.get(asset);
-
-      if (
-        !asset ||
-        !Number.isFinite(available) ||
-        !Number.isFinite(locked) ||
-        price === undefined ||
-        !Number.isFinite(price)
-      ) {
-        continue;
-      }
-
-      availableValueUsd += available * price;
-      lockedValueUsd += locked * price;
-    }
-
-    totalValueUsd =
-      availableValueUsd + lockedValueUsd;
-
-    return {
-      totalValueUsd,
-      availableValueUsd,
-      lockedValueUsd,
-    };
-  }, [marketPrices, walletBalances]);
-
-  const formatUsd = (value: number) =>
-    new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(
-      Number.isFinite(value) ? value : 0
-    );
 
   return (
     <main dir="rtl" className="min-h-screen bg-[#050a13] text-white">
@@ -253,67 +129,6 @@ export default function DashboardPage() {
                   </>
                 </div>
               </div>
-
-            </div>
-
-            <div className="mb-6">
-              <Panel
-                title="القيمة الإجمالية"
-                right={
-                  <div className="flex items-center gap-2 text-xs text-slate-600">
-                    USDT <Eye size={14} />
-                  </div>
-                }
-              >
-                <div className="p-5">
-                  <div className="flex flex-col justify-between gap-5 md:flex-row">
-                    <div>
-                      <div className="text-3xl font-bold">
-                        {loadingWallet
-                          ? "—"
-                          : `${formatUsd(accountTotalUsd ?? portfolio.totalValueUsd)} USDT`}
-                      </div>
-                      <div className="mt-2 text-xs text-slate-600">
-                        القيمة بالدولار:{" "}
-                        {loadingWallet
-                          ? "..."
-                          : `$${formatUsd(accountTotalUsd ?? portfolio.totalValueUsd)}`}
-                      </div>
-                    </div>
-
-
-                  </div>
-
-                  <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                    <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                      <div className="text-xs text-slate-600">
-                        الرصيد المتاح
-                      </div>
-                      <div className="mt-2 font-mono text-sm text-slate-300">
-                        {loadingWallet
-                          ? "..."
-                          : `${formatUsd(portfolio.availableValueUsd)} USDT`}
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-4">
-                      <div className="text-xs font-bold text-amber-200">
-                        الرصيد
-                      </div>
-                      <div className="mt-2 space-y-1.5">
-                        {loadingWallet ? "..." : externalDepositBalances.length ? externalDepositBalances.map((item) => (
-                          <div key={item.asset} className="flex items-center justify-between gap-2 font-mono text-sm text-amber-100">
-                            <span>{item.asset}</span>
-                            <span>{formatUsd(item.available)} <span className="text-[10px] text-amber-200/60">متاح</span></span>
-                          </div>
-                        )) : <div className="font-mono text-sm text-amber-100">0 USDT</div>}
-                      </div>
-                      <Link href="/dashboard/assets/deposit" className="mt-3 inline-flex text-[11px] font-bold text-amber-200 hover:text-amber-100">تفاصيل الإيداع ←</Link>
-                    </div>
-                  </div>
-                </div>
-              </Panel>
-
 
             </div>
 

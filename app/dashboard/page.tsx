@@ -3,6 +3,8 @@ import { apiFetch } from "@/lib/frontend-api";
 
 import Link from "next/link";
 import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
   Eye,
   UserRound,
 } from "lucide-react";
@@ -11,8 +13,6 @@ import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
 import {
   Panel,
-  EmptyState,
-  ActionCards,
 } from "@/components/dashboard/AccountUI";
 
 type UserData = {
@@ -299,16 +299,6 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                      <div className="text-xs text-slate-600">
-                        الرصيد المقفل
-                      </div>
-                      <div className="mt-2 font-mono text-sm text-slate-300">
-                        {loadingWallet
-                          ? "..."
-                          : `${formatUsd(portfolio.lockedValueUsd)} USDT`}
-                      </div>
-                    </div>
                     <div className="rounded-xl border border-amber-300/15 bg-amber-300/[0.04] p-4">
                       <div className="text-xs font-bold text-amber-200">
                         رصيد الإيداع الخارجي
@@ -330,8 +320,31 @@ export default function DashboardPage() {
 
             </div>
 
-            <div className="mb-6">
-              <ActionCards />
+            <div className="mb-6 grid gap-3 sm:grid-cols-2">
+              <Link
+                href="/dashboard/assets/deposit"
+                className="group flex items-center gap-3 rounded-xl border border-white/10 bg-[#07101d] p-4 transition hover:border-cyan-400/25 hover:bg-white/[0.025]"
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-400/10 text-cyan-300">
+                  <ArrowDownToLine size={20} />
+                </span>
+                <span>
+                  <span className="block text-sm font-bold text-white">إيداع</span>
+                  <span className="mt-1 block text-xs text-slate-500">إيداع رصيد إلى حسابك</span>
+                </span>
+              </Link>
+              <Link
+                href="/dashboard/withdrawals"
+                className="group flex items-center gap-3 rounded-xl border border-white/10 bg-[#07101d] p-4 transition hover:border-cyan-400/25 hover:bg-white/[0.025]"
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-400/10 text-cyan-300">
+                  <ArrowUpFromLine size={20} />
+                </span>
+                <span>
+                  <span className="block text-sm font-bold text-white">سحب</span>
+                  <span className="mt-1 block text-xs text-slate-500">إدارة طلبات السحب</span>
+                </span>
+              </Link>
             </div>
 
             <div className="mb-6 rounded-2xl border border-white/10 bg-[#07101d] p-5">

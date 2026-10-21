@@ -64,7 +64,8 @@ export default function AdminDashboard() {
   }, [load]);
 
   return (
-        {data ? (
+    <>
+      {data ? (
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -189,5 +190,6 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+    </>
   );
 }

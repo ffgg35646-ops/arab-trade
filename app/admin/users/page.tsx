@@ -1,7 +1,7 @@
 "use client";
 
 import AdminPageFrame from "@/components/AdminPageFrame";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 
 function date(v: unknown) {
   if (!v) return "—";
@@ -320,8 +320,8 @@ export default function UsersPage() {
 
                 <tbody>
                   {users.map((user) => (
+                    <Fragment key={user._id}>
                     <tr
-                      key={user._id}
                       className="border-b border-slate-800/70 last:border-0"
                     >
                       <td className="px-4 py-4 font-black text-blue-400">
@@ -436,6 +436,7 @@ export default function UsersPage() {
                         </td>
                       </tr>
                     ) : null}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

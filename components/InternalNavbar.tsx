@@ -322,7 +322,7 @@ export default function InternalNavbar() {
               className="max-w-[190px] rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] px-2 py-2 transition hover:bg-cyan-300/[0.1] xl:px-3"
               title="إجمالي رصيد السحب المتاح من السحب العام والباقات، باستثناء المبالغ المحجوزة لطلبات السحب"
             >
-              <span className="block text-[10px] text-cyan-200/80">رصيد السحب</span>
+              <span className="block text-[10px] text-cyan-200/80"><CircleDollarSign size={12} className="ml-1 inline-block" />رصيد السحب</span>
               <span className="block max-w-[170px] truncate text-xs font-black text-cyan-100">{withdrawalBalanceSummary}</span>
             </Link>
           </div>
@@ -502,7 +502,7 @@ export default function InternalNavbar() {
                 <span className="mt-1 block break-words text-xs font-black leading-5 text-amber-100">{depositBalanceSummary}</span>
               </Link>
               <Link href="/dashboard/withdrawals" onClick={() => setMobile(false)} className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-3" title="الرصيد المتاح من السحب العام والباقات، بعد استبعاد المبالغ المحجوزة لطلبات السحب">
-                <span className="block text-[10px] text-cyan-200/80">رصيد السحب</span>
+                <span className="block text-[10px] text-cyan-200/80"><CircleDollarSign size={12} className="ml-1 inline-block" />رصيد السحب</span>
                 <span className="mt-1 block break-words text-xs font-black leading-5 text-cyan-100">{withdrawalBalanceSummary}</span>
               </Link>
             </div>

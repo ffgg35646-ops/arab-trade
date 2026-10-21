@@ -141,6 +141,7 @@ export default function UserPackagesPage() {
                   disabled={Boolean(busy)}
                   onClick={() => {
                     const packageId = pendingChangePackageId;
+                    if (!packageId) return;
                     setPendingChangePackageId(null);
                     void action("change", packageId, true);
                   }}

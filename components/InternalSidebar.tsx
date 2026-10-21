@@ -40,7 +40,6 @@ const sections = [
     icon: ClipboardList,
     children: [
       ["التداول الفوري", "/protrade"],
-      ["التداول بالهامش", "/margin"],
       ["سجل التداول", "/dashboard/trades"],
     ],
   },

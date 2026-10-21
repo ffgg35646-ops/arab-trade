@@ -198,22 +198,17 @@ export async function GET(request: NextRequest) {
       account,
     };
   });
-  const generalLocked = roundWithdrawal(requests
-    .filter((item: any) => (item.type || "package") === "general" && item.status === "pending")
-    .reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0));
   const packageAvailable = roundWithdrawal(packages.reduce((sum, plan) => sum + Number(plan.account?.balance || 0), 0));
-  const packageLocked = roundWithdrawal(packages.reduce((sum, plan) => sum + Number(plan.account?.locked || 0), 0));
   const generalAvailable = getUsdtAvailable(wallet);
-  const totalBalance = roundWithdrawal(generalAvailable + generalLocked + packageAvailable + packageLocked);
+  // Withdrawal totals include only available balances; pending/reserved amounts are excluded.
+  const totalBalance = roundWithdrawal(generalAvailable + packageAvailable);
 
   return NextResponse.json({
     success: true,
     summary: {
       totalBalance,
       generalAvailable,
-      generalLocked,
       packageAvailable,
-      packageLocked,
     },
     general: {
       available: generalAvailable,

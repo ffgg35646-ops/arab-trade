@@ -10,7 +10,6 @@ type Account = {
   sourceAccountIds: string[];
   status: string;
   balance: number;
-  locked: number;
   activationAmount: number;
   allowance: number;
   baseAllowance: number;
@@ -76,9 +75,7 @@ type Data = {
   summary: {
     totalBalance: number;
     generalAvailable: number;
-    generalLocked: number;
     packageAvailable: number;
-    packageLocked: number;
   };
   general: { available: number; minimum: number; configured: boolean; feePercent?: number };
   networks: Network[];
@@ -633,11 +630,8 @@ export default function WithdrawalsPage() {
                         <h3 className="truncate text-lg font-black">{plan.name}</h3>
                       </div>
                       <div className="shrink-0 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-2 text-left">
-                        <p className="text-xs text-slate-400">إجمالي رصيد الباقة</p>
-                        <p className="mt-1 font-black text-white">{money(account?.balance || 0)} USDT</p>
-                        <p className="mt-2 text-xs text-slate-400">المتاح للسحب الآن</p>
+                        <p className="text-xs text-slate-400">الرصيد المتاح للسحب</p>
                         <p className="mt-1 font-black text-emerald-300">{money(account?.available || 0)} USDT</p>
-                        {Number(account?.locked || 0) > 0 && <p className="mt-2 text-xs text-amber-200">محجوز: {money(account?.locked || 0)} USDT</p>}
                       </div>
                     </div>
 
@@ -796,7 +790,6 @@ export default function WithdrawalsPage() {
                       )}
                       <div className="mt-2 rounded-lg bg-[#050a13] p-2 text-xs">
                         <div className="grid gap-1 text-slate-400 sm:grid-cols-3">
-                          <p>الإجمالي المحجوز: {money(item.grossAmount ?? item.amount)} USDT</p>
                           <p>العمولة: {money(item.feeAmount ?? 0)} USDT</p>
                           <p className="text-emerald-300">الصافي المطلوب إرساله: {money(item.payoutAmount ?? item.amount)} USDT</p>
                         </div>

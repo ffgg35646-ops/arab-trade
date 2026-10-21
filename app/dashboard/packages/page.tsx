@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import InternalNavbar from "@/components/InternalNavbar";
-import InternalSidebar from "@/components/InternalSidebar";
 import { Loader2, RefreshCw, Clock3, Gift } from "lucide-react";
 
 type Plan = { _id: string; name: string; description?: string; price: number; asset: string; durationDays: number; dailyProfit?: number };
@@ -91,9 +89,9 @@ export default function UserPackagesPage() {
 
 
   return <>
-    <InternalNavbar />
+    
     <div className="mx-auto flex max-w-[1700px]">
-      <InternalSidebar />
+      
       <main dir="rtl" className="min-w-0 flex-1 bg-[#050a13] p-4 text-white md:p-8">
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#07101d] px-4 py-3">
           <div><h1 className="text-xl font-black">الباقات</h1><p className="mt-1 text-xs text-slate-400">الرصيد المتاح للتفعيل: <strong className="text-cyan-200">{money(depositUsdt)} USDT</strong> · الباقة الحالية: <strong className="text-white">{activePlan?.packageName || "لا توجد"}</strong></p></div>

@@ -464,7 +464,7 @@ export async function POST(
         settings.trading.defaultFeePercent || 0
       );
 
-if (
+    if (
       type === "limit" &&
       (
         !Number.isFinite(

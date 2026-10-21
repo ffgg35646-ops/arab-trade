@@ -30,7 +30,6 @@ const sections = [
     title: "المحفظة",
     icon: WalletCards,
     children: [
-      ["نظرة عامة", "/dashboard/assets"],
       ["الإيداع", "/dashboard/assets/deposit"],
       ["الباقات", "/dashboard/packages"],
       ["السحب", "/dashboard/withdrawals"],

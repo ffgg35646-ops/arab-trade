@@ -6,7 +6,6 @@ import { CheckCircle2, Loader2, Package, Plus, RefreshCw, Save, ShieldAlert, X }
 
 type Plan = { _id: string; name: string; description: string; price: number; asset: string; durationDays: number; dailyProfit: number; withdrawalMinimum: number; enabled: boolean; sortOrder: number };
 type UserPackage = { _id: string; packageName: string; investedAmount: number; asset: string; status: string; availableEarnings: number; lockedEarnings: number; totalRealizedEarnings: number; activatedAt: string; userId?: { _id: string; name?: string; username?: string; email?: string } | null };
-type DepositBalance = { _id: string; asset: string; available: number; locked: number; userId?: { _id: string; name?: string; username?: string; email?: string } | null };
 type LedgerRow = { _id: string; type: string; asset: string; amount: number; note?: string; createdAt: string; userId?: { name?: string; username?: string; email?: string } | null; userPackageId?: { packageName?: string } | null };
 const emptyForm = { name: "", description: "", price: "", durationDays: "0", dailyProfit: "2", withdrawalMinimum: "100", sortOrder: "0", enabled: true };
 const money = (value: number) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 }).format(Number(value || 0));
@@ -14,7 +13,6 @@ const money = (value: number) => new Intl.NumberFormat("en-US", { minimumFractio
 export default function AdminPackagesPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [accounts, setAccounts] = useState<UserPackage[]>([]);
-  const [depositBalances, setDepositBalances] = useState<DepositBalance[]>([]);
   const [packageLedger, setPackageLedger] = useState<LedgerRow[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
@@ -34,7 +32,6 @@ export default function AdminPackagesPage() {
       if (!res.ok || !json.success) throw new Error(json.message || "تعذر تحميل الباقات");
       setPlans(Array.isArray(json.packages) ? json.packages : []);
       setAccounts(Array.isArray(json.userPackages) ? json.userPackages : []);
-      setDepositBalances(Array.isArray(json.depositBalances) ? json.depositBalances : []);
       setPackageLedger(Array.isArray(json.packageLedger) ? json.packageLedger : []);
       setError("");
     } catch (e) {
@@ -100,7 +97,6 @@ export default function AdminPackagesPage() {
 
   const enabledPlanCount = plans.filter((plan) => plan.enabled).length;
   const activeAccountCount = accounts.filter((account) => account.status === "active").length;
-  const totalDepositAvailable = depositBalances.filter((item) => item.asset === "USDT").reduce((sum, item) => sum + Number(item.available || 0), 0);
   const totalPackageAvailable = accounts.filter((account) => account.asset === "USDT").reduce((sum, account) => sum + Number(account.availableEarnings || 0), 0);
   const totalPackageLocked = accounts.filter((account) => account.asset === "USDT").reduce((sum, account) => sum + Number(account.lockedEarnings || 0), 0);
 
@@ -118,7 +114,6 @@ export default function AdminPackagesPage() {
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#08111e] p-4"><div className="text-xs text-slate-400">باقات متاحة للمستخدمين</div><div className="mt-3 text-3xl font-black text-cyan-200">{enabledPlanCount}</div><div className="mt-1 text-xs text-slate-500">من إجمالي {plans.length} باقة</div></div>
         <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#08111e] p-4"><div className="text-xs text-slate-400">حسابات الباقات النشطة</div><div className="mt-3 text-3xl font-black text-emerald-200">{activeAccountCount}</div><div className="mt-1 text-xs text-slate-500">إجمالي حسابات الباقات: {accounts.length}</div></div>
-        <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#08111e] p-4"><div className="text-xs text-slate-400">رصيد إيداع قابل للتفعيل</div><div className="mt-3 text-2xl font-black text-cyan-200">{money(totalDepositAvailable)} <span className="text-xs">USDT</span></div><div className="mt-1 text-xs text-slate-500">أرصدة خارجية معتمدة فقط</div></div>
         <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#0d2030] to-[#08111e] p-4"><div className="text-xs text-slate-400">أرصدة الباقات المتاحة / المحجوزة</div><div className="mt-3 text-xl font-black text-emerald-200">{money(totalPackageAvailable)} <span className="text-xs">USDT</span></div><div className="mt-1 text-xs text-slate-500">الرصيد المحجوز: {money(totalPackageLocked)} USDT</div></div>
       </section>
 
@@ -145,12 +140,6 @@ export default function AdminPackagesPage() {
       </div>
 
       <section className="rounded-2xl border border-white/10 bg-[#08111e] p-5 md:p-6">
-        <h2 className="font-black">أرصدة الإيداع الخارجية للمستخدمين</h2>
-        <p className="mt-1 text-xs leading-6 text-slate-500">الأرصدة الناتجة عن إيداعات خارجية اعتمدها الأدمن، وهي منفصلة عن أرصدة الباقات.</p>
-        {loading ? <div className="py-6 text-center text-slate-500">جاري التحميل...</div> : depositBalances.length === 0 ? <div className="mt-4 rounded-xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">لا توجد أرصدة إيداع متاحة حاليًا.</div> : <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[650px] text-right text-sm"><thead><tr className="border-b border-white/10 text-xs text-slate-500"><th className="px-3 py-3">المستخدم</th><th className="px-3 py-3">العملة</th><th className="px-3 py-3">متاح للتفعيل</th><th className="px-3 py-3">مقفل</th></tr></thead><tbody>{depositBalances.map((item) => <tr key={item._id} className="border-b border-white/5"><td className="px-3 py-4"><div className="font-bold">{item.userId?.name || item.userId?.username || "مستخدم"}</div><div className="mt-1 text-xs text-slate-500">{item.userId?.email || "—"}</div></td><td className="px-3 py-4 font-bold text-cyan-200">{item.asset}</td><td className="px-3 py-4 font-black">{money(item.available)}</td><td className="px-3 py-4 text-slate-400">{money(item.locked)}</td></tr>)}</tbody></table></div>}
-      </section>
-
-      <section className="rounded-2xl border border-white/10 bg-[#08111e] p-5 md:p-6">
         <h2 className="font-black">حسابات الباقات لدى المستخدمين</h2><p className="mt-1 text-xs leading-6 text-slate-500">معرف حساب الباقة يستخدم لتسجيل عائد محقق فعليًا.</p>
         {loading ? <div className="py-8 text-center text-slate-500">جاري التحميل...</div> : accounts.length === 0 ? <div className="mt-4 rounded-xl border border-dashed border-white/10 p-8 text-center text-sm text-slate-500">لا توجد حسابات باقات حتى الآن.</div> : <div className="mt-4 overflow-x-auto"><table className="w-full min-w-[900px] text-right text-sm"><thead><tr className="border-b border-white/10 text-xs text-slate-500"><th className="px-3 py-3">المستخدم</th><th className="px-3 py-3">الباقة / الحالة</th><th className="px-3 py-3">قيمة التفعيل</th><th className="px-3 py-3">الرصيد المتاح</th><th className="px-3 py-3">الرصيد المحجوز</th><th className="px-3 py-3">عائد محقق</th><th className="px-3 py-3">المعرف</th><th className="px-3 py-3">الإجراء</th></tr></thead><tbody>{accounts.map((account) => <tr key={account._id} className="border-b border-white/5"><td className="px-3 py-4"><div className="font-bold">{account.userId?.name || account.userId?.username || "مستخدم"}</div><div className="mt-1 text-xs text-slate-500">{account.userId?.email || "—"}</div></td><td className="px-3 py-4">{account.packageName}<div className="mt-1 text-xs text-slate-500">{account.status === "active" ? "نشطة" : "ملغاة"}</div></td><td className="px-3 py-4">{money(account.investedAmount)} {account.asset}</td><td className="px-3 py-4 text-emerald-300">{money(account.availableEarnings)} {account.asset}</td><td className="px-3 py-4 text-amber-200">{money(account.lockedEarnings)} {account.asset}</td><td className="px-3 py-4">{money(account.totalRealizedEarnings)} {account.asset}</td><td className="px-3 py-4"><button type="button" onClick={() => setCreditId(account._id)} className="max-w-44 break-all text-left font-mono text-[10px] text-cyan-300 underline">{account._id}</button></td><td className="px-3 py-4"><button type="button" onClick={() => setCreditId(account._id)} disabled={account.status !== "active"} className="rounded-lg bg-blue-600/20 px-3 py-2 text-xs font-bold text-blue-200 disabled:opacity-40">تسجيل عائد</button></td></tr>)}</tbody></table></div>}
       </section>
@@ -171,7 +160,7 @@ export default function AdminPackagesPage() {
         </form>
       </section>
 
-      <section className="flex items-start gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.04] p-4 text-xs leading-6 text-amber-100/80"><ShieldAlert size={18} className="mt-0.5 shrink-0 text-amber-300"/><div>الإيداع الخارجي يظهر في رصيد الإيداع. تفعيل الباقة يخصم منه، وإلغاء الباقة يحوّل نصف قيمة التفعيل إلى رصيد الباقة السابقة. العائد اليومي يُضاف إلى رصيد أرباح الباقة بعد تسجيله.</div></section>
+      <section className="flex items-start gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[0.04] p-4 text-xs leading-6 text-amber-100/80"><ShieldAlert size={18} className="mt-0.5 shrink-0 text-amber-300"/><div>إلغاء الباقة يحوّل نصف قيمة التفعيل إلى رصيد الباقة السابقة. العائد اليومي يُضاف إلى رصيد أرباح الباقة بعد تسجيله.</div></section>
     </div>
   </AdminPageFrame>;
 }

@@ -82,7 +82,7 @@ export default function InternalSidebar() {
   return (
     <aside
       dir="rtl"
-      className={`hidden shrink-0 border-l border-white/10 bg-[#07101d] lg:block ${
+      className={`hidden shrink-0 border-l border-white/10 bg-[#07101d] xl:block ${
         collapsed ? "w-[76px]" : "w-[240px]"
       } transition-all duration-200`}
     >

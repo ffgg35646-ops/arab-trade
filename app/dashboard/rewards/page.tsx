@@ -123,8 +123,8 @@ export default function RewardsPage() {
     setRemaining(timers);
   }
 
-  async function load() {
-    setLoading(true);
+  async function load(background = false) {
+    if (!background) setLoading(true);
     setError("");
 
     try {
@@ -136,7 +136,7 @@ export default function RewardsPage() {
           : "تعذر تحميل بيانات المكافآت"
       );
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   }
 
@@ -166,7 +166,7 @@ export default function RewardsPage() {
         );
       }
 
-      await load();
+      await load(true);
     } catch (e) {
       setError(
         e instanceof Error
@@ -231,7 +231,7 @@ export default function RewardsPage() {
 
               <button
                 type="button"
-                onClick={() => void load()}
+                onClick={() => void load(true)}
                 disabled={loading}
                 className="rounded-xl border border-white/10 bg-[#07101d] px-4 py-2.5 text-sm font-bold text-slate-300 transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
               >

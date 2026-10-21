@@ -1112,13 +1112,11 @@ export default function ProTradeTerminal() {
       <div className="border-b border-white/[0.06] bg-[#07101d] px-5 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-xs font-semibold text-slate-300">التداول الفوري</span>
-          <span className={executionConfigured
-            ? "rounded-full border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-1 text-[11px] font-semibold text-emerald-300"
-            : "rounded-full border border-amber-400/20 bg-amber-400/[0.06] px-3 py-1 text-[11px] font-semibold text-amber-200"}>
-            {executionConfigured
-              ? executionTestnet ? "اتصال Binance Testnet" : "تنفيذ Spot متصل بـ Binance"
-              : "أسعار حية — تنفيذ Binance غير مهيأ"}
-          </span>
+          {executionConfigured ? (
+            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-1 text-[11px] font-semibold text-emerald-300">
+              {executionTestnet ? "اتصال Binance Testnet" : "تنفيذ Spot متصل بـ Binance"}
+            </span>
+          ) : null}
         </div>
       </div>
 

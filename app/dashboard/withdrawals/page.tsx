@@ -310,15 +310,18 @@ export default function WithdrawalsPage() {
                 );
                 return (
                   <article key={plan._id} className="flex flex-col gap-4 rounded-2xl border border-slate-700 bg-[#08111e] p-4 md:p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="truncate text-lg font-black">{plan.name}</h3>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-lg font-black">{plan.name}</h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="rounded-xl border border-slate-600 bg-[#050a13] p-4">
+                        <p className="text-sm font-bold text-slate-300">رصيد الباقة</p>
+                        <p className="mt-2 text-xl font-black text-white">{money(account?.balance || 0)} USDT</p>
                       </div>
-                      <div className="shrink-0 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] px-3 py-2 text-left">
-                        <p className="text-xs text-slate-400">رصيد الباقة</p>
-                        <p className="mt-1 font-black text-white">{money(account?.balance || 0)} USDT</p>
-                        <p className="mt-2 text-xs text-slate-400">الرصيد المتاح للسحب</p>
-                        <p className="mt-1 font-black text-emerald-300">{money(account?.available || 0)} USDT</p>
+                      <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/[0.06] p-4">
+                        <p className="text-sm font-bold text-slate-300">الرصيد المتاح للسحب</p>
+                        <p className="mt-2 text-xl font-black text-emerald-300">{money(account?.available || 0)} USDT</p>
                       </div>
                     </div>
 

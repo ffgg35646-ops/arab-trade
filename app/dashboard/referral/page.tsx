@@ -219,7 +219,7 @@ export default function ReferralPage() {
               </div>
             ) : data ? (
               <>
-                <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
                   <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-slate-500">إجمالي المدعوين</span>

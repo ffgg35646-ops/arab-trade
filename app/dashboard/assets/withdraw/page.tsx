@@ -97,16 +97,20 @@ export default function WithdrawPage() {
                   <p className="mt-3 text-xs text-slate-500">الحد الأدنى للسحب: {amount(p.minimum)} USDT</p>
                 </article>
               ))}
-              <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <h2 className="font-bold">رصيد السحب العام</h2>
-                <p className="mt-3 text-xs text-slate-500">المتاح للسحب العام</p>
-                <p className="mt-1 text-xl font-bold" dir="ltr">{amount(data.general.available)} USDT</p>
-                <p className="mt-3 text-xs text-slate-500">الحد الأدنى: {data.general.configured ? amount(data.general.minimum) + " USDT" : "لم يحدده الأدمن بعد"}</p>
-              </article>
             </section>
 
             <form onSubmit={submit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-              <h2 className="text-lg font-bold">إنشاء طلب سحب</h2>
+              <h2 className="text-lg font-bold">السحب</h2>
+              <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-slate-500">{kind === "general" ? "الرصيد العام المتاح" : "رصيد الباقة المتاح للسحب"}</p>
+                  <p className="mt-1 text-lg font-bold" dir="ltr">{amount(kind === "general" ? available : (selected?.account?.available || 0))} USDT</p>
+                </div>
+                <div className="border-r border-slate-200 pr-3">
+                  <p className="text-xs text-slate-500">الحد الأدنى للسحب</p>
+                  <p className="mt-1 font-semibold" dir="ltr">{amount(minimum)} USDT</p>
+                </div>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block text-sm font-medium">مصدر السحب
                   <select className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3" value={kind} onChange={(e) => setKind(e.target.value as "package" | "general")}>
@@ -127,7 +131,7 @@ export default function WithdrawPage() {
                     {data.networks.map((n) => <option key={n.code} value={n.code}>{n.code} — {n.name}</option>)}
                   </select>
                 </label>
-                <label className="block text-sm font-medium sm:col-span-2">عنوان الدفع (محفظة USDT)
+                <label className="block text-sm font-medium sm:col-span-2">عنوان الإيداع (محفظة USDT)
                   <input required minLength={3} maxLength={200} className="mt-1 w-full rounded-xl border border-slate-300 p-3 text-left" dir="ltr" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="أدخل عنوان المحفظة" />
                 </label>
               </div>

@@ -426,7 +426,8 @@ export default function AdminWithdrawalsPage() {
               {visibleRequests.length > 0 && (query || statusFilter !== "all") && <button type="button" onClick={() => { setQuery(""); setStatusFilter("all"); }} className="mt-4 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-white/[0.04]">مسح الفلاتر</button>}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              <div className="overflow-x-auto">
               <table className="w-full min-w-[850px] border-collapse text-right">
                 <thead>
                   <tr className="border-b border-slate-800 bg-[#0b1422] text-xs font-bold text-slate-400">
@@ -589,6 +590,7 @@ export default function AdminWithdrawalsPage() {
                 </nav>
               )}
             </div>
+            </>
           )}
         </section>
       </div>

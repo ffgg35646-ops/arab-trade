@@ -2,9 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import InternalNavbar from "@/components/InternalNavbar";
-import InternalSidebar from "@/components/InternalSidebar";
-
 type PackageRow = {
   _id: string; name: string; price: number; minimum: number; enabled: boolean;
   account: null | { status: string; balance: number; locked: number; available: number; hasAccount: boolean };
@@ -70,9 +67,9 @@ export default function WithdrawPage() {
 
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-900">
-      <InternalNavbar />
+      
       <div className="mx-auto flex w-full max-w-7xl gap-5 px-3 py-5 sm:px-6">
-        <InternalSidebar />
+        
         <main className="min-w-0 flex-1 space-y-5">
           <div className="flex items-center justify-between gap-3">
             <div><h1 className="text-2xl font-bold">السحب</h1><p className="mt-1 text-sm text-slate-500">أرصدة السحب لكل باقة مستقلة عن باقي الباقات.</p></div>

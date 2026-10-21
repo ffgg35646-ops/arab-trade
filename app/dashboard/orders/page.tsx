@@ -12,9 +12,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import InternalNavbar from "@/components/InternalNavbar";
-import InternalSidebar from "@/components/InternalSidebar";
-
 type Tab =
   | "open"
   | "history"
@@ -1027,10 +1024,10 @@ export default function OrdersPage() {
       className="min-h-screen bg-[#050a13] text-white"
       dir="rtl"
     >
-      <InternalNavbar />
+      
 
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-[1700px]">
-        <InternalSidebar />
+        
 
         <main className="min-w-0 flex-1">
           <div className="p-4 md:p-6 lg:p-8">

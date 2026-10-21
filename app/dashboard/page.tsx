@@ -305,7 +305,7 @@ export default function DashboardPage() {
 
 
                       <Link
-                        href="/markets"
+                        href="/dashboard/markets"
                         className="flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-400/15"
                       >
                         <BarChart3 size={15} />
@@ -437,7 +437,7 @@ export default function DashboardPage() {
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-bold">الأسواق</h2>
                 <Link
-                  href="/markets"
+                  href="/dashboard/markets"
                   className="text-xs text-cyan-300"
                 >
                   عرض الكل

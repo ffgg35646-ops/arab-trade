@@ -3,6 +3,8 @@ import { connectDB } from "@/lib/mongodb";
 import { requireAdminLeader } from "@/lib/admin-auth";
 import User from "@/models/User";
 import DepositBalance from "@/models/DepositBalance";
+import DepositRequest from "@/models/DepositRequest";
+import WithdrawalRequest from "@/models/WithdrawalRequest";
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,14 +74,104 @@ export async function GET(request: NextRequest) {
       }]);
     }
 
+    // Count only successful withdrawals. "amount" is the gross amount released
+    // from the user's withdrawal balance, with legacy rows falling back to amount.
+    const [withdrawalRows, referredUsers] = await Promise.all([
+      userIds.length
+        ? WithdrawalRequest.aggregate([
+            { $match: { userId: { $in: userIds }, status: "approved" } },
+            {
+              $group: {
+                _id: "$userId",
+                count: { $sum: 1 },
+                totalAmount: { $sum: { $ifNull: ["$grossAmount", "$amount"] } },
+              },
+            },
+          ])
+        : Promise.resolve([]),
+      userIds.length
+        ? User.find({
+            referredBy: { $in: userIds },
+            role: { $nin: ["admin", "admin_leader"] },
+          })
+            .select("_id referredBy")
+            .lean()
+        : Promise.resolve([]),
+    ]);
+
+    const withdrawalByUser = new Map<string, { count: number; totalAmount: number }>();
+    for (const row of withdrawalRows as any[]) {
+      withdrawalByUser.set(String(row._id), {
+        count: Number(row.count || 0),
+        totalAmount: Number(row.totalAmount || 0),
+      });
+    }
+
+    // A referral is active when at least one external deposit has been approved,
+    // matching the referral dashboard's existing definition.
+    const referredUserIds = (referredUsers as any[]).map((user) => user._id);
+    const approvedDepositRows = referredUserIds.length
+      ? await DepositRequest.aggregate([
+          { $match: { userId: { $in: referredUserIds }, status: "approved" } },
+          {
+            $group: {
+              _id: {
+                userId: "$userId",
+                asset: { $toUpper: "$asset" },
+              },
+              totalAmount: { $sum: "$amount" },
+            },
+          },
+        ])
+      : [];
+
+    const approvedDepositsByUser = new Map<string, Map<string, number>>();
+    for (const row of approvedDepositRows as any[]) {
+      const userId = String(row._id.userId);
+      const asset = String(row._id.asset || "USDT").toUpperCase();
+      const byAsset = approvedDepositsByUser.get(userId) || new Map<string, number>();
+      byAsset.set(asset, Number(row.totalAmount || 0));
+      approvedDepositsByUser.set(userId, byAsset);
+    }
+
+    const activeReferralCountByUser = new Map<string, number>();
+    const activeReferralDepositsByUser = new Map<string, Map<string, number>>();
+    for (const referred of referredUsers as any[]) {
+      const referredId = String(referred._id);
+      const parentId = String(referred.referredBy);
+      const deposits = approvedDepositsByUser.get(referredId);
+
+      if (!deposits || deposits.size === 0) continue;
+
+      activeReferralCountByUser.set(
+        parentId,
+        (activeReferralCountByUser.get(parentId) || 0) + 1
+      );
+
+      const parentTotals =
+        activeReferralDepositsByUser.get(parentId) || new Map<string, number>();
+      for (const [asset, amount] of deposits.entries()) {
+        parentTotals.set(asset, (parentTotals.get(asset) || 0) + amount);
+      }
+      activeReferralDepositsByUser.set(parentId, parentTotals);
+    }
+
     return NextResponse.json({
       success: true,
       users: users.map((user: any) => {
         const id = String(user._id);
+        const referralTotals = activeReferralDepositsByUser.get(id);
         return {
           ...user,
           _id: id,
           depositBalances: depositByUser.get(id) || [],
+          withdrawalCount: withdrawalByUser.get(id)?.count || 0,
+          withdrawnAmount: withdrawalByUser.get(id)?.totalAmount || 0,
+          activeReferralCount: activeReferralCountByUser.get(id) || 0,
+          activeReferralDepositsByAsset: referralTotals
+            ? Array.from(referralTotals, ([asset, amount]) => ({ asset, amount }))
+                .sort((a, b) => a.asset.localeCompare(b.asset))
+            : [],
         };
       }),
     });

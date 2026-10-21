@@ -30,7 +30,6 @@ const groups = [
       { label: "الباقات", href: "/admin/packages" },
       { label: "السحوبات", href: "/admin/withdrawals" },
       { label: "وسائل الإيداع", href: "/admin/payments" },
-      { label: "الأصول والشبكات", href: "/admin/assets" },
     ],
   },
   {

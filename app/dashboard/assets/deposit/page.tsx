@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import InternalNavbar from "@/components/InternalNavbar";
-import InternalSidebar from "@/components/InternalSidebar";
 import { Check, Copy, ImagePlus, UploadCloud } from "lucide-react";
 
 type DepositRecord = { _id?: string; id?: string; asset: string; network: string; amount: number; status: string; txHash?: string; adminNote?: string; createdAt?: string };
@@ -293,9 +291,9 @@ export default function DepositPage() {
 
   return (
     <>
-      <InternalNavbar />
+      
       <div className="mx-auto flex max-w-[1700px]">
-        <InternalSidebar />
+        
         <main dir="rtl" className="min-h-screen w-full min-w-0 flex-1 bg-[#050a13] p-3 text-white sm:p-6">
           <div className="mx-auto w-full max-w-3xl space-y-5">
             <header className="flex flex-wrap items-center justify-between gap-3">

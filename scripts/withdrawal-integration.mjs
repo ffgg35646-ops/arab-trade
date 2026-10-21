@@ -273,9 +273,10 @@ try {
   assert.equal(adminPendingGeneral.data.counts.withdrawals, 1, "admin notification menu should count the pending general withdrawal");
   const generalSummary = await call("/api/withdrawals", { cookie: userCookie });
   assert.equal(generalSummary.data.summary.generalAvailable, 25);
-  assert.equal(generalSummary.data.summary.generalLocked, 25);
-  assert.equal(generalSummary.data.summary.totalBalance, 1060,
-    "the grand total should include the reserved general withdrawal while it is pending");
+  assert.equal(generalSummary.data.summary.generalLocked, undefined,
+    "reserved general withdrawal amounts must not be exposed in the user summary");
+  assert.equal(generalSummary.data.summary.totalBalance, 1035,
+    "the grand total must exclude reserved general withdrawal amounts while pending");
   assert.equal((await review(generalPending._id, "reject")).status, 200);
   const generalReviewNoticeCount = await mongoose.connection.collection("notifications")
     .countDocuments({ userId: user._id, type: "withdrawal", title: "تم رفض طلب السحب" });
@@ -414,9 +415,10 @@ try {
   assert.ok(packageRequestNoticeCount >= 3, "the user should receive a notice for each accepted withdrawal request");
   const pendingSummary = await call("/api/withdrawals", { cookie: userCookie });
   assert.equal(pendingSummary.data.summary.packageAvailable, 610);
-  assert.equal(pendingSummary.data.summary.packageLocked, 200);
-  assert.equal(pendingSummary.data.summary.totalBalance, 860,
-    "while a package withdrawal is pending, available plus locked package funds remain in the grand total");
+  assert.equal(pendingSummary.data.summary.packageLocked, undefined,
+    "reserved package withdrawal amounts must not be exposed in the user summary");
+  assert.equal(pendingSummary.data.summary.totalBalance, 660,
+    "while a package withdrawal is pending, the grand total must exclude its reserved amount");
   assert.equal((await review(firstReferralPending._id, "approve")).status, 200);
   await checkPackageBalance(oldUserPackageId, 610, 0, "approved first referral-backed withdrawal");
   state = await getPackageState(packageAId);
@@ -454,12 +456,14 @@ try {
   const finalSummaryResponse = await call("/api/withdrawals", { cookie: userCookie });
   assert.equal(finalSummaryResponse.status, 200);
   assert.equal(finalSummaryResponse.data.summary.generalAvailable, 50);
-  assert.equal(finalSummaryResponse.data.summary.generalLocked, 0);
+  assert.equal(finalSummaryResponse.data.summary.generalLocked, undefined,
+    "reserved general withdrawal amounts are omitted from the summary");
   assert.equal(finalSummaryResponse.data.summary.packageAvailable, 310);
-  assert.equal(finalSummaryResponse.data.summary.packageLocked, 0);
+  assert.equal(finalSummaryResponse.data.summary.packageLocked, undefined,
+    "reserved package withdrawal amounts are omitted from the summary");
   assert.equal(finalSummaryResponse.data.summary.totalBalance, 360,
-    "grand total combines general and package withdrawal balances but not deposit balance");
-  log("Grand total includes the general balance and all package balances, but excludes the separate deposit balance");
+    "grand total combines only unreserved general and package withdrawal balances, excluding deposit balance");
+  log("Grand total includes unreserved general and package withdrawal balances, but excludes reserved and separate deposit balances");
   log("ALL WITHDRAWAL END-TO-END SCENARIOS PASSED");
 } catch (error) {
   console.error("[E2E] FAILED:", error?.stack || error);

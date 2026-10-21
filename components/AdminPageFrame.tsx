@@ -1,18 +1,12 @@
 "use client";
 
-import AdminGuard from "@/components/AdminGuard";
-import AdminShell from "@/components/AdminShell";
-
 export default function AdminPageFrame({
-  title,
   children,
 }: {
   title: string;
   children: React.ReactNode;
 }) {
-  return (
-    <AdminGuard>
-      <AdminShell title={title}>{children}</AdminShell>
-    </AdminGuard>
-  );
+  // The persistent AdminWorkspace in app/admin/layout.tsx owns the shell.
+  // Keep this wrapper for existing pages without remounting navigation.
+  return <>{children}</>;
 }

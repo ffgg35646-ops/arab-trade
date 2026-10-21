@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Layers3, RefreshCw, Wallet } from "lucide-react";
 
 type Account = {
@@ -68,6 +68,7 @@ function isValidPayoutAddress(network: string, address: string) {
 
 export default function WithdrawalsPage() {
   const [data, setData] = useState<Data | null>(null);
+  const dataRef = useRef<Data | null>(null);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [addresses, setAddresses] = useState<Record<string, string>>({});
   const [packageNetworks, setPackageNetworks] = useState<Record<string, string>>({});
@@ -92,16 +93,17 @@ export default function WithdrawalsPage() {
       const response = await fetch("/api/withdrawals", { credentials: "include", cache: "no-store" });
       const json = await response.json().catch(() => ({}));
       if (!response.ok || !json.success) {
-        showMessage(json.message || "تعذر تحميل بيانات السحب", "error");
+        if (!dataRef.current) showMessage(json.message || "تعذر تحميل بيانات السحب", "error");
         return;
       }
-      setData(json as Data);
+      dataRef.current = json as Data;
+      setData(dataRef.current);
       setGeneralNetwork((current) => {
         if (current && json.networks?.some((network: Network) => network.code === current)) return current;
         return json.networks?.[0]?.code || "";
       });
     } catch {
-      showMessage("تعذر تحميل بيانات السحب", "error");
+      if (!dataRef.current) showMessage("تعذر تحميل بيانات السحب", "error");
     } finally {
       if (showRefreshing) setRefreshing(false);
     }

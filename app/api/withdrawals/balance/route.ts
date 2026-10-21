@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       asset: "USDT",
+      generalWithdrawalBalance: generalAvailable,
       withdrawalBalance: round8(generalAvailable + packageAvailable),
       breakdown: {
         generalAvailable,

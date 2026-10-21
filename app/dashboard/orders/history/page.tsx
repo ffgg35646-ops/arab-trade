@@ -1,7 +1,7 @@
 "use client";
 
 import { RefreshCw, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Order = {
   _id: string;
@@ -73,9 +73,10 @@ export default function OrderHistoryPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const hasLoadedOnce = useRef(false);
 
   async function load() {
-    setLoading(true);
+    if (!hasLoadedOnce.current) setLoading(true);
     setError("");
 
     try {
@@ -95,8 +96,11 @@ export default function OrderHistoryPage() {
       }
 
       setOrders(Array.isArray(data.orders) ? data.orders : []);
+      hasLoadedOnce.current = true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "حدث خطأ");
+      if (!hasLoadedOnce.current) {
+        setError(e instanceof Error ? e.message : "حدث خطأ");
+      }
     } finally {
       setLoading(false);
     }

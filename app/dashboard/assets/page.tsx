@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import InternalNavbar from "@/components/InternalNavbar";
-import InternalSidebar from "@/components/InternalSidebar";
 import {
   Wallet,
   ArrowDownToLine,
@@ -232,13 +230,13 @@ export default function WalletPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#050a13]">
-        <InternalNavbar />
+        
 
         <div
           className="flex min-h-[calc(100vh-4rem)]"
           dir="rtl"
         >
-          <InternalSidebar />
+          
 
           <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
             <div className="mx-auto max-w-7xl space-y-6">
@@ -265,13 +263,13 @@ export default function WalletPage() {
 
   return (
     <div className="min-h-screen bg-[#050a13]">
-      <InternalNavbar />
+      
 
       <div
         className="flex min-h-[calc(100vh-4rem)]"
         dir="rtl"
       >
-        <InternalSidebar />
+        
 
         <main className="min-w-0 flex-1 text-white">
           <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">

@@ -605,104 +605,6 @@ export default function WithdrawalsPage() {
             </div>
           )}
 
-          <section className="space-y-4 rounded-2xl border border-slate-700 bg-[#08111e] p-4 md:p-5">
-            <div className="flex items-center gap-2">
-              <Wallet size={20} className="text-cyan-300" />
-              <h2 className="text-xl font-black">السحب العام</h2>
-            </div>
-
-            <p className="rounded-xl border border-emerald-400/15 bg-emerald-400/[0.04] p-3 text-sm leading-6 text-emerald-100">السحب العام مرتبط برصيد USDT المتاح في محفظة التداول. بعد تنفيذ بيع العملة مقابل USDT تُضاف حصيلة البيع بعد رسوم التداول إلى هذا الرصيد، ويمكن طلب سحبها من هنا. أرباح الباقات تظل منفصلة وتُسحب من قسم الباقات.</p>
-
-            <section className="space-y-3 rounded-xl border border-cyan-500/20 bg-[#0b1422] p-4">
-              <div>
-                <h3 className="font-bold">تقدير تحويل أرباح العملات إلى USDT</h3>
-                <p className="mt-1 text-xs leading-5 text-slate-400">اختر عملة موجودة في رصيد التداول وحدد الكمية. السعر من سوق Binance، وستظهر قيمة السوق وعمولة التداول التقديرية ثم عمولة السحب 5%. هذه معاينة فقط: لا تبيع العملة ولا تنشئ طلب سحب تلقائيًا.</p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-2 text-sm text-slate-300">
-                  <span>عملة الأرباح</span>
-                  <select value={conversionAsset} onChange={(event) => { setConversionAsset(event.target.value); setConversionQuantity(""); setConversionQuote(null); }} disabled={busy || hasPending || Boolean(conversionPendingOrder) || !spotBalances.length} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:opacity-50">
-                    {!spotBalances.length && <option value="">لا توجد أرصدة متاحة</option>}
-                    {spotBalances.map((row) => <option key={row.asset} value={row.asset}>{row.asset} — متاح {money(row.available)}</option>)}
-                  </select>
-                </label>
-                <label className="block space-y-2 text-sm text-slate-300">
-                  <span>الكمية المراد تحويل قيمتها</span>
-                  <input type="number" min="0.00000001" max={selectedSpotBalance?.available} step="0.00000001" value={conversionQuantity} disabled={busy || hasPending || Boolean(conversionPendingOrder) || !selectedSpotBalance} onChange={(event) => setConversionQuantity(event.target.value)} placeholder={selectedSpotBalance ? "الحد الأقصى " + money(selectedSpotBalance.available) + " " + conversionAsset : "اختر عملة أولًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:opacity-50" />
-                </label>
-              </div>
-              {quoteLoading && <p className="text-xs text-cyan-200">جاري حساب القيمة بسعر السوق الحالي…</p>}
-              {conversionQuote && (
-                conversionQuote.success ? (
-                  <div className="space-y-2 rounded-lg border border-slate-700 bg-[#050a13] p-3">
-                    <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
-                      <div><p className="text-slate-400">سعر {conversionAsset}</p><p className="mt-1 font-bold">{money(conversionQuote.priceUsdt || 0)} USDT</p></div>
-                      <div><p className="text-slate-400">القيمة السوقية التقديرية</p><p className="mt-1 font-bold">{money(conversionQuote.marketValueUsdt || 0)} USDT</p></div>
-                      <div><p className="text-slate-400">عمولة التداول التقديرية ({conversionQuote.tradingFeePercent || 0}%)</p><p className="mt-1 font-bold text-amber-200">{money(conversionQuote.estimatedTradingFeeUsdt || 0)} USDT</p></div>
-                      <div><p className="text-slate-400">بعد عمولة التداول</p><p className="mt-1 font-bold">{money(conversionQuote.estimatedAfterTradingFeeUsdt || 0)} USDT</p></div>
-                      <div><p className="text-slate-400">عمولة السحب (5%)</p><p className="mt-1 font-bold text-amber-200">{money(conversionQuote.estimatedWithdrawalFeeUsdt || 0)} USDT</p></div>
-                      <div><p className="text-slate-400">صافي السحب التقديري</p><p className="mt-1 text-lg font-black text-emerald-300">{money(conversionQuote.estimatedPayoutUsdt || 0)} USDT</p></div>
-                    </div>
-                    <p className="text-[11px] leading-5 text-slate-500">{conversionQuote.disclaimer || "السعر تقديري وقد يتغير قبل التنفيذ."}</p>
-                  </div>
-                ) : <p role="alert" className="rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 text-sm text-rose-200">{conversionQuote.message || "تعذر حساب القيمة"}</p>
-              )}
-            </section>
-
-            <div className="grid gap-4 lg:grid-cols-2">
-              <div className="grid gap-3 rounded-xl border border-slate-700 bg-[#0b1422] p-4 sm:grid-cols-2">
-                <label className="block space-y-2 text-sm text-slate-300">
-                  <span>العملة</span>
-                  <select value="USDT" disabled className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:opacity-100">
-                    <option value="USDT">USDT</option>
-                  </select>
-                </label>
-                <label className="block space-y-2 text-sm text-slate-300">
-                  <span>الشبكة</span>
-                  <select value={selectedGeneralNetwork} onChange={(event) => setGeneralNetwork(event.target.value)} disabled={busy || hasPending || !data?.networks.length} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:cursor-not-allowed disabled:opacity-50">
-                    {!data?.networks.length && <option value="">لا توجد شبكات</option>}
-                    {data?.networks.map((network) => <option key={network.code} value={network.code}>{network.name} ({network.code})</option>)}
-                  </select>
-                </label>
-              </div>
-
-              <div className="space-y-3 rounded-xl border border-slate-700 bg-[#0b1422] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-slate-300">الرصيد المتاح</span>
-                  <strong className="text-xl font-black text-white">{data ? money(data.general.available) : "—"} USDT</strong>
-                </div>
-                <label className="block space-y-2 text-sm text-slate-300">
-                  <span>مبلغ السحب قبل العمولة (USDT)</span>
-                  <input type="number" min={data?.general.minimum || undefined} max={data?.general.available} step="0.00000001" value={generalAmount} disabled={busy || hasPending || !data?.general.configured} onChange={(event) => setGeneralAmount(event.target.value)} placeholder={data?.general.configured ? "الحد الأدنى " + money(data.general.minimum) + " USDT" : "الحد الأدنى يحدده الأدمن"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
-                </label>
-                <div className="rounded-lg border border-slate-700 bg-[#050a13] p-3 text-sm">
-                  <div className="flex items-center justify-between gap-3 text-slate-400">
-                    <span>عمولة السحب ({data?.general.feePercent ?? 5}%)</span>
-                    <strong className="text-amber-200">{money(Math.round(Math.max(0, Number(generalAmount) || 0) * (Number(data?.general.feePercent ?? 5) / 100) * 1e8) / 1e8)} USDT</strong>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-slate-300">صافي المبلغ الذي سيُرسل</span>
-                    <strong className="text-emerald-300">{money(Math.max(0, Number(generalAmount) || 0) - Math.round(Math.max(0, Number(generalAmount) || 0) * (Number(data?.general.feePercent ?? 5) / 100) * 1e8) / 1e8)} USDT</strong>
-                  </div>
-                  <p className="mt-2 text-[11px] text-slate-500">تُخصم العمولة من المبلغ الإجمالي، ولا يُرسل إلا الصافي الموضح.</p>
-                </div>
-              </div>
-            </div>
-
-            <label className="block space-y-2 text-sm text-slate-300">
-              <span>عنوان الدفع</span>
-              <input value={generalAddress} maxLength={200} disabled={busy || hasPending} onChange={(event) => setGeneralAddress(event.target.value)} placeholder={selectedGeneralNetwork === "TRC20" ? "عنوان TRON يبدأ بـ T وطوله 34 حرفًا" : "عنوان BEP20 يبدأ بـ 0x وطوله 42 حرفًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
-            </label>
-
-            <button type="button" onClick={submitGeneral} disabled={busy || hasPending || !data?.general.configured || !selectedGeneralNetwork || !data?.networks.length} className="w-full rounded-xl bg-blue-600 px-4 py-3 font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">
-              طلب سحب
-            </button>
-            <button type="button" onClick={() => void submitConvertedGeneral()} disabled={busy || hasPending || (!conversionPendingOrder && (!conversionQuantity || !conversionQuote?.success)) || !selectedGeneralNetwork || !data?.general.configured} className="w-full rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 font-black text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-40">
-              {busy ? "جارٍ تنفيذ التحويل والسحب..." : conversionPendingOrder ? "متابعة أمر بيع " + conversionPendingOrder.asset + " وإنشاء السحب" : conversionAsset === "USDT" ? "طلب سحب الكمية المحددة من USDT" : "بيع " + conversionAsset + " بسعر السوق ثم طلب السحب"}
-            </button>
-            <p className="text-[11px] leading-5 text-slate-500">للعملات غير USDT: يُرسل أولًا أمر بيع سوق إلى Binance. لا يُنشأ طلب السحب إلا بعد تأكيد التنفيذ وقراءة حصيلة البيع. إذا تعذّر إنشاء طلب السحب بعد البيع، تظل حصيلة USDT في محفظتك.</p>
-          </section>
-
           <section className="space-y-4">
             <div className="flex items-center gap-2">
               <Layers3 size={20} className="text-cyan-300" />
@@ -776,6 +678,87 @@ export default function WithdrawalsPage() {
                 );
               })}
             </div>
+          </section>
+
+          <section className="space-y-4 rounded-2xl border border-cyan-500/20 bg-[#08111e] p-4 md:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Wallet size={20} className="text-cyan-300" />
+                <h2 className="text-xl font-black">السحب العام</h2>
+              </div>
+              <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.05] px-4 py-2">
+                <span className="text-xs text-slate-300">الرصيد المتاح عبر {selectedGeneralNetwork || "الشبكة المحددة"}</span>
+                <strong className="mt-1 block text-lg font-black text-emerald-300">{data ? money(data.general.available) : "—"} USDT</strong>
+              </div>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-[1fr_1.35fr_1fr]">
+              <label className="block space-y-2 text-sm text-slate-300">
+                <span>مبلغ السحب (USDT)</span>
+                <input type="number" min={data?.general.minimum || undefined} max={data?.general.available} step="0.00000001" value={generalAmount} disabled={busy || hasPending || !data?.general.configured} onChange={(event) => setGeneralAmount(event.target.value)} placeholder={data?.general.configured ? "الحد الأدنى " + money(data.general.minimum) : "الحد الأدنى يحدده الأدمن"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
+              </label>
+
+              <label className="block space-y-2 text-sm text-slate-300">
+                <span>عنوان السحب</span>
+                <input value={generalAddress} maxLength={200} disabled={busy || hasPending} onChange={(event) => setGeneralAddress(event.target.value)} placeholder={selectedGeneralNetwork === "TRC20" ? "عنوان TRC20 يبدأ بـ T وطوله 34 حرفًا" : "عنوان BEP20 يبدأ بـ 0x وطوله 42 حرفًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
+              </label>
+
+              <label className="block space-y-2 text-sm text-slate-300">
+                <span>شبكة السحب</span>
+                <select value={selectedGeneralNetwork} onChange={(event) => setGeneralNetwork(event.target.value)} disabled={busy || hasPending || !data?.networks.length} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:cursor-not-allowed disabled:opacity-50">
+                  {!data?.networks.length && <option value="">لا توجد شبكات</option>}
+                  {data?.networks.map((network) => <option key={network.code} value={network.code}>{network.name} ({network.code})</option>)}
+                </select>
+              </label>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#050a13] p-3">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+                <span className="text-slate-400">العمولة ({data?.general.feePercent ?? 5}%): <strong className="text-amber-200">{money(Math.round(Math.max(0, Number(generalAmount) || 0) * (Number(data?.general.feePercent ?? 5) / 100) * 1e8) / 1e8)} USDT</strong></span>
+                <span className="text-slate-300">صافي المبلغ: <strong className="text-emerald-300">{money(Math.max(0, Number(generalAmount) || 0) - Math.round(Math.max(0, Number(generalAmount) || 0) * (Number(data?.general.feePercent ?? 5) / 100) * 1e8) / 1e8)} USDT</strong></span>
+              </div>
+              <button type="button" onClick={submitGeneral} disabled={busy || hasPending || !data?.general.configured || !selectedGeneralNetwork || !data?.networks.length} className="min-w-32 rounded-lg bg-blue-600 px-8 py-3 font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40">
+                {busy ? "جارٍ السحب..." : "سحب"}
+              </button>
+            </div>
+
+            <details className="rounded-xl border border-slate-700 bg-[#0b1422] p-3">
+              <summary className="cursor-pointer select-none text-sm font-bold text-cyan-100">تحويل عملات التداول إلى USDT قبل السحب (اختياري)</summary>
+              <p className="mt-2 text-xs leading-5 text-slate-400">لتحويل عملة أخرى من محفظة التداول، اختر العملة والكمية. سيتم عرض السعر والرسوم أولًا، ولا يُرسل أمر البيع إلا عند الضغط على زر التنفيذ أدناه.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="block space-y-2 text-sm text-slate-300">
+                  <span>عملة التداول</span>
+                  <select value={conversionAsset} onChange={(event) => { setConversionAsset(event.target.value); setConversionQuantity(""); setConversionQuote(null); }} disabled={busy || hasPending || Boolean(conversionPendingOrder) || !spotBalances.length} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:opacity-50">
+                    {!spotBalances.length && <option value="">لا توجد أرصدة متاحة</option>}
+                    {spotBalances.map((row) => <option key={row.asset} value={row.asset}>{row.asset} — متاح {money(row.available)}</option>)}
+                  </select>
+                </label>
+                <label className="block space-y-2 text-sm text-slate-300">
+                  <span>الكمية المراد تحويلها</span>
+                  <input type="number" min="0.00000001" max={selectedSpotBalance?.available} step="0.00000001" value={conversionQuantity} disabled={busy || hasPending || Boolean(conversionPendingOrder) || !selectedSpotBalance} onChange={(event) => setConversionQuantity(event.target.value)} placeholder={selectedSpotBalance ? "الحد الأقصى " + money(selectedSpotBalance.available) + " " + conversionAsset : "اختر عملة أولًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:opacity-50" />
+                </label>
+              </div>
+              {quoteLoading && <p className="mt-3 text-xs text-cyan-200">جاري حساب القيمة بسعر السوق الحالي…</p>}
+              {conversionQuote && (
+                conversionQuote.success ? (
+                  <div className="mt-3 space-y-2 rounded-lg border border-slate-700 bg-[#050a13] p-3">
+                    <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
+                      <div><p className="text-slate-400">سعر {conversionAsset}</p><p className="mt-1 font-bold">{money(conversionQuote.priceUsdt || 0)} USDT</p></div>
+                      <div><p className="text-slate-400">القيمة السوقية التقديرية</p><p className="mt-1 font-bold">{money(conversionQuote.marketValueUsdt || 0)} USDT</p></div>
+                      <div><p className="text-slate-400">عمولة التداول التقديرية ({conversionQuote.tradingFeePercent || 0}%)</p><p className="mt-1 font-bold text-amber-200">{money(conversionQuote.estimatedTradingFeeUsdt || 0)} USDT</p></div>
+                      <div><p className="text-slate-400">بعد عمولة التداول</p><p className="mt-1 font-bold">{money(conversionQuote.estimatedAfterTradingFeeUsdt || 0)} USDT</p></div>
+                      <div><p className="text-slate-400">عمولة السحب (5%)</p><p className="mt-1 font-bold text-amber-200">{money(conversionQuote.estimatedWithdrawalFeeUsdt || 0)} USDT</p></div>
+                      <div><p className="text-slate-400">صافي السحب التقديري</p><p className="mt-1 text-lg font-black text-emerald-300">{money(conversionQuote.estimatedPayoutUsdt || 0)} USDT</p></div>
+                    </div>
+                    <p className="text-[11px] leading-5 text-slate-500">{conversionQuote.disclaimer || "السعر تقديري وقد يتغير قبل التنفيذ."}</p>
+                  </div>
+                ) : <p role="alert" className="mt-3 rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 text-sm text-rose-200">{conversionQuote.message || "تعذر حساب القيمة"}</p>
+              )}
+              <button type="button" onClick={() => void submitConvertedGeneral()} disabled={busy || hasPending || (!conversionPendingOrder && (!conversionQuantity || !conversionQuote?.success)) || !selectedGeneralNetwork || !data?.general.configured} className="mt-3 w-full rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 font-black text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-40">
+                {busy ? "جارٍ تنفيذ التحويل والسحب..." : conversionPendingOrder ? "متابعة أمر بيع " + conversionPendingOrder.asset + " وإنشاء السحب" : conversionAsset === "USDT" ? "سحب كمية USDT المحددة" : "بيع " + conversionAsset + " بسعر السوق ثم السحب"}
+              </button>
+              <p className="mt-2 text-[11px] leading-5 text-slate-500">للعملات غير USDT: لا يُنشأ طلب السحب إلا بعد تأكيد تنفيذ البيع وقراءة الحصيلة. إذا تعذّر إنشاء الطلب بعد البيع، تظل حصيلة USDT في محفظتك.</p>
+            </details>
           </section>
 
           <section className="space-y-4 rounded-2xl border border-slate-700 bg-[#08111e] p-4 md:p-5">

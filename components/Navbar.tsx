@@ -19,9 +19,9 @@ export default function Navbar() {
 
   return (
     <header dir="rtl" className="sticky top-0 z-50 border-b border-white/10 bg-[#050a13]/95 backdrop-blur-xl">
-      <div className="mx-auto flex h-20 max-w-[1500px] items-center justify-between px-5">
+      <div className="mx-auto flex h-16 max-w-[1500px] items-center justify-between gap-3 px-3 sm:h-20 sm:px-5">
         <Link href="/" className="shrink-0" onClick={() => setOpen(false)}>
-          <img src="/logo.svg" alt="عرب تريد" className="h-11 w-auto" />
+          <img src="/logo.svg" alt="عرب تريد" className="h-9 w-auto sm:h-11" />
         </Link>
         <nav className="hidden items-center gap-2 lg:flex" aria-label="التنقل الرئيسي">
           {links.map((link) => {
@@ -33,11 +33,11 @@ export default function Navbar() {
           <Link href="/login" className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-slate-200 transition hover:bg-white/5">تسجيل الدخول</Link>
           <Link href="/register" className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">إنشاء حساب</Link>
         </div>
-        <button type="button" onClick={() => setOpen(v => !v)} className="rounded-xl border border-white/10 p-2 text-slate-200 lg:hidden" aria-label={open ? "إغلاق القائمة" : "فتح القائمة"}>
+        <button type="button" onClick={() => setOpen(v => !v)} className="shrink-0 rounded-xl border border-white/10 p-2 text-slate-200 lg:hidden" aria-label={open ? "إغلاق القائمة" : "فتح القائمة"}>
           {open ? <X size={21} /> : <Menu size={21} />}
         </button>
       </div>
-      {open && <nav className="border-t border-white/10 bg-[#07101d] p-3 lg:hidden" aria-label="التنقل للأجهزة الصغيرة">
+      {open && <nav className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-white/10 bg-[#07101d] p-3 lg:hidden" aria-label="التنقل للأجهزة الصغيرة">
         {links.map((link) => {
           const active = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href + "/"));
           return <Link key={link.href} href={link.href} onClick={() => setOpen(false)} className={`block rounded-xl px-4 py-3 text-sm transition ${active ? "bg-blue-500/10 text-cyan-300" : "text-slate-300 hover:bg-white/5"}`}>{link.label}</Link>;

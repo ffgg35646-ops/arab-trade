@@ -126,14 +126,7 @@ export default function UsersPage() {
     }
   }
 
-  async function toggleReferrals(userId: string) {
-    const willOpen = !expandedReferralIds[userId];
-    setExpandedReferralIds((current) => ({ ...current, [userId]: willOpen }));
-
-    if (!willOpen || Object.prototype.hasOwnProperty.call(referralChildren, userId)) {
-      return;
-    }
-
+  async function loadReferralChildren(userId: string) {
     setReferralLoading((current) => ({ ...current, [userId]: true }));
     setReferralErrors((current) => ({ ...current, [userId]: "" }));
 
@@ -159,6 +152,15 @@ export default function UsersPage() {
       }));
     } finally {
       setReferralLoading((current) => ({ ...current, [userId]: false }));
+    }
+  }
+
+  function toggleReferrals(userId: string) {
+    const willOpen = !expandedReferralIds[userId];
+    setExpandedReferralIds((current) => ({ ...current, [userId]: willOpen }));
+
+    if (willOpen && !Object.prototype.hasOwnProperty.call(referralChildren, userId)) {
+      void loadReferralChildren(userId);
     }
   }
 
@@ -189,14 +191,7 @@ export default function UsersPage() {
           <span>{referralErrors[parentId]}</span>
           <button
             type="button"
-            onClick={() => {
-              setReferralChildren((current) => {
-                const next = { ...current };
-                delete next[parentId];
-                return next;
-              });
-              void toggleReferrals(parentId);
-            }}
+            onClick={() => void loadReferralChildren(parentId)}
             className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-300"
           >
             إعادة المحاولة

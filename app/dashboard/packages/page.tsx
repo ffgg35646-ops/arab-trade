@@ -86,8 +86,8 @@ export default function UserPackagesPage() {
     .reduce((sum, x) => sum + Number(x.available || 0), 0) || 0;
   const activePlan = data?.userPackages.find((x) => x.status === "active");
 
-  // The page shows only the currently enabled package offers; historical changes stay off-screen.
-  const visiblePackages = (data?.packages ?? []).slice(0, 4);
+  // Show every package enabled by the admin; disabled packages are filtered by /api/packages.
+  const visiblePackages = data?.packages ?? [];
 
 
   return <>

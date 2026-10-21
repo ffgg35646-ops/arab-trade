@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import InternalNavbar from "@/components/InternalNavbar";
-import InternalSidebar from "@/components/InternalSidebar";
 import {
   User,
   Mail,
@@ -225,10 +223,10 @@ export default function AccountPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#050a13]">
-        <InternalNavbar />
+        
 
         <div className="flex min-h-[calc(100vh-5rem)]" dir="rtl">
-          <InternalSidebar />
+          
 
           <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
             <div className="mx-auto max-w-7xl">
@@ -246,10 +244,10 @@ export default function AccountPage() {
 
   return (
     <div className="min-h-screen bg-[#050a13]">
-      <InternalNavbar />
+      
 
       <div className="flex min-h-[calc(100vh-5rem)]" dir="rtl">
-        <InternalSidebar />
+        
 
         <main className="min-w-0 flex-1 text-white">
           <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">

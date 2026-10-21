@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { invalidateAdminGuardCache } from "@/components/AdminGuard";
 
 type Counts = {
   deposits: number;
@@ -10,6 +11,57 @@ type Counts = {
   kyc: number;
   total: number;
 };
+
+const ADMIN_COUNTS_CACHE_MS = 15_000;
+let cachedAdminCounts: Counts = { deposits: 0, withdrawals: 0, kyc: 0, total: 0 };
+let cachedAdminCountsAt = 0;
+let pendingAdminCountsRequest: Promise<Counts | null> | null = null;
+
+function invalidateAdminCountsCache() {
+  cachedAdminCountsAt = 0;
+  cachedAdminCounts = { deposits: 0, withdrawals: 0, kyc: 0, total: 0 };
+  pendingAdminCountsRequest = null;
+}
+
+async function getAdminCounts(): Promise<Counts | null> {
+  if (Date.now() - cachedAdminCountsAt < ADMIN_COUNTS_CACHE_MS) {
+    return cachedAdminCounts;
+  }
+  if (pendingAdminCountsRequest) return pendingAdminCountsRequest;
+
+  const request = (async () => {
+    try {
+      const response = await fetch("/api/admin/notifications-summary", {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!response.ok) return null;
+
+      const json = await response.json();
+      if (!json?.success || !json?.counts) return null;
+
+      const counts: Counts = {
+        deposits: Number(json.counts.deposits || 0),
+        withdrawals: Number(json.counts.withdrawals || 0),
+        kyc: Number(json.counts.kyc || 0),
+        total: Number(json.counts.total || 0),
+      };
+
+      cachedAdminCounts = counts;
+      cachedAdminCountsAt = Date.now();
+      return counts;
+    } catch {
+      return null;
+    }
+  })();
+
+  pendingAdminCountsRequest = request;
+  try {
+    return await request;
+  } finally {
+    if (pendingAdminCountsRequest === request) pendingAdminCountsRequest = null;
+  }
+}
 
 const groups = [
   {
@@ -62,27 +114,8 @@ export default function AdminShell({
   });
 
   const loadCounts = useCallback(async () => {
-    try {
-      const response = await fetch("/api/admin/notifications-summary", {
-        credentials: "include",
-        cache: "no-store",
-      });
-
-      if (!response.ok) return;
-
-      const json = await response.json();
-
-      if (json?.success && json?.counts) {
-        setCounts({
-          deposits: Number(json.counts.deposits || 0),
-          withdrawals: Number(json.counts.withdrawals || 0),
-          kyc: Number(json.counts.kyc || 0),
-          total: Number(json.counts.total || 0),
-        });
-      }
-    } catch {
-      // إبقاء آخر أرقام ناجحة بدل كسر واجهة الأدمن.
-    }
+    const nextCounts = await getAdminCounts();
+    if (nextCounts) setCounts(nextCounts);
   }, []);
 
   useEffect(() => {
@@ -90,7 +123,7 @@ export default function AdminShell({
 
     const timer = window.setInterval(() => {
       void loadCounts();
-    }, 3000);
+    }, ADMIN_COUNTS_CACHE_MS);
 
     return () => window.clearInterval(timer);
   }, [loadCounts]);
@@ -108,6 +141,8 @@ export default function AdminShell({
         credentials: "include",
       });
     } finally {
+      invalidateAdminCountsCache();
+      invalidateAdminGuardCache();
       router.replace("/admin/login");
       setBusy(false);
     }

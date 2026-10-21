@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
-import { Loader2, RefreshCw, Clock3, Gift } from "lucide-react";
+import { Loader2, RefreshCw, Clock3, Gift, ArrowLeftRight } from "lucide-react";
 
 type Plan = { _id: string; name: string; description?: string; price: number; asset: string; durationDays: number; dailyProfit?: number };
 type DepositBalance = { asset: string; available: number; locked: number };
 type UserPlan = { _id: string; packageId?: string; packageName: string; cancellationRefund?: number; cancelledAt?: string; investedAmount: number; asset: string; durationDays: number; status: string; availableEarnings: number; lockedEarnings: number; totalRealizedEarnings: number; activatedAt: string; lastProfitAt?: string; dailyProfit?: number; nextCollectAt?: string; collectWindowEndsAt?: string; collectWindowOpen?: boolean; };
 type LedgerRow = { _id: string; type: string; asset: string; amount: number; note?: string; createdAt: string; userPackageId?: { packageName?: string } | null };
 type Data = { packages: Plan[]; depositBalances: DepositBalance[]; userPackages: UserPlan[]; packageLedger?: LedgerRow[]; policy?: { earningsNotice?: string; cancellationNotice?: string } };
+type PackageChangeHistoryItem = { previous: UserPlan; next: UserPlan | null; occurredAt: number; refund: number };
 const money = (n: number) => new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 }).format(Number(n || 0));
 const packageLedgerLabels: Record<string, string> = {
   activation: "تفعيل باقة",
@@ -96,6 +97,44 @@ export default function UserPackagesPage() {
     .reduce((sum, x) => sum + Number(x.available || 0), 0) || 0;
   const activePlan = data?.userPackages.find((x) => x.status === "active");
 
+  const packageChangeHistory: PackageChangeHistoryItem[] = (() => {
+    const packages = data?.userPackages ?? [];
+    const matchedNextPackageIds = new Set<string>();
+
+    return packages
+      .filter((item) => item.status === "cancelled" && item.cancelledAt)
+      .map((previous) => {
+        const occurredAt = new Date(previous.cancelledAt as string).getTime();
+        const next = packages
+          .filter((candidate) => candidate._id !== previous._id && !matchedNextPackageIds.has(candidate._id))
+          .map((candidate) => ({
+            candidate,
+            activatedAt: new Date(candidate.activatedAt).getTime(),
+          }))
+          .filter(({ activatedAt }) =>
+            Number.isFinite(activatedAt) &&
+            activatedAt >= occurredAt - 2 * 60 * 1000 &&
+            activatedAt <= occurredAt + 5 * 60 * 1000
+          )
+          .sort((a, b) => Math.abs(a.activatedAt - occurredAt) - Math.abs(b.activatedAt - occurredAt));
+
+        const nextPackage = next[0]?.candidate ?? null;
+        if (nextPackage) matchedNextPackageIds.add(nextPackage._id);
+
+        return {
+          previous,
+          next: nextPackage,
+          occurredAt,
+          refund: Math.max(0, Number(previous.cancellationRefund || 0)),
+        };
+      })
+      .filter((item) => item.refund > 0 || item.next !== null)
+      .sort((a, b) => b.occurredAt - a.occurredAt);
+  })();
+
+  const packageChangeCount = packageChangeHistory.filter((item) => item.next !== null).length;
+  const packageRefundTotal = packageChangeHistory.reduce((total, item) => total + item.refund, 0);
+
   return <>
     <InternalNavbar />
     <div className="mx-auto flex max-w-[1700px]">
@@ -147,6 +186,71 @@ export default function UserPackagesPage() {
             {windowOpen && <p className="mt-3 text-xs font-bold text-amber-200">فرصة الجمع مفتوحة الآن — تنتهي خلال {formatRemaining(endsAt - clockNow)}.</p>}
           </section>;
         })()}
+        <section className="mt-5 rounded-xl border border-white/10 bg-[#07101d] p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-black">تاريخ تغيير الباقات</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">كل تغيير في مكان واحد: الباقة السابقة، الباقة الجديدة، وقيمة الاسترداد التي أُضيفت إلى أرباح الباقة السابقة.</p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[11px]">
+              <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-slate-300">عدد التغييرات: <strong className="text-white">{packageChangeCount}</strong></span>
+              <span className="rounded-lg border border-cyan-300/15 bg-cyan-300/[0.05] px-3 py-2 text-cyan-100">إجمالي الاسترداد: <strong>{money(packageRefundTotal)} USDT</strong></span>
+            </div>
+          </div>
+
+          {packageChangeHistory.length ? (
+            <div className="mt-4 space-y-3">
+              {packageChangeHistory.map((item, index) => (
+                <article key={item.previous._id} className="rounded-xl border border-white/[0.08] bg-black/15 p-3 sm:p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px] font-bold text-slate-300">عملية #{packageChangeHistory.length - index}</span>
+                      <span className={item.next ? "rounded-md bg-cyan-300/10 px-2 py-1 text-[10px] font-bold text-cyan-200" : "rounded-md bg-slate-500/10 px-2 py-1 text-[10px] font-bold text-slate-300"}>
+                        {item.next ? "تم تغيير الباقة" : "تم إلغاء الباقة"}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-500">
+                      {Number.isFinite(item.occurredAt) ? new Date(item.occurredAt).toLocaleString("ar-EG") : "—"}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+                    <div className="rounded-lg border border-rose-300/10 bg-rose-300/[0.035] p-3">
+                      <p className="text-[10px] text-slate-500">الباقة السابقة</p>
+                      <h3 className="mt-1 text-sm font-black text-white">{item.previous.packageName}</h3>
+                      <p className="mt-1 text-xs text-slate-400">قيمة التفعيل: {money(Number(item.previous.investedAmount || 0))} {item.previous.asset}</p>
+                    </div>
+
+                    <div className="hidden items-center justify-center text-slate-500 md:flex">
+                      <ArrowLeftRight size={18} aria-hidden="true" />
+                    </div>
+
+                    <div className="rounded-lg border border-emerald-300/10 bg-emerald-300/[0.035] p-3">
+                      <p className="text-[10px] text-slate-500">الباقة الجديدة</p>
+                      <h3 className="mt-1 text-sm font-black text-white">{item.next?.packageName || "لا توجد باقة بديلة"}</h3>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {item.next ? `قيمة التفعيل: ${money(Number(item.next.investedAmount || 0))} ${item.next.asset}` : "تم الإلغاء دون تفعيل باقة أخرى"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-cyan-300/10 bg-cyan-300/[0.035] px-3 py-2.5">
+                    <div>
+                      <p className="text-xs font-bold text-slate-200">الاسترداد إلى رصيد أرباح الباقة السابقة</p>
+                      <p className="mt-1 text-[10px] text-slate-500">لا يُضاف إلى رصيد الإيداع.</p>
+                    </div>
+                    <strong className="font-mono text-sm text-cyan-200">+{money(item.refund)} {item.previous.asset || "USDT"}</strong>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-lg border border-dashed border-white/10 p-6 text-center text-xs text-slate-500">
+              لا توجد تغييرات أو استردادات مسجلة حتى الآن.
+            </div>
+          )}
+        </section>
+
         {data?.userPackages?.length ? (
           <section className="mt-5 rounded-xl border border-white/10 bg-[#07101d] p-4">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -190,11 +294,6 @@ export default function UserPackagesPage() {
                       <div className="mt-1 text-sm font-bold">{money(item.totalRealizedEarnings)} {item.asset}</div>
                     </div>
                   </div>
-                  {Number(item.cancellationRefund || 0) > 0 && (
-                    <p className="mt-3 text-xs text-cyan-200">
-                      استرداد مسجل لهذه الباقة: {money(Number(item.cancellationRefund || 0))} {item.asset}
-                    </p>
-                  )}
                   {item.cancelledAt && (
                     <p className="mt-1 text-[11px] text-slate-500">
                       تاريخ الإلغاء: {new Date(item.cancelledAt).toLocaleDateString("ar-EG")}

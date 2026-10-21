@@ -247,6 +247,17 @@ export default function InternalNavbar() {
           >
             التداول
           </Link>
+
+          <Link
+            href="/dashboard/packages"
+            className={`rounded-xl px-3 py-2 text-sm transition ${
+              isActive(pathname, "/dashboard/packages")
+                ? "bg-blue-500/10 text-cyan-300"
+                : "text-slate-300 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            الباقات
+          </Link>
         </nav>
 
         {/* Right actions */}
@@ -396,10 +407,21 @@ export default function InternalNavbar() {
               التداول
             </Link>
 
+            <Link
+              href="/dashboard/packages"
+              onClick={() => setMobile(false)}
+              className={`rounded-xl px-3 py-3 text-sm transition ${
+                isActive(pathname, "/dashboard/packages")
+                  ? "bg-blue-500/10 text-cyan-300"
+                  : "text-slate-300 hover:bg-white/5"
+              }`}
+            >
+              الباقات
+            </Link>
+
             {/* Mobile workspace shortcuts replace the desktop sidebar on small screens. */}
             <div className="grid grid-cols-2 gap-1 rounded-2xl border border-white/5 bg-white/[0.015] p-1">
               {[
-                ["الباقات", "/dashboard/packages"],
                 ["السحب", "/dashboard/withdrawals"],
                 ["التمويل", "/dashboard/funding"],
                 ["أوامر التداول", "/dashboard/orders"],

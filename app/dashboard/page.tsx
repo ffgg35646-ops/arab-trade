@@ -3,18 +3,8 @@ import { apiFetch } from "@/lib/frontend-api";
 
 import Link from "next/link";
 import {
-  ArrowDownToLine,
-  BadgeCheck,
-  ChevronLeft,
-  CircleHelp,
   Eye,
-  Gift,
-  ShieldCheck,
-  TrendingUp,
   UserRound,
-  Users,
-  Wallet,
-  BarChart3,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import InternalNavbar from "@/components/InternalNavbar";
@@ -268,7 +258,7 @@ export default function DashboardPage() {
 
             </div>
 
-            <div className="mb-6 grid gap-4 xl:grid-cols-[1.4fr_0.8fr]">
+            <div className="mb-6">
               <Panel
                 title="القيمة الإجمالية"
                 description="إجمالي الحساب يجمع أرصدة USDT والعملات داخل محافظ التداول والتمويل، دون احتساب أي رصيد مرتين."
@@ -294,37 +284,10 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                      <Link
-                        href="/dashboard/assets/deposit"
-                        className="flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-xs font-bold"
-                      >
-                        <ArrowDownToLine size={15} />
-                        إيداع
-                      </Link>
 
-
-                      <Link
-                        href="/dashboard/markets"
-                        className="flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-400/15"
-                      >
-                        <BarChart3 size={15} />
-                        الأسواق
-                      </Link>
-
-                    </div>
                   </div>
 
-                  <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
-                      <div className="text-xs text-slate-600">
-                        أرباح / خسائر اليوم
-                      </div>
-                      <div className="mt-2 font-mono text-sm text-slate-500">
-                        —
-                      </div>
-                    </div>
-
+                  <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     <div className="rounded-xl border border-white/5 bg-white/[0.02] p-4">
                       <div className="text-xs text-slate-600">
                         الرصيد المتاح
@@ -369,68 +332,6 @@ export default function DashboardPage() {
 
             <div className="mb-6">
               <ActionCards />
-            </div>
-
-            <div className="mb-6 grid gap-4 xl:grid-cols-3">
-
-              <Panel
-                title="حالة الحساب"
-                description="حالة التوثيق والأمان"
-              >
-                <div className="p-5">
-                  <div className={`rounded-xl border p-4 ${
-                    user?.isVerified
-                      ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
-                      : "border-red-400/20 bg-red-400/10 text-red-300"
-                  }`}>
-                    {user?.isVerified
-                      ? "الحساب موثق"
-                      : "الحساب يحتاج توثيق"}
-                  </div>
-
-                  {!user?.isVerified && (
-                    <Link
-                      href="/dashboard/account/verification"
-                      className="mt-4 block rounded-xl bg-cyan-500 px-4 py-3 text-center text-sm font-bold text-black"
-                    >
-                      توثيق الحساب
-                    </Link>
-                  )}
-                </div>
-              </Panel>
-
-
-              <Panel
-                title="عمليات سريعة"
-                description="الوصول للخدمات"
-              >
-                <div className="grid gap-2 p-5">
-                  <Link
-                    href="/dashboard/assets/transfer"
-                    className="rounded-xl border border-white/10 p-3 text-center text-sm"
-                  >
-                    تحويل
-                  </Link>
-
-                  <Link
-                    href="/trading/spot"
-                    className="rounded-xl border border-white/10 p-3 text-center text-sm"
-                  >
-                    التداول
-                  </Link>
-                </div>
-              </Panel>
-
-
-              <Panel
-                title="آخر النشاطات"
-                description="عمليات الحساب"
-              >
-                <div className="p-5 text-sm text-slate-400">
-                  يتم تحميل العمليات من النظام الحقيقي
-                </div>
-              </Panel>
-
             </div>
 
             <div className="mb-6 rounded-2xl border border-white/10 bg-[#07101d] p-5">

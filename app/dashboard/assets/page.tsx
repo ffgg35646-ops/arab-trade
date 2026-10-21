@@ -138,6 +138,7 @@ export default function WalletPage() {
   });
 
   const [depositBalances, setDepositBalances] = useState<SplitBalance[]>([]);
+  const [generalWithdrawalBalance, setGeneralWithdrawalBalance] = useState<number | null>(null);
 
   const [transactions, setTransactions] = useState<
     TransactionItem[]
@@ -158,10 +159,16 @@ export default function WalletPage() {
 
       setError("");
 
-      const response = await fetch("/api/wallet", {
-        credentials: "include",
-        cache: "no-store",
-      });
+      const [response, withdrawalBalanceResponse] = await Promise.all([
+        fetch("/api/wallet", {
+          credentials: "include",
+          cache: "no-store",
+        }),
+        fetch("/api/withdrawals/balance", {
+          credentials: "include",
+          cache: "no-store",
+        }).catch(() => null),
+      ]);
 
       const data = await response.json();
 
@@ -175,6 +182,20 @@ export default function WalletPage() {
       setWallet(data.wallet);
       setDepositBalances(Array.isArray(data.depositBalances) ? data.depositBalances : []);
       setTransactions(data.transactions || []);
+
+      if (withdrawalBalanceResponse?.ok) {
+        try {
+          const withdrawalData = await withdrawalBalanceResponse.json();
+          const amount = Number(
+            withdrawalData?.generalWithdrawalBalance ?? withdrawalData?.breakdown?.generalAvailable
+          );
+          if (Number.isFinite(amount) && amount >= 0) {
+            setGeneralWithdrawalBalance(amount);
+          }
+        } catch {
+          // Keep the last known general withdrawal balance.
+        }
+      }
     } catch (error: any) {
       setError(
         error?.message ||
@@ -403,15 +424,17 @@ export default function WalletPage() {
               <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#08111e] to-[#0b1628] p-6">
                 <div className="mb-4 flex items-center justify-between">
                   <span className="text-xs text-slate-500">
-                    إجمالي المتاح
+                    السحب العام
                   </span>
-                  <ArrowDownToLine size={17} className="text-emerald-300" />
+                  <ArrowUpFromLine size={17} className="text-emerald-300" />
                 </div>
 
                 <div className="text-2xl font-black">
-                  {displayMoney(wallet.totalAccountAvailableUsd ?? wallet.totalAvailableUsd)}
+                  {generalWithdrawalBalance === null
+                    ? (loading ? "..." : "—")
+                    : displayMoney(generalWithdrawalBalance)}
                   <span className="mr-2 text-xs text-slate-500">
-                    USD
+                    USDT
                   </span>
                 </div>
               </div>

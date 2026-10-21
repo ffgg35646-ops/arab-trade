@@ -264,41 +264,6 @@ export default function ReferralPage() {
                   </div>
                 </div>
 
-                {data.commissionsByAsset.length > 0 && (
-                  <section className="mt-6 rounded-2xl border border-white/10 bg-[#07101d] p-5 md:p-6">
-                    <div className="mb-5">
-                      <h2 className="text-lg font-black">تفاصيل عمولات الإحالة</h2>
-                      <p className="mt-1 text-xs leading-6 text-slate-500">
-                        الأرصدة مفصولة حسب الأصل لتجنب جمع عملات مختلفة في إجمالي واحد.
-                      </p>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[600px] text-right text-sm">
-                        <thead>
-                          <tr className="border-b border-white/10 text-xs text-slate-500">
-                            <th className="px-3 py-3 font-semibold">الأصل</th>
-                            <th className="px-3 py-3 font-semibold">الإجمالي</th>
-                            <th className="px-3 py-3 font-semibold">قيد الانتظار</th>
-                            <th className="px-3 py-3 font-semibold">متاحة</th>
-                            <th className="px-3 py-3 font-semibold">مدفوعة</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.commissionsByAsset.map((item) => (
-                            <tr key={item.asset} className="border-b border-white/5 last:border-0">
-                              <td className="px-3 py-4 font-bold text-cyan-200">{item.asset}</td>
-                              <td className="px-3 py-4 font-semibold">{formatAmount(item.total)}</td>
-                              <td className="px-3 py-4 text-amber-200">{formatAmount(item.pending)}</td>
-                              <td className="px-3 py-4 text-emerald-200">{formatAmount(item.available)}</td>
-                              <td className="px-3 py-4 text-slate-300">{formatAmount(item.paid)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-                )}
-
                 <section className="mt-6 rounded-2xl border border-white/10 bg-[#07101d] p-5 md:p-6">
                   <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                     <div>

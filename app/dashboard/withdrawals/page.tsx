@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import InternalNavbar from "@/components/InternalNavbar";
-import InternalSidebar from "@/components/InternalSidebar";
 import { AlertCircle, CheckCircle2, Layers3, RefreshCw, Wallet } from "lucide-react";
 
 type Account = {
@@ -252,9 +250,9 @@ export default function WithdrawalsPage() {
 
   return (
     <>
-      <InternalNavbar />
+      
       <div className="mx-auto flex max-w-[1700px]">
-        <InternalSidebar />
+        
         <main dir="rtl" className="min-h-screen min-w-0 flex-1 space-y-6 bg-[#050a13] p-4 text-white md:p-6">
           <header className="flex flex-wrap items-center justify-between gap-3">
             <div>

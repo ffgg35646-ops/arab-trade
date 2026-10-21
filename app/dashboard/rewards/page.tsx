@@ -2,7 +2,7 @@
 
 import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type Reward = {
   _id: string;
@@ -13,6 +13,7 @@ type Reward = {
   status: "pending" | "available" | "claimed" | "expired";
   expiresAt?: string | null;
   createdAt?: string;
+  updatedAt?: string;
   metadata?: {
     amountMode?: "fixed" | "random";
     minAmount?: number;
@@ -21,18 +22,6 @@ type Reward = {
     durationHours?: number;
     target?: string;
   };
-};
-
-type LedgerEntry = {
-  _id: string;
-  asset: string;
-  type: string;
-  amount: number;
-  balanceBefore: number;
-  balanceAfter: number;
-  referenceId?: string;
-  note?: string;
-  createdAt: string;
 };
 
 function getRemaining(expiresAt?: string | null) {
@@ -85,11 +74,13 @@ function formatDate(value?: string) {
 
 export default function RewardsPage() {
   const [rewards, setRewards] = useState<Reward[]>([]);
-  const [ledger, setLedger] = useState<LedgerEntry[]>([]);
+  const [claimedRewards, setClaimedRewards] = useState<Reward[]>([]);
+  const [claimedCount, setClaimedCount] = useState(0);
+  const [claimedByAsset, setClaimedByAsset] = useState<Record<string, number>>({});
+  const [totalClaimed, setTotalClaimed] = useState(0);
   const [remaining, setRemaining] = useState<Record<string, number>>({});
 
   const [loading, setLoading] = useState(true);
-  const [historyLoading, setHistoryLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
 
@@ -112,6 +103,16 @@ export default function RewardsPage() {
       : [];
 
     setRewards(list);
+    setClaimedRewards(
+      Array.isArray(data.claimedRewards) ? data.claimedRewards : []
+    );
+    setClaimedCount(Number(data.claimedCount || 0));
+    setClaimedByAsset(
+      data.claimedByAsset && typeof data.claimedByAsset === "object"
+        ? data.claimedByAsset
+        : {}
+    );
+    setTotalClaimed(Number(data.totalClaimed || 0));
 
     const timers: Record<string, number> = {};
 
@@ -124,40 +125,12 @@ export default function RewardsPage() {
     setRemaining(timers);
   }
 
-  async function loadHistory() {
-    const res = await fetch(
-      "/api/account/ledger?type=reward",
-      {
-        credentials: "include",
-        cache: "no-store",
-      }
-    );
-
-    const data = await res.json();
-
-    if (!res.ok || !data.success) {
-      throw new Error(
-        data.message || "تعذر تحميل سجل المكافآت"
-      );
-    }
-
-    const entries = Array.isArray(data.entries)
-      ? data.entries
-      : [];
-
-    setLedger(entries);
-  }
-
   async function load() {
     setLoading(true);
-    setHistoryLoading(true);
     setError("");
 
     try {
-      await Promise.all([
-        loadRewards(),
-        loadHistory(),
-      ]);
+      await loadRewards();
     } catch (e) {
       setError(
         e instanceof Error
@@ -166,7 +139,6 @@ export default function RewardsPage() {
       );
     } finally {
       setLoading(false);
-      setHistoryLoading(false);
     }
   }
 
@@ -230,27 +202,6 @@ export default function RewardsPage() {
     return () => window.clearInterval(timer);
   }, [rewards]);
 
-  const totalClaimed = useMemo(() => {
-    return ledger.reduce(
-      (sum, entry) => sum + Number(entry.amount || 0),
-      0
-    );
-  }, [ledger]);
-
-  const claimedByAsset = useMemo(() => {
-    const map: Record<string, number> = {};
-
-    for (const entry of ledger) {
-      const asset = String(entry.asset || "").toUpperCase();
-
-      if (!asset) continue;
-
-      map[asset] =
-        (map[asset] || 0) + Number(entry.amount || 0);
-    }
-
-    return map;
-  }, [ledger]);
 
   return (
     <>
@@ -283,7 +234,7 @@ export default function RewardsPage() {
               <button
                 type="button"
                 onClick={() => void load()}
-                disabled={loading || historyLoading}
+                disabled={loading}
                 className="rounded-xl border border-white/10 bg-[#07101d] px-4 py-2.5 text-sm font-bold text-slate-300 transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 تحديث البيانات
@@ -313,7 +264,7 @@ export default function RewardsPage() {
                 </div>
 
                 <div className="mt-3 text-2xl font-black">
-                  {historyLoading ? "—" : ledger.length}
+                  {loading ? "—" : claimedCount}
                 </div>
               </div>
 
@@ -323,12 +274,10 @@ export default function RewardsPage() {
                 </div>
 
                 <div className="mt-3 text-2xl font-black">
-                  {historyLoading
-                    ? "—"
-                    : formatAmount(totalClaimed)}
+                  {loading ? "—" : formatAmount(totalClaimed)}
                 </div>
 
-                {!historyLoading &&
+                {!loading &&
                 Object.keys(claimedByAsset).length > 0 ? (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {Object.entries(claimedByAsset).map(
@@ -504,22 +453,22 @@ export default function RewardsPage() {
                 </h2>
 
                 <p className="mt-1 text-xs text-slate-500">
-                  السجل مأخوذ من Ledger المالي الحقيقي للحساب.
+                  يعرض أحدث المكافآت التي سُجّل استلامها بنجاح.
                 </p>
               </div>
 
-              {historyLoading ? (
+              {loading ? (
                 <div className="rounded-2xl border border-white/10 bg-[#07101d] p-10 text-center text-sm text-slate-500">
                   جاري تحميل سجل المكافآت...
                 </div>
-              ) : ledger.length === 0 ? (
+              ) : claimedRewards.length === 0 ? (
                 <div className="rounded-2xl border border-white/10 bg-[#07101d] p-10 text-center text-sm text-slate-500">
-                  لم تستلم أي مكافآت مسجلة حتى الآن.
+                  لم تستلم أي مكافآت حتى الآن.
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#07101d]">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[700px] text-right text-sm">
+                    <table className="w-full min-w-[600px] text-right text-sm">
                       <thead className="border-b border-white/10 bg-white/[0.02] text-xs text-slate-500">
                         <tr>
                           <th className="px-5 py-4 font-bold">
@@ -531,54 +480,45 @@ export default function RewardsPage() {
                           </th>
 
                           <th className="px-5 py-4 font-bold">
-                            الرصيد بعد العملية
+                            حالة الاستلام
                           </th>
 
                           <th className="px-5 py-4 font-bold">
-                            التاريخ
+                            تاريخ الاستلام
                           </th>
                         </tr>
                       </thead>
 
                       <tbody>
-                        {ledger.map((entry) => (
+                        {claimedRewards.map((reward) => (
                           <tr
-                            key={entry._id}
+                            key={reward._id}
                             className="border-b border-white/5 last:border-b-0"
                           >
                             <td className="px-5 py-4">
                               <div className="font-bold text-slate-200">
-                                {entry.note || "مكافأة"}
+                                {reward.title || "مكافأة"}
                               </div>
-
-                              {entry.referenceId ? (
-                                <div className="mt-1 max-w-[220px] truncate text-[10px] text-slate-600">
-                                  {entry.referenceId}
-                                </div>
-                              ) : null}
                             </td>
 
                             <td className="px-5 py-4">
                               <span className="font-black text-emerald-300">
-                                +{formatAmount(entry.amount)}
+                                +{formatAmount(Number(reward.amount || 0))}
                               </span>
 
                               <span className="mr-2 text-xs text-slate-500">
-                                {entry.asset}
+                                {reward.asset}
                               </span>
                             </td>
 
-                            <td className="px-5 py-4 font-mono text-slate-300">
-                              {formatAmount(
-                                entry.balanceAfter
-                              )}{" "}
-                              {entry.asset}
+                            <td className="px-5 py-4">
+                              <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-300">
+                                تم الاستلام
+                              </span>
                             </td>
 
                             <td className="px-5 py-4 text-xs text-slate-500">
-                              {formatDate(
-                                entry.createdAt
-                              )}
+                              {formatDate(reward.updatedAt || reward.createdAt)}
                             </td>
                           </tr>
                         ))}

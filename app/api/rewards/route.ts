@@ -28,48 +28,85 @@ export async function GET(request: NextRequest) {
       key: "global",
     }).lean();
 
-    if (settings?.rewards?.enabled === false) {
-      return NextResponse.json({
-        success: true,
-        rewardsEnabled: false,
-        rewards: [],
-      });
-    }
-
+    const rewardsEnabled = settings?.rewards?.enabled !== false;
     const now = new Date();
 
-    await Reward.updateMany(
-      {
-        userId: user._id,
-        status: "available",
-        expiresAt: {
-          $ne: null,
-          $lte: now,
+    if (rewardsEnabled) {
+      await Reward.updateMany(
+        {
+          userId: user._id,
+          status: "available",
+          expiresAt: {
+            $ne: null,
+            $lte: now,
+          },
         },
-      },
-      {
-        $set: {
-          status: "expired",
-        },
-      }
-    );
+        {
+          $set: {
+            status: "expired",
+          },
+        }
+      );
+    }
 
-    const rewards = await Reward.find({
+    const rewards = rewardsEnabled
+      ? await Reward.find({
+          userId: user._id,
+          status: "available",
+          $or: [
+            { expiresAt: null },
+            { expiresAt: { $gt: now } },
+          ],
+        })
+          .sort({ createdAt: -1 })
+          .limit(200)
+          .lean()
+      : [];
+
+    // The Reward collection is the source of truth for successful claims.
+    // PackageLedger records the financial credit in the active package bucket,
+    // so do not derive reward counts from the unrelated general-wallet LedgerEntry.
+    const claimedFilter = {
       userId: user._id,
-      status: "available",
-      $or: [
-        { expiresAt: null },
-        { expiresAt: { $gt: now } },
-      ],
-    })
-      .sort({ createdAt: -1 })
-      .limit(200)
-      .lean();
+      status: "claimed" as const,
+    };
+
+    const [claimedCount, claimedRewards, totalsByAsset] = await Promise.all([
+      Reward.countDocuments(claimedFilter),
+      Reward.find(claimedFilter)
+        .sort({ updatedAt: -1, createdAt: -1 })
+        .limit(100)
+        .lean(),
+      Reward.aggregate([
+        { $match: claimedFilter },
+        {
+          $group: {
+            _id: { $toUpper: "$asset" },
+            total: { $sum: "$amount" },
+          },
+        },
+      ]),
+    ]);
+
+    const claimedByAsset: Record<string, number> = {};
+    for (const item of totalsByAsset) {
+      const asset = String(item._id || "").trim().toUpperCase();
+      if (asset) claimedByAsset[asset] = Number(item.total || 0);
+    }
+
+    const totalClaimed = Object.values(claimedByAsset).reduce(
+      (sum, amount) => sum + amount,
+      0
+    );
 
     return NextResponse.json({
       success: true,
-      rewardsEnabled: true,
+      rewardsEnabled,
       rewards,
+      claimedCount,
+      claimedRewards,
+      claimedByAsset,
+      totalClaimed,
     });
   } catch (error) {
     console.error("REWARDS GET:", error);

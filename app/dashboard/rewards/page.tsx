@@ -1,7 +1,5 @@
 "use client";
 
-import InternalNavbar from "@/components/InternalNavbar";
-import InternalSidebar from "@/components/InternalSidebar";
 import { useEffect, useState } from "react";
 
 type Reward = {
@@ -205,10 +203,10 @@ export default function RewardsPage() {
 
   return (
     <>
-      <InternalNavbar />
+      
 
       <div className="mx-auto flex max-w-[1700px]">
-        <InternalSidebar />
+        
 
         <main
           dir="rtl"

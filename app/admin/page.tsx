@@ -36,7 +36,6 @@ export default function AdminDashboard() {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    setLoading(true);
     setError("");
 
     try {

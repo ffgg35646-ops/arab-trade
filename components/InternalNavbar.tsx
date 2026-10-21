@@ -173,7 +173,7 @@ export default function InternalNavbar() {
       dir="rtl"
       className="sticky top-0 z-50 border-b border-white/10 bg-[#050a13]/95 backdrop-blur-xl"
     >
-      <div className="mx-auto flex h-16 max-w-[1700px] items-center gap-3 px-4 lg:px-6">
+      <div className="mx-auto flex h-16 max-w-[1700px] items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:px-6">
 
         {/* Mobile menu */}
         <button
@@ -183,7 +183,7 @@ export default function InternalNavbar() {
               (value) => !value
             )
           }
-          className="rounded-xl border border-white/10 p-2 text-slate-300 transition hover:bg-white/5 hover:text-white xl:hidden"
+          className="shrink-0 rounded-xl border border-white/10 p-2 text-slate-300 transition hover:bg-white/5 hover:text-white xl:hidden"
           aria-label="القائمة"
         >
           {mobile ? (
@@ -202,7 +202,7 @@ export default function InternalNavbar() {
           <img
             src="/logo.svg"
             alt="عرب تريد"
-            className="h-9 w-auto"
+            className="h-8 w-auto sm:h-9"
           />
         </Link>
 
@@ -261,7 +261,7 @@ export default function InternalNavbar() {
         </nav>
 
         {/* Right actions */}
-        <div className="mr-auto flex items-center gap-2">
+        <div className="mr-auto flex shrink-0 items-center gap-1 sm:gap-2">
 
           <Link
             href="/dashboard/markets"
@@ -310,7 +310,7 @@ export default function InternalNavbar() {
 
           <Link
             href="/dashboard/assets"
-            className={`rounded-xl border p-2.5 transition ${
+            className={`hidden sm:flex rounded-xl border p-2.5 transition ${
               isActive(
                 pathname,
                 "/dashboard/assets"
@@ -358,7 +358,7 @@ export default function InternalNavbar() {
 
       {/* Mobile navigation */}
       {mobile && (
-        <div className="border-t border-white/10 bg-[#07101d] p-3 xl:hidden">
+        <div className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-white/10 bg-[#07101d] p-3 xl:hidden">
           <div className="grid gap-1">
 
             <Link

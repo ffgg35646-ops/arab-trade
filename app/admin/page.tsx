@@ -1,7 +1,5 @@
 "use client";
 
-import AdminGuard from "@/components/AdminGuard";
-import AdminShell from "@/components/AdminShell";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -66,8 +64,6 @@ export default function AdminDashboard() {
   }, [load]);
 
   return (
-    <AdminGuard>
-      <AdminShell title="لوحة التحكم">
         {data ? (
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -193,7 +189,5 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-      </AdminShell>
-    </AdminGuard>
   );
 }

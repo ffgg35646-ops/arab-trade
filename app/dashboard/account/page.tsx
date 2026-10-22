@@ -291,23 +291,6 @@ export default function AccountPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/10 text-blue-300">
-                      <WalletCards size={19} />
-                    </div>
-
-                    <div>
-                      <div className="text-[11px] text-slate-500">
-                        حالة الحساب
-                      </div>
-
-                      <div className="mt-1 text-sm font-bold text-emerald-300">
-                        {user?.isActive
-                          ? "الحساب نشط"
-                          : "الحساب غير نشط"}
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             </section>
@@ -459,66 +442,6 @@ export default function AccountPage() {
 
               {/* Right */}
               <div className="space-y-6">
-
-                <section className="rounded-3xl border border-white/10 bg-[#08111e] shadow-2xl shadow-black/10">
-                  <div className="border-b border-white/10 px-6 py-5">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300">
-                        <ShieldCheck size={19} />
-                      </div>
-
-                      <div>
-                        <h2 className="text-base font-bold">
-                          حالة الحساب
-                        </h2>
-
-                        <p className="mt-1 text-xs text-slate-500">
-                          معلومات الحساب الأساسية
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 p-6">
-                    <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/[0.02] px-4 py-4">
-                      <span className="text-sm text-slate-400">
-                        البريد
-                      </span>
-
-                      <span className="text-sm font-bold text-emerald-300">
-                        {user?.isVerified
-                          ? "مؤكد"
-                          : "غير مؤكد"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/[0.02] px-4 py-4">
-                      <span className="text-sm text-slate-400">
-                        الحساب
-                      </span>
-
-                      <span className="text-sm font-bold text-emerald-300">
-                        {user?.isActive
-                          ? "نشط"
-                          : "غير نشط"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/[0.02] px-4 py-4">
-                      <span className="text-sm text-slate-400">
-                        تاريخ التسجيل
-                      </span>
-
-                      <span className="text-sm font-bold text-slate-200">
-                        {user?.createdAt
-                          ? new Date(
-                              user.createdAt
-                            ).toLocaleDateString("ar-EG")
-                          : "—"}
-                      </span>
-                    </div>
-                  </div>
-                </section>
 
                 <section className="rounded-3xl border border-white/10 bg-[#08111e] shadow-2xl shadow-black/10">
 

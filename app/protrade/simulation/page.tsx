@@ -97,7 +97,7 @@ export default function SimulatedOrderPreviewPage() {
       <div className="mx-auto max-w-5xl">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="mb-2 text-xs text-cyan-300">ARAB TRADE · ORDER FLOW</p>
+            <p className="mb-2 text-xs text-cyan-300">EQUITI TRADING · ORDER FLOW</p>
             <h1 className="text-2xl font-bold sm:text-3xl">معاينة أمر تداول لمدة 5 دقائق</h1>
             <p className="mt-2 text-sm text-slate-400">واجهة تجريبية مستقلة لعرض حركة الأمر والعدّاد وسجل الإغلاق.</p>
           </div>

@@ -21,7 +21,7 @@ export default function Navbar() {
     <header dir="rtl" className="sticky top-0 z-50 border-b border-white/10 bg-[#050a13]/95 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-[1500px] items-center justify-between gap-3 px-3 sm:h-20 sm:px-5">
         <Link href="/" className="shrink-0" onClick={() => setOpen(false)}>
-          <img src="/logo.svg" alt="عرب تريد" className="h-9 w-auto sm:h-11" />
+          <img src="/logo.svg" alt="EQUITI للتداول" className="h-9 w-auto sm:h-11" />
         </Link>
         <nav className="hidden items-center gap-2 lg:flex" aria-label="التنقل الرئيسي">
           {links.map((link) => {

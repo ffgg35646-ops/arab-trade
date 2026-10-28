@@ -9,6 +9,7 @@ export interface IWithdrawalAllocation {
 export interface IWithdrawalRequest {
   userId: mongoose.Types.ObjectId;
   type: "general" | "package";
+  generalSource?: "wallet" | "deposit";
   userPackageId?: mongoose.Types.ObjectId;
   packageId?: mongoose.Types.ObjectId;
   allocations?: IWithdrawalAllocation[];
@@ -40,6 +41,7 @@ const AllocationSchema = new Schema<IWithdrawalAllocation>({
 const schema = new Schema<IWithdrawalRequest>({
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
   type: { type: String, enum: ["general", "package"], default: "package", required: true, index: true },
+  generalSource: { type: String, enum: ["wallet", "deposit"], default: "wallet" },
   userPackageId: { type: Schema.Types.ObjectId, ref: "UserPackage", required: false },
   packageId: { type: Schema.Types.ObjectId, ref: "InvestmentPackage", required: false, index: true },
   allocations: { type: [AllocationSchema], default: [] },

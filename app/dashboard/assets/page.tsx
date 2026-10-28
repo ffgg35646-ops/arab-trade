@@ -386,8 +386,16 @@ export default function WalletPage() {
             {/* Separate funding sources: external deposits vs earnings/refunds from inside the platform */}
             <section className="mb-6 grid gap-4 lg:grid-cols-2">
               <div className="rounded-2xl border border-sky-400/20 bg-sky-500/[0.06] p-5">
-                <div className="text-sm font-bold text-sky-200">رصيد الإيداع الخارجي</div>
-                <p className="mt-1 text-xs text-slate-400">الأموال التي أودعتها من خارج الموقع فقط. تُستخدم لتفعيل الباقات، وتُعرض منفصلة عن رصيد التداول.</p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-sm font-bold text-sky-200">رصيد الإيداع الخارجي</div>
+                  {depositBalances.some((item) => String(item.asset).toUpperCase() === "USDT" && Number(item.available || 0) > 0) && (
+                    <Link href="/dashboard/withdrawals?source=deposit" className="inline-flex items-center gap-2 rounded-lg border border-cyan-300/25 bg-cyan-300/[0.07] px-3 py-2 text-xs font-bold text-cyan-200 transition hover:bg-cyan-300/[0.12]">
+                      <ArrowUpFromLine size={15} />
+                      سحب رصيد USDT
+                    </Link>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-slate-400">الأموال التي أودعتها من خارج الموقع فقط. تُستخدم لتفعيل الباقات، وتُعرض منفصلة عن رصيد التداول. يمكن سحب رصيد USDT من خيار رصيد الإيداع داخل السحب العام فقط.</p>
                 <div className="mt-4 space-y-2">
                   {depositBalances.length ? depositBalances.map((item) => (
                     <div key={item.asset} className="flex items-center justify-between gap-3 rounded-xl bg-black/20 px-3 py-2 text-sm">

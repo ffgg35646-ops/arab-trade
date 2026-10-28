@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { dashboardNavigation } from "@/components/dashboard-navigation";
 
 function isActive(
   pathname: string,
@@ -32,16 +33,20 @@ export default function InternalNavbar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const [mobile, setMobile] =
-    useState(false);
+  const [mobile, setMobile] = useState(false);
+  const [mobileBalanceOpen, setMobileBalanceOpen] = useState(false);
+  const [mobileSectionsOpen, setMobileSectionsOpen] = useState<Record<string, boolean>>({
+    المحفظة: true,
+    التداول: true,
+  });
 
   const [
     unreadNotifications,
     setUnreadNotifications,
   ] = useState(0);
 
-  const [depositBalanceSummary, setDepositBalanceSummary] = useState("0 USDT");
-  const [withdrawalBalanceSummary, setWithdrawalBalanceSummary] = useState("0.00 USDT");
+  const [depositBalanceSummary, setDepositBalanceSummary] = useState("—");
+  const [withdrawalBalanceSummary, setWithdrawalBalanceSummary] = useState("—");
 
   useEffect(() => {
     let cancelled = false;
@@ -167,7 +172,34 @@ export default function InternalNavbar() {
 
   useEffect(() => {
     setMobile(false);
+    setMobileBalanceOpen(false);
   }, [pathname]);
+
+  // Keep remembered sessions alive while the authenticated workspace is in use.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function refreshSession() {
+      try {
+        await fetch("/api/auth/me", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+      } catch {
+        // A temporary network failure should not interrupt the current screen.
+      }
+    }
+
+    void refreshSession();
+    const timer = window.setInterval(() => {
+      if (!cancelled) void refreshSession();
+    }, 10 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   async function logout() {
     try {
@@ -215,11 +247,10 @@ export default function InternalNavbar() {
         {/* Mobile menu */}
         <button
           type="button"
-          onClick={() =>
-            setMobile(
-              (value) => !value
-            )
-          }
+          onClick={() => {
+            setMobileBalanceOpen(false);
+            setMobile((value) => !value);
+          }}
           className="shrink-0 rounded-xl border border-white/10 p-2 text-slate-300 transition hover:bg-white/5 hover:text-white xl:hidden"
           aria-label="القائمة"
         >
@@ -299,6 +330,34 @@ export default function InternalNavbar() {
 
         {/* Right actions */}
         <div className="mr-auto flex shrink-0 items-center gap-1 sm:gap-2">
+          <div className="relative md:hidden">
+            <button
+              type="button"
+              onClick={() => {
+                setMobileBalanceOpen((value) => !value);
+                setMobile(false);
+              }}
+              aria-expanded={mobileBalanceOpen}
+              aria-controls="mobile-balances"
+              className="flex items-center gap-1 rounded-xl border border-white/10 px-2.5 py-2 text-xs font-semibold text-slate-200 hover:bg-white/5"
+            >
+              <Wallet size={16} />
+              الرصيد
+              <ChevronDown size={14} className={mobileBalanceOpen ? "rotate-180 transition-transform" : "transition-transform"} />
+            </button>
+            {mobileBalanceOpen && (
+              <div id="mobile-balances" className="absolute left-0 top-full z-[70] mt-2 w-[min(18rem,calc(100vw-1.5rem))] space-y-2 rounded-2xl border border-white/10 bg-[#07101d] p-3 shadow-2xl shadow-black/50">
+                <Link href="/dashboard/assets/deposit" onClick={() => setMobileBalanceOpen(false)} className="block rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-3">
+                  <span className="block text-xs text-amber-200/80">رصيد الإيداع</span>
+                  <strong className="mt-1 block break-words text-sm text-amber-100">{depositBalanceSummary}</strong>
+                </Link>
+                <Link href="/dashboard/withdrawals" onClick={() => setMobileBalanceOpen(false)} className="block rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] p-3">
+                  <span className="block text-xs text-cyan-200/80">رصيد السحب</span>
+                  <strong className="mt-1 block break-words text-sm text-cyan-100">{withdrawalBalanceSummary}</strong>
+                </Link>
+              </div>
+            )}
+          </div>
 
           <Link
             href="/dashboard/markets"
@@ -357,17 +416,17 @@ export default function InternalNavbar() {
           </Link>
 
           <Link
-            href="/dashboard/assets"
+            href="/dashboard/assets/deposit"
             className={`hidden sm:flex rounded-xl border p-2.5 transition ${
               isActive(
                 pathname,
-                "/dashboard/assets"
+                "/dashboard/assets/deposit"
               )
                 ? "border-blue-400/20 bg-blue-500/10 text-cyan-300"
                 : "border-white/10 text-slate-300 hover:bg-white/5 hover:text-white"
             }`}
-            aria-label="المحفظة"
-            title="المحفظة"
+            aria-label="الإيداع"
+            title="الإيداع"
           >
             <Wallet size={18} />
           </Link>
@@ -404,156 +463,92 @@ export default function InternalNavbar() {
         </div>
       </div>
 
-      {/* Mobile navigation */}
+      {/* Mobile navigation uses the exact same route configuration as the desktop sidebar. */}
       {mobile && (
         <div className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-white/10 bg-[#07101d] p-3 xl:hidden">
-          <div className="grid gap-1">
+          <nav aria-label="القائمة الرئيسية للحساب" className="space-y-1">
+            {dashboardNavigation.map((section) => {
+              const Icon = section.icon;
+              const sectionActive = section.href
+                ? isActive(pathname, section.href)
+                : Boolean(section.children?.some(([, href]) => isActive(pathname, href)));
 
-            <Link
-              href="/dashboard"
-              onClick={() =>
-                setMobile(false)
+              if (section.children) {
+                const expanded = mobileSectionsOpen[section.title] ?? sectionActive;
+
+                return (
+                  <div key={section.title}>
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      onClick={() =>
+                        setMobileSectionsOpen((current) => ({
+                          ...current,
+                          [section.title]: !expanded,
+                        }))
+                      }
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${
+                        expanded || sectionActive
+                          ? "bg-white/[0.035] text-white"
+                          : "text-slate-400 hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      <Icon size={18} />
+                      <span className="flex-1 text-right">{section.title}</span>
+                      <ChevronDown size={15} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {expanded && (
+                      <div className="mr-5 mt-1 space-y-1 border-r border-white/10 pr-2">
+                        {section.children.map(([label, href]) => (
+                          <Link
+                            key={href}
+                            href={href}
+                            onClick={() => setMobile(false)}
+                            aria-current={isActive(pathname, href) ? "page" : undefined}
+                            className={`block rounded-lg px-3 py-2.5 text-xs transition ${
+                              isActive(pathname, href)
+                                ? "bg-blue-500/15 font-semibold text-cyan-300"
+                                : "text-slate-400 hover:bg-white/5 hover:text-white"
+                            }`}
+                          >
+                            {label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
               }
-              className={`rounded-xl px-3 py-3 text-sm transition ${
-                isActive(
-                  pathname,
-                  "/dashboard"
-                )
-                  ? "bg-blue-500/10 text-cyan-300"
-                  : "text-slate-300 hover:bg-white/5"
-              }`}
-            >
-              الرئيسية
-            </Link>
 
-            <Link
-              href="/dashboard/markets"
-              onClick={() =>
-                setMobile(false)
-              }
-              className={`rounded-xl px-3 py-3 text-sm transition ${
-                isActive(
-                  pathname,
-                  "/dashboard/markets"
-                )
-                  ? "bg-blue-500/10 text-cyan-300"
-                  : "text-slate-300 hover:bg-white/5"
-              }`}
-            >
-              الأسواق
-            </Link>
-
-            <Link
-              href="/protrade"
-              onClick={() => setMobile(false)}
-              className={`rounded-xl px-3 py-3 text-sm transition ${
-                isActive(pathname, "/protrade")
-                  ? "bg-blue-500/10 text-cyan-300"
-                  : "text-slate-300 hover:bg-white/5"
-              }`}
-            >
-              التداول
-            </Link>
-
-            <Link
-              href="/dashboard/packages"
-              onClick={() => setMobile(false)}
-              className={`rounded-xl px-3 py-3 text-sm transition ${
-                isActive(pathname, "/dashboard/packages")
-                  ? "bg-blue-500/10 text-cyan-300"
-                  : "text-slate-300 hover:bg-white/5"
-              }`}
-            >
-              الباقات
-            </Link>
-
-            {/* Mobile workspace shortcuts replace the desktop sidebar on small screens. */}
-            <div className="grid grid-cols-2 gap-1 rounded-2xl border border-white/5 bg-white/[0.015] p-1">
-              {[
-                ["السحب", "/dashboard/withdrawals"],
-                ["التمويل", "/dashboard/funding"],
-                ["أوامر التداول", "/dashboard/orders"],
-                ["سجل الأوامر", "/dashboard/orders/history"],
-                ["سجل التداول", "/dashboard/trades"],
-                ["المكافآت", "/dashboard/rewards"],
-                ["الإحالة", "/dashboard/referral"],
-                ["التوثيق", "/dashboard/account/verification"],
-                ["كشف الحساب", "/dashboard/account/statement"],
-                ["التقارير المالية", "/dashboard/account/reports"],
-              ].map(([label, href]) => (
+              return (
                 <Link
-                  key={href}
-                  href={href}
+                  key={section.title}
+                  href={section.href!}
                   onClick={() => setMobile(false)}
-                  className={`rounded-xl px-2 py-3 text-xs transition ${
-                    isActive(pathname, href)
-                      ? "bg-blue-500/10 text-cyan-300"
+                  aria-current={sectionActive ? "page" : undefined}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${
+                    sectionActive
+                      ? "bg-blue-500/15 font-semibold text-cyan-300"
                       : "text-slate-400 hover:bg-white/5 hover:text-white"
                   }`}
                 >
-                  {label}
+                  <Icon size={18} />
+                  <span>{section.title}</span>
                 </Link>
-              ))}
-            </div>
+              );
+            })}
+          </nav>
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <Link href="/dashboard/assets/deposit" onClick={() => setMobile(false)} className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3 py-3">
-                <span className="block text-[10px] text-amber-200/80">رصيد الإيداع</span>
-                <span className="mt-1 block break-words text-xs font-black leading-5 text-amber-100">{depositBalanceSummary}</span>
-              </Link>
-              <Link href="/dashboard/withdrawals" onClick={() => setMobile(false)} className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.06] px-3 py-3" title="إجمالي السحب المتاح من السحب العام والباقات، بعد استبعاد المبالغ المحجوزة لطلبات السحب">
-                <span className="block text-[10px] text-cyan-200/80"><CircleDollarSign size={12} className="ml-1 inline-block" />إجمالي السحب</span>
-                <span className="mt-1 block break-words text-xs font-black leading-5 text-cyan-100">{withdrawalBalanceSummary}</span>
-              </Link>
-            </div>
 
-            <Link
-              href="/dashboard/notifications"
-              onClick={() =>
-                void openNotifications()
-              }
-              className="rounded-xl px-3 py-3 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
-            >
-              الإشعارات
-              {unreadNotifications >
-              0
-                ? ` (${unreadNotifications > 99 ? "99+" : unreadNotifications})`
-                : ""}
-            </Link>
-
-            <Link
-              href="/dashboard/assets"
-              onClick={() =>
-                setMobile(false)
-              }
-              className="rounded-xl px-3 py-3 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
-            >
-              المحفظة
-            </Link>
-
-            <Link
-              href="/dashboard/account"
-              onClick={() =>
-                setMobile(false)
-              }
-              className="rounded-xl px-3 py-3 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
-            >
-              الحساب
-            </Link>
-
-            <button
-              type="button"
-              onClick={
-                logout
-              }
-              className="flex items-center gap-2 rounded-xl px-3 py-3 text-right text-sm text-red-300 hover:bg-red-500/10"
-            >
-              <LogOut
-                size={16}
-              />
-              تسجيل الخروج
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={logout}
+            className="mt-3 flex w-full items-center gap-2 rounded-xl px-3 py-3 text-right text-sm text-red-300 transition hover:bg-red-500/10"
+          >
+            <LogOut size={16} />
+            تسجيل الخروج
+          </button>
         </div>
       )}
     </header>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify } from "jose";
+import { jwtVerify, SignJWT } from "jose";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
 
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: {
         id: String(user._id),
@@ -60,6 +60,34 @@ export async function GET(request: NextRequest) {
         createdAt: user.createdAt,
       },
     });
+
+    const remainingSeconds =
+      typeof payload.exp === "number"
+        ? payload.exp - Math.floor(Date.now() / 1000)
+        : 0;
+
+    if (payload.remember === true && remainingSeconds < 15 * 24 * 60 * 60) {
+      const renewedToken = await new SignJWT({
+        userId: String(user._id),
+        username: user.username,
+        email: user.email,
+        remember: true,
+      })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuedAt()
+        .setExpirationTime("30d")
+        .sign(secret);
+
+      response.cookies.set("arabtrade_session", renewedToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
+      });
+    }
+
+    return response;
   } catch (error) {
     console.error("ME ERROR:", error);
 

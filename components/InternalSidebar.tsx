@@ -2,65 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  BarChart3,
-  ChevronDown,
-  ClipboardList,
-  Gift,
-  Home,
-  PanelLeftClose,
-  ShieldCheck,
-  Users,
-  WalletCards,
-} from "lucide-react";
+import { ChevronDown, PanelLeftClose } from "lucide-react";
 import { useState } from "react";
+import { dashboardNavigation } from "@/components/dashboard-navigation";
 
-const sections = [
-  {
-    title: "الرئيسية",
-    href: "/dashboard",
-    icon: Home,
-  },
-  {
-    title: "الأسواق",
-    href: "/dashboard/markets",
-    icon: BarChart3,
-  },
-  {
-    title: "المحفظة",
-    icon: WalletCards,
-    children: [
-      ["الإيداع", "/dashboard/assets/deposit"],
-      ["الباقات", "/dashboard/packages"],
-      ["السحب", "/dashboard/withdrawals"],
-    ],
-  },
-  {
-    title: "التداول",
-    icon: ClipboardList,
-    children: [
-      ["التداول الفوري", "/protrade"],
-      ["سجل التداول", "/dashboard/trades"],
-    ],
-  },
-  {
-    title: "مركز المكافآت",
-    href: "/dashboard/rewards",
-    icon: Gift,
-  },
-  {
-    title: "الإحالة",
-    href: "/dashboard/referral",
-    icon: Users,
-  },
-  {
-    title: "الحساب",
-    icon: ShieldCheck,
-    children: [
-      ["الملف الشخصي", "/dashboard/account"],
-    ],
-  },
-];
+const sections = dashboardNavigation;
 
 export default function InternalSidebar() {
   const pathname = usePathname();

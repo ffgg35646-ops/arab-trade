@@ -19,11 +19,12 @@ import UserPackage from "@/models/UserPackage";
 import InvestmentPackage from "@/models/InvestmentPackage";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
 import Wallet from "@/models/Wallet";
+import DepositBalance from "@/models/DepositBalance";
 import User from "@/models/User";
 import DepositRequest from "@/models/DepositRequest";
 import PlatformSettings from "@/models/PlatformSettings";
 import Notification from "@/models/Notification";
-import { separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
+import { debitDepositBalance, separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
 import { consolidateFundingWalletIntoSpotWallet } from "@/lib/consolidate-funding-wallet";
 import {
   roundWithdrawal,
@@ -136,11 +137,12 @@ export async function GET(request: NextRequest) {
   await separateLegacyDepositsFromSpotWallet(user._id);
   await consolidateFundingWalletIntoSpotWallet(user._id);
 
-  const [plans, sourceAccounts, requests, wallet, platformSettings, referralStats] = await Promise.all([
+  const [plans, sourceAccounts, requests, wallet, depositBalances, platformSettings, referralStats] = await Promise.all([
     InvestmentPackage.find({}).select("name price withdrawalMinimum enabled sortOrder").sort({ sortOrder: 1, price: 1 }).lean(),
     UserPackage.find({ userId: user._id }).sort({ createdAt: 1 }).lean(),
     WithdrawalRequest.find({ userId: user._id }).sort({ createdAt: -1 }).lean(),
     Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).select("balances").lean(),
+    DepositBalance.find({ userId: user._id }).select("asset available").lean(),
     getPlatformSettings(),
     activeReferralDepositStats(user._id),
   ]);
@@ -200,7 +202,10 @@ export async function GET(request: NextRequest) {
   });
   const packageAvailable = roundWithdrawal(packages.reduce((sum, plan) => sum + Number(plan.account?.balance || 0), 0));
   const generalAvailable = getUsdtAvailable(wallet);
-  // Withdrawal totals include only available balances; pending/reserved amounts are excluded.
+  const depositAvailable = roundWithdrawal(depositBalances.reduce((sum: number, balance: any) =>
+    sum + (String(balance.asset || "").trim().toUpperCase() === "USDT" ? Math.max(0, Number(balance.available || 0)) : 0),
+  0));
+  // Keep the external deposit balance separate from the navbar withdrawal-balance summary.
   const totalBalance = roundWithdrawal(generalAvailable + packageAvailable);
 
   return NextResponse.json({
@@ -212,6 +217,7 @@ export async function GET(request: NextRequest) {
     },
     general: {
       available: generalAvailable,
+      depositAvailable,
       minimum: Number(platformSettings.withdrawals?.generalMinimum || 0),
       configured: Number(platformSettings.withdrawals?.generalMinimum || 0) > 0,
       feePercent: WITHDRAWAL_FEE_PERCENT,
@@ -221,6 +227,7 @@ export async function GET(request: NextRequest) {
     requests: requests.map((item) => ({
       _id: String(item._id),
       type: item.type || "package",
+      generalSource: item.generalSource === "deposit" ? "deposit" : "wallet",
       packageId: item.packageId ? String(item.packageId) : null,
       amount: Number(item.amount),
       grossAmount: Number(item.grossAmount ?? item.amount),
@@ -251,6 +258,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const type = body.type === "general" ? "general" : "package";
+  const generalSource = body.generalSource === "deposit" ? "deposit" : "wallet";
   const packageId = String(body.packageId || "").trim();
   let amount = Number(body.amount);
   const asset = String(body.asset || "").trim().toUpperCase() as "USDT";
@@ -258,6 +266,10 @@ export async function POST(request: NextRequest) {
   const payoutAddress = String(body.payoutAddress || "").trim();
   const conversionOrderId = String(body.conversionOrderId || "").trim();
   let conversionDetails: Record<string, unknown> = {};
+
+  if (conversionOrderId && generalSource === "deposit") {
+    return NextResponse.json({ success: false, message: "حصيلة التداول تُسحب من رصيد السحب العام، وليس من رصيد الإيداع." }, { status: 400 });
+  }
 
   if (conversionOrderId) {
     if (type !== "general" || !mongoose.isValidObjectId(conversionOrderId)) {
@@ -349,6 +361,26 @@ export async function POST(request: NextRequest) {
         if (minimum <= 0) throw new Error("لم يحدد الأدمن الحد الأدنى للسحب العام بعد");
         if (amount < minimum) throw new Error("الحد الأدنى للسحب العام هو " + minimum + " USDT");
 
+        if (generalSource === "deposit") {
+          const debited = await debitDepositBalance(user._id, "USDT", amount, session);
+          if (!debited.ok) {
+            throw new Error("رصيد الإيداع الخارجي المتاح للسحب هو " + debited.availableBefore + " USDT فقط");
+          }
+          const created = await WithdrawalRequest.create([{
+            userId: user._id,
+            type: "general",
+            generalSource: "deposit",
+            amount,
+            ...feeDetails!,
+            asset,
+            network,
+            payoutAddress,
+            status: "pending",
+          }], { session });
+          createdWithdrawal = created[0];
+          return;
+        }
+
         const wallet = await Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).session(session);
         if (!wallet) throw new Error("لا يوجد رصيد عام متاح للسحب");
         const available = getUsdtAvailable(wallet);
@@ -362,7 +394,7 @@ export async function POST(request: NextRequest) {
         if (reserved.modifiedCount !== 1) throw new Error("الرصيد العام تغير، حاول مجددًا");
 
         const created = await WithdrawalRequest.create([{
-          userId: user._id, type: "general", amount, ...feeDetails!, ...conversionDetails, asset, network, payoutAddress, status: "pending",
+          userId: user._id, type: "general", generalSource: "wallet", amount, ...feeDetails!, ...conversionDetails, asset, network, payoutAddress, status: "pending",
         }], { session });
         createdWithdrawal = created[0];
         if (conversionOrderId) {
@@ -460,7 +492,9 @@ export async function POST(request: NextRequest) {
 
     if (createdWithdrawal) {
       try {
-        const sourceLabel = type === "general" ? "السحب العام" : "باقة " + (withdrawalPackageName || "الباقة");
+        const sourceLabel = type === "general"
+          ? (createdWithdrawal.generalSource === "deposit" ? "السحب العام من رصيد الإيداع الخارجي" : "السحب العام")
+          : "باقة " + (withdrawalPackageName || "الباقة");
         await Notification.create({
           userId: user._id,
           type: "withdrawal",

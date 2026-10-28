@@ -9,6 +9,7 @@ import Wallet from "@/models/Wallet";
 import PlatformSettings from "@/models/PlatformSettings";
 import Notification from "@/models/Notification";
 import LedgerEntry from "@/models/LedgerEntry";
+import { creditDepositBalance } from "@/lib/deposit-balance-source";
 
 async function recordWithdrawalFee(row: any, session: mongoose.ClientSession) {
   const amount = Number(row.feeAmount || 0);
@@ -113,12 +114,16 @@ export async function PATCH(request: NextRequest) {
       const rejecting = body.action === "reject";
       if ((row.type || "package") === "general") {
         if (rejecting) {
-          const returned = await Wallet.updateOne(
-            { userId: row.userId, type: "spot", mode: "live", balances: { $elemMatch: { asset: row.asset || "USDT" } } },
-            { $inc: { "balances.$.available": row.amount } },
-            { session }
-          );
-          if (returned.modifiedCount !== 1) throw new Error("تعذر إرجاع مبلغ السحب العام؛ لم يتم اعتماد المراجعة");
+          if (row.generalSource === "deposit") {
+            await creditDepositBalance(row.userId, row.asset || "USDT", row.amount, session);
+          } else {
+            const returned = await Wallet.updateOne(
+              { userId: row.userId, type: "spot", mode: "live", balances: { $elemMatch: { asset: row.asset || "USDT" } } },
+              { $inc: { "balances.$.available": row.amount } },
+              { session }
+            );
+            if (returned.modifiedCount !== 1) throw new Error("تعذر إرجاع مبلغ السحب العام؛ لم يتم اعتماد المراجعة");
+          }
         }
         if (!rejecting) await recordWithdrawalFee(row, session);
         return;
@@ -148,7 +153,9 @@ export async function PATCH(request: NextRequest) {
     if (processedWithdrawal) {
       try {
         const approved = body.action === "approve";
-        let sourceLabel = "السحب العام";
+        let sourceLabel = processedWithdrawal.generalSource === "deposit"
+          ? "السحب العام من رصيد الإيداع الخارجي"
+          : "السحب العام";
         if ((processedWithdrawal.type || "package") !== "general") {
           const plan = await InvestmentPackage.findById(processedWithdrawal.packageId).select("name").lean();
           sourceLabel = "باقة " + String(plan?.name || "الباقات");
@@ -159,7 +166,7 @@ export async function PATCH(request: NextRequest) {
           title: approved ? "تم قبول طلب السحب" : "تم رفض طلب السحب",
           message: approved
             ? "وافق الأدمن على طلب السحب من " + sourceLabel + ". إجمالي المبلغ المحجوز " + Number(processedWithdrawal.grossAmount ?? processedWithdrawal.amount ?? 0) + " USDT، والعمولة " + Number(processedWithdrawal.feeAmount || 0) + " USDT، وصافي المبلغ المطلوب إرساله " + Number(processedWithdrawal.payoutAmount ?? processedWithdrawal.amount ?? 0) + " USDT."
-            : "رفض الأدمن طلب سحب " + Number(processedWithdrawal.amount || 0) + " USDT من " + sourceLabel + "، وتم إرجاع المبلغ كاملًا إلى رصيد السحب الخاص به.",
+            : "رفض الأدمن طلب سحب " + Number(processedWithdrawal.amount || 0) + " USDT من " + sourceLabel + "، وتم إرجاع المبلغ كاملًا " + (processedWithdrawal.generalSource === "deposit" ? "إلى رصيد الإيداع الخارجي." : "إلى رصيد السحب الخاص به."),
           read: false,
         });
       } catch (notificationError) {

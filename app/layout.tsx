@@ -4,9 +4,9 @@ import BottomNavigation from "@/components/BottomNavigation";
 import GlobalSuccessToast from "@/components/GlobalSuccessToast";
 
 export const metadata: Metadata = {
-  title: "عرب تريد | منصة التداول والاستثمار",
+  title: "EQUITI للتداول",
   description:
-    "منصة عربية حديثة لمتابعة الأسواق والتداول والاستثمار.",
+    "EQUITI للتداول والاستثمار.",
   icons: {
     icon: "/icon.svg",
   },

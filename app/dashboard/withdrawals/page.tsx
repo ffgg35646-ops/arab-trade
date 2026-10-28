@@ -80,6 +80,7 @@ export default function WithdrawalsPage() {
   const [generalNetwork, setGeneralNetwork] = useState("");
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [requestsPage, setRequestsPage] = useState(1);
   const [message, setMessage] = useState("");
   const [messageKind, setMessageKind] = useState<"success" | "error" | "info">("info");
@@ -106,6 +107,7 @@ export default function WithdrawalsPage() {
     } catch {
       showMessage("تعذر تحميل بيانات السحب", "error");
     } finally {
+      setInitialLoadComplete(true);
       setRefreshing(false);
     }
   }, []);
@@ -263,7 +265,7 @@ export default function WithdrawalsPage() {
           <header className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-black">السحب</h1>
-              <p className="mt-1 text-xs text-slate-500">بيانات الطلبات والأرصدة تتحدث تلقائيًا.</p>
+              <p role="status" className="mt-1 text-xs text-slate-500">{refreshing ? "يتم تحديث البيانات في الخلفية…" : "بيانات الطلبات والأرصدة تتحدث تلقائيًا."}</p>
             </div>
             <button type="button" onClick={() => void load()} disabled={refreshing || busy} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-2.5 text-sm font-bold text-slate-200 transition hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-50">
               <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
@@ -295,6 +297,7 @@ export default function WithdrawalsPage() {
             <label className="block space-y-2 text-sm font-bold text-slate-200">
               <span>حدد الباقة</span>
               <select
+                aria-label="مصدر السحب"
                 value={validSelectedSource}
                 onChange={(event) => {
                   setSelectedSource(event.target.value);
@@ -309,7 +312,8 @@ export default function WithdrawalsPage() {
                 ))}
               </select>
             </label>
-            {validSelectedSource !== "general" && (
+            {!data && <p role="status" className="text-xs text-slate-400">{initialLoadComplete ? "تعذر عرض بيانات السحب حاليًا. يمكنك إعادة المحاولة من زر تحديث." : "يتم جلب بيانات السحب في الخلفية؛ النموذج جاهز للعرض بمجرد وصول البيانات."}</p>}
+            {data && validSelectedSource !== "general" && (
             <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Layers3 size={20} className="text-cyan-300" />
@@ -392,7 +396,7 @@ export default function WithdrawalsPage() {
             </div>
             </div>
             )}
-            {validSelectedSource === "general" && (
+            {data && validSelectedSource === "general" && (
             <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -443,7 +447,9 @@ export default function WithdrawalsPage() {
               <h2 className="text-xl font-black">طلبات السحب وتاريخها</h2>
               <span className="text-xs text-slate-400">طلبات السحب العام وكل الباقات</span>
             </div>
-            {!data?.requests.length ? (
+            {!data ? (
+              <p role="status" className="text-sm text-slate-400">سيظهر سجل الطلبات بعد وصول البيانات في الخلفية.</p>
+            ) : !data.requests.length ? (
               <p className="rounded-xl border border-slate-700 p-4 text-sm text-slate-400">لا توجد طلبات سحب مسجلة حتى الآن.</p>
             ) : (
               <>

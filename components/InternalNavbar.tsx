@@ -416,17 +416,17 @@ export default function InternalNavbar() {
           </Link>
 
           <Link
-            href="/dashboard/assets"
+            href="/dashboard/assets/deposit"
             className={`hidden sm:flex rounded-xl border p-2.5 transition ${
               isActive(
                 pathname,
-                "/dashboard/assets"
+                "/dashboard/assets/deposit"
               )
                 ? "border-blue-400/20 bg-blue-500/10 text-cyan-300"
                 : "border-white/10 text-slate-300 hover:bg-white/5 hover:text-white"
             }`}
-            aria-label="المحفظة"
-            title="المحفظة"
+            aria-label="الإيداع"
+            title="الإيداع"
           >
             <Wallet size={18} />
           </Link>

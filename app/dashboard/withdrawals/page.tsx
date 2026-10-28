@@ -331,7 +331,7 @@ export default function WithdrawalsPage() {
                   account.referralAllowance <= 0
                 );
                 return (
-                  <article key={plan._id} className="flex flex-col gap-4 rounded-2xl border border-slate-700 bg-[#08111e] p-4 md:p-5">
+                  <article key={plan._id} className="flex flex-col gap-4">
                     <div className="min-w-0">
                       <h3 className="truncate text-lg font-black">{plan.name}</h3>
                     </div>

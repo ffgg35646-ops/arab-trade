@@ -247,12 +247,10 @@ export default function InternalNavbar() {
         {/* Mobile menu */}
         <button
           type="button"
-          onClick={() =>
+          onClick={() => {
             setMobileBalanceOpen(false);
-            setMobile(
-              (value) => !value
-            )
-          }
+            setMobile((value) => !value);
+          }}
           className="shrink-0 rounded-xl border border-white/10 p-2 text-slate-300 transition hover:bg-white/5 hover:text-white xl:hidden"
           aria-label="القائمة"
         >

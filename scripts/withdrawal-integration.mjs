@@ -75,8 +75,8 @@ async function getPackageState(id) {
 async function requestWithdrawal(amount, packageId = packageAId) {
   return call("/api/withdrawals", { method: "POST", cookie: userCookie, body: { type: "package", packageId: String(packageId), amount, asset: "USDT", network: "TRC20", payoutAddress: validTrcAddress } });
 }
-async function requestGeneralWithdrawal(amount) {
-  return call("/api/withdrawals", { method: "POST", cookie: userCookie, body: { type: "general", amount, asset: "USDT", network: "TRC20", payoutAddress: validTrcAddress } });
+async function requestGeneralWithdrawal(amount, generalSource = "wallet") {
+  return call("/api/withdrawals", { method: "POST", cookie: userCookie, body: { type: "general", generalSource, amount, asset: "USDT", network: "TRC20", payoutAddress: validTrcAddress } });
 }
 async function review(requestId, action) {
   return call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie, body: { id: String(requestId), action } });
@@ -289,6 +289,39 @@ try {
   generalWallet = await mongoose.connection.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
   assert.equal(generalWallet.balances.find((row) => row.asset === "USDT").available, 50);
   log("General withdrawal uses configured minimum, enabled admin network and trading USDT balance; rejection returns funds");
+
+  const depositSourceView = await call("/api/withdrawals", { cookie: userCookie });
+  assert.equal(depositSourceView.status, 200);
+  assert.equal(depositSourceView.data.general.depositAvailable, 100,
+    "external deposit balance must be exposed separately to the general withdrawal form");
+  const navbarBalanceBeforeDepositWithdrawal = await call("/api/withdrawals/balance", { cookie: userCookie });
+  assert.equal(navbarBalanceBeforeDepositWithdrawal.data.generalWithdrawalBalance, 50,
+    "external deposit balance must not be merged into the navbar withdrawal balance");
+  const depositSourceRequest = await requestGeneralWithdrawal(25, "deposit");
+  assert.equal(depositSourceRequest.status, 201,
+    "the general withdrawal section should accept a request specifically funded by external USDT deposits");
+  let externalDepositBalance = await mongoose.connection.collection("depositbalances")
+    .findOne({ userId: user._id, asset: "USDT" });
+  assert.equal(externalDepositBalance.available, 75,
+    "pending deposit-source withdrawal must reserve funds from DepositBalance only");
+  generalWallet = await mongoose.connection.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+  assert.equal(generalWallet.balances.find((row) => row.asset === "USDT").available, 50,
+    "deposit-source withdrawal must not change the general withdrawal wallet");
+  const depositSourcePending = await latestPending();
+  assert.equal(depositSourcePending.generalSource, "deposit");
+  assert.equal((await review(depositSourcePending._id, "reject")).status, 200,
+    "admin rejection should return deposit-source funds");
+  externalDepositBalance = await mongoose.connection.collection("depositbalances")
+    .findOne({ userId: user._id, asset: "USDT" });
+  assert.equal(externalDepositBalance.available, 100,
+    "rejecting a deposit-source withdrawal must return funds to DepositBalance");
+  generalWallet = await mongoose.connection.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
+  assert.equal(generalWallet.balances.find((row) => row.asset === "USDT").available, 50,
+    "deposit-source rejection must not credit the spot wallet");
+  const navbarBalanceAfterDepositWithdrawal = await call("/api/withdrawals/balance", { cookie: userCookie });
+  assert.equal(navbarBalanceAfterDepositWithdrawal.data.generalWithdrawalBalance, 50,
+    "the navbar withdrawal balance must remain independent before and after a deposit-source request");
+  log("External deposit USDT can be withdrawn only through general withdrawals; rejection restores it to DepositBalance and navbar withdrawal balance remains separate");
 
   const setHigherMinimum = await call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie,
     body: { action: "minimum", packageId: packageAId, minimum: 125 } });

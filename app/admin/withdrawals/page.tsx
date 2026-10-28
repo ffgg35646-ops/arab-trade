@@ -31,6 +31,7 @@ type Allocation = {
 type Request = {
   _id: string;
   type?: string;
+  generalSource?: "wallet" | "deposit";
   amount: number;
   grossAmount?: number;
   feePercent?: number;
@@ -64,7 +65,7 @@ function userEmail(user: UserRef | undefined) {
 }
 
 function requestSource(request: Request) {
-  if (request.type === "general") return "السحب العام";
+  if (request.type === "general") return request.generalSource === "deposit" ? "السحب العام · رصيد الإيداع" : "السحب العام";
   return request.packageId?.name || request.userPackageId?.packageName || "سحب أرباح الباقات (مجمّع)";
 }
 

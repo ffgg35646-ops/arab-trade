@@ -74,6 +74,7 @@ export default function WithdrawalsPage() {
   const [addresses, setAddresses] = useState<Record<string, string>>({});
   const [packageNetworks, setPackageNetworks] = useState<Record<string, string>>({});
   const [packageMessages, setPackageMessages] = useState<Record<string, string>>({});
+  const [selectedSource, setSelectedSource] = useState("general");
   const [generalAmount, setGeneralAmount] = useState("");
   const [generalAddress, setGeneralAddress] = useState("");
   const [generalNetwork, setGeneralNetwork] = useState("");
@@ -249,6 +250,8 @@ export default function WithdrawalsPage() {
   }
 
   const visiblePackages = data?.packages || [];
+  const selectedPackage = visiblePackages.find((plan) => plan._id === selectedSource);
+  const validSelectedSource = selectedSource === "general" || selectedPackage ? selectedSource : "general";
 
   return (
     <>
@@ -287,7 +290,26 @@ export default function WithdrawalsPage() {
             </div>
           )}
 
-          <section className="space-y-4">
+          <section className="space-y-5 rounded-2xl border border-slate-700 bg-[#08111e] p-4 md:p-5">
+            <label className="block space-y-2 text-sm font-bold text-slate-200">
+              <span>حدد الباقة</span>
+              <select
+                value={validSelectedSource}
+                onChange={(event) => {
+                  setSelectedSource(event.target.value);
+                  setMessage("");
+                }}
+                disabled={!data || busy}
+                className="w-full rounded-xl border border-slate-600 bg-[#050a13] p-3 text-white outline-none focus:border-cyan-400 disabled:opacity-50"
+              >
+                <option value="general">السحب العام</option>
+                {visiblePackages.map((plan) => (
+                  <option key={plan._id} value={plan._id}>{plan.name}</option>
+                ))}
+              </select>
+            </label>
+            {validSelectedSource !== "general" && (
+            <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Layers3 size={20} className="text-cyan-300" />
               <h2 className="text-xl font-black">السحب من الباقات</h2>
@@ -297,8 +319,8 @@ export default function WithdrawalsPage() {
             {!data && <p className="text-sm text-slate-400">جاري تحميل الباقات…</p>}
             {data && visiblePackages.length === 0 && <p className="rounded-xl border border-slate-700 p-4 text-slate-400">لا توجد باقات لديك أرصدة سحب منها حاليًا.</p>}
 
-            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
-              {visiblePackages.map((plan) => {
+            <div className="grid gap-4">
+              {visiblePackages.filter((plan) => plan._id === validSelectedSource).map((plan) => {
                 const account = plan.account;
                 const network = packageNetworks[plan._id] || firstNetwork;
                 const canWithdraw = Boolean(account?.hasAccount && account.available > 0);
@@ -362,9 +384,10 @@ export default function WithdrawalsPage() {
                 );
               })}
             </div>
-          </section>
-
-          <section className="space-y-4 rounded-2xl border border-cyan-500/20 bg-[#08111e] p-4 md:p-5">
+            </div>
+            )}
+            {validSelectedSource === "general" && (
+            <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Wallet size={20} className="text-cyan-300" />
@@ -405,7 +428,8 @@ export default function WithdrawalsPage() {
                 {busy ? "جارٍ السحب..." : "سحب"}
               </button>
             </div>
-
+            </div>
+            )}
           </section>
 
           <section className="space-y-4 rounded-2xl border border-slate-700 bg-[#08111e] p-4 md:p-5">

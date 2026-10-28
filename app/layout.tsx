@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 import BottomNavigation from "@/components/BottomNavigation";
 import GlobalSuccessToast from "@/components/GlobalSuccessToast";
+import GlobalFooter from "@/components/GlobalFooter";
 
 export const metadata: Metadata = {
   title: "EQUITI للتداول",
-  description:
-    "EQUITI للتداول والاستثمار.",
+  description: "EQUITI للتداول والاستثمار.",
   icons: {
     icon: "/icon.svg",
   },
@@ -21,6 +21,7 @@ export default function RootLayout({
     <html lang="ar" dir="rtl">
       <body className="pb-24 md:pb-0">
         {children}
+        <GlobalFooter />
         <GlobalSuccessToast />
         <BottomNavigation />
       </body>

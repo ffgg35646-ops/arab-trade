@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const identifier = String(body.identifier || "").trim().toLowerCase();
     const password = String(body.password || "");
+    const remember = body.remember !== false;
+    const sessionDays = remember ? 30 : 7;
 
     if (!identifier || !password) {
       return NextResponse.json(
@@ -108,10 +110,11 @@ export async function POST(request: NextRequest) {
       userId: String(user._id),
       username: user.username,
       email: user.email,
+      remember,
     })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
-      .setExpirationTime("7d")
+      .setExpirationTime(`${sessionDays}d`)
       .sign(secret);
 
     const response = NextResponse.json({
@@ -130,7 +133,7 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: 60 * 60 * 24 * sessionDays,
     });
     return response;
   } catch (error) {

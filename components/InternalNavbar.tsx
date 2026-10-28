@@ -458,15 +458,15 @@ export default function InternalNavbar() {
                           [section.title]: !expanded,
                         }))
                       }
-                      className={\`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition \${
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${
                         expanded || sectionActive
                           ? "bg-white/[0.035] text-white"
                           : "text-slate-400 hover:bg-white/5 hover:text-white"
-                      }\`}
+                      }`}
                     >
                       <Icon size={18} />
                       <span className="flex-1 text-right">{section.title}</span>
-                      <ChevronDown size={15} className={\`transition-transform \${expanded ? "rotate-180" : ""}\`} />
+                      <ChevronDown size={15} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
                     </button>
 
                     {expanded && (
@@ -477,11 +477,11 @@ export default function InternalNavbar() {
                             href={href}
                             onClick={() => setMobile(false)}
                             aria-current={isActive(pathname, href) ? "page" : undefined}
-                            className={\`block rounded-lg px-3 py-2.5 text-xs transition \${
+                            className={`block rounded-lg px-3 py-2.5 text-xs transition ${
                               isActive(pathname, href)
                                 ? "bg-blue-500/15 font-semibold text-cyan-300"
                                 : "text-slate-400 hover:bg-white/5 hover:text-white"
-                            }\`}
+                            }`}
                           >
                             {label}
                           </Link>
@@ -498,11 +498,11 @@ export default function InternalNavbar() {
                   href={section.href!}
                   onClick={() => setMobile(false)}
                   aria-current={sectionActive ? "page" : undefined}
-                  className={\`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition \${
+                  className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${
                     sectionActive
                       ? "bg-blue-500/15 font-semibold text-cyan-300"
                       : "text-slate-400 hover:bg-white/5 hover:text-white"
-                  }\`}
+                  }`}
                 >
                   <Icon size={18} />
                   <span>{section.title}</span>

@@ -258,7 +258,8 @@ export default function WithdrawalsPage() {
       <InternalNavbar />
       <div className="mx-auto flex max-w-[1700px]">
         <InternalSidebar />
-        <main dir="rtl" className="min-h-screen min-w-0 flex-1 space-y-6 bg-[#050a13] p-4 text-white md:p-6">
+        <main dir="rtl" className="min-h-screen w-full min-w-0 flex-1 bg-[#050a13] p-3 text-white sm:p-6">
+          <div className="mx-auto w-full max-w-3xl space-y-5">
           <header className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-black">السحب</h1>
@@ -347,10 +348,16 @@ export default function WithdrawalsPage() {
                       </div>
                     </div>
 
-                    <label className="block space-y-2 text-sm text-slate-300">
-                      <span>عنوان الدفع</span>
-                      <input type="text" autoComplete="off" maxLength={200} disabled={busy || hasPending} value={addresses[plan._id] || ""} onChange={(event) => setAddresses((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder={network === "TRC20" ? "عنوان TRON يبدأ بـ T وطوله 34 حرفًا" : "عنوان BEP20 يبدأ بـ 0x وطوله 42 حرفًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
-                    </label>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="block min-w-0 space-y-2 text-sm text-slate-300">
+                        <span>مبلغ السحب (USDT) — الحد الأدنى {money(plan.minimum)} USDT</span>
+                        <input aria-label={"مبلغ السحب من " + plan.name} type="number" min={plan.minimum} max={account?.available} step="0.00000001" disabled={busy || hasPending || !canWithdraw} value={amounts[plan._id] || ""} onChange={(event) => setAmounts((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder={"الحد الأدنى " + money(plan.minimum) + " USDT قبل العمولة"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-50" />
+                      </label>
+                      <label className="block min-w-0 space-y-2 text-sm text-slate-300">
+                        <span>عنوان الدفع</span>
+                        <input type="text" autoComplete="off" maxLength={200} disabled={busy || hasPending} value={addresses[plan._id] || ""} onChange={(event) => setAddresses((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder={network === "TRC20" ? "عنوان TRON يبدأ بـ T وطوله 34 حرفًا" : "عنوان BEP20 يبدأ بـ 0x وطوله 42 حرفًا"} className="w-full min-w-0 rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
+                      </label>
+                    </div>
 
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="block space-y-2 text-sm text-slate-300">
@@ -368,7 +375,6 @@ export default function WithdrawalsPage() {
                       </label>
                     </div>
 
-                    <input aria-label={"مبلغ السحب من " + plan.name} type="number" min={plan.minimum} max={account?.available} step="0.00000001" disabled={busy || hasPending || !canWithdraw} value={amounts[plan._id] || ""} onChange={(event) => setAmounts((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder={"الحد الأدنى " + money(plan.minimum) + " USDT قبل العمولة"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-50" />
                     <div className="rounded-lg border border-slate-700 bg-[#050a13] p-3 text-xs">
                       <div className="flex justify-between gap-2 text-slate-400"><span>عمولة السحب (5%)</span><span className="text-amber-200">{money(Math.round(Math.max(0, Number(amounts[plan._id]) || 0) * 0.05 * 1e8) / 1e8)} USDT</span></div>
                       <div className="mt-2 flex justify-between gap-2"><span className="text-slate-300">صافي المبلغ المرسل</span><strong className="text-emerald-300">{money(Math.max(0, Number(amounts[plan._id]) || 0) - Math.round(Math.max(0, Number(amounts[plan._id]) || 0) * 0.05 * 1e8) / 1e8)} USDT</strong></div>
@@ -399,9 +405,9 @@ export default function WithdrawalsPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-[1fr_1.35fr_1fr]">
+            <div className="grid gap-3 sm:grid-cols-2">
               <label className="block space-y-2 text-sm text-slate-300">
-                <span>مبلغ السحب (USDT)</span>
+                <span>مبلغ السحب (USDT) — الحد الأدنى {data?.general.configured ? money(data.general.minimum) + " USDT" : "يحدده الأدمن"}</span>
                 <input type="number" min={data?.general.minimum || undefined} max={data?.general.available} step="0.00000001" value={generalAmount} disabled={busy || hasPending || !data?.general.configured} onChange={(event) => setGeneralAmount(event.target.value)} placeholder={data?.general.configured ? "الحد الأدنى " + money(data.general.minimum) : "الحد الأدنى يحدده الأدمن"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
               </label>
 
@@ -410,7 +416,7 @@ export default function WithdrawalsPage() {
                 <input value={generalAddress} maxLength={200} disabled={busy || hasPending} onChange={(event) => setGeneralAddress(event.target.value)} placeholder={selectedGeneralNetwork === "TRC20" ? "عنوان TRC20 يبدأ بـ T وطوله 34 حرفًا" : "عنوان BEP20 يبدأ بـ 0x وطوله 42 حرفًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
               </label>
 
-              <label className="block space-y-2 text-sm text-slate-300">
+              <label className="block space-y-2 text-sm text-slate-300 sm:col-span-2">
                 <span>شبكة السحب</span>
                 <select value={selectedGeneralNetwork} onChange={(event) => setGeneralNetwork(event.target.value)} disabled={busy || hasPending || !data?.networks.length} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:cursor-not-allowed disabled:opacity-50">
                   {!data?.networks.length && <option value="">لا توجد شبكات</option>}
@@ -515,7 +521,7 @@ export default function WithdrawalsPage() {
               </>
             )}
           </section>
-
+          </div>
         </main>
       </div>
     </>

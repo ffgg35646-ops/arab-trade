@@ -669,11 +669,7 @@ export default function OrdersPage() {
       async (
         silent = false
       ) => {
-        if (silent) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
+        setRefreshing(true);
 
         setError("");
 

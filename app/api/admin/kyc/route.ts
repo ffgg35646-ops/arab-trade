@@ -110,7 +110,7 @@ export async function PATCH(request: NextRequest) {
       (file): file is string => typeof file === "string" && file.startsWith("private/kyc/")
     );
     const sensitiveDirectory = sensitiveFiles.length
-      ? path.dirname(path.resolve(process.cwd(), sensitiveFiles[0]))
+      ? path.dirname(path.resolve(/*turbopackIgnore: true*/ process.cwd(), sensitiveFiles[0]))
       : null;
 
     if (action === "approve") {

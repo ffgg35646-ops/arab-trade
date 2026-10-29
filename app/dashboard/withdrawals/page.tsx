@@ -167,7 +167,7 @@ export default function WithdrawalsPage() {
       return;
     }
     if (!data?.general.configured) {
-      showMessage("الأدمن لم يحدد الحد الأدنى للسحب العام بعد");
+      showMessage("الحد الأدنى للسحب العام غير متاح حاليًا");
       return;
     }
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -290,7 +290,7 @@ export default function WithdrawalsPage() {
           )}
           {hasPending && (
             <div role="status" className="rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-3 text-sm text-amber-100">
-              لديك طلب سحب قيد المراجعة. لن يمكن إرسال طلب آخر حتى يراجع الأدمن الطلب الحالي.
+              لديك طلب سحب قيد المراجعة. لن يمكن إرسال طلب آخر حتى تتم مراجعة الطلب الحالي.
             </div>
           )}
 
@@ -415,15 +415,13 @@ export default function WithdrawalsPage() {
 
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block space-y-2 text-sm text-slate-300">
-                <span>مبلغ السحب (USDT) — الحد الأدنى {data?.general.configured ? money(data.general.minimum) + " USDT" : "يحدده الأدمن"}</span>
-                <input type="number" min={data?.general.minimum || undefined} max={selectedGeneralAvailable} step="0.00000001" value={generalAmount} disabled={busy || hasPending || !data?.general.configured} onChange={(event) => setGeneralAmount(event.target.value)} placeholder={data?.general.configured ? "الحد الأدنى " + money(data.general.minimum) : "الحد الأدنى يحدده الأدمن"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
-              </label>
+              <div className="block">
+                <input aria-label="مبلغ السحب العام (USDT)" type="number" min={data?.general.minimum || undefined} max={selectedGeneralAvailable} step="0.00000001" value={generalAmount} disabled={busy || hasPending || !data?.general.configured} onChange={(event) => setGeneralAmount(event.target.value)} placeholder={data?.general.configured ? "الحد الأدنى " + money(data.general.minimum) + " USDT" : "الحد الأدنى غير متاح حاليًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
+              </div>
 
-              <label className="block space-y-2 text-sm text-slate-300">
-                <span>عنوان السحب</span>
-                <input value={generalAddress} maxLength={200} disabled={busy || hasPending} onChange={(event) => setGeneralAddress(event.target.value)} placeholder={selectedGeneralNetwork === "TRC20" ? "عنوان TRC20 يبدأ بـ T وطوله 34 حرفًا" : "عنوان BEP20 يبدأ بـ 0x وطوله 42 حرفًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
-              </label>
+              <div className="block">
+                <input aria-label="عنوان السحب" value={generalAddress} maxLength={200} disabled={busy || hasPending} onChange={(event) => setGeneralAddress(event.target.value)} placeholder={selectedGeneralNetwork === "TRC20" ? "عنوان TRC20 يبدأ بـ T وطوله 34 حرفًا" : "عنوان BEP20 يبدأ بـ 0x وطوله 42 حرفًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
+              </div>
 
               <label className="block space-y-2 text-sm text-slate-300 sm:col-span-2">
                 <span>شبكة السحب</span>

@@ -46,7 +46,7 @@ const licenses = [
 
 export default function LicensesContent() {
   return (
-    <main dir="rtl" className="min-h-screen bg-[#07101a] px-3 py-5 text-white sm:px-5 sm:py-7">
+    <main dir="rtl" className="min-h-screen bg-[#2b2e34] px-3 py-5 text-white sm:px-5 sm:py-7">
       <div className="mx-auto max-w-4xl">
         <section className="mb-6 text-right">
           <div className="mb-3 flex justify-end">
@@ -61,15 +61,15 @@ export default function LicensesContent() {
         <section className="mb-6">
           <h2 className="mb-3 text-xl font-extrabold">أركان الأمان</h2>
           <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-2xl border border-slate-600/70 bg-[#171e28] px-2 py-3 text-center shadow-sm shadow-black/20">
+            <div className="rounded-2xl border border-slate-500/80 bg-[#3b3f46] px-2 py-3 text-center shadow-sm shadow-black/20">
               <div className="text-sm font-extrabold sm:text-base">⚖️ أموال مفصولة</div>
               <p className="mt-1 text-xs leading-5 text-slate-300 sm:text-sm">حسابات بنكية مستقلة</p>
             </div>
-            <div className="rounded-2xl border border-slate-600/70 bg-[#171e28] px-2 py-3 text-center shadow-sm shadow-black/20">
+            <div className="rounded-2xl border border-slate-600/70 bg-[#3b3f46] px-2 py-3 text-center shadow-sm shadow-black/20">
               <div className="text-sm font-extrabold sm:text-base">🛡️ تأمين الودائع</div>
               <p className="mt-1 text-xs leading-5 text-slate-300 sm:text-sm">تغطية تأمينية شاملة</p>
             </div>
-            <div className="rounded-2xl border border-slate-600/70 bg-[#171e28] px-2 py-3 text-center shadow-sm shadow-black/20">
+            <div className="rounded-2xl border border-slate-600/70 bg-[#3b3f46] px-2 py-3 text-center shadow-sm shadow-black/20">
               <div className="text-sm font-extrabold sm:text-base">⚖️ رقابة دورية</div>
               <p className="mt-1 text-xs leading-5 text-slate-300 sm:text-sm">امتثال وتدقيق مالي</p>
             </div>
@@ -80,7 +80,7 @@ export default function LicensesContent() {
           <h2 className="mb-3 text-xl font-extrabold">تراخيص المنصة</h2>
           <div className="space-y-2">
             {licenses.map((license) => (
-              <article key={license.code} className="rounded-[22px] border border-slate-600/80 bg-[#171e28] p-3.5 shadow-[0_4px_14px_rgba(0,0,0,0.22)] sm:p-4">
+              <article key={license.code} className="rounded-[22px] border border-slate-500/90 bg-[#3b3f46] p-3.5 shadow-[0_4px_14px_rgba(0,0,0,0.22)] sm:p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1 text-right">
                     <h3 className="text-base font-extrabold leading-6 sm:text-lg">
@@ -94,7 +94,7 @@ export default function LicensesContent() {
                     </span>
                   )}
                 </div>
-                <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-slate-700/80 bg-[#10283d] px-3 py-2 text-sm">
+                <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-slate-500/80 bg-[#292e35] px-3 py-2 text-sm">
                   <span className="text-slate-200">{license.numberLabel}: {license.number}</span>
                   {license.active && <Copy size={15} className="shrink-0 text-slate-400" />}
                 </div>
@@ -103,7 +103,7 @@ export default function LicensesContent() {
           </div>
         </section>
 
-        <div className="mt-5 flex items-start gap-2 rounded-2xl border border-amber-400/20 bg-[#171e28] p-3 text-xs leading-6 text-slate-300 sm:text-sm">
+        <div className="mt-5 flex items-start gap-2 rounded-2xl border border-amber-400/20 bg-[#3b3f46] p-3 text-xs leading-6 text-slate-300 sm:text-sm">
           <AlertTriangle className="mt-1 h-4 w-4 shrink-0 text-amber-400" />
           <p><span className="font-bold text-amber-300">إخلاء مسؤولية وتحذير المخاطر:</span> إن التداول ينطوي على مخاطر رأس المال. نحن ملتزمون بفصل أموال العملاء تمامًا عن أموال الشركة التشغيلية في حسابات بنكية موثوقة وفق المعايير الرقابية.</p>
         </div>

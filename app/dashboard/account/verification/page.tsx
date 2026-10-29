@@ -154,7 +154,7 @@ export default function VerificationPage() {
                   </div>
                   {item.adminNote && (
                     <div className="mt-2 text-sm text-slate-500">
-                      ملاحظة الإدارة: {item.adminNote}
+                      ملاحظة الطلب: {item.adminNote}
                     </div>
                   )}
                 </div>

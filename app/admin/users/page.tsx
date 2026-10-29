@@ -289,9 +289,7 @@ export default function UsersPage() {
 
         <div className="overflow-hidden rounded-2xl border border-slate-800 bg-[#08111e]">
           {loading ? (
-            <div className="p-12 text-center text-slate-500">
-              جاري تحميل المستخدمين...
-            </div>
+            <div className="min-h-[8rem]" aria-hidden="true" />
           ) : users.length === 0 ? (
             <div className="p-12 text-center text-slate-500">
               لا يوجد مستخدمون مطابقون للفلتر.

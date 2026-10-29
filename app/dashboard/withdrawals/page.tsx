@@ -306,9 +306,9 @@ export default function WithdrawalsPage() {
             </div>
           )}
 
-          <section className="space-y-5 rounded-2xl border border-slate-700 bg-[#08111e] p-4 md:p-5">
+          <section className="rounded-2xl border border-white/10 bg-white/[0.025] p-4 shadow-lg shadow-black/10 backdrop-blur-xl md:p-5">
             <label className="block space-y-2 text-sm font-bold text-slate-200">
-              <span>حدد الباقة</span>
+              <span className="inline-flex w-fit items-center rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-cyan-100 shadow-lg shadow-cyan-950/20 backdrop-blur-md">حدد الباقة</span>
               <select
                 aria-label="مصدر السحب"
                 value={validSelectedSource}
@@ -317,7 +317,7 @@ export default function WithdrawalsPage() {
                   setMessage("");
                 }}
                 disabled={!data || busy}
-                className="w-full rounded-xl border border-slate-600 bg-[#050a13] p-3 text-white outline-none focus:border-cyan-400 disabled:opacity-50"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.035] p-3 text-white outline-none backdrop-blur-xl transition focus:border-cyan-300/50 focus:bg-white/[0.06] disabled:opacity-50"
               >
                 <option value="general">السحب العام</option>
                 {visiblePackages.map((plan) => (
@@ -326,6 +326,10 @@ export default function WithdrawalsPage() {
               </select>
             </label>
             {!data && <p role="status" className="text-xs text-slate-400">{initialLoadComplete ? "تعذر عرض بيانات السحب حاليًا. يمكنك إعادة المحاولة من زر تحديث." : "يتم جلب بيانات السحب في الخلفية؛ النموذج جاهز للعرض بمجرد وصول البيانات."}</p>}
+          </section>
+
+          {data && (
+          <section className="space-y-5 rounded-2xl border border-slate-700 bg-[#08111e] p-4 md:p-5">
             {data && validSelectedSource !== "general" && (
             <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -468,6 +472,7 @@ export default function WithdrawalsPage() {
             </div>
             )}
           </section>
+          )}
 
           <section className="space-y-4 rounded-2xl border border-slate-700 bg-[#08111e] p-4 md:p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">

@@ -70,7 +70,7 @@ export default function AdminDepositsPage() {
   const [message, setMessage] = useState("");
 
   const load = useCallback(async (quiet = false) => {
-    if (!quiet) setLoading(true);
+    void quiet;
     setRefreshing(true);
     setError("");
     try {

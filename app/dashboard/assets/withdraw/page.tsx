@@ -140,7 +140,7 @@ export default function WithdrawPage() {
 
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <h2 className="text-lg font-bold">طلبات السحب المعلّقة</h2>
-              <p className="mt-1 text-sm text-slate-500">هذه الطلبات فقط هي التي تظهر كمبالغ محجوزة بانتظار قرار الإدارة.</p>
+              <p className="mt-1 text-sm text-slate-500">هذه الطلبات فقط هي التي تظهر كمبالغ محجوزة بانتظار المراجعة.</p>
               {pending.length ? <div className="mt-3 divide-y divide-slate-100">{pending.map((r) => <div key={r._id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="font-semibold">{amount(r.amount)} {r.asset} · {r.network}</p><p className="break-all text-xs text-slate-500" dir="ltr">{r.payoutAddress}</p><p className="text-xs text-slate-500">{new Date(r.createdAt).toLocaleString("ar-EG")}</p></div><span className="rounded-full bg-amber-50 px-3 py-1 text-sm text-amber-800">{statusText[r.status]}</span></div>)}</div> : <p className="mt-3 text-sm text-slate-500">لا توجد طلبات معلّقة.</p>}
             </section>
 

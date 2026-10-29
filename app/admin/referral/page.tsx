@@ -180,10 +180,7 @@ export default function ReferralPage() {
         )}
 
         {loading ? (
-          <div className="flex min-h-56 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-[#08111e] text-sm text-slate-400">
-            <Loader2 size={21} className="animate-spin text-cyan-300" />
-            جاري تحميل إعدادات الإحالة...
-          </div>
+          <div className="min-h-[8rem]" aria-hidden="true" />
         ) : (
           <>
             <section className="rounded-2xl border border-white/10 bg-[#08111e] p-5 md:p-6">

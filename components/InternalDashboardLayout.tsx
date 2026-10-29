@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
+import Footer from "@/components/Footer";
 import { InternalDashboardChromeContext } from "@/components/InternalDashboardChromeContext";
 
 export default function InternalDashboardLayout({ children }: { children: ReactNode }) {
@@ -17,6 +18,7 @@ export default function InternalDashboardLayout({ children }: { children: ReactN
           </InternalDashboardChromeContext.Provider>
         </div>
       </div>
+      <Footer showOnInternal />
     </div>
   );
 }

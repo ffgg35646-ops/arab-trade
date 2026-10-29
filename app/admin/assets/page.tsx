@@ -499,9 +499,7 @@ export default function AssetsAdminPage() {
           </div>
 
           {loading ? (
-            <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-12 text-center text-slate-500">
-              جاري تحميل العملات...
-            </div>
+            <div className="min-h-[8rem]" aria-hidden="true" />
           ) : (
             <div className="grid gap-4">
               {filtered.map((asset) => (

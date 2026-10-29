@@ -461,8 +461,8 @@ try {
   assert.equal(pendingSummary.data.summary.packageAvailable, 610);
   assert.equal(pendingSummary.data.summary.packageLocked, undefined,
     "reserved package withdrawal amounts must not be exposed in the user summary");
-  assert.equal(pendingSummary.data.summary.totalBalance, 660,
-    "while a package withdrawal is pending, the grand total must exclude its reserved amount");
+  assert.equal(pendingSummary.data.summary.totalBalance, 760,
+    "while a package withdrawal is pending, the grand total includes the unified general balance and excludes its reserved package amount");
   assert.equal((await review(firstReferralPending._id, "approve")).status, 200);
   await checkPackageBalance(oldUserPackageId, 610, 0, "approved first referral-backed withdrawal");
   state = await getPackageState(packageAId);

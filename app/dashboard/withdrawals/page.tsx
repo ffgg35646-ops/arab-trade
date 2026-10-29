@@ -423,13 +423,12 @@ export default function WithdrawalsPage() {
                 <input aria-label="عنوان السحب" value={generalAddress} maxLength={200} disabled={busy || hasPending} onChange={(event) => setGeneralAddress(event.target.value)} placeholder={selectedGeneralNetwork === "TRC20" ? "عنوان TRC20 يبدأ بـ T وطوله 34 حرفًا" : "عنوان BEP20 يبدأ بـ 0x وطوله 42 حرفًا"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />
               </div>
 
-              <label className="block space-y-2 text-sm text-slate-300 sm:col-span-2">
-                <span>شبكة السحب</span>
-                <select value={selectedGeneralNetwork} onChange={(event) => setGeneralNetwork(event.target.value)} disabled={busy || hasPending || !data?.networks.length} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:cursor-not-allowed disabled:opacity-50">
+              <div className="block sm:col-span-2">
+                <select aria-label="شبكة السحب" value={selectedGeneralNetwork} onChange={(event) => setGeneralNetwork(event.target.value)} disabled={busy || hasPending || !data?.networks.length} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:cursor-not-allowed disabled:opacity-50">
                   {!data?.networks.length && <option value="">لا توجد شبكات</option>}
                   {data?.networks.map((network) => <option key={network.code} value={network.code}>{network.name} ({network.code})</option>)}
                 </select>
-              </label>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#050a13] p-3">

@@ -392,9 +392,7 @@ export default function DepositPage() {
                   </div>
                 )}
                 {loading && methods.length === 0 && (
-                  <div className="rounded-xl border border-white/[0.08] bg-black/10 p-3 text-xs text-slate-500">
-                    جاري تحميل شبكات الإيداع…
-                  </div>
+                  <div className="min-h-[3rem]" aria-hidden="true" />
                 )}
 
                 <label htmlFor="deposit-amount" className="block text-xs font-bold text-slate-300">

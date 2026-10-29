@@ -517,7 +517,7 @@ export default function DepositPage() {
                             </span>
                           </div>
                           {item.txHash && <div className="mt-3 rounded-lg bg-white/[0.025] p-3"><p className="text-[10px] text-slate-500">رقم المعاملة</p><p dir="ltr" className="mt-1 break-all text-left font-mono text-xs text-slate-300">{item.txHash}</p></div>}
-                          {item.adminNote && <div className="mt-2 text-xs leading-5 text-slate-400">ملاحظة الإدارة: {item.adminNote}</div>}
+                          {item.adminNote && <div className="mt-2 text-xs leading-5 text-slate-400">ملاحظة الطلب: {item.adminNote}</div>}
                           {item.status === "pending" && item.txHash && methods.some((method) => method.source === "asset-network" && method.asset === item.asset && method.network.toUpperCase() === item.network.toUpperCase()) && (
                             <button type="button" disabled={Boolean(verifyingId)} onClick={() => void verifyBlockchainDeposit(item)} className="mt-3 rounded-lg border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-2 text-xs font-bold text-cyan-200 disabled:opacity-50">
                               {verifyingId === String(item._id || item.id) ? "جاري التحقق..." : "التحقق من البلوكشين"}

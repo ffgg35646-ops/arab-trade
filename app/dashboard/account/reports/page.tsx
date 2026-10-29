@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, BarChart3, RefreshCw, TrendingDown, TrendingUp, Wallet, LoaderCircle } from "lucide-react";
+import { Activity, BarChart3, RefreshCw, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
@@ -234,7 +234,7 @@ export default function FinancialReportsPage() {
             <section className="rounded-2xl border border-white/10 bg-[#07101d] p-5">
               <h2 className="font-semibold">الرسوم حسب العملة</h2>
               <p className="mt-1 text-xs text-slate-600">لا يتم جمع رسوم بعملات مختلفة في رقم إجمالي مضلل.</p>
-              {fees.length === 0 ? <div className="py-8 text-center text-sm text-slate-600">{loading ? "جاري التحميل..." : "لا توجد رسوم مسجلة خلال الفترة."}</div>
+              {fees.length === 0 ? <div className="py-8 text-center text-sm text-slate-600">{loading ? "" : "لا توجد رسوم مسجلة خلال الفترة."}</div>
                 : <div className="mt-4 space-y-3">{fees.map((fee) => <div key={fee.asset} className="flex items-center justify-between border-b border-white/5 pb-3 last:border-0">
                   <div><div className="font-semibold">{fee.asset}</div><div className="mt-1 text-xs text-slate-600">{fmt(fee.count, 0)} عملية</div></div>
                   <div className="font-mono">{fmt(fee.total, 8)}</div>

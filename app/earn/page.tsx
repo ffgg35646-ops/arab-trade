@@ -366,7 +366,7 @@ export default function EarnPage() {
             </h2>
 
             <p className="mt-2 text-xs text-slate-600">
-              سيتم عرض المكافآت عند تفعيل النظام من لوحة الإدارة.
+              ستظهر المكافآت عند إتاحتها.
             </p>
           </section>
         ) : (

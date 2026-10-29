@@ -306,9 +306,7 @@ export default function RewardsPage() {
               </div>
 
               {loading ? (
-                <div className="rounded-2xl border border-white/10 bg-[#07101d] p-12 text-center text-sm text-slate-500">
-                  جاري تحميل صناديق المكافآت...
-                </div>
+                <div className="min-h-[8rem]" aria-hidden="true" />
               ) : rewards.length === 0 ? (
                 <div className="rounded-2xl border border-white/10 bg-[#07101d] p-12 text-center">
                   <div className="text-lg font-bold text-slate-300">
@@ -457,9 +455,7 @@ export default function RewardsPage() {
               </div>
 
               {loading ? (
-                <div className="rounded-2xl border border-white/10 bg-[#07101d] p-10 text-center text-sm text-slate-500">
-                  جاري تحميل سجل المكافآت...
-                </div>
+                <div className="min-h-[6rem]" aria-hidden="true" />
               ) : claimedRewards.length === 0 ? (
                 <div className="rounded-2xl border border-white/10 bg-[#07101d] p-10 text-center text-sm text-slate-500">
                   لم تستلم أي مكافآت حتى الآن.

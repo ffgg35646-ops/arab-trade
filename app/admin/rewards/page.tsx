@@ -618,9 +618,7 @@ export default function RewardsAdminPage() {
           </div>
 
           {loading ? (
-            <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-10 text-center text-slate-500">
-              جاري تحميل الصناديق...
-            </div>
+            <div className="min-h-[8rem]" aria-hidden="true" />
           ) : boxes.length === 0 ? (
             <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-10 text-center text-slate-500">
               لا توجد مكافآت منشأة.

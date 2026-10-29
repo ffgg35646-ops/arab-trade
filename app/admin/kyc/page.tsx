@@ -19,8 +19,6 @@ export default function AdminKycPage() {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
-
     try {
       const res = await fetch(
         `/api/admin/kyc?status=${encodeURIComponent(status)}&sort=${sort}`,

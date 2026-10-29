@@ -97,9 +97,7 @@ export default function AdminSupportPage() {
           </p>
 
           {loading ? (
-            <div className="mt-6 text-sm text-slate-500">
-              جاري تحميل بيانات الدعم...
-            </div>
+            <div className="mt-6 min-h-[18rem]" aria-hidden="true" />
           ) : (
             <div className="mt-6 space-y-5">
               <div>

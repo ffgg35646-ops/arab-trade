@@ -77,7 +77,7 @@ export default function KycPage() {
   if (status === "loading") {
     return (
       <main dir="rtl" className="min-h-screen bg-[#050a13] p-6 text-white">
-        جاري تحميل حالة التوثيق...
+        <div className="mx-auto min-h-[16rem] max-w-2xl" aria-hidden="true" />
       </main>
     );
   }

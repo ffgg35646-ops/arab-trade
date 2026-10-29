@@ -137,7 +137,7 @@ export default function MarketsPage() {
                 <th className="px-4 py-4 text-right">زوج التداول</th><th className="px-4 py-4 text-left">آخر سعر</th><th className="px-4 py-4 text-left">التغير 24س</th><th className="px-4 py-4 text-left">أعلى 24س</th><th className="px-4 py-4 text-left">أدنى 24س</th><th className="px-4 py-4 text-left">حجم التداول</th><th className="px-4 py-4 text-left">الإجراء</th>
               </tr></thead>
               <tbody>
-                {loading && pairs.length === 0 ? [1,2,3,4,5,6,7].map((item) => <tr key={item} className="border-b border-white/5"><td colSpan={7} className="px-4 py-4"><div className="h-5 animate-pulse rounded bg-white/5" /></td></tr>) :
+                {loading && pairs.length === 0 ? [1,2,3,4,5,6,7].map((item) => <tr key={item} className="border-b border-white/5"><td colSpan={7} className="h-14" /></tr>) :
                 visiblePairs.length === 0 ? <tr><td colSpan={7} className="px-4 py-16 text-center text-slate-500">{error ? "بيانات السوق غير متاحة الآن." : "لا توجد أزواج تطابق البحث."}</td></tr> :
                 visiblePairs.map((item) => <tr key={item.symbol} className="border-b border-white/5 hover:bg-cyan-400/[0.035]">
                   <td className="px-4 py-4"><Link href={"/trading/spot?symbol=" + item.symbol} className="font-bold text-white hover:text-cyan-300">{item.baseAsset}<span className="text-slate-500">/{item.quoteAsset}</span></Link><div className="mt-1 text-[10px] text-slate-600">Spot · {item.tradeCount.toLocaleString("en-US")} صفقة/24س</div></td>

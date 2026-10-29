@@ -173,24 +173,7 @@ export default function AdminDashboard() {
             </button>
           </div>
         ) : (
-          <div className="space-y-5" aria-hidden="true">
-            <div className="h-8 w-48  rounded-lg bg-white/[0.04]" />
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-              {Array.from({ length: 5 }, (_, i) => (
-                <div key={i} className="h-28 rounded-2xl border border-slate-800 bg-[#08111e]" />
-              ))}
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {Array.from({ length: 4 }, (_, i) => (
-                <div key={i} className="h-24 rounded-2xl border border-slate-800 bg-[#08111e]" />
-              ))}
-            </div>
-            <div className="grid gap-6 xl:grid-cols-3">
-              {Array.from({ length: 3 }, (_, i) => (
-                <div key={i} className="h-64 rounded-2xl border border-slate-800 bg-[#08111e]" />
-              ))}
-            </div>
-          </div>
+          <div className="min-h-[32rem]" aria-hidden="true" />
         )}
       </AdminShell>
     </AdminGuard>

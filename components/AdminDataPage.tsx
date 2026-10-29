@@ -85,7 +85,6 @@ export default function AdminDataPage({
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    setLoading(true);
     setError("");
 
     try {
@@ -171,9 +170,7 @@ export default function AdminDataPage({
       ) : null}
 
       {loading ? (
-        <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-12 text-center text-slate-400">
-          جاري تحميل البيانات...
-        </div>
+        <div className="min-h-[10rem]" aria-hidden="true" />
       ) : rows.length === 0 ? (
         <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-12 text-center text-slate-400">
           لا توجد سجلات.

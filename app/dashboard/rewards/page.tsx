@@ -126,7 +126,6 @@ export default function RewardsPage() {
   }
 
   async function load() {
-    setLoading(true);
     setError("");
 
     try {

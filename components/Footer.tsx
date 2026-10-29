@@ -31,9 +31,9 @@ const columns = [
   },
 ];
 
-export default function Footer() {
+export default function Footer({ showOnInternal = false }: { showOnInternal?: boolean }) {
   const pathname = usePathname();
-  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/") || pathname === "/admin" || pathname.startsWith("/admin/") || pathname === "/protrade" || pathname.startsWith("/protrade/") || pathname === "/margin" || pathname.startsWith("/margin/") || pathname === "/futures" || pathname.startsWith("/futures/")) return null;
+  if (!showOnInternal && (pathname === "/dashboard" || pathname.startsWith("/dashboard/") || pathname === "/admin" || pathname.startsWith("/admin/") || pathname === "/protrade" || pathname.startsWith("/protrade/") || pathname === "/margin" || pathname.startsWith("/margin/") || pathname === "/futures" || pathname.startsWith("/futures/"))) return null;
 
   return (
     <footer className="border-t border-sky-400/15 bg-[#050a13]">

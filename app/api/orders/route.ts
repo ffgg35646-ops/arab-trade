@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getBinanceSpotPair } from "@/lib/binance-market";
 import { connectDB } from "@/lib/mongodb";
 import Order from "@/models/Order";
+import QuickTrade from "@/models/QuickTrade";
 import Asset from "@/models/Asset";
 import { getCurrentUser } from "@/lib/current-user";
 import { getPlatformSettings } from "@/lib/platform-settings";
@@ -272,10 +273,52 @@ export async function GET(
         }
       );
 
+    // Expired five-minute trades leave the open-order list and enter trade history.
+    const quickNow = new Date();
+    await QuickTrade.updateMany(
+      { userId: user._id, mode: "live", status: "open", expiresAt: { $lte: quickNow } },
+      { $set: { status: "closed", outcome: "loss", closedAt: quickNow } }
+    );
+
+    let quickOrders: any[] = [];
+    if (!status || status === "open") {
+      const quickFilter: Record<string, unknown> = {
+        userId: user._id,
+        mode: "live",
+        status: "open",
+        expiresAt: { $gt: quickNow },
+      };
+      if (symbol) quickFilter.symbol = symbol;
+      quickOrders = (await QuickTrade.find(quickFilter)
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean()).map((trade: any) => ({
+          _id: String(trade._id),
+          userId: String(trade.userId),
+          symbol: trade.symbol,
+          side: trade.side,
+          type: "five-minute",
+          purpose: "quick-trade",
+          price: Number(trade.entryPrice || 0),
+          quantity: Number(trade.stakeAmount || 0),
+          originalQuantity: Number(trade.stakeAmount || 0),
+          filledQuantity: 0,
+          remainingQuantity: Number(trade.stakeAmount || 0),
+          quoteAmount: Number(trade.stakeAmount || 0),
+          fillPercent: 0,
+          status: "open",
+          createdAt: trade.createdAt || trade.openedAt,
+          expiresAt: trade.expiresAt,
+        }));
+    }
+
+    const combinedOrders = [...quickOrders, ...normalizedOrders]
+      .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .slice(0, limit);
+
     return NextResponse.json({
       success: true,
-      orders:
-        normalizedOrders,
+      orders: combinedOrders,
     });
   } catch (error) {
     console.error(

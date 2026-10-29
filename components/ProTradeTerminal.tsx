@@ -773,7 +773,7 @@ export default function ProTradeTerminal() {
           personalTradesResponse,
         ] = await Promise.all([
           fetch("/api/assets", { cache: "no-store" }),
-          fetch("/api/wallet?mode=demo", {
+          fetch("/api/wallet", {
             credentials: "include",
             cache: "no-store",
           }),
@@ -805,11 +805,12 @@ export default function ProTradeTerminal() {
 
         setAssets(Array.isArray(assetData.assets) ? assetData.assets : []);
 
-        const walletBalances =
-          walletData?.wallet?.balances ||
-          walletData?.spot?.balances ||
-          [];
-        setBalances(Array.isArray(walletBalances) ? walletBalances : []);
+        const depositBalances = Array.isArray(walletData?.depositBalances) ? walletData.depositBalances : [];
+        const walletBalances = depositBalances.map((balance: any) => ({
+          ...balance,
+          total: num(balance.available) + num(balance.locked),
+        }));
+        setBalances(walletBalances);
 
         if (ordersResponse.ok && Array.isArray(orderData.orders)) {
           setOrders(orderData.orders);
@@ -860,13 +861,13 @@ export default function ProTradeTerminal() {
     setError("");
     setMessage("");
 
-    const parsedQuantity = num(quantity);
+    const stakeAmount = num(quantity);
     const parsedPrice = orderType === "market"
       ? (marketExecutionPrice || currentPrice)
       : num(price);
 
-    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
-      setError("أدخل كمية صحيحة قبل إرسال الأمر.");
+    if (!Number.isFinite(stakeAmount) || stakeAmount < 1) {
+      setError("أدخل مبلغ صفقة لا يقل عن 1 USDT من رصيد الإيداع.");
       return;
     }
 
@@ -882,10 +883,6 @@ export default function ProTradeTerminal() {
 
     setSubmittingOrder(true);
     try {
-      const stakeAmount = Math.round(parsedPrice * parsedQuantity * 1e8) / 1e8;
-      if (!Number.isFinite(stakeAmount) || stakeAmount < 1) {
-        throw new Error("قيمة الصفقة يجب ألا تقل عن 1 USDT.");
-      }
       const response = await fetch("/api/quick-trades", {
         method: "POST",
         credentials: "include",
@@ -898,7 +895,7 @@ export default function ProTradeTerminal() {
         throw new Error(data?.message || "تعذر فتح الصفقة.");
       }
 
-      setMessage(`تم فتح الصفقة وخصم ${stakeAmount.toLocaleString("en-US", { maximumFractionDigits: 2 })} USDT من رصيد المحاكاة فورًا. مدة الصفقة 5 دقائق.`);
+      setMessage(`تم فتح الصفقة وخصم ${stakeAmount.toLocaleString("en-US", { maximumFractionDigits: 2 })} USDT من رصيد الإيداع فورًا. مدة الصفقة 5 دقائق.`);
       setQuantity("");
       await loadAll(true);
     } catch (err) {
@@ -942,23 +939,13 @@ export default function ProTradeTerminal() {
   };
 
   const percentageQuantity = (percent: number) => {
-    const available =
-      side === "buy" ? num(quoteBalance.available) : num(baseBalance.available);
-
-    const p = orderType === "market" ? (marketExecutionPrice || currentPrice) : num(price) || currentPrice;
-
-    if (!p) return;
-
-    const qty =
-      side === "buy"
-        ? (available * percent) / 100 / p
-        : (available * percent) / 100;
-
-    setQuantity(qty > 0 ? String(qty) : "");
+    const available = num(quoteBalance.available);
+    const stakeAmount = available * percent / 100;
+    setQuantity(stakeAmount > 0 ? String(stakeAmount) : "");
   };
 
   const effectiveOrderPrice = orderType === "market" ? (marketExecutionPrice || currentPrice) : num(price);
-  const total = effectiveOrderPrice * num(quantity);
+  const total = num(quantity);
 
   const selectableBaseAssets = useMemo(() => {
     const names = availablePairs
@@ -1388,11 +1375,9 @@ export default function ProTradeTerminal() {
           <div className="border-b border-white/[0.06] p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <div className="text-xs text-slate-500">الرصيد المتاح</div>
+                <div className="text-xs text-slate-500">رصيد الإيداع المتاح</div>
                 <div className="mt-1 text-sm font-semibold">
-                  {side === "buy"
-                    ? `${fmt(quoteBalance.available ?? 0, 4)} ${quoteAsset}`
-                    : `${fmt(baseBalance.available ?? 0, 8)} ${baseAsset}`}
+                  {fmt(quoteBalance.available ?? 0, 4)} USDT
                 </div>
               </div>
               <div className="rounded-lg bg-white/[0.04] p-2 text-slate-400">
@@ -1400,15 +1385,9 @@ export default function ProTradeTerminal() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
-                <div className="text-[10px] text-slate-500">{baseAsset}</div>
-                <div className="mt-1 text-xs font-medium">{fmt(baseBalance.total ?? 0, 8)}</div>
-              </div>
-              <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
-                <div className="text-[10px] text-slate-500">{quoteAsset}</div>
-                <div className="mt-1 text-xs font-medium">{fmt(quoteBalance.total ?? 0, 4)}</div>
-              </div>
+            <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
+              <div className="text-[10px] text-slate-500">إجمالي رصيد الإيداع USDT</div>
+              <div className="mt-1 text-xs font-medium">{fmt(quoteBalance.total ?? 0, 4)}</div>
             </div>
           </div>
 
@@ -1501,7 +1480,7 @@ export default function ProTradeTerminal() {
               <span className="text-[11px] text-slate-500">{quoteAsset}</span>
             </div>
 
-            <label className="mb-2 block text-[11px] text-slate-500">الكمية</label>
+            <label className="mb-2 block text-[11px] text-slate-500">مبلغ الصفقة المخصوم من رصيد الإيداع</label>
             <div className="mb-3 flex h-11 items-center rounded-lg border border-white/[0.08] bg-[#050a13] px-3 focus-within:border-cyan-400/50">
               <input
                 value={quantity}
@@ -1510,7 +1489,7 @@ export default function ProTradeTerminal() {
                 placeholder="0.00000000"
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none"
               />
-              <span className="text-[11px] text-slate-500">{baseAsset}</span>
+              <span className="text-[11px] text-slate-500">USDT</span>
             </div>
 
             <div className="mb-4 grid grid-cols-4 gap-1">
@@ -1528,9 +1507,9 @@ export default function ProTradeTerminal() {
 
             <div className="mb-5 flex items-center justify-between text-xs">
               <span className="text-slate-500">
-                {orderType === "market" ? "القيمة التقديرية حسب أفضل سعر متاح" : "إجمالي الأمر"}
+                مبلغ الخصم من رصيد الإيداع
               </span>
-              <span className="font-medium">{total > 0 ? `${money(total)} ${quoteAsset}` : "—"}</span>
+              <span className="font-medium">{total > 0 ? `${money(total)} USDT` : "—"}</span>
             </div>
 
             <button
@@ -1551,7 +1530,7 @@ export default function ProTradeTerminal() {
 
           <div className="p-4">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold">أرصدة التداول</h3>
+              <h3 className="text-sm font-semibold">رصيد الإيداع</h3>
               <Search size={15} className="text-slate-600" />
             </div>
             <div className="space-y-1">

@@ -124,9 +124,7 @@ export default function AdminKycPage() {
 
         <div className="overflow-hidden rounded-2xl border border-slate-800 bg-[#08111e]">
           {loading ? (
-            <div className="p-12 text-center text-slate-500">
-              جاري تحميل الطلبات...
-            </div>
+            <div className="min-h-[8rem]" aria-hidden="true" />
           ) : requests.length === 0 ? (
             <div className="p-12 text-center text-slate-500">
               لا توجد طلبات.

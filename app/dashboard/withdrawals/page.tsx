@@ -266,7 +266,7 @@ export default function WithdrawalsPage() {
           <header className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-black">السحب</h1>
-              <p role="status" className="mt-1 text-xs text-slate-500">{refreshing ? "يتم تحديث البيانات في الخلفية…" : "بيانات الطلبات والأرصدة تتحدث تلقائيًا."}</p>
+              <p role="status" className="mt-1 text-xs text-slate-500">بيانات الطلبات والأرصدة تتحدث تلقائيًا.</p>
             </div>
             <button type="button" onClick={() => void load()} disabled={refreshing || busy} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-[#0b1422] px-4 py-2.5 text-sm font-bold text-slate-200 transition hover:bg-white/[0.05] disabled:cursor-not-allowed disabled:opacity-50">
               <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
@@ -313,7 +313,7 @@ export default function WithdrawalsPage() {
                 ))}
               </select>
             </label>
-            {!data && <p role="status" className="text-xs text-slate-400">{initialLoadComplete ? "تعذر عرض بيانات السحب حاليًا. يمكنك إعادة المحاولة من زر تحديث." : "يتم جلب بيانات السحب في الخلفية؛ النموذج جاهز للعرض بمجرد وصول البيانات."}</p>}
+            {!data && initialLoadComplete && <p role="status" className="text-xs text-slate-400">تعذر عرض بيانات السحب حاليًا. يمكنك إعادة المحاولة من زر تحديث.</p>}
           </section>
 
           {data && (

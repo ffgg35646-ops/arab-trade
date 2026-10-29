@@ -358,10 +358,9 @@ export default function WithdrawalsPage() {
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <label className="block min-w-0 space-y-2 text-sm text-slate-300">
-                        <span>مبلغ السحب (USDT) — الحد الأدنى {money(plan.minimum)} USDT</span>
+                      <div className="block min-w-0">
                         <input aria-label={"مبلغ السحب من " + plan.name} type="number" min={plan.minimum} max={account?.available} step="0.00000001" disabled={busy || hasPending || !canWithdraw} value={amounts[plan._id] || ""} onChange={(event) => setAmounts((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder={"الحد الأدنى " + money(plan.minimum) + " USDT قبل العمولة"} className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-50" />
-                      </label>
+                      </div>
                       <label className="block min-w-0 space-y-2 text-sm text-slate-300">
                         <span>عنوان الدفع</span>
                         <input type="text" autoComplete="off" maxLength={200} disabled={busy || hasPending} value={addresses[plan._id] || ""} onChange={(event) => setAddresses((current) => ({ ...current, [plan._id]: event.target.value }))} placeholder={network === "TRC20" ? "عنوان TRON يبدأ بـ T وطوله 34 حرفًا" : "عنوان BEP20 يبدأ بـ 0x وطوله 42 حرفًا"} className="w-full min-w-0 rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-50" />

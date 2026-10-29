@@ -62,7 +62,7 @@ export default function QuickTradePanel({ symbol }: { symbol: string }) {
     <section className="border-t border-white/[0.06] bg-[#07101d] p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-white">صفقات الخمس دقائق</h3>
-        <span className="rounded-full bg-cyan-400/10 px-2.5 py-1 text-[10px] text-cyan-300">محاكاة مرئية · رصيد تجريبي</span>
+        <span className="rounded-full bg-cyan-400/10 px-2.5 py-1 text-[10px] text-cyan-300">خصم من رصيد الإيداع</span>
       </div>
 
       {active.length ? active.map((trade) => (

@@ -169,9 +169,7 @@ export default function NotificationsPage() {
               </div>
 
               {loading ? (
-                <div className="px-5 py-16 text-center text-xs text-slate-500">
-                  جاري تحميل الإشعارات...
-                </div>
+                <div className="min-h-[8rem]" aria-hidden="true" />
               ) : error ? (
                 <div className="px-5 py-16 text-center text-xs text-red-300">
                   {error}

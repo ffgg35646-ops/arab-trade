@@ -77,7 +77,8 @@ export async function POST(request: NextRequest) {
           mode: "live",
         }], { session });
         const trade = rows[0];
-        availableAfter = roundAmount(debit.availableBefore - stakeAmount);
+        const nextAvailableBalance = roundAmount(debit.availableBefore - stakeAmount);
+        availableAfter = nextAvailableBalance;
 
         await LedgerEntry.create([{
           userId: user._id,
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
           type: "trade",
           amount: -stakeAmount,
           balanceBefore: debit.availableBefore,
-          balanceAfter: availableAfter,
+          balanceAfter: nextAvailableBalance,
           referenceId: `separate-deposit-spend:quick-trade:${String(trade._id)}`,
           note: "خصم قيمة صفقة الخمس دقائق من رصيد الإيداع",
         }], { session });

@@ -20,7 +20,6 @@ function amount(value: number) {
 
 export default function QuickTradePanel({ symbol }: { symbol: string }) {
   const [items, setItems] = useState<QuickTrade[]>([]);
-  const [now, setNow] = useState(Date.now());
   const [curve, setCurve] = useState<number[]>([52, 57, 49, 61, 55, 66, 59, 64, 53, 58, 48, 55, 45, 51, 42, 47]);
 
   const refresh = useCallback(async () => {
@@ -36,7 +35,6 @@ export default function QuickTradePanel({ symbol }: { symbol: string }) {
   useEffect(() => {
     void refresh();
     const poll = window.setInterval(() => void refresh(), 2500);
-    const clock = window.setInterval(() => setNow(Date.now()), 1000);
     const movement = window.setInterval(() => {
       setCurve((previous) => {
         const last = previous[previous.length - 1] ?? 50;
@@ -45,7 +43,6 @@ export default function QuickTradePanel({ symbol }: { symbol: string }) {
     }, 1200);
     return () => {
       window.clearInterval(poll);
-      window.clearInterval(clock);
       window.clearInterval(movement);
     };
   }, [refresh]);
@@ -53,23 +50,12 @@ export default function QuickTradePanel({ symbol }: { symbol: string }) {
   const active = items.filter((item) => item.symbol === symbol && item.status === "open");
   const history = items.filter((item) => item.symbol === symbol && item.status === "closed").slice(0, 5);
   const points = curve.map((value, index) => `${(index / Math.max(curve.length - 1, 1)) * 1000},${280 - value * 2.6}`).join(" ");
-  const countdown = (expiresAt: string) => {
-    const seconds = Math.max(0, Math.ceil((new Date(expiresAt).getTime() - now) / 1000));
-    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-  };
-
   return (
     <section className="border-t border-white/[0.06] bg-[#07101d] p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-white">صفقات الخمس دقائق</h3>
-        <span className="rounded-full bg-cyan-400/10 px-2.5 py-1 text-[10px] text-cyan-300">خصم من رصيد الإيداع</span>
-      </div>
-
       {active.length ? active.map((trade) => (
         <article key={trade._id} className="mb-3 rounded-xl border border-cyan-400/15 bg-[#050a13] p-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
             <span className="font-semibold text-white">{trade.symbol} · {trade.side === "buy" ? "شراء" : "بيع"}</span>
-            <span className="font-mono text-cyan-300">العد التنازلي: {countdown(trade.expiresAt)}</span>
           </div>
           <div className="mb-2 flex items-center justify-between text-[11px] text-slate-400">
             <span>مبلغ الصفقة: {amount(trade.stakeAmount)} USDT</span>

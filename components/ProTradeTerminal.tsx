@@ -888,7 +888,7 @@ export default function ProTradeTerminal() {
         throw new Error(data?.message || "تعذر فتح الصفقة.");
       }
 
-      setMessage(`تم فتح الصفقة وخصم ${stakeAmount.toLocaleString("en-US", { maximumFractionDigits: 2 })} USDT من رصيد الإيداع فورًا. مدة الصفقة 5 دقائق.`);
+      setMessage("صفقات الخمس دقائق");
       setQuantity("");
       await loadAll(true);
     } catch (err) {
@@ -1091,19 +1091,6 @@ export default function ProTradeTerminal() {
           )}
         </div>
       )}
-
-      <div className="border-b border-white/[0.06] bg-[#07101d] px-5 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs font-semibold text-slate-300">صفقات الخمس دقائق</span>
-          <span className="rounded-full border border-cyan-400/20 bg-cyan-400/[0.06] px-3 py-1 text-[11px] font-semibold text-cyan-300">
-            خصم مباشر من رصيد الإيداع
-          </span>
-        </div>
-      </div>
-
-      <p className="mt-2 px-5 text-[10px] leading-5 text-slate-500">
-        صفقة مرئية مدتها خمس دقائق: يُخصم مبلغها فورًا من رصيد الإيداع USDT الفعلي المسجل في حسابك، ويظهر عدّاد ورسم متحرك، ثم تُغلق وتظهر في سجل التداول. رصيد السحب منفصل ولا يتأثر.
-      </p>
 
       <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px]">
         <div className="min-w-0">
@@ -1515,9 +1502,6 @@ export default function ProTradeTerminal() {
               {submittingOrder ? "جارٍ إرسال الأمر..." : side === "buy" ? `شراء ${baseAsset}` : `بيع ${baseAsset}`}
             </button>
 
-            <div className="mt-3 text-center text-[10px] leading-5 text-slate-600">
-              اضغط شراء أو بيع لفتح صفقة محاكاة مدتها خمس دقائق. قيمة الصفقة تُخصم فورًا من رصيد USDT التجريبي، ويظهر العد التنازلي والرسم المتحرك أسفل مخطط السوق.
-            </div>
           </div>
 
           <div className="p-4">

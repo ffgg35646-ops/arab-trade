@@ -11,7 +11,6 @@ const links = [
   { href: "/trading/spot", label: "التداول" },
   { href: "/about", label: "عن الموقع" },
   { href: "/contact", label: "تواصل معنا" },
-  { href: "/licenses", label: "التراخيص والأمان" },
 ];
 
 export default function Navbar() {

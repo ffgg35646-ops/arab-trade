@@ -78,7 +78,6 @@ export default function OrderHistoryPage() {
   const [error, setError] = useState("");
 
   async function load() {
-    setLoading(true);
     setError("");
 
     try {

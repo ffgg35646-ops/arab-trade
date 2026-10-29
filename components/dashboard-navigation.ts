@@ -58,6 +58,6 @@ export const dashboardNavigation: DashboardNavigationSection[] = [
   {
     title: "الحساب",
     icon: ShieldCheck,
-    children: [["الملف الشخصي", "/dashboard/account"], ["التراخيص والأمان", "/dashboard/licenses"]],
+    children: [["الملف الشخصي", "/dashboard/account"]],
   },
 ];

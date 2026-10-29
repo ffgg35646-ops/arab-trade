@@ -230,7 +230,7 @@ export default function UserPackagesPage() {
               <div className="flex items-center justify-between gap-2"><h3 className="text-base font-black">{plan.name}</h3><span className="rounded-md bg-emerald-400/10 px-2 py-1 text-[10px] text-emerald-200">تفعيل دائم</span></div>
               <div className="mt-3 text-2xl font-black">{money(plan.price)} <span className="text-xs text-cyan-300">{plan.asset}</span></div>
               <div className="mt-3 space-y-1.5 border-t border-white/10 pt-3 text-xs text-slate-400">
-                {plan.description && plan.description.replace(/\s+/g, " ").trim() !== "باقة تفعيل مستمرة دون انتهاء. رصيد التفعيل مستقل عن رصيد السحب، ويُضاف الربح اليومي المحدد من الإدارة. يمكن تعديل السعر والتفاصيل من لوحة الإدارة." && <p className="leading-5">{plan.description}</p>}
+                {plan.description && (() => { const description = plan.description.replace(/باقة تفعيل مستمرة دون انتهاء\.\s*رصيد التفعيل مستقل عن رصيد السحب، ويُضاف الربح اليومي المحدد من الإدارة\.\s*يمكن تعديل السعر والتفاصيل من لوحة الإدارة\./g, "").replace(/(?:الأدمن|الادمن|الإدارة|الادارة)/g, "المنصة").trim(); return description ? <p className="leading-5">{description}</p> : null; })()}
                 <div className="flex justify-between gap-2"><span>الربح اليومي</span><strong className="text-emerald-200">{money(Number(plan.dailyProfit || 0))} {plan.asset}</strong></div>
                 <div className="flex justify-between gap-2"><span>المصدر عند التفعيل</span><strong className="text-slate-300">رصيد الإيداع</strong></div>
               </div>

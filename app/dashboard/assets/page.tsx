@@ -151,9 +151,7 @@ export default function WalletPage() {
 
   async function loadWallet(showSpinner = true) {
     try {
-      if (showSpinner) {
-        setLoading(true);
-      } else {
+      if (!showSpinner) {
         setRefreshing(true);
       }
 
@@ -219,49 +217,15 @@ export default function WalletPage() {
     };
   }, []);
 
-  const displayedBalance = hideBalance
+  const displayedBalance = loading ? "—" : hideBalance
     ? "••••••••"
     : money(wallet.totalAccountBalanceUsd ?? wallet.totalBalanceUsd);
 
   const displayMoney = (value: number, digits = 2) =>
-    hideBalance ? "••••••" : money(value, digits);
+    loading ? "—" : hideBalance ? "••••••" : money(value, digits);
 
   const displayAssetAmount = (value: number) =>
-    hideBalance ? "••••••" : assetAmount(value);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#050a13]">
-        <InternalNavbar />
-
-        <div
-          className="flex min-h-[calc(100vh-4rem)]"
-          dir="rtl"
-        >
-          <InternalSidebar />
-
-          <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
-            <div className="mx-auto max-w-7xl space-y-6">
-              <div className="h-12 w-48 animate-pulse rounded-xl bg-white/5" />
-
-              <div className="h-64 animate-pulse rounded-3xl bg-white/[0.03]" />
-
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-32 animate-pulse rounded-2xl bg-white/[0.03]"
-                  />
-                ))}
-              </div>
-
-              <div className="h-96 animate-pulse rounded-3xl bg-white/[0.03]" />
-            </div>
-          </main>
-        </div>
-      </div>
-    );
-  }
+    loading ? "—" : hideBalance ? "••••••" : assetAmount(value);
 
   return (
     <div className="min-h-screen bg-[#050a13]">
@@ -472,7 +436,7 @@ export default function WalletPage() {
                 </div>
 
                 <div className="text-2xl font-black">
-                  {wallet.balances.length}
+                  {loading ? "—" : wallet.balances.length}
                   <span className="mr-2 text-xs text-slate-500">
                     أصل
                   </span>
@@ -496,11 +460,11 @@ export default function WalletPage() {
                 </div>
 
                 <span className="rounded-full border border-blue-400/10 bg-blue-500/10 px-3 py-1 text-[11px] font-bold text-cyan-300">
-                  {wallet.balances.length} {wallet.balances.length === 1 ? "أصل" : "أصول"}
+                  {loading ? "—" : wallet.balances.length} {wallet.balances.length === 1 ? "أصل" : "أصول"}
                 </span>
               </div>
 
-              {wallet.balances.length === 0 ? (
+              {loading ? <div className="min-h-[8rem]" aria-hidden="true" /> : wallet.balances.length === 0 ? (
                 <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
 
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.03] text-slate-600">
@@ -655,7 +619,7 @@ export default function WalletPage() {
                 </Link>
               </div>
 
-              {transactions.length === 0 ? (
+              {loading ? <div className="min-h-[8rem]" aria-hidden="true" /> : transactions.length === 0 ? (
                 <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.03] text-slate-600">
                     <History size={23} />

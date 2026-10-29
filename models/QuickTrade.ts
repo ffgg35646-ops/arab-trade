@@ -11,7 +11,7 @@ export interface IQuickTrade {
   expiresAt: Date;
   closedAt?: Date;
   outcome?: "loss";
-  mode: "demo";
+  mode: "live";
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -27,7 +27,7 @@ const QuickTradeSchema = new Schema<IQuickTrade>({
   expiresAt: { type: Date, required: true, index: true },
   closedAt: { type: Date },
   outcome: { type: String, enum: ["loss"] },
-  mode: { type: String, enum: ["demo"], default: "demo", index: true },
+  mode: { type: String, enum: ["live"], default: "live", index: true },
 }, { timestamps: true });
 
 QuickTradeSchema.index({ userId: 1, createdAt: -1 });

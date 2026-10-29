@@ -19,6 +19,9 @@ export default function UserPackagesPage() {
   const [message, setMessage] = useState("");
   const [pendingChangePackageId, setPendingChangePackageId] = useState<string | null>(null);
   const [clockNow, setClockNow] = useState(0);
+  // UI-only grace window: keep the collect button visually available for 30 minutes
+  // after a successful collect, even if the refreshed API schedule points to tomorrow.
+  const [collectUiWindows, setCollectUiWindows] = useState<Record<string, number>>({});
 
   const load = useCallback(async () => {
     try {
@@ -60,6 +63,19 @@ export default function UserPackagesPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const now = Date.now();
+    const saved: Record<string, number> = {};
+    for (const plan of data?.userPackages ?? []) {
+      if (plan.status !== "active") continue;
+      const key = `arabTrade:collect-window-ui:${plan._id}`;
+      const until = Number(window.localStorage.getItem(key) || 0);
+      if (until > now) saved[plan._id] = until;
+      else window.localStorage.removeItem(key);
+    }
+    setCollectUiWindows(saved);
+  }, [data?.userPackages]);
+
   async function action(kind: "activate" | "cancel" | "change" | "collect", id: string, confirmed = false) {
     if (kind === "cancel" && !window.confirm("إلغاء هذه الباقة سيضيف 50% من قيمة التفعيل إلى رصيد أرباح هذه الباقة نفسها، وستبقى الأرباح المحققة في رصيدها. هل تريد المتابعة؟")) return;
     if (kind === "change") {
@@ -82,6 +98,15 @@ export default function UserPackagesPage() {
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || "تعذر إتمام العملية");
       setMessage(json.message || "تمت العملية بنجاح");
+      if (kind === "collect") {
+        const uiWindowEndsAt = Date.now() + 30 * 60 * 1000;
+        setCollectUiWindows((previous) => ({ ...previous, [id]: uiWindowEndsAt }));
+        try {
+          window.localStorage.setItem(`arabTrade:collect-window-ui:${id}`, String(uiWindowEndsAt));
+        } catch {
+          // Button state still works for the current page if browser storage is unavailable.
+        }
+      }
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "تعذر إتمام العملية");
@@ -162,7 +187,11 @@ export default function UserPackagesPage() {
           const skippedCycles = clockNow > scheduledEndsAt ? Math.floor((clockNow - scheduledEndsAt) / cycleMs) + 1 : 0;
           const nextAt = scheduledNextAt + skippedCycles * cycleMs;
           const endsAt = nextAt + 30 * 60 * 1000;
-          const windowOpen = clockNow >= nextAt && clockNow <= endsAt;
+          const scheduledWindowOpen = clockNow >= nextAt && clockNow <= endsAt;
+          const collectUiEndsAt = Number(collectUiWindows[activePlan._id] || 0);
+          const recentCollectWindowOpen = clockNow > 0 && collectUiEndsAt > clockNow;
+          const windowOpen = scheduledWindowOpen || recentCollectWindowOpen;
+          const visibleWindowEndsAt = recentCollectWindowOpen && !scheduledWindowOpen ? collectUiEndsAt : endsAt;
           const formatRemaining = (milliseconds: number) => {
             const total = Math.max(0, Math.floor(milliseconds / 1000));
             const hours = Math.floor(total / 3600).toString().padStart(2, "0");
@@ -185,14 +214,14 @@ export default function UserPackagesPage() {
               </button>
               <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-center">
                 <div className="text-[11px] text-slate-400">{windowOpen ? "الوقت المتبقي للجمع" : "الوقت المتبقي لفتح الجمع"}</div>
-                <div className="mt-1 font-mono text-xl font-black text-cyan-200">{windowOpen ? formatRemaining(endsAt - clockNow) : formatRemaining(nextAt - clockNow)}</div>
+                <div className="mt-1 font-mono text-xl font-black text-cyan-200">{windowOpen ? formatRemaining(visibleWindowEndsAt - clockNow) : formatRemaining(nextAt - clockNow)}</div>
               </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-black/20 p-3">
               <div><div className="text-xs text-slate-400">الربح اليومي</div><div className="mt-1 text-lg font-black text-emerald-200">{money(Number(activePlan.dailyProfit || 0))} {activePlan.asset}</div><div className="mt-1 text-[11px] text-slate-500">يضاف إلى رصيد أرباح هذه الباقة فقط.</div></div>
-              <button type="button" onClick={() => void action("collect", activePlan._id)} disabled={!windowOpen || Boolean(busy)} className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"><Gift size={16}/>{busy === activePlan._id ? "جاري الجمع..." : windowOpen ? "جمع الأرباح" : "الجمع غير متاح الآن"}</button>
+              <button type="button" onClick={() => void action("collect", activePlan._id)} disabled={!windowOpen || Boolean(busy)} className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"><Gift size={16}/>{busy === activePlan._id ? "جاري الجمع..." : recentCollectWindowOpen ? "متاح الجمع الآن" : windowOpen ? "جمع الأرباح" : "الجمع غير متاح الآن"}</button>
             </div>
-            {windowOpen && <p className="mt-3 text-xs font-bold text-amber-200">فرصة الجمع مفتوحة الآن — تنتهي خلال {formatRemaining(endsAt - clockNow)}.</p>}
+            {windowOpen && <p className="mt-3 text-xs font-bold text-amber-200">فرصة الجمع مفتوحة الآن — تنتهي خلال {formatRemaining(visibleWindowEndsAt - clockNow)}.</p>}
           </section>;
         })()}
         <section className="mt-5"><h2 className="mb-3 text-base font-black">الباقات المفعلة</h2>

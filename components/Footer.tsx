@@ -25,7 +25,6 @@ const internalColumns = [
     title: "الحساب والأمان",
     links: [
       ["التراخيص والأمان", "/dashboard/licenses"],
-      ["توثيق الحساب", "/dashboard/account/verification"],
       ["بيانات الحساب", "/dashboard/account"],
     ],
   },

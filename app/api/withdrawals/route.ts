@@ -201,11 +201,12 @@ export async function GET(request: NextRequest) {
     };
   });
   const packageAvailable = roundWithdrawal(packages.reduce((sum, plan) => sum + Number(plan.account?.balance || 0), 0));
-  const generalAvailable = getUsdtAvailable(wallet);
+  const walletAvailable = getUsdtAvailable(wallet);
   const depositAvailable = roundWithdrawal(depositBalances.reduce((sum: number, balance: any) =>
     sum + (String(balance.asset || "").trim().toUpperCase() === "USDT" ? Math.max(0, Number(balance.available || 0)) : 0),
   0));
-  // Keep the external deposit balance separate from the navbar withdrawal-balance summary.
+  // General withdrawals use one combined pool: spot-wallet USDT + external-deposit USDT.
+  const generalAvailable = roundWithdrawal(walletAvailable + depositAvailable);
   const totalBalance = roundWithdrawal(generalAvailable + packageAvailable);
 
   return NextResponse.json({
@@ -217,7 +218,6 @@ export async function GET(request: NextRequest) {
     },
     general: {
       available: generalAvailable,
-      depositAvailable,
       minimum: Number(platformSettings.withdrawals?.generalMinimum || 0),
       configured: Number(platformSettings.withdrawals?.generalMinimum || 0) > 0,
       feePercent: WITHDRAWAL_FEE_PERCENT,
@@ -258,7 +258,6 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const type = body.type === "general" ? "general" : "package";
-  const generalSource = body.generalSource === "deposit" ? "deposit" : "wallet";
   const packageId = String(body.packageId || "").trim();
   let amount = Number(body.amount);
   const asset = String(body.asset || "").trim().toUpperCase() as "USDT";
@@ -266,10 +265,6 @@ export async function POST(request: NextRequest) {
   const payoutAddress = String(body.payoutAddress || "").trim();
   const conversionOrderId = String(body.conversionOrderId || "").trim();
   let conversionDetails: Record<string, unknown> = {};
-
-  if (conversionOrderId && generalSource === "deposit") {
-    return NextResponse.json({ success: false, message: "حصيلة التداول تُسحب من رصيد السحب العام، وليس من رصيد الإيداع." }, { status: 400 });
-  }
 
   if (conversionOrderId) {
     if (type !== "general" || !mongoose.isValidObjectId(conversionOrderId)) {
@@ -361,42 +356,59 @@ export async function POST(request: NextRequest) {
         if (minimum <= 0) throw new Error("لم يحدد الأدمن الحد الأدنى للسحب العام بعد");
         if (amount < minimum) throw new Error("الحد الأدنى للسحب العام هو " + minimum + " USDT");
 
-        if (generalSource === "deposit") {
-          const debited = await debitDepositBalance(user._id, "USDT", amount, session);
-          if (!debited.ok) {
-            throw new Error("رصيد الإيداع الخارجي المتاح للسحب هو " + debited.availableBefore + " USDT فقط");
-          }
-          const created = await WithdrawalRequest.create([{
-            userId: user._id,
-            type: "general",
-            generalSource: "deposit",
-            amount,
-            ...feeDetails!,
-            asset,
-            network,
-            payoutAddress,
-            status: "pending",
-          }], { session });
-          createdWithdrawal = created[0];
-          return;
+        const wallet = await Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).session(session);
+        const walletAvailable = getUsdtAvailable(wallet);
+        const depositRows = await DepositBalance.find({ userId: user._id })
+          .select("asset available")
+          .session(session)
+          .lean();
+        const depositAvailable = roundWithdrawal(depositRows.reduce((sum: number, row: any) =>
+          sum + (String(row.asset || "").trim().toUpperCase() === "USDT" ? Math.max(0, Number(row.available || 0)) : 0),
+        0));
+        const totalAvailable = roundWithdrawal(walletAvailable + depositAvailable);
+        if (amount > totalAvailable) {
+          throw new Error("رصيد السحب العام المتاح هو " + totalAvailable + " USDT فقط");
         }
 
-        const wallet = await Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).session(session);
-        if (!wallet) throw new Error("لا يوجد رصيد عام متاح للسحب");
-        const available = getUsdtAvailable(wallet);
-        if (amount > available) throw new Error("المتاح للسحب العام " + available + " USDT فقط");
+        // Reserve from the spot wallet first, then cover any remainder from
+        // DepositBalance. The UI and validation treat these as one withdrawal pool.
+        const walletDebit = roundWithdrawal(Math.min(walletAvailable, amount));
+        const depositDebit = roundWithdrawal(amount - walletDebit);
 
-        const reserved = await Wallet.updateOne(
-          { _id: wallet._id, balances: { $elemMatch: { asset: "USDT", available: { $gte: amount } } } },
-          { $inc: { "balances.$.available": -amount } },
-          { session }
-        );
-        if (reserved.modifiedCount !== 1) throw new Error("الرصيد العام تغير، حاول مجددًا");
+        if (walletDebit > 0) {
+          if (!wallet) throw new Error("الرصيد العام تغير، حاول مجددًا");
+          const reserved = await Wallet.updateOne(
+            { _id: wallet._id, balances: { $elemMatch: { asset: "USDT", available: { $gte: walletDebit } } } },
+            { $inc: { "balances.$.available": -walletDebit } },
+            { session }
+          );
+          if (reserved.modifiedCount !== 1) throw new Error("الرصيد العام تغير، حاول مجددًا");
+        }
+
+        if (depositDebit > 0) {
+          const debited = await debitDepositBalance(user._id, "USDT", depositDebit, session);
+          if (!debited.ok) {
+            throw new Error("رصيد السحب العام تغير؛ المتاح حاليًا " +
+              roundWithdrawal(walletAvailable + debited.availableBefore) + " USDT فقط");
+          }
+        }
 
         const created = await WithdrawalRequest.create([{
-          userId: user._id, type: "general", generalSource: "wallet", amount, ...feeDetails!, ...conversionDetails, asset, network, payoutAddress, status: "pending",
+          userId: user._id,
+          type: "general",
+          generalSource: "wallet",
+          generalWalletAmount: walletDebit,
+          generalDepositAmount: depositDebit,
+          amount,
+          ...feeDetails!,
+          ...conversionDetails,
+          asset,
+          network,
+          payoutAddress,
+          status: "pending",
         }], { session });
         createdWithdrawal = created[0];
+
         if (conversionOrderId) {
           const marked = await Order.updateOne(
             {

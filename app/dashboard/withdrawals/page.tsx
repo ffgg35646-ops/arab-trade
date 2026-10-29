@@ -34,7 +34,6 @@ type Network = { code: string; name: string };
 type Request = {
   _id: string;
   type: string;
-  generalSource?: "wallet" | "deposit";
   packageId?: string | null;
   amount: number;
   grossAmount?: number;
@@ -54,7 +53,7 @@ type Data = {
     generalAvailable: number;
     packageAvailable: number;
   };
-  general: { available: number; depositAvailable: number; minimum: number; configured: boolean; feePercent?: number };
+  general: { available: number; minimum: number; configured: boolean; feePercent?: number };
   networks: Network[];
   packages: Plan[];
   requests: Request[];
@@ -76,7 +75,6 @@ export default function WithdrawalsPage() {
   const [packageNetworks, setPackageNetworks] = useState<Record<string, string>>({});
   const [packageMessages, setPackageMessages] = useState<Record<string, string>>({});
   const [selectedSource, setSelectedSource] = useState("general");
-  const [generalSource, setGeneralSource] = useState<"wallet" | "deposit">("wallet");
   const [generalAmount, setGeneralAmount] = useState("");
   const [generalAddress, setGeneralAddress] = useState("");
   const [generalNetwork, setGeneralNetwork] = useState("");
@@ -115,11 +113,6 @@ export default function WithdrawalsPage() {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("source") === "deposit") {
-      setSelectedSource("general");
-      setGeneralSource("deposit");
-    }
     void load();
     const timer = window.setInterval(() => void load(), 20000);
     return () => window.clearInterval(timer);
@@ -128,9 +121,7 @@ export default function WithdrawalsPage() {
   const hasPending = Boolean(data?.requests.some((item) => item.status === "pending"));
   const firstNetwork = data?.networks[0]?.code || "";
   const selectedGeneralNetwork = generalNetwork || firstNetwork;
-  const selectedGeneralAvailable = generalSource === "deposit"
-    ? Number(data?.general.depositAvailable || 0)
-    : Number(data?.general.available || 0);
+  const selectedGeneralAvailable = Number(data?.general.available || 0);
   const requestsPerPage = 4;
   const requestCount = data?.requests.length || 0;
   const requestPageCount = Math.ceil(requestCount / requestsPerPage);
@@ -188,9 +179,7 @@ export default function WithdrawalsPage() {
       return;
     }
     if (amount > selectedGeneralAvailable) {
-      showMessage(generalSource === "deposit"
-        ? "رصيد الإيداع الخارجي المتاح للسحب هو " + money(selectedGeneralAvailable) + " USDT فقط"
-        : "الرصيد العام المتاح للسحب هو " + money(selectedGeneralAvailable) + " USDT فقط");
+      showMessage("رصيد السحب العام المتاح هو " + money(selectedGeneralAvailable) + " USDT فقط");
       return;
     }
     if (!isValidPayoutAddress(selectedGeneralNetwork, generalAddress.trim())) {
@@ -201,7 +190,6 @@ export default function WithdrawalsPage() {
     }
     void submit({
       type: "general",
-      generalSource,
       amount,
       asset: "USDT",
       network: selectedGeneralNetwork,
@@ -421,24 +409,11 @@ export default function WithdrawalsPage() {
                 <h2 className="text-xl font-black">السحب العام</h2>
               </div>
               <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/[0.05] px-4 py-2">
-                <span className="text-xs text-slate-300">الرصيد المتاح من {generalSource === "deposit" ? "رصيد الإيداع" : "السحب العام"} · {selectedGeneralNetwork || "الشبكة المحددة"}</span>
+                <span className="text-xs text-slate-300">رصيد السحب العام · {selectedGeneralNetwork || "الشبكة المحددة"}</span>
                 <strong className="mt-1 block text-lg font-black text-emerald-300">{data ? money(selectedGeneralAvailable) : "—"} USDT</strong>
               </div>
             </div>
 
-            <label className="block space-y-2 text-sm text-slate-300">
-              <span>مصدر الرصيد</span>
-              <select
-                value={generalSource}
-                onChange={(event) => setGeneralSource(event.target.value === "deposit" ? "deposit" : "wallet")}
-                disabled={busy || hasPending}
-                className="w-full rounded-lg border border-slate-700 bg-[#050a13] p-3 text-white disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="wallet">رصيد السحب العام</option>
-                <option value="deposit">رصيد الإيداع الخارجي (USDT)</option>
-              </select>
-              <p className="text-xs text-slate-500">رصيد الإيداع منفصل عن رصيد السحب، ويمكن استخدامه هنا فقط دون إضافته إلى رصيد السحب المعروض في الناف بار.</p>
-            </label>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block space-y-2 text-sm text-slate-300">
@@ -503,7 +478,7 @@ export default function WithdrawalsPage() {
                   return (
                     <article key={item._id} className="rounded-xl border border-slate-700 bg-[#0b1422] p-3">
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <strong>{item.type === "general" ? (item.generalSource === "deposit" ? "السحب العام — رصيد الإيداع" : "السحب العام") : plan?.name || "السحب من الباقات"}</strong>
+                        <strong>{item.type === "general" ? "السحب العام" : plan?.name || "السحب من الباقات"}</strong>
                         <strong className="font-mono">{money(item.amount)} {item.asset || "USDT"}</strong>
                         <span className={item.status === "approved" ? "text-emerald-300" : item.status === "rejected" ? "text-red-300" : "text-amber-200"}>الحالة: {statusLabel}</span>
                       </div>

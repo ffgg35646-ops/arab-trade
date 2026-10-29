@@ -1218,7 +1218,7 @@ export default function OrdersPage() {
               ) : null}
 
               <div className="overflow-x-auto">
-                {loading ? <div className="min-h-[320px]" aria-hidden="true" /> :tab ===
+                {loading ? <div className="min-h-[320px]" aria-hidden="true" /> : tab ===
                   "trades" ? (
                   filteredTrades.length ===
                   0 ? (

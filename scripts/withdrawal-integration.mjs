@@ -265,6 +265,10 @@ try {
   assert.equal(generalWallet.balances.find((row) => row.asset === "USDT").available, 25);
   let generalPending = await latestPending();
   assert.equal(generalPending.type, "general");
+  assert.equal(generalPending.generalWalletAmount, 25,
+    "wallet-covered withdrawals store the wallet reservation");
+  assert.equal(generalPending.generalDepositAmount, 0,
+    "wallet-covered withdrawals leave the deposit source untouched");
   const generalRequestNoticeCount = await mongoose.connection.collection("notifications")
     .countDocuments({ userId: user._id, type: "withdrawal", title: "تم استلام طلب السحب" });
   assert.equal(generalRequestNoticeCount, 1, "the user should receive a notice when a general withdrawal is created");
@@ -272,11 +276,12 @@ try {
   assert.equal(adminPendingGeneral.status, 200);
   assert.equal(adminPendingGeneral.data.counts.withdrawals, 1, "admin notification menu should count the pending general withdrawal");
   const generalSummary = await call("/api/withdrawals", { cookie: userCookie });
-  assert.equal(generalSummary.data.summary.generalAvailable, 25);
+  assert.equal(generalSummary.data.summary.generalAvailable, 125,
+    "pending withdrawal reduces wallet balance while external deposits remain included in the unified general pool");
   assert.equal(generalSummary.data.summary.generalLocked, undefined,
     "reserved general withdrawal amounts must not be exposed in the user summary");
-  assert.equal(generalSummary.data.summary.totalBalance, 1035,
-    "the grand total must exclude reserved general withdrawal amounts while pending");
+  assert.equal(generalSummary.data.summary.totalBalance, 1135,
+    "the grand total includes the remaining general pool and package balance, but excludes reserved amounts");
   assert.equal((await review(generalPending._id, "reject")).status, 200);
   const generalReviewNoticeCount = await mongoose.connection.collection("notifications")
     .countDocuments({ userId: user._id, type: "withdrawal", title: "تم رفض طلب السحب" });
@@ -284,44 +289,50 @@ try {
   const adminAfterGeneralReview = await call("/api/admin/notifications-summary", { cookie: adminCookie });
   assert.equal(adminAfterGeneralReview.data.counts.withdrawals, 0, "reviewed requests must disappear from pending admin count");
   const generalAfterRejectSummary = await call("/api/withdrawals", { cookie: userCookie });
-  assert.equal(generalAfterRejectSummary.data.summary.totalBalance, 1060,
-    "rejecting a general withdrawal returns its amount and keeps the grand total unchanged");
+  assert.equal(generalAfterRejectSummary.data.summary.totalBalance, 1160,
+    "rejecting a general withdrawal returns its amount and keeps the combined grand total unchanged");
   generalWallet = await mongoose.connection.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
   assert.equal(generalWallet.balances.find((row) => row.asset === "USDT").available, 50);
   log("General withdrawal uses configured minimum, enabled admin network and trading USDT balance; rejection returns funds");
 
-  const depositSourceView = await call("/api/withdrawals", { cookie: userCookie });
-  assert.equal(depositSourceView.status, 200);
-  assert.equal(depositSourceView.data.general.depositAvailable, 100,
-    "external deposit balance must be exposed separately to the general withdrawal form");
-  const navbarBalanceBeforeDepositWithdrawal = await call("/api/withdrawals/balance", { cookie: userCookie });
-  assert.equal(navbarBalanceBeforeDepositWithdrawal.data.generalWithdrawalBalance, 50,
-    "external deposit balance must not be merged into the navbar withdrawal balance");
-  const depositSourceRequest = await requestGeneralWithdrawal(25, "deposit");
-  assert.equal(depositSourceRequest.status, 201,
-    "the general withdrawal section should accept a request specifically funded by external USDT deposits");
+  const unifiedPoolView = await call("/api/withdrawals", { cookie: userCookie });
+  assert.equal(unifiedPoolView.status, 200);
+  assert.equal(unifiedPoolView.data.general.available, 150,
+    "general withdrawal availability must combine 50 wallet USDT and 100 external-deposit USDT");
+  assert.equal(unifiedPoolView.data.general.depositAvailable, undefined,
+    "the API must not expose a separate external-deposit balance in the withdrawal form");
+  const navbarBalanceBeforeUnifiedWithdrawal = await call("/api/withdrawals/balance", { cookie: userCookie });
+  assert.equal(navbarBalanceBeforeUnifiedWithdrawal.data.generalWithdrawalBalance, 150,
+    "the navbar general withdrawal balance includes external deposits");
+  // Legacy clients may still send generalSource; the new server behavior is a single combined pool.
+  const combinedRequest = await requestGeneralWithdrawal(75, "deposit");
+  assert.equal(combinedRequest.status, 201,
+    "a general withdrawal may draw from wallet USDT and external deposits as one pool");
   let externalDepositBalance = await mongoose.connection.collection("depositbalances")
     .findOne({ userId: user._id, asset: "USDT" });
   assert.equal(externalDepositBalance.available, 75,
-    "pending deposit-source withdrawal must reserve funds from DepositBalance only");
+    "the combined reservation must debit the 25 USDT remainder from DepositBalance");
   generalWallet = await mongoose.connection.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
-  assert.equal(generalWallet.balances.find((row) => row.asset === "USDT").available, 50,
-    "deposit-source withdrawal must not change the general withdrawal wallet");
-  const depositSourcePending = await latestPending();
-  assert.equal(depositSourcePending.generalSource, "deposit");
-  assert.equal((await review(depositSourcePending._id, "reject")).status, 200,
-    "admin rejection should return deposit-source funds");
+  assert.equal(generalWallet.balances.find((row) => row.asset === "USDT").available, 0,
+    "the combined reservation consumes the 50 USDT general wallet amount first");
+  const combinedPending = await latestPending();
+  assert.equal(combinedPending.generalWalletAmount, 50,
+    "the request stores the portion reserved from the general wallet");
+  assert.equal(combinedPending.generalDepositAmount, 25,
+    "the request stores the portion reserved from DepositBalance");
+  assert.equal((await review(combinedPending._id, "reject")).status, 200,
+    "admin rejection should restore both parts of a combined general withdrawal");
   externalDepositBalance = await mongoose.connection.collection("depositbalances")
     .findOne({ userId: user._id, asset: "USDT" });
   assert.equal(externalDepositBalance.available, 100,
-    "rejecting a deposit-source withdrawal must return funds to DepositBalance");
+    "rejecting the combined request restores the deposit portion");
   generalWallet = await mongoose.connection.collection("wallets").findOne({ userId: user._id, type: "spot", mode: "live" });
   assert.equal(generalWallet.balances.find((row) => row.asset === "USDT").available, 50,
-    "deposit-source rejection must not credit the spot wallet");
-  const navbarBalanceAfterDepositWithdrawal = await call("/api/withdrawals/balance", { cookie: userCookie });
-  assert.equal(navbarBalanceAfterDepositWithdrawal.data.generalWithdrawalBalance, 50,
-    "the navbar withdrawal balance must remain independent before and after a deposit-source request");
-  log("External deposit USDT can be withdrawn only through general withdrawals; rejection restores it to DepositBalance and navbar withdrawal balance remains separate");
+    "rejecting the combined request restores the wallet portion");
+  const navbarBalanceAfterUnifiedWithdrawal = await call("/api/withdrawals/balance", { cookie: userCookie });
+  assert.equal(navbarBalanceAfterUnifiedWithdrawal.data.generalWithdrawalBalance, 150,
+    "the unified general balance remains consistent before and after a rejected request");
+  log("General withdrawals combine wallet and external deposits; rejected mixed-source requests restore both allocations");
 
   const setHigherMinimum = await call("/api/admin/withdrawals", { method: "PATCH", cookie: adminCookie,
     body: { action: "minimum", packageId: packageAId, minimum: 125 } });
@@ -488,15 +499,16 @@ try {
   log("Package withdrawal operations do not alter the separate deposit balance");
   const finalSummaryResponse = await call("/api/withdrawals", { cookie: userCookie });
   assert.equal(finalSummaryResponse.status, 200);
-  assert.equal(finalSummaryResponse.data.summary.generalAvailable, 50);
+  assert.equal(finalSummaryResponse.data.summary.generalAvailable, 150,
+    "final general availability includes the 50 USDT wallet plus 100 USDT external-deposit balance");
   assert.equal(finalSummaryResponse.data.summary.generalLocked, undefined,
     "reserved general withdrawal amounts are omitted from the summary");
   assert.equal(finalSummaryResponse.data.summary.packageAvailable, 310);
   assert.equal(finalSummaryResponse.data.summary.packageLocked, undefined,
     "reserved package withdrawal amounts are omitted from the summary");
-  assert.equal(finalSummaryResponse.data.summary.totalBalance, 360,
-    "grand total combines only unreserved general and package withdrawal balances, excluding deposit balance");
-  log("Grand total includes unreserved general and package withdrawal balances, but excludes reserved and separate deposit balances");
+  assert.equal(finalSummaryResponse.data.summary.totalBalance, 460,
+    "grand total combines unreserved general and package withdrawal balances, including external deposits once");
+  log("Grand total includes the unified general balance and package balances, excluding reserved amounts");
   log("ALL WITHDRAWAL END-TO-END SCENARIOS PASSED");
 } catch (error) {
   console.error("[E2E] FAILED:", error?.stack || error);

@@ -1457,7 +1457,6 @@ export default function ProTradeTerminal() {
               <span className="text-[11px] text-slate-500">{quoteAsset}</span>
             </div>
 
-            <label className="mb-2 block text-[11px] text-slate-500">مبلغ الصفقة المخصوم من رصيد الإيداع</label>
             <div className="mb-3 flex h-11 items-center rounded-lg border border-white/[0.08] bg-[#050a13] px-3 focus-within:border-cyan-400/50">
               <input
                 value={quantity}
@@ -1482,10 +1481,7 @@ export default function ProTradeTerminal() {
               ))}
             </div>
 
-            <div className="mb-5 flex items-center justify-between text-xs">
-              <span className="text-slate-500">
-                مبلغ الخصم من رصيد الإيداع
-              </span>
+            <div className="mb-5 flex items-center justify-end text-xs">
               <span className="font-medium">{total > 0 ? `${money(total)} USDT` : "—"}</span>
             </div>
 

@@ -72,7 +72,6 @@ export default function FinancialReportsPage() {
   const [error, setError] = useState("");
 
   const load = useCallback(async (requestedPeriod = period) => {
-    setLoading(true);
     setError("");
     try {
       const [reportRes, walletRes] = await Promise.all([

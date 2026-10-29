@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     );
 
     const symbol = String(new URL(request.url).searchParams.get("symbol") || "").trim().toUpperCase();
-    const filter: Record<string, unknown> = { userId: user._id, mode: "live" };
+    const filter: Record<string, unknown> = { userId: user._id, mode: "demo" };
     if (symbol) filter.symbol = symbol;
 
     const trades = await QuickTrade.find(filter).sort({ createdAt: -1 }).limit(100).lean();
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     // Reserve/deduct USDT atomically so two parallel taps cannot spend the same funds.
     const wallet = await Wallet.findOneAndUpdate(
-      { userId: user._id, type: "spot", mode: "live", balances: { $elemMatch: { asset: "USDT", available: { $gte: stakeAmount } } } },
+      { userId: user._id, type: "spot", mode: "demo", balances: { $elemMatch: { asset: "USDT", available: { $gte: stakeAmount } } } },
       { $inc: { "balances.$.available": -stakeAmount } },
       { new: true }
     );
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       userId: user._id, symbol, side, stakeAmount, entryPrice,
       status: "open", openedAt,
       expiresAt: new Date(openedAt.getTime() + 5 * 60 * 1000),
-      mode: "live",
+      mode: "demo",
     });
 
     const usdt = wallet.balances.find((balance: any) => String(balance.asset).toUpperCase() === "USDT");
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     if (deducted > 0 && userId) {
       try {
         await Wallet.updateOne(
-          { userId, type: "spot", mode: "live", "balances.asset": "USDT" },
+          { userId, type: "spot", mode: "demo", "balances.asset": "USDT" },
           { $inc: { "balances.$.available": deducted } }
         );
       } catch (refundError) {

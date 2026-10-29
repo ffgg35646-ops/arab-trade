@@ -739,15 +739,8 @@ export default function ProTradeTerminal() {
   const marketChange =
     liveTicker?.symbol === symbol ? num(liveTicker.change24h) : null;
 
-  const baseBalance =
-    balances.find(
-      (b) => String(b.asset || "").toUpperCase() === baseAsset
-    ) || {};
-
-  const quoteBalance =
-    balances.find(
-      (b) => String(b.asset || "").toUpperCase() === quoteAsset
-    ) || {};
+  const depositUsdtBalance =
+    balances.find((b) => String(b.asset || "").trim().toUpperCase() === "USDT") || {};
 
   const openOrders = useMemo(
     () => orders.filter((o) => String(o.status).toLowerCase() === "open"),
@@ -939,7 +932,7 @@ export default function ProTradeTerminal() {
   };
 
   const percentageQuantity = (percent: number) => {
-    const available = num(quoteBalance.available);
+    const available = num(depositUsdtBalance.available);
     const stakeAmount = available * percent / 100;
     setQuantity(stakeAmount > 0 ? String(stakeAmount) : "");
   };
@@ -1112,7 +1105,7 @@ export default function ProTradeTerminal() {
       </div>
 
       <p className="mt-2 px-5 text-[10px] leading-5 text-slate-500">
-        هذه محاكاة مرئية لصفقات مدتها خمس دقائق باستخدام رصيد تجريبي مستقل؛ يُخصم مبلغ الصفقة فورًا من رصيد المحاكاة، ويظهر عدّاد ورسم متحرك، ثم تُغلق الصفقة وتظهر في سجل التداول. لا تُخصم أموال المحفظة الحقيقية.
+        صفقة مرئية مدتها خمس دقائق: يُخصم مبلغها فورًا من رصيد الإيداع USDT الفعلي المسجل في حسابك، ويظهر عدّاد ورسم متحرك، ثم تُغلق وتظهر في سجل التداول. رصيد السحب منفصل ولا يتأثر.
       </p>
 
       <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px]">
@@ -1377,7 +1370,7 @@ export default function ProTradeTerminal() {
               <div>
                 <div className="text-xs text-slate-500">رصيد الإيداع المتاح</div>
                 <div className="mt-1 text-sm font-semibold">
-                  {fmt(quoteBalance.available ?? 0, 4)} USDT
+                  {fmt(depositUsdtBalance.available ?? 0, 4)} USDT
                 </div>
               </div>
               <div className="rounded-lg bg-white/[0.04] p-2 text-slate-400">
@@ -1387,7 +1380,7 @@ export default function ProTradeTerminal() {
 
             <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
               <div className="text-[10px] text-slate-500">إجمالي رصيد الإيداع USDT</div>
-              <div className="mt-1 text-xs font-medium">{fmt(quoteBalance.total ?? 0, 4)}</div>
+              <div className="mt-1 text-xs font-medium">{fmt(depositUsdtBalance.total ?? 0, 4)}</div>
             </div>
           </div>
 

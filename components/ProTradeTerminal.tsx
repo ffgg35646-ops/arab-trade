@@ -65,6 +65,8 @@ type Trade = {
   side?: string;
   role?: string;
   createdAt?: string;
+  status?: string;
+  outcome?: string;
 };
 
 type LiveTicker = {
@@ -937,7 +939,6 @@ export default function ProTradeTerminal() {
     setQuantity(stakeAmount > 0 ? String(stakeAmount) : "");
   };
 
-  const effectiveOrderPrice = orderType === "market" ? (marketExecutionPrice || currentPrice) : num(price);
   const total = num(quantity);
 
   const selectableBaseAssets = useMemo(() => {
@@ -1225,6 +1226,7 @@ export default function ProTradeTerminal() {
                       <th className="px-4 py-3 font-normal">سعر التنفيذ</th>
                       <th className="px-4 py-3 font-normal">الكمية</th>
                       <th className="px-4 py-3 font-normal">قيمة الصفقة</th>
+                      <th className="px-4 py-3 font-normal">الحالة</th>
                       <th className="px-4 py-3 font-normal">الوقت</th>
                     </tr>
                   ) : (
@@ -1255,7 +1257,8 @@ export default function ProTradeTerminal() {
                           </td>
                           <td className="px-4 py-3 font-mono">{fmt(trade.price ?? 0, 8)}</td>
                           <td className="px-4 py-3 font-mono">{fmt(trade.quantity ?? 0, 8)}</td>
-                          <td className="px-4 py-3 font-mono">{fmt(trade.quoteAmount ?? (num(trade.price) * num(trade.quantity)), 8)}</td>
+                          <td className="px-4 py-3 font-mono">{fmt(trade.quoteAmount ?? (num(trade.price) * num(trade.quantity)), 8)} USDT</td>
+                          <td className={trade.outcome === "loss" ? "px-4 py-3 text-rose-400" : "px-4 py-3 text-emerald-400"}>{trade.status === "تم إغلاق الصفقة" ? "تم إغلاق الصفقة" : "منفذة"}</td>
                           <td className="px-4 py-3 text-slate-500">{time(trade.createdAt)}</td>
                         </tr>
                       ))

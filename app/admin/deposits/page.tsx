@@ -197,7 +197,7 @@ export default function AdminDepositsPage() {
 
         <section className="overflow-hidden rounded-2xl border border-slate-800 bg-[#08111e]">
           {loading ? (
-            <div className="p-12 text-center text-slate-500">جاري تحميل طلبات الإيداع...</div>
+            <div className="min-h-[8rem]" aria-hidden="true" />
           ) : filtered.length === 0 ? (
             <div className="p-12 text-center text-slate-500">{search ? "لا توجد نتائج مطابقة للبحث." : "لا توجد طلبات ضمن الحالة المختارة."}</div>
           ) : (

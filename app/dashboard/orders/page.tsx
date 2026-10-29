@@ -1218,17 +1218,7 @@ export default function OrdersPage() {
               ) : null}
 
               <div className="overflow-x-auto">
-                {loading ? (
-                  <div className="flex min-h-[320px] items-center justify-center">
-                    <div className="flex items-center gap-3 text-xs text-slate-500">
-                      <RefreshCw
-                        size={16}
-                        className="animate-spin"
-                      />
-                      جاري تحميل البيانات...
-                    </div>
-                  </div>
-                ) : tab ===
+                {loading ? <div className="min-h-[320px]" aria-hidden="true" /> :tab ===
                   "trades" ? (
                   filteredTrades.length ===
                   0 ? (

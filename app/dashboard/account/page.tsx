@@ -58,8 +58,6 @@ export default function AccountPage() {
 
   async function loadUser() {
     try {
-      setLoading(true);
-
       const response = await fetch("/api/account/profile", {
         credentials: "include",
         cache: "no-store",
@@ -222,28 +220,6 @@ export default function AccountPage() {
     ).toUpperCase();
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#050a13]">
-        <InternalNavbar />
-
-        <div className="flex min-h-[calc(100vh-5rem)]" dir="rtl">
-          <InternalSidebar />
-
-          <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
-            <div className="mx-auto max-w-7xl">
-              <div className="mb-6 h-32 animate-pulse rounded-3xl border border-white/5 bg-white/[0.03]" />
-              <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-                <div className="h-[540px] animate-pulse rounded-3xl border border-white/5 bg-white/[0.03]" />
-                <div className="h-[540px] animate-pulse rounded-3xl border border-white/5 bg-white/[0.03]" />
-              </div>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#050a13]">
       <InternalNavbar />
@@ -333,6 +309,7 @@ export default function AccountPage() {
 
                       <input
                         value={name}
+                        disabled={loading}
                         onChange={(e) => setName(e.target.value)}
                         className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-12 py-3.5 text-sm text-white outline-none transition focus:border-blue-400/40"
                       />
@@ -352,6 +329,7 @@ export default function AccountPage() {
 
                       <input
                         value={username}
+                        disabled={loading}
                         onChange={(e) =>
                           setUsername(
                             e.target.value
@@ -379,6 +357,7 @@ export default function AccountPage() {
                       <input
                         type="email"
                         value={email}
+                        disabled={loading}
                         onChange={(e) => setEmail(e.target.value)}
                         className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-12 py-3.5 text-sm text-white outline-none transition focus:border-blue-400/40"
                         dir="ltr"
@@ -429,7 +408,7 @@ export default function AccountPage() {
                   <button
                     type="button"
                     onClick={saveProfile}
-                    disabled={savingProfile}
+                    disabled={loading || savingProfile}
                     className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-500 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Save size={17} />

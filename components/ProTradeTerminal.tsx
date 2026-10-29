@@ -14,6 +14,7 @@ import {
 
 import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
+import QuickTradePanel from "@/components/QuickTradePanel";
 
 type Asset = {
   current_price?: number;
@@ -772,7 +773,7 @@ export default function ProTradeTerminal() {
           personalTradesResponse,
         ] = await Promise.all([
           fetch("/api/assets", { cache: "no-store" }),
-          fetch("/api/wallet", {
+          fetch("/api/wallet?mode=demo", {
             credentials: "include",
             cache: "no-store",
           }),
@@ -881,35 +882,24 @@ export default function ProTradeTerminal() {
 
     setSubmittingOrder(true);
     try {
-      const response = await fetch("/api/orders", {
+      const stakeAmount = Math.round(parsedPrice * parsedQuantity * 1e8) / 1e8;
+      if (!Number.isFinite(stakeAmount) || stakeAmount < 1) {
+        throw new Error("قيمة الصفقة يجب ألا تقل عن 1 USDT.");
+      }
+      const response = await fetch("/api/quick-trades", {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: JSON.stringify({
-          symbol,
-          side,
-          type: orderType,
-          price: parsedPrice,
-          quantity: parsedQuantity,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol, side, price: parsedPrice, amount: stakeAmount }),
       });
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data?.success === false) {
-        throw new Error(data?.message || "تعذر إرسال أمر التداول.");
+        throw new Error(data?.message || "تعذر فتح الصفقة.");
       }
 
-      setMessage(
-        data?.message ||
-        (data?.pending
-          ? "تم استلام الأمر وجارٍ تأكيده؛ تم حجز الرصيد المتاح."
-          : "تم إرسال أمر التداول بنجاح.")
-      );
+      setMessage(`تم فتح الصفقة وخصم ${stakeAmount.toLocaleString("en-US", { maximumFractionDigits: 2 })} USDT من رصيد المحاكاة فورًا. مدة الصفقة 5 دقائق.`);
       setQuantity("");
-      // Reload the persisted wallet and order history immediately after the server response.
       await loadAll(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "تعذر إرسال أمر التداول.");
@@ -1135,12 +1125,7 @@ export default function ProTradeTerminal() {
       </div>
 
       <p className="mt-2 px-5 text-[10px] leading-5 text-slate-500">
-        السعر والمخطط ودفتر أوامر السوق وآخر الصفقات المعروضة من Binance.
-        {executionConfigured
-          ? executionTestnet
-            ? " أوامر الشراء والبيع تُرسل إلى حساب Binance Testnet للاختبار، وليست تداولًا بأموال حقيقية."
-            : " أوامر الشراء والبيع تُرسل إلى حساب Binance المرتبط. تأكد من كفاية أرصدة حساب المنصة ومطابقتها لأرصدة المستخدمين."
-          : " التداول الحقيقي متوقف حتى يضبط الأدمن BINANCE_API_KEY وBINANCE_API_SECRET ويفعّل BINANCE_LIVE_TRADING_ENABLED على الخادم. لن ينفذ الموقع أمرًا داخليًا بديلًا."}
+        هذه محاكاة مرئية لصفقات مدتها خمس دقائق باستخدام رصيد تجريبي مستقل؛ يُخصم مبلغ الصفقة فورًا من رصيد المحاكاة، ويظهر عدّاد ورسم متحرك، ثم تُغلق الصفقة وتظهر في سجل التداول. لا تُخصم أموال المحفظة الحقيقية.
       </p>
 
       <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px]">
@@ -1152,6 +1137,7 @@ export default function ProTradeTerminal() {
                 <span className="text-[10px] text-slate-500">بيانات السوق المرجعي لحظيًا</span>
               </div>
               <Chart symbol={symbol} />
+              <QuickTradePanel symbol={symbol} />
             </div>
 
             <div className="min-h-[650px]">
@@ -1559,13 +1545,7 @@ export default function ProTradeTerminal() {
             </button>
 
             <div className="mt-3 text-center text-[10px] leading-5 text-slate-600">
-              {orderType === "market" && marketExecutionPrice <= 0
-                ? "لا تتوفر سيولة مقابلة من Binance الآن؛ لن يُرسل أمر السوق حتى يظهر سعر قابل للتنفيذ."
-                : orderType === "market"
-                  ? "أمر السوق يُرسل إلى Binance للتنفيذ بأفضل الأسعار المتاحة الآن. قد يختلف متوسط التنفيذ عن السعر المعروض، وقد يكون التنفيذ جزئيًا عند نقص السيولة."
-                  : side === "buy"
-                    ? `شراء محدد: يُرسل الأمر إلى دفتر Binance بسعرك أو بسعر أفضل. تُحجز ${quoteAsset}، ولا تُضاف ${baseAsset} إلى الرصيد إلا بالكمية التي تنفّذ فعلًا؛ وقد يظل الأمر مفتوحًا حتى التنفيذ أو الإلغاء.`
-                    : `بيع محدد: يُرسل الأمر إلى دفتر Binance بسعرك أو بسعر أفضل. تُحجز ${baseAsset} من رصيدك حتى التنفيذ أو الإلغاء؛ ولا تُسجل الصفقة إلا بالكمية التي بيعت فعلًا.`}
+              اضغط شراء أو بيع لفتح صفقة محاكاة مدتها خمس دقائق. قيمة الصفقة تُخصم فورًا من رصيد USDT التجريبي، ويظهر العد التنازلي والرسم المتحرك أسفل مخطط السوق.
             </div>
           </div>
 

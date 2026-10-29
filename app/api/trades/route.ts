@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
 import Trade from "@/models/Trade";
 import { getBinanceRecentTrades } from "@/lib/binance-trading";
+import QuickTrade from "@/models/QuickTrade";
 
 export async function GET(
   request: NextRequest
@@ -177,9 +178,35 @@ export async function GET(
         }
       );
 
+    // Include closed five-minute demo trades in the same history endpoint used by the UI.
+    const now = new Date();
+    await QuickTrade.updateMany(
+      { userId: user._id, mode: "demo", status: "open", expiresAt: { $lte: now } },
+      { $set: { status: "closed", outcome: "loss", closedAt: now } }
+    );
+    const quickFilter: Record<string, unknown> = { userId: user._id, mode: "demo", status: "closed" };
+    if (symbol) quickFilter.symbol = symbol;
+    const quickRows = await QuickTrade.find(quickFilter).sort({ closedAt: -1 }).limit(limit).lean();
+    const quickHistory = quickRows.map((trade: any) => ({
+      _id: String(trade._id),
+      mode: "demo",
+      symbol: trade.symbol,
+      side: trade.side,
+      price: Number(trade.entryPrice || 0),
+      quantity: Number(trade.entryPrice || 0) > 0 ? Number(trade.stakeAmount || 0) / Number(trade.entryPrice) : 0,
+      quoteAmount: Number(trade.stakeAmount || 0),
+      createdAt: trade.closedAt || trade.openedAt,
+      status: "تم إغلاق الصفقة",
+      outcome: trade.outcome || "loss",
+      executionProvider: "internal",
+    }));
+    const combined = [...normalized, ...quickHistory]
+      .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+      .slice(0, limit);
+
     return NextResponse.json({
       success: true,
-      trades: normalized,
+      trades: combined,
     });
   } catch (error) {
     console.error(

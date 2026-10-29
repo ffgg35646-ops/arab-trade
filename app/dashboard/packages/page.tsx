@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import InternalNavbar from "@/components/InternalNavbar";
 import InternalSidebar from "@/components/InternalSidebar";
-import { Loader2, RefreshCw, Clock3, Gift } from "lucide-react";
+import { RefreshCw, Clock3, Gift } from "lucide-react";
 
 type Plan = { _id: string; name: string; description?: string; price: number; asset: string; durationDays: number; dailyProfit?: number };
 type DepositBalance = { asset: string; available: number; locked: number };
@@ -225,7 +225,7 @@ export default function UserPackagesPage() {
           </section>;
         })()}
         <section className="mt-5"><h2 className="mb-3 text-base font-black">الباقات المفعلة</h2>
-          {loading ? <div className="p-8 text-center text-slate-500"><Loader2 className="mx-auto animate-spin"/></div> : !visiblePackages.length ? <div className="rounded-xl border border-white/10 p-6 text-center text-slate-500">لا توجد باقات مفعلة حاليًا.</div> :
+          {loading ? <div className="min-h-[6rem]" aria-hidden="true" /> : !visiblePackages.length ? <div className="rounded-xl border border-white/10 p-6 text-center text-slate-500">لا توجد باقات مفعلة حاليًا.</div> :
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">{visiblePackages.map((plan) => <article key={plan._id} className="flex flex-col rounded-xl border border-white/10 bg-[#07101d] p-4">
               <div className="flex items-center justify-between gap-2"><h3 className="text-base font-black">{plan.name}</h3><span className="rounded-md bg-emerald-400/10 px-2 py-1 text-[10px] text-emerald-200">تفعيل دائم</span></div>
               <div className="mt-3 text-2xl font-black">{money(plan.price)} <span className="text-xs text-cyan-300">{plan.asset}</span></div>

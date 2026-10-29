@@ -168,10 +168,7 @@ export default function ReferralPage() {
                   </div>
 
                   {loading ? (
-                    <div className="mt-5 flex items-center gap-2 rounded-xl border border-white/10 bg-[#07101d] px-4 py-4 text-sm text-slate-500">
-                      <Loader2 className="animate-spin" size={17} />
-                      جاري تحميل رابط الإحالة...
-                    </div>
+                    <div className="mt-5 min-h-[4rem]" aria-hidden="true" />
                   ) : data ? (
                     <>
                       <div className="mt-5 break-all rounded-xl border border-white/10 bg-[#07101d] px-4 py-3 text-left font-mono text-xs leading-6 text-slate-300" dir="ltr">
@@ -213,10 +210,7 @@ export default function ReferralPage() {
             )}
 
             {loading ? (
-              <div className="mt-6 flex min-h-40 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-[#07101d] text-sm text-slate-500">
-                <Loader2 className="animate-spin" size={20} />
-                جاري تحميل إحصائيات الإحالة...
-              </div>
+              <div className="mt-6 min-h-40" aria-hidden="true" />
             ) : data ? (
               <>
                 <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">

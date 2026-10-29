@@ -492,6 +492,7 @@ export default function ProTradeTerminal() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [submittingOrder, setSubmittingOrder] = useState(false);
   const [cancellingId, setCancellingId] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -852,9 +853,71 @@ export default function ProTradeTerminal() {
   }, [currentPrice, price]);
 
 
-  const createOrder = () => {
+  const createOrder = async () => {
+    if (submittingOrder) return;
+
     setError("");
-    setMessage("سيتم تشغيل التداول قريبًا.");
+    setMessage("");
+
+    const parsedQuantity = num(quantity);
+    const parsedPrice = orderType === "market"
+      ? (marketExecutionPrice || currentPrice)
+      : num(price);
+
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+      setError("أدخل كمية صحيحة قبل إرسال الأمر.");
+      return;
+    }
+
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      setError("لا يوجد سعر صالح لتنفيذ الأمر حاليًا.");
+      return;
+    }
+
+    if (orderType === "limit" && (!Number.isFinite(num(price)) || num(price) <= 0)) {
+      setError("أدخل سعرًا صحيحًا للأمر المحدد.");
+      return;
+    }
+
+    setSubmittingOrder(true);
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          symbol,
+          side,
+          type: orderType,
+          price: parsedPrice,
+          quantity: parsedQuantity,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data?.success === false) {
+        throw new Error(data?.message || "تعذر إرسال أمر التداول.");
+      }
+
+      setMessage(
+        data?.message ||
+        (data?.pending
+          ? "تم استلام الأمر وجارٍ تأكيده؛ تم حجز الرصيد المتاح."
+          : "تم إرسال أمر التداول بنجاح.")
+      );
+      setQuantity("");
+      // Reload the persisted wallet and order history immediately after the server response.
+      await loadAll(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تعذر إرسال أمر التداول.");
+      // The server may have reserved funds before a network interruption; reconcile the displayed state.
+      await loadAll(true);
+    } finally {
+      setSubmittingOrder(false);
+    }
   };
 
   const cancelOrder = async (id: string) => {
@@ -1487,11 +1550,12 @@ export default function ProTradeTerminal() {
             <button
               type="button"
               onClick={createOrder}
+              disabled={submittingOrder || !quantity || (orderType === "limit" && !price)}
               className={side === "buy"
                 ? "w-full rounded-lg bg-emerald-500 py-3 text-sm font-semibold text-[#03100a] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
                 : "w-full rounded-lg bg-rose-500 py-3 text-sm font-semibold text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-40"}
             >
-              {side === "buy" ? `شراء ${baseAsset}` : `بيع ${baseAsset}`}
+              {submittingOrder ? "جارٍ إرسال الأمر..." : side === "buy" ? `شراء ${baseAsset}` : `بيع ${baseAsset}`}
             </button>
 
             <div className="mt-3 text-center text-[10px] leading-5 text-slate-600">

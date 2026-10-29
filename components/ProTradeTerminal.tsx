@@ -1097,7 +1097,6 @@ export default function ProTradeTerminal() {
           <div className="grid grid-cols-1 border-b border-white/[0.06] lg:grid-cols-[minmax(0,1fr)_310px]">
             <div className="border-l border-white/[0.06]">
               <div className="flex h-12 items-center justify-between border-b border-white/[0.06] px-4">
-                <h3 className="text-sm font-semibold text-white">مخطط الشموع اليابانية</h3>
                 <span className="text-[10px] text-slate-500">بيانات السوق المرجعي لحظيًا</span>
               </div>
               <Chart symbol={symbol} />

@@ -7,20 +7,25 @@ import QuickTrade from "@/models/QuickTrade";
 export const dynamic = "force-dynamic";
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8) / 1e8;
 
-async function ensureDemoWallet(userId: unknown) {
+async function ensureDemoWallet(userId: any) {
   let wallet = await Wallet.findOne({ userId, type: "spot", mode: "demo" });
-  if (wallet) return wallet;
-  try {
-    return await Wallet.create({
-      userId, type: "spot", mode: "demo",
-      balances: [{ asset: "USDT", available: 10000, locked: 0 }],
-    });
-  } catch (error) {
-    // Another request may have initialized the same demo wallet concurrently.
-    wallet = await Wallet.findOne({ userId, type: "spot", mode: "demo" });
-    if (wallet) return wallet;
-    throw error;
+  if (!wallet) {
+    try {
+      wallet = await Wallet.create({
+        userId, type: "spot", mode: "demo",
+        balances: [{ asset: "USDT", available: 10000, locked: 0 }],
+      });
+    } catch (error) {
+      // Another request may have initialized the same demo wallet concurrently.
+      wallet = await Wallet.findOne({ userId, type: "spot", mode: "demo" });
+      if (!wallet) throw error;
+    }
   }
+  if (!wallet.balances.some((balance: any) => String(balance.asset).toUpperCase() === "USDT")) {
+    wallet.balances.push({ asset: "USDT", available: 10000, locked: 0 });
+    await wallet.save();
+  }
+  return wallet;
 }
 
 export async function GET(request: NextRequest) {

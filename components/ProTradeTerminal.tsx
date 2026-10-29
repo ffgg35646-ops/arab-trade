@@ -1099,7 +1099,6 @@ export default function ProTradeTerminal() {
                 <span className="text-[10px] text-slate-500">بيانات السوق المرجعي لحظيًا</span>
               </div>
               <Chart symbol={symbol} />
-              <QuickTradePanel symbol={symbol} />
             </div>
 
             <div className="min-h-[650px]">
@@ -1161,6 +1160,197 @@ export default function ProTradeTerminal() {
             </div>
           </div>
 
+        </div>
+
+        <aside className="border-r border-white/[0.06] bg-[#07101d]">
+          <div className="border-b border-white/[0.06] p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <div className="text-xs text-slate-500">رصيد الإيداع المتاح</div>
+                <div className="mt-1 text-sm font-semibold">
+                  {fmt(depositUsdtBalance.available ?? 0, 4)} USDT
+                </div>
+              </div>
+              <div className="rounded-lg bg-white/[0.04] p-2 text-slate-400">
+                <Clock3 size={17} />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
+              <div className="text-[10px] text-slate-500">إجمالي رصيد الإيداع USDT</div>
+              <div className="mt-1 text-xs font-medium">{fmt(depositUsdtBalance.total ?? 0, 4)}</div>
+            </div>
+          </div>
+
+          <div className="border-b border-white/[0.06] p-4">
+            <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-white/[0.035] p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setSide("buy");
+                  setAssetMenuOpen((open) => !open);
+                }}
+                aria-expanded={assetMenuOpen}
+                aria-haspopup="listbox"
+                className={side === "buy"
+                  ? "flex items-center justify-center gap-1 rounded-md bg-emerald-500/15 py-2.5 text-sm font-semibold text-emerald-400"
+                  : "flex items-center justify-center gap-1 rounded-md py-2.5 text-sm text-slate-500 hover:text-white"}
+              >
+                شراء {baseAsset} <ChevronDown size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSide("sell");
+                  setAssetMenuOpen((open) => !open);
+                }}
+                aria-expanded={assetMenuOpen}
+                aria-haspopup="listbox"
+                className={side === "sell"
+                  ? "flex items-center justify-center gap-1 rounded-md bg-rose-500/15 py-2.5 text-sm font-semibold text-rose-400"
+                  : "flex items-center justify-center gap-1 rounded-md py-2.5 text-sm text-slate-500 hover:text-white"}
+              >
+                بيع {baseAsset} <ChevronDown size={14} />
+              </button>
+            </div>
+
+            {assetMenuOpen && (
+              <div role="listbox" aria-label="اختيار عملة التداول" className="mb-4 max-h-56 overflow-y-auto rounded-lg border border-white/[0.10] bg-[#050a13] p-1 shadow-xl">
+                {selectableBaseAssets.map((asset) => (
+                  <button
+                    key={asset}
+                    type="button"
+                    role="option"
+                    aria-selected={asset === baseAsset}
+                    onClick={() => {
+                      selectBaseAsset(asset);
+                      setAssetMenuOpen(false);
+                    }}
+                    className={asset === baseAsset
+                      ? "flex w-full items-center justify-between rounded-md bg-cyan-400/10 px-3 py-2.5 text-right text-sm font-semibold text-cyan-300"
+                      : "flex w-full items-center justify-between rounded-md px-3 py-2.5 text-right text-sm text-slate-300 hover:bg-white/[0.06]"}
+                  >
+                    <span>{asset}</span>
+                    {asset === baseAsset ? <span className="text-[10px]">✓ مختارة</span> : null}
+                  </button>
+                ))}
+                {!selectableBaseAssets.length && <div className="px-3 py-2 text-xs text-slate-500">لا توجد عملات متاحة</div>}
+              </div>
+            )}
+
+            <div className="mb-4">
+              <label className="mb-2 block text-xs text-slate-500">نوع الأمر</label>
+              <div className="grid grid-cols-2 gap-1 rounded-lg border border-white/[0.08] bg-[#050a13] p-1">
+                {(["limit", "market"] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setOrderType(type)}
+                    className={orderType === type
+                      ? "rounded-md bg-cyan-500/15 px-3 py-2 text-xs font-bold text-cyan-300"
+                      : "rounded-md px-3 py-2 text-xs text-slate-500 hover:text-white"}
+                  >
+                    {type === "limit" ? "محدد (Limit)" : "سوق (Market)"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label className="mb-2 block text-[11px] text-slate-500">
+              {orderType === "market" ? (side === "buy" ? "أفضل سعر بيع في دفتر Binance" : "أفضل سعر شراء في دفتر Binance") : "سعر الأمر المحدد"}
+            </label>
+            <div className="mb-4 flex h-11 items-center rounded-lg border border-white/[0.08] bg-[#050a13] px-3 focus-within:border-cyan-400/50">
+              <input
+                value={orderType === "market" ? (marketExecutionPrice > 0 ? String(marketExecutionPrice) : "") : price}
+                onChange={(event) => setPrice(event.target.value)}
+                disabled={orderType === "market"}
+                inputMode="decimal"
+                placeholder={orderType === "market" && marketExecutionPrice <= 0 ? "لا توجد سيولة مقابلة" : currentPrice > 0 ? String(currentPrice) : "0.00"}
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none disabled:text-slate-500"
+              />
+              <span className="text-[11px] text-slate-500">{quoteAsset}</span>
+            </div>
+
+            <div className="mb-3 flex h-11 items-center rounded-lg border border-white/[0.08] bg-[#050a13] px-3 focus-within:border-cyan-400/50">
+              <input
+                value={quantity}
+                onChange={(event) => setQuantity(event.target.value)}
+                inputMode="decimal"
+                placeholder="0.00000000"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+              />
+              <span className="text-[11px] text-slate-500">USDT</span>
+            </div>
+
+            <div className="mb-4 grid grid-cols-4 gap-1">
+              {[25, 50, 75, 100].map((percent) => (
+                <button
+                  key={percent}
+                  type="button"
+                  onClick={() => percentageQuantity(percent)}
+                  className="rounded-md border border-white/[0.06] py-1.5 text-[10px] text-slate-500 hover:bg-white/[0.04] hover:text-white"
+                >
+                  {percent}%
+                </button>
+              ))}
+            </div>
+
+            <div className="mb-5 flex items-center justify-end text-xs">
+              <span className="font-medium">{total > 0 ? `${money(total)} USDT` : "—"}</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={createOrder}
+              disabled={submittingOrder || !quantity || (orderType === "limit" && !price)}
+              className={side === "buy"
+                ? "w-full rounded-lg bg-emerald-500 py-3 text-sm font-semibold text-[#03100a] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+                : "w-full rounded-lg bg-rose-500 py-3 text-sm font-semibold text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-40"}
+            >
+              {submittingOrder ? "جارٍ إرسال الأمر..." : side === "buy" ? `شراء ${baseAsset}` : `بيع ${baseAsset}`}
+            </button>
+
+          </div>
+
+          <div className="p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">رصيد الإيداع</h3>
+              <Search size={15} className="text-slate-600" />
+            </div>
+            <div className="space-y-1">
+              {balances.slice(0, 8).map((balance, index) => (
+                <div
+                  key={`${balance.asset}-${index}`}
+                  className="flex items-center justify-between rounded-lg px-2 py-2.5 hover:bg-white/[0.03]"
+                >
+                  <span className="text-xs font-medium">{balance.asset}</span>
+                  <div className="text-left">
+                    <div className="text-xs">{fmt(balance.available, 8)}</div>
+                    {num(balance.locked) > 0 ? (
+                      <div className="text-[9px] text-amber-400">مقفل: {fmt(balance.locked, 8)}</div>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+              {!balances.length ? (
+                <div className="py-5 text-center text-xs text-slate-600">لا توجد أرصدة</div>
+              ) : null}
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      {/* Keep the active five-minute trade and account orders together below the trading form. */}
+      <section className="mx-3 my-5 overflow-hidden rounded-2xl border border-cyan-400/15 bg-[#07101d] shadow-lg shadow-black/20 sm:mx-5" aria-label="متابعة الصفقات والأوامر">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.07] bg-cyan-400/[0.035] px-4 py-4 sm:px-5">
+          <div>
+            <h2 className="text-sm font-bold text-white sm:text-base">متابعة الصفقات والأوامر</h2>
+            <p className="mt-1 text-[11px] text-slate-400">الصفقات المفتوحة وسجل الأوامر في مكان واحد</p>
+          </div>
+          <span className="rounded-lg border border-cyan-400/15 bg-cyan-400/[0.06] px-3 py-1.5 text-xs text-cyan-200">{symbol}</span>
+        </div>
+        <QuickTradePanel symbol={symbol} />
+        <div className="border-t border-white/[0.07]">
           <div className="bg-[#060c15]">
             <div className="flex h-14 flex-wrap items-center gap-5 border-b border-white/[0.06] px-5">
               <button
@@ -1346,184 +1536,8 @@ export default function ProTradeTerminal() {
               )}
             </div>
           </div>
+
         </div>
-
-        <aside className="border-r border-white/[0.06] bg-[#07101d]">
-          <div className="border-b border-white/[0.06] p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <div className="text-xs text-slate-500">رصيد الإيداع المتاح</div>
-                <div className="mt-1 text-sm font-semibold">
-                  {fmt(depositUsdtBalance.available ?? 0, 4)} USDT
-                </div>
-              </div>
-              <div className="rounded-lg bg-white/[0.04] p-2 text-slate-400">
-                <Clock3 size={17} />
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-3">
-              <div className="text-[10px] text-slate-500">إجمالي رصيد الإيداع USDT</div>
-              <div className="mt-1 text-xs font-medium">{fmt(depositUsdtBalance.total ?? 0, 4)}</div>
-            </div>
-          </div>
-
-          <div className="border-b border-white/[0.06] p-4">
-            <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-white/[0.035] p-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setSide("buy");
-                  setAssetMenuOpen((open) => !open);
-                }}
-                aria-expanded={assetMenuOpen}
-                aria-haspopup="listbox"
-                className={side === "buy"
-                  ? "flex items-center justify-center gap-1 rounded-md bg-emerald-500/15 py-2.5 text-sm font-semibold text-emerald-400"
-                  : "flex items-center justify-center gap-1 rounded-md py-2.5 text-sm text-slate-500 hover:text-white"}
-              >
-                شراء {baseAsset} <ChevronDown size={14} />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSide("sell");
-                  setAssetMenuOpen((open) => !open);
-                }}
-                aria-expanded={assetMenuOpen}
-                aria-haspopup="listbox"
-                className={side === "sell"
-                  ? "flex items-center justify-center gap-1 rounded-md bg-rose-500/15 py-2.5 text-sm font-semibold text-rose-400"
-                  : "flex items-center justify-center gap-1 rounded-md py-2.5 text-sm text-slate-500 hover:text-white"}
-              >
-                بيع {baseAsset} <ChevronDown size={14} />
-              </button>
-            </div>
-
-            {assetMenuOpen && (
-              <div role="listbox" aria-label="اختيار عملة التداول" className="mb-4 max-h-56 overflow-y-auto rounded-lg border border-white/[0.10] bg-[#050a13] p-1 shadow-xl">
-                {selectableBaseAssets.map((asset) => (
-                  <button
-                    key={asset}
-                    type="button"
-                    role="option"
-                    aria-selected={asset === baseAsset}
-                    onClick={() => {
-                      selectBaseAsset(asset);
-                      setAssetMenuOpen(false);
-                    }}
-                    className={asset === baseAsset
-                      ? "flex w-full items-center justify-between rounded-md bg-cyan-400/10 px-3 py-2.5 text-right text-sm font-semibold text-cyan-300"
-                      : "flex w-full items-center justify-between rounded-md px-3 py-2.5 text-right text-sm text-slate-300 hover:bg-white/[0.06]"}
-                  >
-                    <span>{asset}</span>
-                    {asset === baseAsset ? <span className="text-[10px]">✓ مختارة</span> : null}
-                  </button>
-                ))}
-                {!selectableBaseAssets.length && <div className="px-3 py-2 text-xs text-slate-500">لا توجد عملات متاحة</div>}
-              </div>
-            )}
-
-            <div className="mb-4">
-              <label className="mb-2 block text-xs text-slate-500">نوع الأمر</label>
-              <div className="grid grid-cols-2 gap-1 rounded-lg border border-white/[0.08] bg-[#050a13] p-1">
-                {(["limit", "market"] as const).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setOrderType(type)}
-                    className={orderType === type
-                      ? "rounded-md bg-cyan-500/15 px-3 py-2 text-xs font-bold text-cyan-300"
-                      : "rounded-md px-3 py-2 text-xs text-slate-500 hover:text-white"}
-                  >
-                    {type === "limit" ? "محدد (Limit)" : "سوق (Market)"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <label className="mb-2 block text-[11px] text-slate-500">
-              {orderType === "market" ? (side === "buy" ? "أفضل سعر بيع في دفتر Binance" : "أفضل سعر شراء في دفتر Binance") : "سعر الأمر المحدد"}
-            </label>
-            <div className="mb-4 flex h-11 items-center rounded-lg border border-white/[0.08] bg-[#050a13] px-3 focus-within:border-cyan-400/50">
-              <input
-                value={orderType === "market" ? (marketExecutionPrice > 0 ? String(marketExecutionPrice) : "") : price}
-                onChange={(event) => setPrice(event.target.value)}
-                disabled={orderType === "market"}
-                inputMode="decimal"
-                placeholder={orderType === "market" && marketExecutionPrice <= 0 ? "لا توجد سيولة مقابلة" : currentPrice > 0 ? String(currentPrice) : "0.00"}
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none disabled:text-slate-500"
-              />
-              <span className="text-[11px] text-slate-500">{quoteAsset}</span>
-            </div>
-
-            <div className="mb-3 flex h-11 items-center rounded-lg border border-white/[0.08] bg-[#050a13] px-3 focus-within:border-cyan-400/50">
-              <input
-                value={quantity}
-                onChange={(event) => setQuantity(event.target.value)}
-                inputMode="decimal"
-                placeholder="0.00000000"
-                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-              />
-              <span className="text-[11px] text-slate-500">USDT</span>
-            </div>
-
-            <div className="mb-4 grid grid-cols-4 gap-1">
-              {[25, 50, 75, 100].map((percent) => (
-                <button
-                  key={percent}
-                  type="button"
-                  onClick={() => percentageQuantity(percent)}
-                  className="rounded-md border border-white/[0.06] py-1.5 text-[10px] text-slate-500 hover:bg-white/[0.04] hover:text-white"
-                >
-                  {percent}%
-                </button>
-              ))}
-            </div>
-
-            <div className="mb-5 flex items-center justify-end text-xs">
-              <span className="font-medium">{total > 0 ? `${money(total)} USDT` : "—"}</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={createOrder}
-              disabled={submittingOrder || !quantity || (orderType === "limit" && !price)}
-              className={side === "buy"
-                ? "w-full rounded-lg bg-emerald-500 py-3 text-sm font-semibold text-[#03100a] transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
-                : "w-full rounded-lg bg-rose-500 py-3 text-sm font-semibold text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-40"}
-            >
-              {submittingOrder ? "جارٍ إرسال الأمر..." : side === "buy" ? `شراء ${baseAsset}` : `بيع ${baseAsset}`}
-            </button>
-
-          </div>
-
-          <div className="p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold">رصيد الإيداع</h3>
-              <Search size={15} className="text-slate-600" />
-            </div>
-            <div className="space-y-1">
-              {balances.slice(0, 8).map((balance, index) => (
-                <div
-                  key={`${balance.asset}-${index}`}
-                  className="flex items-center justify-between rounded-lg px-2 py-2.5 hover:bg-white/[0.03]"
-                >
-                  <span className="text-xs font-medium">{balance.asset}</span>
-                  <div className="text-left">
-                    <div className="text-xs">{fmt(balance.available, 8)}</div>
-                    {num(balance.locked) > 0 ? (
-                      <div className="text-[9px] text-amber-400">مقفل: {fmt(balance.locked, 8)}</div>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-              {!balances.length ? (
-                <div className="py-5 text-center text-xs text-slate-600">لا توجد أرصدة</div>
-              ) : null}
-            </div>
-          </div>
-        </aside>
       </section>
 
       {loading && (

@@ -7,11 +7,28 @@ import QuickTrade from "@/models/QuickTrade";
 export const dynamic = "force-dynamic";
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8) / 1e8;
 
+async function ensureDemoWallet(userId: unknown) {
+  let wallet = await Wallet.findOne({ userId, type: "spot", mode: "demo" });
+  if (wallet) return wallet;
+  try {
+    return await Wallet.create({
+      userId, type: "spot", mode: "demo",
+      balances: [{ asset: "USDT", available: 10000, locked: 0 }],
+    });
+  } catch (error) {
+    // Another request may have initialized the same demo wallet concurrently.
+    wallet = await Wallet.findOne({ userId, type: "spot", mode: "demo" });
+    if (wallet) return wallet;
+    throw error;
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser(request);
     if (!user) return NextResponse.json({ success: false, message: "سجّل الدخول أولًا" }, { status: 401 });
     await connectDB();
+    await ensureDemoWallet(user._id);
 
     const now = new Date();
     await QuickTrade.updateMany(
@@ -39,6 +56,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ success: false, message: "سجّل الدخول أولًا" }, { status: 401 });
     await connectDB();
     userId = user._id;
+    await ensureDemoWallet(user._id);
     const body = await request.json().catch(() => ({}));
     const symbol = String(body.symbol || "").trim().toUpperCase().replace(/[_/\\s-]/g, "");
     const side = String(body.side || "").toLowerCase();

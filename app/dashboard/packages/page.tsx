@@ -129,7 +129,7 @@ export default function UserPackagesPage() {
       <main dir="rtl" className="min-w-0 flex-1 bg-[#050a13] p-4 text-white md:p-8">
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#07101d] px-4 py-3">
           <div><h1 className="text-xl font-black">الباقات</h1><p className="mt-1 text-xs text-slate-400">الرصيد المتاح للتفعيل: <strong className="text-cyan-200">{money(depositUsdt)} USDT</strong> · الباقة الحالية: <strong className="text-white">{activePlan?.packageName || "لا توجد"}</strong></p></div>
-          <button type="button" onClick={() => { setLoading(true); setError(""); void load(); }} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs"><RefreshCw size={14} className={loading ? "animate-spin" : ""}/>تحديث</button>
+          <button type="button" onClick={() => { setError(""); void load(); }} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs"><RefreshCw size={14} className={loading ? "animate-spin" : ""}/>تحديث</button>
         </section>
         {message && <div role="status" className="mt-5 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.07] p-4 text-sm text-emerald-300">{message}</div>}
         {error && <div role="alert" className="mt-5 rounded-xl border border-red-400/20 bg-red-400/[0.07] p-4 text-sm text-red-300">{error}</div>}

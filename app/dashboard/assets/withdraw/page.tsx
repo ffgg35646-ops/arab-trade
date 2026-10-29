@@ -81,7 +81,7 @@ export default function WithdrawPage() {
 
           {message && <div role="status" className="rounded-xl border border-slate-200 bg-white p-3 text-sm">{message}</div>}
 
-          {!data ? <div className="rounded-2xl bg-white p-6 text-slate-500">جاري تحميل بيانات السحب…</div> : <>
+          {!data ? <div className="min-h-[10rem]" aria-hidden="true" /> : <>
             <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <h2 className="font-bold">إجمالي رصيد الباقة</h2>

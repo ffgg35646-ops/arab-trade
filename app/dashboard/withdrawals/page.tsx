@@ -317,7 +317,7 @@ export default function WithdrawalsPage() {
                   setMessage("");
                 }}
                 disabled={!data || busy}
-                className="w-full rounded-xl border border-white/10 bg-white/[0.035] p-3 text-white outline-none backdrop-blur-xl transition focus:border-cyan-300/50 focus:bg-white/[0.06] disabled:opacity-50"
+                className="w-full rounded-xl border border-slate-600 bg-[#050a13] p-3 text-white outline-none focus:border-cyan-400 disabled:opacity-50"
               >
                 <option value="general">السحب العام</option>
                 {visiblePackages.map((plan) => (

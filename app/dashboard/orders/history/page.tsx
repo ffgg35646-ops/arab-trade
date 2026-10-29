@@ -354,13 +354,7 @@ export default function OrderHistoryPage() {
                 </div>
               )}
 
-              {loading && (
-                <div className="flex min-h-[260px] items-center justify-center">
-                  <div className="text-sm text-slate-500">
-                    جاري تحميل سجل الأوامر...
-                  </div>
-                </div>
-              )}
+              {loading && filteredOrders.length === 0 && <div className="min-h-[2rem]" aria-hidden="true" />}
             </div>
 
           </div>

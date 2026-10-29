@@ -56,8 +56,6 @@ export default function AssetsAdminPage() {
   const [network, setNetwork] = useState<Network>(emptyNetwork);
 
   const load = useCallback(async () => {
-    setLoading(true);
-
     try {
       const res = await fetch("/api/admin/assets", {
         credentials: "include",

@@ -254,7 +254,7 @@ export default function StatementPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? <tr><td colSpan={6} className="px-5 py-16 text-center text-slate-500"><LoaderCircle className="mx-auto mb-2 animate-spin" size={18} />جاري تحميل الحركات...</td></tr>
+                {loading && entries.length === 0 ? <tr aria-hidden="true"><td colSpan={6} className="h-24" /></tr>
                   : filteredEntries.length === 0 ? <tr><td colSpan={6} className="px-5 py-16 text-center text-slate-500"><Wallet size={22} className="mx-auto mb-3 opacity-60" />لا توجد حركات مطابقة للفلاتر.</td></tr>
                   : filteredEntries.map((entry) => <tr key={entry.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
                     <td className="whitespace-nowrap px-5 py-4 text-xs text-slate-500">{formatDate(entry.date)}</td>

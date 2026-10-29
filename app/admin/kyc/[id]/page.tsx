@@ -73,9 +73,7 @@ export default function KycDetailPage({ params }: { params: Promise<{ id: string
     <AdminPageFrame title="مراجعة إنشاء الحساب والهوية">
       <div dir="rtl">
         {loading ? (
-          <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-12 text-center text-slate-500">
-            جاري تحميل الطلب...
-          </div>
+          <div className="min-h-[10rem]" aria-hidden="true" />
         ) : error ? (
           <div className="rounded-2xl border border-red-900/60 bg-red-950/30 p-5 text-red-300">{error}</div>
         ) : item ? (

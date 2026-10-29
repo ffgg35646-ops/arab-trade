@@ -192,7 +192,7 @@ export default function FinancialReportsPage() {
                   <th className="px-5 py-4 font-medium">الرسوم</th>
                 </tr></thead>
                 <tbody>
-                  {loading ? <tr><td colSpan={7} className="px-5 py-16 text-center text-slate-500"><LoaderCircle size={18} className="mx-auto mb-2 animate-spin" />جاري تحميل التقرير...</td></tr>
+                  {loading && trades.length === 0 ? <tr aria-hidden="true"><td colSpan={7} className="h-24" /></tr>
                     : trades.length === 0 ? <tr><td colSpan={7} className="px-5 py-16 text-center text-slate-500">لا توجد صفقات خلال الفترة المختارة.</td></tr>
                     : trades.map((trade) => <tr key={trade._id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02]">
                       <td className="whitespace-nowrap px-5 py-4 text-xs text-slate-500">{date(trade.createdAt)}</td>

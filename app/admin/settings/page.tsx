@@ -160,7 +160,7 @@ export default function Page() {
 
         <section className="w-full max-w-3xl rounded-2xl border border-slate-800 bg-[#08111e] p-5">
           <h2 className="text-lg font-black">حدود الإيداع</h2>
-          {loadingFinancialLimits ? <p className="py-4 text-sm text-slate-500">جاري تحميل حدود الإيداع...</p> : (
+          {loadingFinancialLimits ? <div className="min-h-[6rem]" aria-hidden="true" /> : (
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               {([
                 ["minDeposit", "الحد الأدنى للإيداع"],
@@ -205,9 +205,7 @@ export default function Page() {
           {open ? (
             <div className="border-t border-slate-800 p-5">
               {loadingSupport ? (
-                <div className="py-6 text-center text-sm text-slate-500">
-                  جاري تحميل بيانات الدعم...
-                </div>
+                <div className="min-h-[6rem]" aria-hidden="true" />
               ) : (
                 <div className="space-y-5">
                   <div>

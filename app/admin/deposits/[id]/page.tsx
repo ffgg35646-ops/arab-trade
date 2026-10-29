@@ -106,9 +106,7 @@ export default function DepositDetailPage({
     <AdminPageFrame title="تفاصيل طلب الإيداع">
       <div dir="rtl">
         {loading ? (
-          <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-12 text-center text-slate-500">
-            جاري تحميل الطلب...
-          </div>
+          <div className="min-h-[10rem]" aria-hidden="true" />
         ) : !item ? (
           <div className="rounded-2xl border border-slate-800 bg-[#08111e] p-12 text-center text-slate-500">
             الطلب غير موجود.

@@ -174,7 +174,7 @@ export default function AdminDashboard() {
           </div>
         ) : (
           <div className="space-y-5" aria-hidden="true">
-            <div className="h-8 w-48 animate-pulse rounded-lg bg-white/[0.04]" />
+            <div className="h-8 w-48  rounded-lg bg-white/[0.04]" />
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
               {Array.from({ length: 5 }, (_, i) => (
                 <div key={i} className="h-28 rounded-2xl border border-slate-800 bg-[#08111e]" />

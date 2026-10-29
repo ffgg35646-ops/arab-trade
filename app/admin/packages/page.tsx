@@ -102,7 +102,7 @@ export default function AdminPackagesPage() {
       <section className="rounded-2xl border border-white/10 bg-[#08111e] p-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3"><div className="rounded-xl border border-cyan-300/15 bg-cyan-400/10 p-2 text-cyan-300"><Package size={20}/></div><div><h1 className="text-lg font-black">إدارة الباقات والأرصدة</h1></div></div>
-          <button type="button" onClick={() => { setLoading(true); setError(""); void load(); }} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-bold disabled:opacity-50"><RefreshCw size={16} className={loading ? "animate-spin" : ""}/>تحديث</button>
+          <button type="button" onClick={() => { setError(""); void load(); }} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-bold disabled:opacity-50"><RefreshCw size={16} className={loading ? "animate-spin" : ""}/>تحديث</button>
         </div>
       </section>
       {message && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.07] p-4 text-sm text-emerald-300"><CheckCircle2 size={17}/>{message}</div>}

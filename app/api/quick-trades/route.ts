@@ -4,7 +4,7 @@ import { connectDB } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
 import { debitDepositBalance } from "@/lib/deposit-balance-source";
 import LedgerEntry from "@/models/LedgerEntry";
-import QuickTrade from "@/models/QuickTrade";
+import QuickTrade, { type IQuickTrade } from "@/models/QuickTrade";
 
 export const dynamic = "force-dynamic";
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 1e8) / 1e8;
@@ -41,15 +41,17 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}));
     const symbol = String(body.symbol || "").trim().toUpperCase().replace(/[_/\\s-]/g, "");
-    const side = String(body.side || "").toLowerCase();
+    const sideInput = String(body.side || "").toLowerCase();
     const entryPrice = Number(body.price);
     const stakeAmount = roundAmount(Number(body.amount));
 
-    if (!/^[A-Z0-9]{5,25}$/.test(symbol) || !["buy", "sell"].includes(side) ||
+    if (!/^[A-Z0-9]{5,25}$/.test(symbol) || !["buy", "sell"].includes(sideInput) ||
         !Number.isFinite(entryPrice) || entryPrice <= 0 ||
         !Number.isFinite(stakeAmount) || stakeAmount < 1 || stakeAmount > 100000) {
       return NextResponse.json({ success: false, message: "أدخل مبلغًا لا يقل عن 1 USDT وسعرًا صحيحًا" }, { status: 400 });
     }
+
+    const side: IQuickTrade["side"] = sideInput as IQuickTrade["side"];
 
     // The real deposit balance is the only source of funds used here. Withdrawal
     // earnings and the spot wallet are deliberately never debited by this route.
@@ -65,7 +67,7 @@ export async function POST(request: NextRequest) {
 
         const openedAt = new Date();
         const expiresAt = new Date(openedAt.getTime() + 5 * 60 * 1000);
-        const rows = await QuickTrade.create([{
+        const tradeInput: IQuickTrade = {
           userId: user._id,
           symbol,
           side,
@@ -75,7 +77,8 @@ export async function POST(request: NextRequest) {
           openedAt,
           expiresAt,
           mode: "live",
-        }], { session });
+        };
+        const rows = await QuickTrade.create([tradeInput], { session });
         const trade = rows[0];
         const nextAvailableBalance = roundAmount(debit.availableBefore - stakeAmount);
         availableAfter = nextAvailableBalance;

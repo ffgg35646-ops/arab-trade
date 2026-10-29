@@ -83,9 +83,9 @@ function transactionTitle(type: string) {
     case "collect":
       return "ربح يومي";
     case "admin_credit":
-      return "إضافة من الإدارة";
+      return "إضافة رصيد";
     case "admin_debit":
-      return "خصم من الإدارة";
+      return "خصم رصيد";
     case "referral":
     case "referral_commission":
       return "عمولة إحالة";

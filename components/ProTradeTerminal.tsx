@@ -450,7 +450,6 @@ function OrderBook({
           <div className="text-base font-semibold text-cyan-400">
             {currentPrice > 0 ? fmt(currentPrice, 4) : "—"} <span className="text-[10px] text-slate-500">{quoteAsset}</span>
           </div>
-          <span className="text-[10px] text-slate-600">السعر المرجعي من Binance</span>
         </div>
       </div>
 

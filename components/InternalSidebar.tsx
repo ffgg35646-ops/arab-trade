@@ -3,12 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, PanelLeftClose } from "lucide-react";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { dashboardNavigation } from "@/components/dashboard-navigation";
+import { InternalDashboardChromeContext } from "@/components/InternalDashboardChromeContext";
 
 const sections = dashboardNavigation;
 
 export default function InternalSidebar() {
+  const managedByDashboardLayout = useContext(InternalDashboardChromeContext);
+  if (managedByDashboardLayout) return null;
+  return <InternalSidebarContent />;
+}
+
+function InternalSidebarContent() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({

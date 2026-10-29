@@ -17,6 +17,9 @@ export default function Navbar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  // Public navigation must never leak into authenticated dashboard routes.
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) return null;
+
   return (
     <header dir="rtl" className="sticky top-0 z-50 border-b border-white/10 bg-[#050a13]/95 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-[1500px] items-center justify-between gap-3 px-3 sm:h-20 sm:px-5">

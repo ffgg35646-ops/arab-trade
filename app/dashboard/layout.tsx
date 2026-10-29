@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { jwtVerify } from "jose";
+import InternalDashboardLayout from "@/components/InternalDashboardLayout";
 
 const secretText = process.env.AUTH_SECRET;
 
@@ -27,5 +28,5 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  return children;
+  return <InternalDashboardLayout>{children}</InternalDashboardLayout>;
 }

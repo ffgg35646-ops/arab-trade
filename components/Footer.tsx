@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const columns = [
   {
@@ -31,6 +32,9 @@ const columns = [
 ];
 
 export default function Footer() {
+  const pathname = usePathname();
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/") || pathname === "/admin" || pathname.startsWith("/admin/") || pathname === "/protrade" || pathname.startsWith("/protrade/") || pathname === "/margin" || pathname.startsWith("/margin/") || pathname === "/futures" || pathname.startsWith("/futures/")) return null;
+
   return (
     <footer className="border-t border-sky-400/15 bg-[#050a13]">
       <div className="mx-auto max-w-7xl px-4 py-12 lg:px-8">

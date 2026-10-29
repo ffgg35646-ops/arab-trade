@@ -12,8 +12,9 @@ import {
   UserCircle,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { dashboardNavigation } from "@/components/dashboard-navigation";
+import { InternalDashboardChromeContext } from "@/components/InternalDashboardChromeContext";
 
 function isActive(
   pathname: string,
@@ -30,6 +31,12 @@ function isActive(
 }
 
 export default function InternalNavbar() {
+  const managedByDashboardLayout = useContext(InternalDashboardChromeContext);
+  if (managedByDashboardLayout) return null;
+  return <InternalNavbarContent />;
+}
+
+function InternalNavbarContent() {
   const pathname = usePathname();
   const router = useRouter();
 

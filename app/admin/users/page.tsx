@@ -38,7 +38,6 @@ export default function UsersPage() {
   const [referralErrors, setReferralErrors] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
-    setLoading(true);
     setError("");
 
     try {

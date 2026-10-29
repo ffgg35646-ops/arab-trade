@@ -45,6 +45,8 @@ type Order = {
   remainingQuantity?: number;
   fillPercent?: number;
   quoteAmount?: number;
+  purpose?: string;
+  expiresAt?: string;
   status?: string;
   createdAt?: string;
 };
@@ -472,8 +474,6 @@ export default function ProTradeTerminal() {
   const [availablePairs, setAvailablePairs] = useState<SpotMarketPair[]>([]);
   const [pairFeedLoading, setPairFeedLoading] = useState(true);
   const [pairFeedError, setPairFeedError] = useState("");
-  const [executionConfigured, setExecutionConfigured] = useState(false);
-  const [executionTestnet, setExecutionTestnet] = useState(false);
   const [pairReload, setPairReload] = useState(0);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -523,8 +523,6 @@ export default function ProTradeTerminal() {
         }
         if (!active) return;
         const nextPairs = data.pairs as SpotMarketPair[];
-        setExecutionConfigured(Boolean(data.execution?.configured));
-        setExecutionTestnet(Boolean(data.execution?.testnet));
         setAvailablePairs(nextPairs);
         setPairFeedError("");
         setSymbol((current) => {
@@ -1271,7 +1269,7 @@ export default function ProTradeTerminal() {
                         </td>
 
                         <td className="px-4 py-3 text-slate-400">
-                          {order.type === "limit" ? "محدد (Limit)" : order.type === "market" ? "سوق (Market)" : order.type}
+                          {order.type === "five-minute" ? "صفقة 5 دقائق" : order.type === "limit" ? "محدد (Limit)" : order.type === "market" ? "سوق (Market)" : order.type}
                         </td>
 
                         <td
@@ -1328,7 +1326,7 @@ export default function ProTradeTerminal() {
                         </td>
 
                         <td className="px-4 py-3">
-                          {order.status === "open" && order._id && (
+                          {order.status === "open" && order._id && order.purpose !== "quick-trade" && (
                             <button
                               onClick={() => cancelOrder(order._id!)}
                               disabled={cancellingId === order._id}

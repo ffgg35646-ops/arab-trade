@@ -949,3 +949,22 @@ main :is(.text-slate-500, .text-slate-600, .text-white\/40, .text-white\/45) {
     margin-bottom: 1rem !important;
   }
 }
+
+
+/* GLOBAL PAGE BACKGROUND — soft white with a subtle cool tint */
+html,
+body {
+  background-color: #eef1f4 !important;
+}
+
+main {
+  background-color: #eef1f4 !important;
+}
+
+/* Full-screen authentication pages use the same page background. */
+.arabtrade-auth-bg {
+  background:
+    radial-gradient(circle at 15% 20%, rgba(37, 99, 235, 0.035), transparent 30%),
+    radial-gradient(circle at 85% 75%, rgba(34, 211, 238, 0.025), transparent 32%),
+    #eef1f4 !important;
+}

@@ -76,7 +76,6 @@ export default function StatementPage() {
 
   const fetchStatement = useCallback(async (before?: string, append = false) => {
     if (append) setLoadingMore(true);
-    else setLoading(true);
     setError("");
 
     try {

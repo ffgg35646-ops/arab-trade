@@ -887,7 +887,6 @@ export default function ProTradeTerminal() {
         throw new Error(data?.message || "تعذر فتح الصفقة.");
       }
 
-      setMessage("صفقات الخمس دقائق");
       setQuantity("");
       await loadAll(true);
     } catch (err) {

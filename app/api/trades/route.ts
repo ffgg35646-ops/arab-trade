@@ -178,18 +178,18 @@ export async function GET(
         }
       );
 
-    // Include closed five-minute demo trades in the same history endpoint used by the UI.
+    // Include closed five-minute trades in the same history endpoint used by the UI.
     const now = new Date();
     await QuickTrade.updateMany(
-      { userId: user._id, mode: "demo", status: "open", expiresAt: { $lte: now } },
+      { userId: user._id, mode: "live", status: "open", expiresAt: { $lte: now } },
       { $set: { status: "closed", outcome: "loss", closedAt: now } }
     );
-    const quickFilter: Record<string, unknown> = { userId: user._id, mode: "demo", status: "closed" };
+    const quickFilter: Record<string, unknown> = { userId: user._id, mode: "live", status: "closed" };
     if (symbol) quickFilter.symbol = symbol;
     const quickRows = await QuickTrade.find(quickFilter).sort({ closedAt: -1 }).limit(limit).lean();
     const quickHistory = quickRows.map((trade: any) => ({
       _id: String(trade._id),
-      mode: "demo",
+      mode: "live",
       symbol: trade.symbol,
       side: trade.side,
       price: Number(trade.entryPrice || 0),

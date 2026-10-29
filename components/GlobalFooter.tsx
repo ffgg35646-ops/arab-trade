@@ -3,7 +3,13 @@
 import { usePathname } from "next/navigation";
 import Footer from "@/components/Footer";
 
-const pagesWithTheirOwnFooter = new Set(["/", "/about", "/licenses"]);
+const pagesWithTheirOwnFooter = new Set([
+  "/",
+  "/about",
+  "/licenses",
+  "/markets",
+  "/trading/spot",
+]);
 const internalWorkspacePrefixes = ["/dashboard", "/admin", "/protrade", "/margin", "/futures"];
 
 function isInternalWorkspace(pathname: string) {

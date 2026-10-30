@@ -228,29 +228,29 @@ export default function AccountPage() {
         <InternalSidebar />
 
         <main className="min-w-0 flex-1 text-white">
-          <div className="mx-auto max-w-7xl p-3 sm:p-6 lg:p-8">
+          <div className="mx-auto max-w-7xl p-2 sm:p-6 lg:p-8">
 
             {/* Header */}
-            <section className="relative mb-4 overflow-hidden rounded-2xl sm:mb-6 sm:rounded-3xl border border-white/10 bg-gradient-to-br from-blue-500/10 via-[#08111e] to-cyan-500/5">
+            <section className="relative mb-2 overflow-hidden rounded-xl sm:mb-6 sm:rounded-3xl border border-white/10 bg-gradient-to-br from-blue-500/10 via-[#08111e] to-cyan-500/5">
               <div className="absolute -left-20 -top-20 h-52 w-52 rounded-full bg-blue-500/10 blur-3xl" />
               <div className="absolute -bottom-24 right-20 h-56 w-56 rounded-full bg-cyan-400/5 blur-3xl" />
 
-              <div className="relative p-4 sm:p-8">
+              <div className="relative p-2.5 sm:p-8">
                 <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
 
                   <div className="flex items-center gap-3 sm:gap-5">
-                    <div className="flex h-12 w-12 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl border border-blue-400/20 bg-gradient-to-br from-blue-500/30 to-cyan-400/10 text-xl sm:text-3xl font-black text-cyan-300 shadow-xl shadow-blue-500/10">
+                    <div className="flex h-10 w-10 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl border border-blue-400/20 bg-gradient-to-br from-blue-500/30 to-cyan-400/10 text-xl sm:text-3xl font-black text-cyan-300 shadow-xl shadow-blue-500/10">
                       {getInitial()}
                     </div>
 
                     <div>
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <div className="mb-1 flex flex-wrap items-center gap-1 sm:mb-2 sm:gap-2">
                         <h1 className="text-lg font-black sm:text-3xl">
                           {user?.name || "المستخدم"}
                         </h1>
 
                         {user?.isVerified ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-bold text-emerald-300">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[10px] sm:px-3 sm:py-1 sm:text-[11px] font-bold text-emerald-300">
                             <CheckCircle2 size={13} />
                             البريد موثق
                           </span>
@@ -261,7 +261,7 @@ export default function AccountPage() {
                         )}
                       </div>
 
-                      <p className="text-sm text-slate-400">
+                      <p className="text-xs sm:text-sm text-slate-400">
                         إدارة الملف الشخصي وبيانات الحساب
                       </p>
                     </div>
@@ -271,60 +271,60 @@ export default function AccountPage() {
               </div>
             </section>
 
-            <div className="grid gap-3 sm:gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="grid gap-2 sm:gap-6 lg:grid-cols-[1.1fr_0.9fr]">
 
               {/* Profile */}
-              <section className="rounded-2xl sm:rounded-3xl border border-white/10 bg-[#08111e] shadow-2xl shadow-black/10">
+              <section className="rounded-xl sm:rounded-3xl border border-white/10 bg-[#08111e] shadow-2xl shadow-black/10">
 
-                <div className="border-b border-white/10 px-4 py-3 sm:px-6 sm:py-5">
+                <div className="border-b border-white/10 px-2.5 py-2 sm:px-6 sm:py-5">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-300">
-                      <User size={16} />
+                    <div className="flex h-6 w-6 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-300">
+                      <User size={13} className="sm:h-4 sm:w-4" />
                     </div>
 
                     <div>
-                      <h2 className="text-base font-bold">
+                      <h2 className="text-sm sm:text-base font-bold">
                         المعلومات الشخصية
                       </h2>
 
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-0.5 text-[11px] sm:mt-1 sm:text-xs text-slate-500">
                         يمكنك تعديل بيانات حسابك
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-3 p-4 sm:space-y-5 sm:p-6">
+                <div className="space-y-2 p-2.5 sm:space-y-5 sm:p-6">
 
                   <div>
-                    <label className="mb-2 block text-xs font-semibold text-slate-400">
+                    <label className="mb-1 block text-[11px] sm:mb-2 sm:text-xs font-semibold text-slate-400">
                       الاسم
                     </label>
 
                     <div className="relative">
                       <User
-                        size={15}
-                        className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-slate-600"
+                        size={12}
+                        className="absolute right-2.5 sm:right-4 top-1/2 -translate-y-1/2 text-slate-600"
                       />
 
                       <input
                         value={name}
                         disabled={loading}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-10 py-2.5 text-sm sm:px-12 sm:py-3.5 text-white outline-none transition focus:border-blue-400/40"
+                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-8 py-1.5 text-base sm:px-12 sm:py-3.5 sm:text-sm text-white outline-none transition focus:border-blue-400/40"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-xs font-semibold text-slate-400">
+                    <label className="mb-1 block text-[11px] sm:mb-2 sm:text-xs font-semibold text-slate-400">
                       اسم المستخدم
                     </label>
 
                     <div className="relative">
                       <AtSign
-                        size={15}
-                        className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-slate-600"
+                        size={12}
+                        className="absolute right-2.5 sm:right-4 top-1/2 -translate-y-1/2 text-slate-600"
                       />
 
                       <input
@@ -337,21 +337,21 @@ export default function AccountPage() {
                               .replace(/[^a-z0-9_]/g, "")
                           )
                         }
-                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-10 py-2.5 text-sm sm:px-12 sm:py-3.5 text-white outline-none transition focus:border-blue-400/40"
+                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-8 py-1.5 text-base sm:px-12 sm:py-3.5 sm:text-sm text-white outline-none transition focus:border-blue-400/40"
                         dir="ltr"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-xs font-semibold text-slate-400">
+                    <label className="mb-1 block text-[11px] sm:mb-2 sm:text-xs font-semibold text-slate-400">
                       البريد الإلكتروني
                     </label>
 
                     <div className="relative">
                       <Mail
-                        size={15}
-                        className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-slate-600"
+                        size={12}
+                        className="absolute right-2.5 sm:right-4 top-1/2 -translate-y-1/2 text-slate-600"
                       />
 
                       <input
@@ -359,21 +359,21 @@ export default function AccountPage() {
                         value={email}
                         disabled={loading}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-10 py-2.5 text-sm sm:px-12 sm:py-3.5 text-white outline-none transition focus:border-blue-400/40"
+                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-8 py-1.5 text-base sm:px-12 sm:py-3.5 sm:text-sm text-white outline-none transition focus:border-blue-400/40"
                         dir="ltr"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-xs font-semibold text-slate-400">
+                    <label className="mb-1 block text-[11px] sm:mb-2 sm:text-xs font-semibold text-slate-400">
                       معرف الحساب
                     </label>
 
-                    <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-[#050a13] p-2">
+                    <div className="flex items-center gap-1 rounded-lg sm:rounded-2xl border border-white/10 bg-[#050a13] p-1 sm:gap-2 sm:p-2">
                       <div className="flex min-w-0 flex-1 items-center gap-3 px-2">
                         <KeyRound
-                          size={15}
+                          size={12}
                           className="shrink-0 text-slate-600"
                         />
 
@@ -385,7 +385,7 @@ export default function AccountPage() {
                       <button
                         type="button"
                         onClick={copyUid}
-                        className="flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-slate-300 transition hover:border-blue-400/20 hover:bg-blue-500/10 hover:text-cyan-300"
+                        className="flex h-7 sm:h-10 items-center gap-1 rounded-lg sm:gap-2 sm:rounded-xl border border-white/10 bg-white/[0.03] px-2 text-[11px] sm:px-3 sm:text-xs font-semibold text-slate-300 transition hover:border-blue-400/20 hover:bg-blue-500/10 hover:text-cyan-300"
                       >
                         <Copy size={14} />
                         {copied ? "تم النسخ" : "نسخ"}
@@ -409,9 +409,9 @@ export default function AccountPage() {
                     type="button"
                     onClick={saveProfile}
                     disabled={loading || savingProfile}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-500 px-4 py-2.5 text-sm sm:px-5 sm:py-3.5 font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-500 px-3 py-1.5 text-xs sm:px-5 sm:py-3.5 sm:text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <Save size={15} />
+                    <Save size={12} />
                     {savingProfile
                       ? "جارٍ الحفظ..."
                       : "حفظ التغييرات"}
@@ -420,32 +420,32 @@ export default function AccountPage() {
               </section>
 
               {/* Right */}
-              <div className="space-y-6">
+              <div className="space-y-2 sm:space-y-6">
 
                 <section className="rounded-2xl sm:rounded-3xl border border-white/10 bg-[#08111e] shadow-2xl shadow-black/10">
 
-                  <div className="border-b border-white/10 px-4 py-3 sm:px-6 sm:py-5">
+                  <div className="border-b border-white/10 px-2.5 py-2 sm:px-6 sm:py-5">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-300">
-                        <Lock size={16} />
+                      <div className="flex h-6 w-6 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-300">
+                        <Lock size={13} className="sm:h-4 sm:w-4" />
                       </div>
 
                       <div>
-                        <h2 className="text-base font-bold">
+                        <h2 className="text-sm sm:text-base font-bold">
                           تغيير كلمة المرور
                         </h2>
 
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-0.5 text-[11px] sm:mt-1 sm:text-xs text-slate-500">
                           استخدم كلمة مرور قوية
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-3 p-4 sm:space-y-4 sm:p-6">
+                  <div className="space-y-2 p-2.5 sm:space-y-4 sm:p-6">
 
                     <div>
-                      <label className="mb-2 block text-xs font-semibold text-slate-400">
+                      <label className="mb-1 block text-[11px] sm:mb-2 sm:text-xs font-semibold text-slate-400">
                         كلمة المرور الحالية
                       </label>
 
@@ -460,7 +460,7 @@ export default function AccountPage() {
                           onChange={(e) =>
                             setCurrentPassword(e.target.value)
                           }
-                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-3 py-2.5 pl-10 text-sm sm:px-4 sm:py-3.5 sm:pl-12 text-white outline-none focus:border-blue-400/40"
+                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-2.5 py-1.5 pl-9 text-base sm:px-4 sm:py-3.5 sm:pl-12 sm:text-sm text-white outline-none focus:border-blue-400/40"
                         />
 
                         <button
@@ -470,19 +470,19 @@ export default function AccountPage() {
                               (value) => !value
                             )
                           }
-                          className="absolute left-3 top-1/2 -translate-y-1/2 p-2 text-slate-500 hover:text-white"
+                          className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 sm:left-3 sm:p-2 text-slate-500 hover:text-white"
                         >
                           {showCurrentPassword ? (
-                            <EyeOff size={15} />
+                            <EyeOff size={12} />
                           ) : (
-                            <Eye size={15} />
+                            <Eye size={12} />
                           )}
                         </button>
                       </div>
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-xs font-semibold text-slate-400">
+                      <label className="mb-1 block text-[11px] sm:mb-2 sm:text-xs font-semibold text-slate-400">
                         كلمة المرور الجديدة
                       </label>
 
@@ -497,7 +497,7 @@ export default function AccountPage() {
                           onChange={(e) =>
                             setNewPassword(e.target.value)
                           }
-                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-3 py-2.5 pl-10 text-sm sm:px-4 sm:py-3.5 sm:pl-12 text-white outline-none focus:border-blue-400/40"
+                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-2.5 py-1.5 pl-9 text-base sm:px-4 sm:py-3.5 sm:pl-12 sm:text-sm text-white outline-none focus:border-blue-400/40"
                         />
 
                         <button
@@ -507,19 +507,19 @@ export default function AccountPage() {
                               (value) => !value
                             )
                           }
-                          className="absolute left-3 top-1/2 -translate-y-1/2 p-2 text-slate-500 hover:text-white"
+                          className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 sm:left-3 sm:p-2 text-slate-500 hover:text-white"
                         >
                           {showNewPassword ? (
-                            <EyeOff size={15} />
+                            <EyeOff size={12} />
                           ) : (
-                            <Eye size={15} />
+                            <Eye size={12} />
                           )}
                         </button>
                       </div>
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-xs font-semibold text-slate-400">
+                      <label className="mb-1 block text-[11px] sm:mb-2 sm:text-xs font-semibold text-slate-400">
                         تأكيد كلمة المرور الجديدة
                       </label>
 
@@ -534,7 +534,7 @@ export default function AccountPage() {
                           onChange={(e) =>
                             setConfirmPassword(e.target.value)
                           }
-                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-3 py-2.5 pl-10 text-sm sm:px-4 sm:py-3.5 sm:pl-12 text-white outline-none focus:border-blue-400/40"
+                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-2.5 py-1.5 pl-9 text-base sm:px-4 sm:py-3.5 sm:pl-12 sm:text-sm text-white outline-none focus:border-blue-400/40"
                         />
 
                         <button
@@ -544,12 +544,12 @@ export default function AccountPage() {
                               (value) => !value
                             )
                           }
-                          className="absolute left-3 top-1/2 -translate-y-1/2 p-2 text-slate-500 hover:text-white"
+                          className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 sm:left-3 sm:p-2 text-slate-500 hover:text-white"
                         >
                           {showConfirmPassword ? (
-                            <EyeOff size={15} />
+                            <EyeOff size={12} />
                           ) : (
-                            <Eye size={15} />
+                            <Eye size={12} />
                           )}
                         </button>
                       </div>
@@ -571,9 +571,9 @@ export default function AccountPage() {
                       type="button"
                       onClick={changePassword}
                       disabled={savingPassword}
-                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-500 px-4 py-2.5 text-sm sm:px-5 sm:py-3.5 font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-500 px-3 py-1.5 text-xs sm:px-5 sm:py-3.5 sm:text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <Lock size={15} />
+                      <Lock size={12} />
 
                       {savingPassword
                         ? "جارٍ التغيير..."
@@ -584,7 +584,7 @@ export default function AccountPage() {
               </div>
             </div>
 
-            <div className="mt-4 rounded-2xl sm:mt-6 sm:rounded-3xl border border-blue-400/10 bg-blue-500/[0.04] p-5">
+            <div className="mt-4 rounded-2xl sm:mt-6 sm:rounded-3xl border border-blue-400/10 bg-blue-500/[0.04] p-3 sm:p-5">
               <div className="flex gap-3">
                 <ShieldCheck
                   size={16}

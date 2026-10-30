@@ -231,21 +231,21 @@ export default function AccountPage() {
           <div className="mx-auto max-w-7xl p-2 sm:p-6 lg:p-8">
 
             {/* Header */}
-            <section className="relative mb-2 overflow-hidden rounded-xl sm:mb-6 sm:rounded-3xl border border-white/10 bg-gradient-to-br from-blue-500/10 via-[#08111e] to-cyan-500/5">
+            <section className="relative mb-2 overflow-hidden rounded-xl sm:mb-3 sm:rounded-3xl border border-white/10 bg-gradient-to-br from-blue-500/10 via-[#08111e] to-cyan-500/5">
               <div className="absolute -left-20 -top-20 h-52 w-52 rounded-full bg-blue-500/10 blur-3xl" />
               <div className="absolute -bottom-24 right-20 h-56 w-56 rounded-full bg-cyan-400/5 blur-3xl" />
 
-              <div className="relative p-2.5 sm:p-8">
-                <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+              <div className="relative px-3 py-2 sm:px-5 sm:py-3">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
 
                   <div className="flex items-center gap-3 sm:gap-5">
-                    <div className="flex h-10 w-10 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl border border-blue-400/20 bg-gradient-to-br from-blue-500/30 to-cyan-400/10 text-xl sm:text-3xl font-black text-cyan-300 shadow-xl shadow-blue-500/10">
+                    <div className="flex h-8 w-8 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl border border-blue-400/20 bg-gradient-to-br from-blue-500/30 to-cyan-400/10 text-base sm:text-xl font-black text-cyan-300 shadow-xl shadow-blue-500/10">
                       {getInitial()}
                     </div>
 
                     <div>
-                      <div className="mb-1 flex flex-wrap items-center gap-1 sm:mb-2 sm:gap-2">
-                        <h1 className="text-lg font-black sm:text-3xl">
+                      <div className="mb-0.5 flex flex-wrap items-center gap-1 sm:mb-1 sm:gap-2">
+                        <h1 className="text-sm font-black sm:text-lg">
                           {user?.name || "المستخدم"}
                         </h1>
 
@@ -261,7 +261,7 @@ export default function AccountPage() {
                         )}
                       </div>
 
-                      <p className="text-xs sm:text-sm text-slate-400">
+                      <p className="text-[11px] sm:text-xs text-slate-400">
                         إدارة الملف الشخصي وبيانات الحساب
                       </p>
                     </div>
@@ -294,10 +294,10 @@ export default function AccountPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2 p-2.5 sm:space-y-5 sm:p-6">
+                <div className="space-y-2 p-2.5 sm:space-y-3 sm:p-4">
 
                   <div>
-                    <label className="mb-1 block text-[11px] sm:mb-2 sm:text-xs font-semibold text-slate-400">
+                    <label className="mb-0.5 block text-[11px] sm:mb-1 sm:text-xs font-semibold text-slate-400">
                       الاسم
                     </label>
 
@@ -311,13 +311,13 @@ export default function AccountPage() {
                         value={name}
                         disabled={loading}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-8 py-1.5 text-base sm:px-12 sm:py-3.5 sm:text-sm text-white outline-none transition focus:border-blue-400/40"
+                        className="w-full rounded-lg sm:rounded-xl border border-white/10 bg-[#050a13] h-[30px] px-8 py-0 text-base sm:h-[32px] sm:px-12 sm:py-0 sm:text-sm text-white outline-none transition focus:border-blue-400/40"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-[11px] sm:mb-2 sm:text-xs font-semibold text-slate-400">
+                    <label className="mb-0.5 block text-[11px] sm:mb-1 sm:text-xs font-semibold text-slate-400">
                       اسم المستخدم
                     </label>
 
@@ -337,14 +337,14 @@ export default function AccountPage() {
                               .replace(/[^a-z0-9_]/g, "")
                           )
                         }
-                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-8 py-1.5 text-base sm:px-12 sm:py-3.5 sm:text-sm text-white outline-none transition focus:border-blue-400/40"
+                        className="w-full rounded-lg sm:rounded-xl border border-white/10 bg-[#050a13] h-[30px] px-8 py-0 text-base sm:h-[32px] sm:px-12 sm:py-0 sm:text-sm text-white outline-none transition focus:border-blue-400/40"
                         dir="ltr"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-[11px] sm:mb-2 sm:text-xs font-semibold text-slate-400">
+                    <label className="mb-0.5 block text-[11px] sm:mb-1 sm:text-xs font-semibold text-slate-400">
                       البريد الإلكتروني
                     </label>
 
@@ -359,18 +359,18 @@ export default function AccountPage() {
                         value={email}
                         disabled={loading}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-8 py-1.5 text-base sm:px-12 sm:py-3.5 sm:text-sm text-white outline-none transition focus:border-blue-400/40"
+                        className="w-full rounded-lg sm:rounded-xl border border-white/10 bg-[#050a13] h-[30px] px-8 py-0 text-base sm:h-[32px] sm:px-12 sm:py-0 sm:text-sm text-white outline-none transition focus:border-blue-400/40"
                         dir="ltr"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-[11px] sm:mb-2 sm:text-xs font-semibold text-slate-400">
+                    <label className="mb-0.5 block text-[11px] sm:mb-1 sm:text-xs font-semibold text-slate-400">
                       معرف الحساب
                     </label>
 
-                    <div className="flex items-center gap-1 rounded-lg sm:rounded-2xl border border-white/10 bg-[#050a13] p-1 sm:gap-2 sm:p-2">
+                    <div className="flex items-center gap-1 rounded-lg sm:rounded-lg sm:rounded-xl border border-white/10 bg-[#050a13] p-1 sm:gap-2 sm:p-2">
                       <div className="flex min-w-0 flex-1 items-center gap-3 px-2">
                         <KeyRound
                           size={12}
@@ -442,10 +442,10 @@ export default function AccountPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-2 p-2.5 sm:space-y-4 sm:p-6">
+                  <div className="space-y-2 p-2.5 sm:space-y-3 sm:p-4">
 
                     <div>
-                      <label className="mb-1 block text-[11px] sm:mb-2 sm:text-xs font-semibold text-slate-400">
+                      <label className="mb-0.5 block text-[11px] sm:mb-1 sm:text-xs font-semibold text-slate-400">
                         كلمة المرور الحالية
                       </label>
 
@@ -460,7 +460,7 @@ export default function AccountPage() {
                           onChange={(e) =>
                             setCurrentPassword(e.target.value)
                           }
-                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-2.5 py-1.5 pl-9 text-base sm:px-4 sm:py-3.5 sm:pl-12 sm:text-sm text-white outline-none focus:border-blue-400/40"
+                          className="w-full rounded-lg sm:rounded-xl border border-white/10 bg-[#050a13] h-[30px] px-2.5 py-0 pl-9 text-base sm:h-[32px] sm:px-4 sm:py-0 sm:pl-12 sm:text-sm text-white outline-none focus:border-blue-400/40"
                         />
 
                         <button
@@ -482,7 +482,7 @@ export default function AccountPage() {
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-[11px] sm:mb-2 sm:text-xs font-semibold text-slate-400">
+                      <label className="mb-0.5 block text-[11px] sm:mb-1 sm:text-xs font-semibold text-slate-400">
                         كلمة المرور الجديدة
                       </label>
 
@@ -497,7 +497,7 @@ export default function AccountPage() {
                           onChange={(e) =>
                             setNewPassword(e.target.value)
                           }
-                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-2.5 py-1.5 pl-9 text-base sm:px-4 sm:py-3.5 sm:pl-12 sm:text-sm text-white outline-none focus:border-blue-400/40"
+                          className="w-full rounded-lg sm:rounded-xl border border-white/10 bg-[#050a13] h-[30px] px-2.5 py-0 pl-9 text-base sm:h-[32px] sm:px-4 sm:py-0 sm:pl-12 sm:text-sm text-white outline-none focus:border-blue-400/40"
                         />
 
                         <button
@@ -519,7 +519,7 @@ export default function AccountPage() {
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-[11px] sm:mb-2 sm:text-xs font-semibold text-slate-400">
+                      <label className="mb-0.5 block text-[11px] sm:mb-1 sm:text-xs font-semibold text-slate-400">
                         تأكيد كلمة المرور الجديدة
                       </label>
 
@@ -534,7 +534,7 @@ export default function AccountPage() {
                           onChange={(e) =>
                             setConfirmPassword(e.target.value)
                           }
-                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-2.5 py-1.5 pl-9 text-base sm:px-4 sm:py-3.5 sm:pl-12 sm:text-sm text-white outline-none focus:border-blue-400/40"
+                          className="w-full rounded-lg sm:rounded-xl border border-white/10 bg-[#050a13] h-[30px] px-2.5 py-0 pl-9 text-base sm:h-[32px] sm:px-4 sm:py-0 sm:pl-12 sm:text-sm text-white outline-none focus:border-blue-400/40"
                         />
 
                         <button

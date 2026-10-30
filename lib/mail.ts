@@ -53,3 +53,14 @@ export async function sendVerificationCode(
     `,
   });
 }
+
+export async function sendPasswordResetLink(email: string, url: string) {
+  if (!smtpUser || !smtpPass) throw new Error("SMTP credentials are not configured");
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || smtpUser,
+    to: email,
+    subject: "استعادة كلمة المرور - عرب تريد",
+    text: `لاستعادة كلمة المرور افتح الرابط التالي خلال 15 دقيقة:\n${url}\nإذا لم تطلب ذلك، تجاهل الرسالة.`,
+    html: `<div dir="rtl" style="font-family:Arial,sans-serif"><h2>استعادة كلمة المرور - عرب تريد</h2><p>الرابط صالح لمدة 15 دقيقة ويُستخدم مرة واحدة فقط.</p><p><a href="${url}">تعيين كلمة مرور جديدة</a></p><p>إذا لم تطلب ذلك، تجاهل الرسالة.</p></div>`,
+  });
+}

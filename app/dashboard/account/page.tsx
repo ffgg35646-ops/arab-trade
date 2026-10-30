@@ -228,24 +228,24 @@ export default function AccountPage() {
         <InternalSidebar />
 
         <main className="min-w-0 flex-1 text-white">
-          <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto max-w-7xl p-3 sm:p-6 lg:p-8">
 
             {/* Header */}
-            <section className="relative mb-6 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-blue-500/10 via-[#08111e] to-cyan-500/5">
+            <section className="relative mb-4 overflow-hidden rounded-2xl sm:mb-6 sm:rounded-3xl border border-white/10 bg-gradient-to-br from-blue-500/10 via-[#08111e] to-cyan-500/5">
               <div className="absolute -left-20 -top-20 h-52 w-52 rounded-full bg-blue-500/10 blur-3xl" />
               <div className="absolute -bottom-24 right-20 h-56 w-56 rounded-full bg-cyan-400/5 blur-3xl" />
 
-              <div className="relative p-6 sm:p-8">
+              <div className="relative p-4 sm:p-8">
                 <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
 
-                  <div className="flex items-center gap-5">
-                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-blue-400/20 bg-gradient-to-br from-blue-500/30 to-cyan-400/10 text-3xl font-black text-cyan-300 shadow-xl shadow-blue-500/10">
+                  <div className="flex items-center gap-3 sm:gap-5">
+                    <div className="flex h-12 w-12 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl border border-blue-400/20 bg-gradient-to-br from-blue-500/30 to-cyan-400/10 text-xl sm:text-3xl font-black text-cyan-300 shadow-xl shadow-blue-500/10">
                       {getInitial()}
                     </div>
 
                     <div>
                       <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <h1 className="text-2xl font-black sm:text-3xl">
+                        <h1 className="text-lg font-black sm:text-3xl">
                           {user?.name || "المستخدم"}
                         </h1>
 
@@ -271,15 +271,15 @@ export default function AccountPage() {
               </div>
             </section>
 
-            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="grid gap-3 sm:gap-6 lg:grid-cols-[1.1fr_0.9fr]">
 
               {/* Profile */}
-              <section className="rounded-3xl border border-white/10 bg-[#08111e] shadow-2xl shadow-black/10">
+              <section className="rounded-2xl sm:rounded-3xl border border-white/10 bg-[#08111e] shadow-2xl shadow-black/10">
 
-                <div className="border-b border-white/10 px-6 py-5">
+                <div className="border-b border-white/10 px-4 py-3 sm:px-6 sm:py-5">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-300">
-                      <User size={19} />
+                    <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-300">
+                      <User size={16} />
                     </div>
 
                     <div>
@@ -294,7 +294,7 @@ export default function AccountPage() {
                   </div>
                 </div>
 
-                <div className="space-y-5 p-6">
+                <div className="space-y-3 p-4 sm:space-y-5 sm:p-6">
 
                   <div>
                     <label className="mb-2 block text-xs font-semibold text-slate-400">
@@ -303,15 +303,15 @@ export default function AccountPage() {
 
                     <div className="relative">
                       <User
-                        size={17}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600"
+                        size={15}
+                        className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-slate-600"
                       />
 
                       <input
                         value={name}
                         disabled={loading}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-12 py-3.5 text-sm text-white outline-none transition focus:border-blue-400/40"
+                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-10 py-2.5 text-sm sm:px-12 sm:py-3.5 text-white outline-none transition focus:border-blue-400/40"
                       />
                     </div>
                   </div>
@@ -323,8 +323,8 @@ export default function AccountPage() {
 
                     <div className="relative">
                       <AtSign
-                        size={17}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600"
+                        size={15}
+                        className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-slate-600"
                       />
 
                       <input
@@ -337,7 +337,7 @@ export default function AccountPage() {
                               .replace(/[^a-z0-9_]/g, "")
                           )
                         }
-                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-12 py-3.5 text-sm text-white outline-none transition focus:border-blue-400/40"
+                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-10 py-2.5 text-sm sm:px-12 sm:py-3.5 text-white outline-none transition focus:border-blue-400/40"
                         dir="ltr"
                       />
                     </div>
@@ -350,8 +350,8 @@ export default function AccountPage() {
 
                     <div className="relative">
                       <Mail
-                        size={17}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600"
+                        size={15}
+                        className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-slate-600"
                       />
 
                       <input
@@ -359,7 +359,7 @@ export default function AccountPage() {
                         value={email}
                         disabled={loading}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-12 py-3.5 text-sm text-white outline-none transition focus:border-blue-400/40"
+                        className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-10 py-2.5 text-sm sm:px-12 sm:py-3.5 text-white outline-none transition focus:border-blue-400/40"
                         dir="ltr"
                       />
                     </div>
@@ -373,7 +373,7 @@ export default function AccountPage() {
                     <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-[#050a13] p-2">
                       <div className="flex min-w-0 flex-1 items-center gap-3 px-2">
                         <KeyRound
-                          size={17}
+                          size={15}
                           className="shrink-0 text-slate-600"
                         />
 
@@ -409,9 +409,9 @@ export default function AccountPage() {
                     type="button"
                     onClick={saveProfile}
                     disabled={loading || savingProfile}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-500 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-500 px-4 py-2.5 text-sm sm:px-5 sm:py-3.5 font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <Save size={17} />
+                    <Save size={15} />
                     {savingProfile
                       ? "جارٍ الحفظ..."
                       : "حفظ التغييرات"}
@@ -422,12 +422,12 @@ export default function AccountPage() {
               {/* Right */}
               <div className="space-y-6">
 
-                <section className="rounded-3xl border border-white/10 bg-[#08111e] shadow-2xl shadow-black/10">
+                <section className="rounded-2xl sm:rounded-3xl border border-white/10 bg-[#08111e] shadow-2xl shadow-black/10">
 
-                  <div className="border-b border-white/10 px-6 py-5">
+                  <div className="border-b border-white/10 px-4 py-3 sm:px-6 sm:py-5">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-300">
-                        <Lock size={19} />
+                      <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-300">
+                        <Lock size={16} />
                       </div>
 
                       <div>
@@ -442,7 +442,7 @@ export default function AccountPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-4 p-6">
+                  <div className="space-y-3 p-4 sm:space-y-4 sm:p-6">
 
                     <div>
                       <label className="mb-2 block text-xs font-semibold text-slate-400">
@@ -460,7 +460,7 @@ export default function AccountPage() {
                           onChange={(e) =>
                             setCurrentPassword(e.target.value)
                           }
-                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-4 py-3.5 pl-12 text-sm text-white outline-none focus:border-blue-400/40"
+                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-3 py-2.5 pl-10 text-sm sm:px-4 sm:py-3.5 sm:pl-12 text-white outline-none focus:border-blue-400/40"
                         />
 
                         <button
@@ -473,9 +473,9 @@ export default function AccountPage() {
                           className="absolute left-3 top-1/2 -translate-y-1/2 p-2 text-slate-500 hover:text-white"
                         >
                           {showCurrentPassword ? (
-                            <EyeOff size={17} />
+                            <EyeOff size={15} />
                           ) : (
-                            <Eye size={17} />
+                            <Eye size={15} />
                           )}
                         </button>
                       </div>
@@ -497,7 +497,7 @@ export default function AccountPage() {
                           onChange={(e) =>
                             setNewPassword(e.target.value)
                           }
-                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-4 py-3.5 pl-12 text-sm text-white outline-none focus:border-blue-400/40"
+                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-3 py-2.5 pl-10 text-sm sm:px-4 sm:py-3.5 sm:pl-12 text-white outline-none focus:border-blue-400/40"
                         />
 
                         <button
@@ -510,9 +510,9 @@ export default function AccountPage() {
                           className="absolute left-3 top-1/2 -translate-y-1/2 p-2 text-slate-500 hover:text-white"
                         >
                           {showNewPassword ? (
-                            <EyeOff size={17} />
+                            <EyeOff size={15} />
                           ) : (
-                            <Eye size={17} />
+                            <Eye size={15} />
                           )}
                         </button>
                       </div>
@@ -534,7 +534,7 @@ export default function AccountPage() {
                           onChange={(e) =>
                             setConfirmPassword(e.target.value)
                           }
-                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-4 py-3.5 pl-12 text-sm text-white outline-none focus:border-blue-400/40"
+                          className="w-full rounded-2xl border border-white/10 bg-[#050a13] px-3 py-2.5 pl-10 text-sm sm:px-4 sm:py-3.5 sm:pl-12 text-white outline-none focus:border-blue-400/40"
                         />
 
                         <button
@@ -547,9 +547,9 @@ export default function AccountPage() {
                           className="absolute left-3 top-1/2 -translate-y-1/2 p-2 text-slate-500 hover:text-white"
                         >
                           {showConfirmPassword ? (
-                            <EyeOff size={17} />
+                            <EyeOff size={15} />
                           ) : (
-                            <Eye size={17} />
+                            <Eye size={15} />
                           )}
                         </button>
                       </div>
@@ -571,9 +571,9 @@ export default function AccountPage() {
                       type="button"
                       onClick={changePassword}
                       disabled={savingPassword}
-                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-500 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-500 px-4 py-2.5 text-sm sm:px-5 sm:py-3.5 font-bold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <Lock size={17} />
+                      <Lock size={15} />
 
                       {savingPassword
                         ? "جارٍ التغيير..."
@@ -584,10 +584,10 @@ export default function AccountPage() {
               </div>
             </div>
 
-            <div className="mt-6 rounded-3xl border border-blue-400/10 bg-blue-500/[0.04] p-5">
+            <div className="mt-4 rounded-2xl sm:mt-6 sm:rounded-3xl border border-blue-400/10 bg-blue-500/[0.04] p-5">
               <div className="flex gap-3">
                 <ShieldCheck
-                  size={19}
+                  size={16}
                   className="mt-0.5 shrink-0 text-blue-300"
                 />
 

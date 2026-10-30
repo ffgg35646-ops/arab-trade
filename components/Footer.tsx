@@ -64,9 +64,9 @@ export default function Footer({ showOnInternal = false }: { showOnInternal?: bo
 
   return (
     <footer className="border-t border-sky-400/15 bg-[#050a13]">
-      <div className="mx-auto max-w-7xl px-4 py-12 lg:px-8">
-        <div className="grid gap-9 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,1fr)] lg:gap-8">
-          <div className="sm:col-span-2 lg:col-span-1">
+      <div className="mx-auto max-w-7xl px-3 py-8 sm:px-4 sm:py-12 lg:px-8">
+        <div className="grid grid-cols-2 gap-3 sm:gap-9 lg:grid-cols-[1.4fr_repeat(3,1fr)] lg:gap-8">
+          <div className="col-span-2 lg:col-span-1">
             <Link href={homeHref} className="inline-flex rounded-xl outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400">
               <Image
                 src="/logo.svg"
@@ -99,15 +99,15 @@ export default function Footer({ showOnInternal = false }: { showOnInternal?: bo
           </div>
           {visibleColumns.map((column) => (
             <div key={column.title}>
-              <h3 className="mb-4 text-sm font-extrabold text-white">
+              <h3 className="mb-3 text-xs sm:mb-4 sm:text-sm font-extrabold text-white">
                 <span className="inline-block border-b-2 border-sky-400/70 pb-2">{column.title}</span>
               </h3>
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-2 sm:gap-2.5">
                 {column.links.map(([label, href]) => (
                   <Link
                     key={label}
                     href={href}
-                    className="group flex min-h-11 items-center justify-between gap-3 rounded-xl border border-slate-700/70 bg-slate-900/65 px-3.5 py-2.5 text-sm font-semibold text-slate-100 shadow-sm shadow-black/10 transition duration-200 hover:-translate-y-0.5 hover:border-sky-400/60 hover:bg-sky-400/10 hover:text-white hover:shadow-lg hover:shadow-sky-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                    className="group flex min-h-9 items-center justify-between gap-1 rounded-lg sm:min-h-11 sm:gap-3 sm:rounded-xl border border-slate-700/70 bg-slate-900/65 px-2 py-2 text-[11px] font-semibold sm:px-3.5 sm:py-2.5 sm:text-sm text-slate-100 shadow-sm shadow-black/10 transition duration-200 hover:-translate-y-0.5 hover:border-sky-400/60 hover:bg-sky-400/10 hover:text-white hover:shadow-lg hover:shadow-sky-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
                   >
                     <span>{label}</span>
                     <span aria-hidden="true" className="text-sky-300/70 transition group-hover:-translate-x-0.5 group-hover:text-sky-200">←</span>

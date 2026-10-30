@@ -1,7 +1,23 @@
+"use client";
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowRight, KeyRound, Mail } from "lucide-react";
 
 export default function ForgotPasswordPage() {
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setError(""); setMessage("");
+    try {
+      const response = await fetch("/api/auth/forgot-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "تعذر إرسال الطلب");
+      setMessage(data.message);
+    } catch (e) { setError(e instanceof Error ? e.message : "حدث خطأ"); }
+    finally { setBusy(false); }
+  }
   return (
     <main className="arabtrade-auth-bg text-white flex items-center justify-center px-4 py-10">
       <div className="arabtrade-auth-candles" aria-hidden="true" />
@@ -29,7 +45,7 @@ export default function ForgotPasswordPage() {
             </p>
           </div>
 
-          <form className="space-y-5">
+          <form onSubmit={submit} className="space-y-5">
             <div>
               <label className="mb-2 block text-sm text-slate-300">
                 البريد الإلكتروني
@@ -44,6 +60,9 @@ export default function ForgotPasswordPage() {
                 <input
                   type="email"
                   name="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
                   placeholder="example@email.com"
                   className="w-full rounded-2xl border border-white/10 bg-[#050a13] py-3.5 pr-11 pl-4 text-sm outline-none transition focus:border-blue-400/60 focus:ring-2 focus:ring-blue-500/10"
@@ -51,11 +70,14 @@ export default function ForgotPasswordPage() {
               </div>
             </div>
 
+            {message && <p role="status" className="text-sm text-emerald-300">{message}</p>}
+            {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
             <button
+              disabled={busy}
               type="submit"
               className="w-full rounded-2xl bg-gradient-to-l from-blue-600 to-cyan-500 py-3.5 font-bold text-white shadow-lg shadow-blue-500/10 transition hover:scale-[1.01] hover:shadow-blue-500/20"
             >
-              إرسال رابط استعادة كلمة المرور
+              {busy ? "جارٍ الإرسال..." : "إرسال رابط استعادة كلمة المرور"}
             </button>
           </form>
 

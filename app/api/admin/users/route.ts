@@ -6,6 +6,7 @@ import User from "@/models/User";
 import DepositBalance from "@/models/DepositBalance";
 import DepositRequest from "@/models/DepositRequest";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
+import Notification from "@/models/Notification";
 import Wallet from "@/models/Wallet";
 import { creditSpotUsdtBalance, debitSpotUsdtBalance } from "@/lib/unified-usdt-wallet";
 import { writeLedger } from "@/lib/ledger";
@@ -279,6 +280,17 @@ export async function PATCH(request: NextRequest) {
             operation === "add" ? "مكافأة يدوية من الإدارة" : "خصم يدوي من الإدارة",
             session
           );
+
+          const formattedAmount = amount.toLocaleString("en-US", { maximumFractionDigits: 8 });
+          await Notification.create([{
+            userId: target._id,
+            type: "account",
+            title: operation === "add" ? "تمت زيادة رصيدك" : "تم خصم مبلغ من رصيدك",
+            message: operation === "add"
+              ? `تمت إضافة ${formattedAmount} USDT إلى رصيد محفظتك بواسطة الإدارة.`
+              : `تم خصم ${formattedAmount} USDT من رصيد محفظتك بواسطة الإدارة.`,
+            read: false,
+          }], { session });
         });
       } catch (adjustmentError) {
         if (adjustmentError instanceof Error && adjustmentError.message === "INSUFFICIENT_USER_BALANCE") {

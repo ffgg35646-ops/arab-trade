@@ -109,9 +109,18 @@ export async function PATCH(request: NextRequest) {
         { session, new: true }
       );
       if (!row) throw new Error("تمت معالجة الطلب بالفعل");
-      processedWithdrawal = row;
-
       const rejecting = body.action === "reject";
+      if (!rejecting && (row.type || "package") === "general") {
+        const hasCombinedAllocation =
+          row.generalWalletAmount != null || row.generalDepositAmount != null;
+        const legacyDepositAmount = hasCombinedAllocation
+          ? Number(row.generalDepositAmount || 0)
+          : row.generalSource === "deposit" ? Number(row.amount || 0) : 0;
+        if (legacyDepositAmount > 0) {
+          throw new Error("لا يمكن اعتماد طلب سحب عام قديم يعتمد على رصيد الإيداع. ارفض الطلب لإرجاع المبلغ إلى المستخدم.");
+        }
+      }
+      processedWithdrawal = row;
       if ((row.type || "package") === "general") {
         if (rejecting) {
           const hasCombinedAllocation =

@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/mongodb";
 import { requireAdminLeader } from "@/lib/admin-auth";
 import User from "@/models/User";
 import DepositBalance from "@/models/DepositBalance";
 import DepositRequest from "@/models/DepositRequest";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
+import Wallet from "@/models/Wallet";
+import { creditSpotUsdtBalance, debitSpotUsdtBalance } from "@/lib/unified-usdt-wallet";
+import { writeLedger } from "@/lib/ledger";
 
 export async function GET(request: NextRequest) {
   try {
@@ -64,7 +68,12 @@ export async function GET(request: NextRequest) {
       .lean();
 
     const userIds = users.map((user: any) => user._id);
-    const depositRows = await DepositBalance.find({ userId: { $in: userIds } }).lean();
+    const [depositRows, walletRows] = await Promise.all([
+      DepositBalance.find({ userId: { $in: userIds } }).lean(),
+      Wallet.find({ userId: { $in: userIds }, type: "spot", mode: "live" })
+        .select("userId balances")
+        .lean(),
+    ]);
 
     const depositByUser = new Map<string, any[]>();
     for (const row of depositRows as any[]) {
@@ -72,6 +81,20 @@ export async function GET(request: NextRequest) {
       depositByUser.set(key, [...(depositByUser.get(key) || []), {
         asset: String(row.asset || "").toUpperCase(), available: Number(row.available || 0), locked: Number(row.locked || 0),
       }]);
+    }
+
+    const walletByUser = new Map<string, { available: number; locked: number }>();
+    for (const wallet of walletRows as any[]) {
+      const totals = (wallet.balances || []).reduce(
+        (sum: { available: number; locked: number }, balance: any) => {
+          if (String(balance.asset || "").trim().toUpperCase() !== "USDT") return sum;
+          sum.available += Math.max(0, Number(balance.available || 0));
+          sum.locked += Math.max(0, Number(balance.locked || 0));
+          return sum;
+        },
+        { available: 0, locked: 0 },
+      );
+      walletByUser.set(String(wallet.userId), totals);
     }
 
     // Count only successful withdrawals. "amount" is the gross amount released
@@ -165,6 +188,8 @@ export async function GET(request: NextRequest) {
           ...user,
           _id: id,
           depositBalances: depositByUser.get(id) || [],
+          walletBalance: walletByUser.get(id)?.available || 0,
+          walletLockedBalance: walletByUser.get(id)?.locked || 0,
           withdrawalCount: withdrawalByUser.get(id)?.count || 0,
           withdrawnAmount: withdrawalByUser.get(id)?.totalAmount || 0,
           activeReferralCount: activeReferralCountByUser.get(id) || 0,
@@ -199,6 +224,82 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const id = String(body.id || "");
     const action = String(body.action || "");
+
+    if (action === "adjustBalance") {
+      const operation = String(body.operation || "");
+      const amount = Number(body.amount);
+      if (
+        !mongoose.isValidObjectId(id) ||
+        !["add", "subtract"].includes(operation) ||
+        !Number.isFinite(amount) ||
+        amount <= 0 ||
+        amount > 1000000000 ||
+        Math.round(amount * 1e8) / 1e8 !== amount
+      ) {
+        return NextResponse.json(
+          { success: false, message: "المستخدم أو مبلغ التعديل غير صالح" },
+          { status: 400 }
+        );
+      }
+
+      await connectDB();
+      const target = await User.findOne({
+        _id: id,
+        $or: [{ role: "user" }, { role: { $exists: false } }],
+      }).select("_id").lean();
+      if (!target) {
+        return NextResponse.json(
+          { success: false, message: "المستخدم غير موجود" },
+          { status: 404 }
+        );
+      }
+
+      const session = await mongoose.startSession();
+      let balanceAfter = 0;
+      try {
+        await session.withTransaction(async () => {
+          const adjustment = operation === "add"
+            ? await creditSpotUsdtBalance(target._id, amount, session)
+            : await debitSpotUsdtBalance(target._id, amount, session);
+
+          if (operation === "subtract" && "ok" in adjustment && !adjustment.ok) {
+            throw new Error("INSUFFICIENT_USER_BALANCE");
+          }
+
+          balanceAfter = adjustment.availableAfter;
+          const signedAmount = operation === "add" ? amount : -amount;
+          await writeLedger(
+            target._id,
+            "USDT",
+            operation === "add" ? "reward" : "adjustment",
+            signedAmount,
+            adjustment.availableBefore,
+            adjustment.availableAfter,
+            "admin-balance-adjustment:" + String(admin._id) + ":" + new mongoose.Types.ObjectId().toString(),
+            operation === "add" ? "مكافأة يدوية من الإدارة" : "خصم يدوي من الإدارة",
+            session
+          );
+        });
+      } catch (adjustmentError) {
+        if (adjustmentError instanceof Error && adjustmentError.message === "INSUFFICIENT_USER_BALANCE") {
+          return NextResponse.json(
+            { success: false, message: "الرصيد المتاح لا يكفي لإتمام الخصم" },
+            { status: 400 }
+          );
+        }
+        throw adjustmentError;
+      } finally {
+        await session.endSession();
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: operation === "add"
+          ? "تمت إضافة المكافأة إلى رصيد المستخدم"
+          : "تم خصم المبلغ من رصيد المستخدم",
+        walletBalance: balanceAfter,
+      });
+    }
 
     if (!id || !["block", "unblock"].includes(action)) {
       return NextResponse.json(

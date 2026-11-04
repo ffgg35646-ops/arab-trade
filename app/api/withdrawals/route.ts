@@ -19,12 +19,12 @@ import UserPackage from "@/models/UserPackage";
 import InvestmentPackage from "@/models/InvestmentPackage";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
 import Wallet from "@/models/Wallet";
-import DepositBalance from "@/models/DepositBalance";
 import User from "@/models/User";
 import DepositRequest from "@/models/DepositRequest";
 import PlatformSettings from "@/models/PlatformSettings";
 import Notification from "@/models/Notification";
-import { debitDepositBalance, separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
+import { separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
+import { debitSpotUsdtBalance } from "@/lib/unified-usdt-wallet";
 import { consolidateFundingWalletIntoSpotWallet } from "@/lib/consolidate-funding-wallet";
 import {
   roundWithdrawal,
@@ -137,12 +137,11 @@ export async function GET(request: NextRequest) {
   await separateLegacyDepositsFromSpotWallet(user._id);
   await consolidateFundingWalletIntoSpotWallet(user._id);
 
-  const [plans, sourceAccounts, requests, wallet, depositBalances, platformSettings, referralStats] = await Promise.all([
+  const [plans, sourceAccounts, requests, wallet, platformSettings, referralStats] = await Promise.all([
     InvestmentPackage.find({}).select("name price withdrawalMinimum enabled sortOrder").sort({ sortOrder: 1, price: 1 }).lean(),
     UserPackage.find({ userId: user._id }).sort({ createdAt: 1 }).lean(),
     WithdrawalRequest.find({ userId: user._id }).sort({ createdAt: -1 }).lean(),
     Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).select("balances").lean(),
-    DepositBalance.find({ userId: user._id }).select("asset available").lean(),
     getPlatformSettings(),
     activeReferralDepositStats(user._id),
   ]);
@@ -202,11 +201,8 @@ export async function GET(request: NextRequest) {
   });
   const packageAvailable = roundWithdrawal(packages.reduce((sum, plan) => sum + Number(plan.account?.balance || 0), 0));
   const walletAvailable = getUsdtAvailable(wallet);
-  const depositAvailable = roundWithdrawal(depositBalances.reduce((sum: number, balance: any) =>
-    sum + (String(balance.asset || "").trim().toUpperCase() === "USDT" ? Math.max(0, Number(balance.available || 0)) : 0),
-  0));
-  // General withdrawals use one combined pool: spot-wallet USDT + external-deposit USDT.
-  const generalAvailable = roundWithdrawal(walletAvailable + depositAvailable);
+  // External deposit balances are separate and are never eligible for general withdrawal.
+  const generalAvailable = walletAvailable;
   const totalBalance = roundWithdrawal(generalAvailable + packageAvailable);
 
   return NextResponse.json({
@@ -358,47 +354,19 @@ export async function POST(request: NextRequest) {
 
         const wallet = await Wallet.findOne({ userId: user._id, type: "spot", mode: "live" }).session(session);
         const walletAvailable = getUsdtAvailable(wallet);
-        const depositRows = await DepositBalance.find({ userId: user._id })
-          .select("asset available")
-          .session(session)
-          .lean();
-        const depositAvailable = roundWithdrawal(depositRows.reduce((sum: number, row: any) =>
-          sum + (String(row.asset || "").trim().toUpperCase() === "USDT" ? Math.max(0, Number(row.available || 0)) : 0),
-        0));
-        const totalAvailable = roundWithdrawal(walletAvailable + depositAvailable);
-        if (amount > totalAvailable) {
-          throw new Error("رصيد السحب العام المتاح هو " + totalAvailable + " USDT فقط");
+        if (amount > walletAvailable) {
+          throw new Error("رصيد السحب العام المتاح هو " + walletAvailable + " USDT فقط");
         }
 
-        // Reserve from the spot wallet first, then cover any remainder from
-        // DepositBalance. The UI and validation treat these as one withdrawal pool.
-        const walletDebit = roundWithdrawal(Math.min(walletAvailable, amount));
-        const depositDebit = roundWithdrawal(amount - walletDebit);
-
-        if (walletDebit > 0) {
-          if (!wallet) throw new Error("الرصيد العام تغير، حاول مجددًا");
-          const reserved = await Wallet.updateOne(
-            { _id: wallet._id, balances: { $elemMatch: { asset: "USDT", available: { $gte: walletDebit } } } },
-            { $inc: { "balances.$.available": -walletDebit } },
-            { session }
-          );
-          if (reserved.modifiedCount !== 1) throw new Error("الرصيد العام تغير، حاول مجددًا");
-        }
-
-        if (depositDebit > 0) {
-          const debited = await debitDepositBalance(user._id, "USDT", depositDebit, session);
-          if (!debited.ok) {
-            throw new Error("رصيد السحب العام تغير؛ المتاح حاليًا " +
-              roundWithdrawal(walletAvailable + debited.availableBefore) + " USDT فقط");
-          }
-        }
+        const debited = await debitSpotUsdtBalance(user._id, amount, session);
+        if (!debited.ok) throw new Error("رصيد السحب العام تغير، حاول مجددًا");
 
         const created = await WithdrawalRequest.create([{
           userId: user._id,
           type: "general",
           generalSource: "wallet",
-          generalWalletAmount: walletDebit,
-          generalDepositAmount: depositDebit,
+          generalWalletAmount: amount,
+          generalDepositAmount: 0,
           amount,
           ...feeDetails!,
           ...conversionDetails,

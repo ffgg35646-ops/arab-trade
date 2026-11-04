@@ -2,19 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/current-user";
 import Wallet from "@/models/Wallet";
-import DepositBalance from "@/models/DepositBalance";
 import UserPackage from "@/models/UserPackage";
+import { separateLegacyDepositsFromSpotWallet } from "@/lib/deposit-balance-source";
+import { consolidateFundingWalletIntoSpotWallet } from "@/lib/consolidate-funding-wallet";
 
 const round8 = (value: number) =>
   Math.round((value + Number.EPSILON) * 1e8) / 1e8;
 
 /**
- * Read-only summary for the internal navbar.
+ * Summary for the internal navbar.
  *
- * General withdrawal balance combines available USDT from the live spot wallet
- * and the external-deposit balance. Package earnings remain a separate bucket.
- * Pending withdrawals are excluded because reserved amounts have left available balances.
- * This endpoint only reads balances; the withdrawal API reserves from each source.
+ * General withdrawal balance comes only from available USDT in the live spot wallet.
+ * External deposits are non-withdrawable and package earnings remain a separate bucket.
+ * Legacy wallet balances are normalized before reading, matching the wallet and withdrawal APIs.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -27,17 +27,16 @@ export async function GET(request: NextRequest) {
     }
 
     await connectDB();
+    await separateLegacyDepositsFromSpotWallet(user._id);
+    await consolidateFundingWalletIntoSpotWallet(user._id);
 
-    const [wallet, depositBalances, packageAccounts] = await Promise.all([
+    const [wallet, packageAccounts] = await Promise.all([
       Wallet.findOne({
         userId: user._id,
         type: "spot",
         mode: "live",
       })
         .select("balances")
-        .lean(),
-      DepositBalance.find({ userId: user._id })
-        .select("asset available")
         .lean(),
       UserPackage.find({
         userId: user._id,
@@ -56,14 +55,7 @@ export async function GET(request: NextRequest) {
         return sum + (Number.isFinite(available) && available > 0 ? available : 0);
       }, 0)
     );
-    const depositAvailable = round8(
-      depositBalances.reduce((sum: number, balance: any) => {
-        if (String(balance.asset || "").trim().toUpperCase() !== "USDT") return sum;
-        const available = Number(balance.available || 0);
-        return sum + (Number.isFinite(available) && available > 0 ? available : 0);
-      }, 0)
-    );
-    const generalAvailable = round8(walletAvailable + depositAvailable);
+    const generalAvailable = walletAvailable;
 
     const packageAvailable = round8(
       packageAccounts.reduce((sum: number, account: any) => {

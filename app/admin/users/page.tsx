@@ -36,6 +36,8 @@ export default function UsersPage() {
   const [referralChildren, setReferralChildren] = useState<Record<string, ReferralPerson[]>>({});
   const [referralLoading, setReferralLoading] = useState<Record<string, boolean>>({});
   const [referralErrors, setReferralErrors] = useState<Record<string, string>>({});
+  const [balanceEditorId, setBalanceEditorId] = useState("");
+  const [balanceAmounts, setBalanceAmounts] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setError("");
@@ -120,6 +122,37 @@ export default function UsersPage() {
       await load();
     } catch (e) {
       alert(e instanceof Error ? e.message : "تعذر حذف المستخدم");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function adjustBalance(id: string, operation: "add" | "subtract") {
+    const amount = Number(balanceAmounts[id] || "");
+    if (!Number.isFinite(amount) || amount <= 0 || Math.round(amount * 1e8) / 1e8 !== amount) {
+      alert("اكتب مبلغًا صحيحًا بحد أقصى 8 منازل عشرية.");
+      return;
+    }
+
+    setBusy(id);
+    try {
+      const response = await fetch("/api/admin/users", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "adjustBalance", operation, amount }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "تعذر تعديل الرصيد");
+      }
+
+      setBalanceEditorId("");
+      setBalanceAmounts((current) => ({ ...current, [id]: "" }));
+      await load();
+      alert(result.message || "تم تعديل رصيد المستخدم");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "تعذر تعديل الرصيد");
     } finally {
       setBusy("");
     }
@@ -303,7 +336,8 @@ export default function UsersPage() {
                     <th className="px-4 py-4">المستخدم</th>
                     <th className="px-4 py-4">البريد</th>
                     <th className="px-4 py-4">الحالة</th>
-                    <th className="px-4 py-4">رصيد الإيداع الخارجي</th>
+                    <th className="px-4 py-4">رصيد المحفظة (USDT)</th>
+                    <th className="px-4 py-4">رصيد الإيداع الخارجي (غير قابل للسحب)</th>
                     <th className="px-4 py-4">عدد السحوبات</th>
                     <th className="px-4 py-4">إجمالي المبلغ المسحوب</th>
                     <th className="px-4 py-4">الإحالات النشطة</th>
@@ -348,6 +382,12 @@ export default function UsersPage() {
                         </span>
                       </td>
 
+                      <td className="px-4 py-4 font-bold text-cyan-200">
+                        {money(user.walletBalance)} USDT
+                        {Number(user.walletLockedBalance || 0) > 0 ? (
+                          <div className="mt-1 text-xs font-normal text-slate-500">محجوز: {money(user.walletLockedBalance)} USDT</div>
+                        ) : null}
+                      </td>
                       <td className="px-4 py-4 text-sky-200">
                         {Array.isArray(user.depositBalances) && user.depositBalances.length ? user.depositBalances.map((b: any) => <div key={b.asset} className="whitespace-nowrap">{Number(b.available || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} {b.asset}</div>) : "—"}
                       </td>
@@ -399,6 +439,14 @@ export default function UsersPage() {
                           </button>
 
                           <button
+                            type="button"
+                            disabled={busy === user._id}
+                            onClick={() => setBalanceEditorId((current) => current === String(user._id) ? "" : String(user._id))}
+                            className="rounded-lg border border-cyan-500/25 bg-cyan-500/10 px-3 py-2 text-xs font-bold text-cyan-200 disabled:opacity-50"
+                          >
+                            {balanceEditorId === String(user._id) ? "إغلاق الرصيد" : "زيادة / خصم"}
+                          </button>
+                          <button
                             disabled={busy === user._id}
                             onClick={() => void removeUser(user._id)}
                             className="rounded-lg bg-red-600 px-3 py-2 text-xs font-bold disabled:opacity-50"
@@ -408,9 +456,50 @@ export default function UsersPage() {
                         </div>
                       </td>
                     </tr>
+                    {balanceEditorId === String(user._id) ? (
+                      <tr className="border-b border-slate-800/70 bg-[#07101b]">
+                        <td colSpan={12} className="px-4 py-4">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-1 text-sm font-bold text-cyan-200">تعديل رصيد المحفظة</div>
+                              <div className="mb-2 text-xs text-slate-500">الرصيد الحالي: {money(user.walletBalance)} USDT</div>
+                              <input
+                                type="number"
+                                min="0.00000001"
+                                step="0.00000001"
+                                inputMode="decimal"
+                                aria-label={"مبلغ تعديل رصيد " + (user.name || user.username)}
+                                value={balanceAmounts[String(user._id)] || ""}
+                                onChange={(event) => setBalanceAmounts((current) => ({ ...current, [String(user._id)]: event.target.value }))}
+                                placeholder="المبلغ بـ USDT"
+                                disabled={busy === user._id}
+                                className="w-full rounded-lg border border-slate-700 bg-[#050a13] px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-500 disabled:opacity-50"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              disabled={busy === user._id || !balanceAmounts[String(user._id)]}
+                              onClick={() => void adjustBalance(String(user._id), "add")}
+                              className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+                            >
+                              زيادة
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy === user._id || !balanceAmounts[String(user._id)]}
+                              onClick={() => void adjustBalance(String(user._id), "subtract")}
+                              className="rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+                            >
+                              خصم
+                            </button>
+                          </div>
+                          <p className="mt-3 text-xs text-slate-500">التعديل يخص رصيد المحفظة USDT فقط، ولا يغيّر رصيد الإيداع الخارجي أو أرصدة الباقات.</p>
+                        </td>
+                      </tr>
+                    ) : null}
                     {expandedReferralIds[String(user._id)] ? (
                       <tr className="border-b border-slate-800/70 bg-[#07101b]">
-                        <td colSpan={11} className="px-4 py-4">
+                        <td colSpan={12} className="px-4 py-4">
                           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                             <div className="font-black text-cyan-200">
                               الإحالات النشطة للمستخدم: {user.name || user.username}

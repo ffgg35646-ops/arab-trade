@@ -7,8 +7,7 @@ import DepositBalance from "@/models/DepositBalance";
 import DepositRequest from "@/models/DepositRequest";
 import WithdrawalRequest from "@/models/WithdrawalRequest";
 import Notification from "@/models/Notification";
-import Wallet from "@/models/Wallet";
-import { creditSpotUsdtBalance, debitSpotUsdtBalance } from "@/lib/unified-usdt-wallet";
+import { creditDepositBalance, debitDepositBalance, normalizeDepositBalanceRows } from "@/lib/deposit-balance-source";
 import { writeLedger } from "@/lib/ledger";
 
 export async function GET(request: NextRequest) {
@@ -69,12 +68,7 @@ export async function GET(request: NextRequest) {
       .lean();
 
     const userIds = users.map((user: any) => user._id);
-    const [depositRows, walletRows] = await Promise.all([
-      DepositBalance.find({ userId: { $in: userIds } }).lean(),
-      Wallet.find({ userId: { $in: userIds }, type: "spot", mode: "live" })
-        .select("userId balances")
-        .lean(),
-    ]);
+    const depositRows = await DepositBalance.find({ userId: { $in: userIds } }).lean();
 
     const depositByUser = new Map<string, any[]>();
     for (const row of depositRows as any[]) {
@@ -82,20 +76,6 @@ export async function GET(request: NextRequest) {
       depositByUser.set(key, [...(depositByUser.get(key) || []), {
         asset: String(row.asset || "").toUpperCase(), available: Number(row.available || 0), locked: Number(row.locked || 0),
       }]);
-    }
-
-    const walletByUser = new Map<string, { available: number; locked: number }>();
-    for (const wallet of walletRows as any[]) {
-      const totals = (wallet.balances || []).reduce(
-        (sum: { available: number; locked: number }, balance: any) => {
-          if (String(balance.asset || "").trim().toUpperCase() !== "USDT") return sum;
-          sum.available += Math.max(0, Number(balance.available || 0));
-          sum.locked += Math.max(0, Number(balance.locked || 0));
-          return sum;
-        },
-        { available: 0, locked: 0 },
-      );
-      walletByUser.set(String(wallet.userId), totals);
     }
 
     // Count only successful withdrawals. "amount" is the gross amount released
@@ -188,9 +168,7 @@ export async function GET(request: NextRequest) {
         return {
           ...user,
           _id: id,
-          depositBalances: depositByUser.get(id) || [],
-          walletBalance: walletByUser.get(id)?.available || 0,
-          walletLockedBalance: walletByUser.get(id)?.locked || 0,
+          depositBalances: normalizeDepositBalanceRows(depositByUser.get(id) || []),
           withdrawalCount: withdrawalByUser.get(id)?.count || 0,
           withdrawnAmount: withdrawalByUser.get(id)?.totalAmount || 0,
           activeReferralCount: activeReferralCountByUser.get(id) || 0,
@@ -259,25 +237,33 @@ export async function PATCH(request: NextRequest) {
       let balanceAfter = 0;
       try {
         await session.withTransaction(async () => {
-          const adjustment = operation === "add"
-            ? await creditSpotUsdtBalance(target._id, amount, session)
-            : await debitSpotUsdtBalance(target._id, amount, session);
-
-          if (operation === "subtract" && "ok" in adjustment && !adjustment.ok) {
-            throw new Error("INSUFFICIENT_USER_BALANCE");
+          let balanceBefore = 0;
+          if (operation === "add") {
+            const credited = await creditDepositBalance(target._id, "USDT", amount, session);
+            balanceBefore = credited.availableBefore;
+            balanceAfter = credited.availableAfter;
+          } else {
+            const debited = await debitDepositBalance(target._id, "USDT", amount, session);
+            balanceBefore = debited.availableBefore;
+            if (!debited.ok) throw new Error("INSUFFICIENT_USER_DEPOSIT_BALANCE");
+            balanceAfter = Math.round((balanceBefore - amount + Number.EPSILON) * 1e8) / 1e8;
           }
 
-          balanceAfter = adjustment.availableAfter;
           const signedAmount = operation === "add" ? amount : -amount;
+          const referencePrefix = operation === "add"
+            ? "external-deposit-balance:admin-adjustment:"
+            : "separate-deposit-spend:admin-adjustment:";
           await writeLedger(
             target._id,
             "USDT",
-            operation === "add" ? "reward" : "adjustment",
+            "adjustment",
             signedAmount,
-            adjustment.availableBefore,
-            adjustment.availableAfter,
-            "admin-balance-adjustment:" + String(admin._id) + ":" + new mongoose.Types.ObjectId().toString(),
-            operation === "add" ? "مكافأة يدوية من الإدارة" : "خصم يدوي من الإدارة",
+            balanceBefore,
+            balanceAfter,
+            referencePrefix + String(target._id) + ":" + String(admin._id) + ":" + new mongoose.Types.ObjectId().toString(),
+            operation === "add"
+              ? "إضافة يدوية إلى رصيد الإيداع بواسطة الإدارة"
+              : "خصم يدوي من رصيد الإيداع بواسطة الإدارة",
             session
           );
 
@@ -285,17 +271,17 @@ export async function PATCH(request: NextRequest) {
           await Notification.create([{
             userId: target._id,
             type: "account",
-            title: operation === "add" ? "تمت زيادة رصيدك" : "تم خصم مبلغ من رصيدك",
+            title: operation === "add" ? "تمت زيادة رصيد الإيداع" : "تم خصم مبلغ من رصيد الإيداع",
             message: operation === "add"
-              ? `تمت إضافة ${formattedAmount} USDT إلى رصيد محفظتك بواسطة الإدارة.`
-              : `تم خصم ${formattedAmount} USDT من رصيد محفظتك بواسطة الإدارة.`,
+              ? `تمت إضافة ${formattedAmount} USDT إلى رصيد الإيداع بواسطة الإدارة.`
+              : `تم خصم ${formattedAmount} USDT من رصيد الإيداع بواسطة الإدارة.`,
             read: false,
           }], { session });
         });
       } catch (adjustmentError) {
-        if (adjustmentError instanceof Error && adjustmentError.message === "INSUFFICIENT_USER_BALANCE") {
+        if (adjustmentError instanceof Error && adjustmentError.message === "INSUFFICIENT_USER_DEPOSIT_BALANCE") {
           return NextResponse.json(
-            { success: false, message: "الرصيد المتاح لا يكفي لإتمام الخصم" },
+            { success: false, message: "رصيد الإيداع المتاح لا يكفي لإتمام الخصم" },
             { status: 400 }
           );
         }
@@ -307,9 +293,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: operation === "add"
-          ? "تمت إضافة المكافأة إلى رصيد المستخدم"
-          : "تم خصم المبلغ من رصيد المستخدم",
-        walletBalance: balanceAfter,
+          ? "تمت إضافة المبلغ إلى رصيد الإيداع"
+          : "تم خصم المبلغ من رصيد الإيداع",
+        depositBalance: balanceAfter,
       });
     }
 

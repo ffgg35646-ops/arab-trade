@@ -14,6 +14,13 @@ function money(v: unknown) {
   return n.toLocaleString("en-US", { maximumFractionDigits: 8 });
 }
 
+function userDepositBalance(user: any, field: "available" | "locked" = "available") {
+  const rows = Array.isArray(user.depositBalances) ? user.depositBalances : [];
+  return rows
+    .filter((row: any) => String(row.asset || "").trim().toUpperCase() === "USDT")
+    .reduce((sum: number, row: any) => sum + Math.max(0, Number(row[field] || 0)), 0);
+}
+
 type AssetTotal = { asset: string; amount: number };
 type ReferralPerson = {
   _id: string;
@@ -336,8 +343,7 @@ export default function UsersPage() {
                     <th className="px-4 py-4">المستخدم</th>
                     <th className="px-4 py-4">البريد</th>
                     <th className="px-4 py-4">الحالة</th>
-                    <th className="px-4 py-4">رصيد المحفظة (USDT)</th>
-                    <th className="px-4 py-4">رصيد الإيداع الخارجي (غير قابل للسحب)</th>
+                    <th className="px-4 py-4">رصيد الإيداع (USDT)</th>
                     <th className="px-4 py-4">عدد السحوبات</th>
                     <th className="px-4 py-4">إجمالي المبلغ المسحوب</th>
                     <th className="px-4 py-4">الإحالات النشطة</th>
@@ -383,13 +389,10 @@ export default function UsersPage() {
                       </td>
 
                       <td className="px-4 py-4 font-bold text-cyan-200">
-                        {money(user.walletBalance)} USDT
-                        {Number(user.walletLockedBalance || 0) > 0 ? (
-                          <div className="mt-1 text-xs font-normal text-slate-500">محجوز: {money(user.walletLockedBalance)} USDT</div>
+                        {money(userDepositBalance(user))} USDT
+                        {userDepositBalance(user, "locked") > 0 ? (
+                          <div className="mt-1 text-xs font-normal text-slate-500">محجوز: {money(userDepositBalance(user, "locked"))} USDT</div>
                         ) : null}
-                      </td>
-                      <td className="px-4 py-4 text-sky-200">
-                        {Array.isArray(user.depositBalances) && user.depositBalances.length ? user.depositBalances.map((b: any) => <div key={b.asset} className="whitespace-nowrap">{Number(b.available || 0).toLocaleString("en-US", { maximumFractionDigits: 8 })} {b.asset}</div>) : "—"}
                       </td>
 
                       <td className="px-4 py-4 text-slate-200">
@@ -458,11 +461,11 @@ export default function UsersPage() {
                     </tr>
                     {balanceEditorId === String(user._id) ? (
                       <tr className="border-b border-slate-800/70 bg-[#07101b]">
-                        <td colSpan={12} className="px-4 py-4">
+                        <td colSpan={11} className="px-4 py-4">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                             <div className="min-w-0 flex-1">
-                              <div className="mb-1 text-sm font-bold text-cyan-200">تعديل رصيد المحفظة</div>
-                              <div className="mb-2 text-xs text-slate-500">الرصيد الحالي: {money(user.walletBalance)} USDT</div>
+                              <div className="mb-1 text-sm font-bold text-cyan-200">تعديل رصيد الإيداع</div>
+                              <div className="mb-2 text-xs text-slate-500">الرصيد الحالي: {money(userDepositBalance(user))} USDT</div>
                               <input
                                 type="number"
                                 min="0.00000001"
@@ -493,13 +496,13 @@ export default function UsersPage() {
                               خصم
                             </button>
                           </div>
-                          <p className="mt-3 text-xs text-slate-500">التعديل يخص رصيد المحفظة USDT فقط، ولا يغيّر رصيد الإيداع الخارجي أو أرصدة الباقات.</p>
+                          <p className="mt-3 text-xs text-slate-500">التعديل يخص رصيد الإيداع المتاح بعملة USDT فقط، ولا يغيّر الرصيد المحجوز أو أرباح الباقات.</p>
                         </td>
                       </tr>
                     ) : null}
                     {expandedReferralIds[String(user._id)] ? (
                       <tr className="border-b border-slate-800/70 bg-[#07101b]">
-                        <td colSpan={12} className="px-4 py-4">
+                        <td colSpan={11} className="px-4 py-4">
                           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                             <div className="font-black text-cyan-200">
                               الإحالات النشطة للمستخدم: {user.name || user.username}

@@ -961,7 +961,7 @@ export default function ProTradeTerminal() {
   return (
     <main
       dir="rtl"
-      className="min-h-screen bg-[#050a13] text-white"
+      className={`min-h-screen bg-[#050a13] text-white ${!internalShell ? "equiti-public-trading-page" : ""}`}
     >
       {internalShell ? <InternalNavbar /> : null}
       <div className={internalShell ? "mx-auto flex max-w-[1700px]" : "mx-auto w-full max-w-[1700px]"}>

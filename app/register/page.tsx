@@ -183,16 +183,11 @@ export default function RegisterPage() {
         <div className="arabtrade-auth-lines" aria-hidden="true" />
         <div className="arabtrade-auth-candles" aria-hidden="true" />
         <div className="relative min-h-screen overflow-hidden">
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute left-1/4 top-20 h-72 w-72 rounded-full bg-blue-600/10 blur-[120px]" />
-            <div className="absolute bottom-10 right-1/4 h-72 w-72 rounded-full bg-cyan-400/10 blur-[120px]" />
-          </div>
-
           <div className="relative z-10 mx-auto flex min-h-screen max-w-2xl items-center justify-center px-5 py-10">
             <div className="w-full">
               <Link
                 href="/"
-                className="mb-6 inline-flex items-center gap-2 text-sm text-slate-400 transition hover:text-white"
+                className="mb-8 inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.025] px-4 py-2 text-sm text-slate-400 transition hover:border-cyan-400/20 hover:bg-cyan-400/[0.06] hover:text-cyan-300"
               >
                 <ArrowRight size={18} />
                 العودة للرئيسية

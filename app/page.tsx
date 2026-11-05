@@ -121,7 +121,7 @@ export default function HomePage() {
 
               <p className="mt-5 text-sm leading-8 text-[#cbd5d8] sm:text-base">
                 من متابعة الأسعار إلى دراسة حركة السوق واكتشاف الفرص، تم تصميم
-                عرب تريد لتكون واجهة مالية حديثة وسهلة الاستخدام.
+                EQUITI لتكون واجهة مالية حديثة وسهلة الاستخدام.
               </p>
             </div>
           </div>

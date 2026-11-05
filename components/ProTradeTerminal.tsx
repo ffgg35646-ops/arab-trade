@@ -961,10 +961,10 @@ export default function ProTradeTerminal() {
   return (
     <main
       dir="rtl"
-      className="min-h-screen bg-[#050a13] text-white"
+      className={internalShell ? "min-h-screen bg-[#050a13] text-white" : "equiti-public-trading-page min-h-screen bg-[#e9edef] p-2 text-white sm:p-4"}
     >
       {internalShell ? <InternalNavbar /> : null}
-      <div className={internalShell ? "mx-auto flex max-w-[1700px]" : "mx-auto w-full max-w-[1700px]"}>
+      <div className={internalShell ? "mx-auto flex max-w-[1700px]" : "mx-auto w-full max-w-[1700px] overflow-hidden rounded-2xl border border-[#d4dcde] bg-[#050a13] shadow-[0_16px_48px_rgba(20,30,35,0.12)]"}>
         {internalShell ? <InternalSidebar /> : null}
         <div className="min-w-0 flex-1">
       <div className="border-b border-white/[0.06] bg-[#07101d]">

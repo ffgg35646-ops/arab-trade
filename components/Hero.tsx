@@ -54,58 +54,58 @@ export default function Hero() {
   return (
     <section
       dir="rtl"
-      className="relative overflow-hidden bg-[#050a13] px-4 pb-8 pt-14 sm:px-6 lg:px-8"
+      className="relative overflow-hidden border-t border-[#c7ced0] bg-[#e5e7e8] px-4 pb-8 pt-5 sm:px-6 lg:px-8"
     >
       <div className="arabtrade-crypto-bg" aria-hidden="true">
         <div className="arabtrade-trade-arrows" />
       </div>
 
       <div className="arabtrade-hero-content mx-auto max-w-[1500px]">
-        <div className="grid min-h-[560px] items-center gap-8 overflow-hidden rounded-[30px] border border-white/[0.08] bg-[#07101d] p-4 shadow-[0_30px_100px_rgba(0,0,0,.45)] sm:p-7 lg:grid-cols-[1fr_1.05fr] lg:p-10">
+        <div className="grid min-h-[560px] items-center gap-8 overflow-hidden rounded-[30px] border border-[#c4cbce] bg-[#d7dcde] p-4 shadow-[0_18px_48px_rgba(35,45,50,.10)] sm:p-7 lg:grid-cols-[1fr_1.05fr] lg:p-10">
           <div className="relative z-10 order-2 max-w-2xl lg:order-1">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-400/[0.07] px-4 py-2 text-xs font-bold text-blue-300">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#00afaa]/25 bg-[#00afaa]/[0.08] px-4 py-2 text-xs font-bold text-[#006f6b]">
               <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
               الأسواق تعمل الآن
             </div>
 
-            <h1 className="text-4xl font-black leading-[1.12] tracking-tight text-white sm:text-5xl lg:text-7xl">
+            <h1 className="text-4xl font-black leading-[1.12] tracking-tight text-[#172126] sm:text-5xl lg:text-7xl">
               تداول
-              <span className="block bg-gradient-to-l from-blue-400 via-cyan-300 to-white bg-clip-text text-transparent">
+              <span className="block bg-gradient-to-l from-[#006f6b] via-[#008f89] to-[#53666a] bg-clip-text text-transparent">
                 بذكاء
               </span>
             </h1>
 
-            <p className="mt-6 max-w-xl text-base leading-8 text-white/85 sm:text-lg">
+            <p className="mt-6 max-w-xl text-base leading-8 text-[#4d5a60] sm:text-lg">
               منصة عربية حديثة لمتابعة الأسواق والعملات الرقمية،
               مع بيانات مباشرة وأدوات تساعدك على فهم حركة السوق.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <button className="rounded-xl bg-blue-500 px-7 py-3.5 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 hover:bg-blue-400">
+              <button className="rounded-xl bg-[#006f6b] px-7 py-3.5 text-sm font-black text-white shadow-md shadow-[#006f6b]/15 transition hover:-translate-y-0.5 hover:bg-[#005e5a]">
                 ابدأ الآن
               </button>
-              <button className="rounded-xl border border-white/10 bg-[#07101d]/[0.04] px-7 py-3.5 text-sm font-bold text-white transition hover:bg-[#07101d]/[0.08]">
+              <button className="rounded-xl border border-[#c2cacc] bg-[#e7eaeb] px-7 py-3.5 text-sm font-bold text-[#344248] transition hover:bg-[#dfe4e5]">
                 استكشف الأسواق
               </button>
             </div>
 
             <div className="mt-10 grid max-w-xl grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-white/[0.07] bg-[#07101d]/[0.025] p-4">
-                <div className="text-xl font-black text-white">100+</div>
-                <div className="mt-1 text-[11px] text-white/75">أصل رقمي</div>
+              <div className="rounded-2xl border border-[#c8cfd1] bg-[#e3e7e8] p-4">
+                <div className="text-xl font-black text-[#172126]">100+</div>
+                <div className="mt-1 text-[11px] text-[#526168]">أصل رقمي</div>
               </div>
-              <div className="rounded-2xl border border-white/[0.07] bg-[#07101d]/[0.025] p-4">
-                <div className="text-xl font-black text-white">مباشر</div>
-                <div className="mt-1 text-[11px] text-white/35">بيانات السوق</div>
+              <div className="rounded-2xl border border-[#c8cfd1] bg-[#e3e7e8] p-4">
+                <div className="text-xl font-black text-[#172126]">مباشر</div>
+                <div className="mt-1 text-[11px] text-[#69767c]">بيانات السوق</div>
               </div>
-              <div className="rounded-2xl border border-white/[0.07] bg-[#07101d]/[0.025] p-4">
-                <div className="text-xl font-black text-white">24/7</div>
-                <div className="mt-1 text-[11px] text-white/35">متابعة مستمرة</div>
+              <div className="rounded-2xl border border-[#c8cfd1] bg-[#e3e7e8] p-4">
+                <div className="text-xl font-black text-[#172126]">24/7</div>
+                <div className="mt-1 text-[11px] text-[#69767c]">متابعة مستمرة</div>
               </div>
             </div>
           </div>
 
-          <div className="relative order-1 h-[350px] overflow-hidden rounded-[24px] border border-white/10 bg-[#050a13] sm:h-[430px] lg:order-2 lg:h-[500px]">
+          <div className="relative order-1 h-[350px] overflow-hidden rounded-[24px] border border-[#c4cbce] bg-[#20282b] sm:h-[430px] lg:order-2 lg:h-[500px]">
             {slides.map((item, index) => (
               <div
                 key={item.image}

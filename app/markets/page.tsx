@@ -90,32 +90,32 @@ export default function MarketsPage() {
   useEffect(() => { setPage(1); }, [search, quote, sort]);
 
   return (
-    <main dir="rtl" className="min-h-screen bg-[#050a13] px-3 py-6 text-white sm:px-5 lg:px-8">
+    <main dir="rtl" className="markets-page min-h-screen bg-[#e9edef] px-3 py-6 text-[#172126] sm:px-5 lg:px-8">
       <div className="mx-auto max-w-[1500px]">
         <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-xs font-bold text-cyan-300">
+            <div className="mb-2 flex items-center gap-2 text-xs font-bold text-[#007a74]">
               <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" /> Binance Spot · بيانات سوق عامة
             </div>
             <h1 className="text-3xl font-black sm:text-4xl">الأسواق</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#536168]">
               قائمة أزواج التداول الفوري المتاحة حاليًا في Binance، مع الأسعار والتغيّر خلال 24 ساعة وحجم التداول. اضغط على أي زوج لفتح صفحة التداول داخل عرب تريد.
             </p>
           </div>
-          <button type="button" onClick={() => void loadMarket(true)} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 hover:bg-white/[0.07]">
+          <button type="button" onClick={() => void loadMarket(true)} className="inline-flex items-center gap-2 rounded-xl border border-[#d4dcde] bg-white px-4 py-3 text-sm font-semibold text-[#344248] hover:bg-[#e3e8e9]">
             <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} /> تحديث الأسواق
           </button>
         </div>
 
         <div className="mb-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5"><div className="text-xs text-slate-400">أزواج Spot المتاحة</div><div className="mt-2 text-2xl font-black tabular-nums">{pairs.length.toLocaleString("en-US")}</div></div>
-          <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5"><div className="text-xs text-slate-400">أزواج مرتفعة خلال 24 ساعة</div><div className="mt-2 text-2xl font-black text-emerald-400">{stats.gainers.toLocaleString("en-US")}</div></div>
-          <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5"><div className="text-xs text-slate-400">عملات التسعير المتاحة</div><div className="mt-2 text-2xl font-black tabular-nums">{stats.quoteCount.toLocaleString("en-US")}</div></div>
+          <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5 text-white"><div className="text-xs text-slate-400">أزواج Spot المتاحة</div><div className="mt-2 text-2xl font-black tabular-nums">{pairs.length.toLocaleString("en-US")}</div></div>
+          <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5 text-white"><div className="text-xs text-slate-400">أزواج مرتفعة خلال 24 ساعة</div><div className="mt-2 text-2xl font-black text-emerald-400">{stats.gainers.toLocaleString("en-US")}</div></div>
+          <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5 text-white"><div className="text-xs text-slate-400">عملات التسعير المتاحة</div><div className="mt-2 text-2xl font-black tabular-nums">{stats.quoteCount.toLocaleString("en-US")}</div></div>
         </div>
 
         {error && <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300"><span>{error}</span><button type="button" onClick={() => void loadMarket(true)} className="rounded-lg border border-red-400/20 px-3 py-2 font-semibold">إعادة المحاولة</button></div>}
 
-        <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#07101d]">
+        <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#07101d] text-white">
           <div className="flex flex-col gap-3 border-b border-white/10 p-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">
               {([["volume", "الأكثر تداولًا"], ["gainers", "الأكثر ارتفاعًا"], ["losers", "الأكثر انخفاضًا"], ["alphabetical", "ترتيب أبجدي"]] as [SortKey, string][]).map(([value, label]) => (

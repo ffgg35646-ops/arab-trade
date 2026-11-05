@@ -51,9 +51,9 @@ export default function QuickTradePanel({ symbol }: { symbol: string }) {
   const history = items.filter((item) => item.symbol === symbol && item.status === "closed").slice(0, 5);
   const points = curve.map((value, index) => `${(index / Math.max(curve.length - 1, 1)) * 1000},${280 - value * 2.6}`).join(" ");
   return (
-    <section className="border-t border-white/[0.06] bg-[#07101d] p-4">
+    <section className="border-t border-white/[0.06] bg-[#30383b] p-4">
       {active.length ? active.map((trade) => (
-        <article key={trade._id} className="mb-3 rounded-xl border border-cyan-400/15 bg-[#050a13] p-3">
+        <article key={trade._id} className="mb-3 rounded-xl border border-cyan-400/15 bg-[#262d30] p-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
             <span className="font-semibold text-white">{trade.symbol} · {trade.side === "buy" ? "شراء" : "بيع"}</span>
           </div>

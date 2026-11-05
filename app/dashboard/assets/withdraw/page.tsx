@@ -69,7 +69,7 @@ export default function WithdrawPage() {
   }
 
   return (
-    <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-900">
+    <div dir="rtl" className="min-h-screen bg-[#e5e7e8] text-[#172126]">
       <InternalNavbar />
       <div className="mx-auto flex w-full max-w-7xl gap-5 px-3 py-5 sm:px-6">
         <InternalSidebar />

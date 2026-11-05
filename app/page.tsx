@@ -5,7 +5,7 @@ import Navbar from "@/components/Navbar";
 
 export default function HomePage() {
   return (
-    <div dir="rtl" className="min-h-screen overflow-x-hidden bg-white text-[#172126]">
+    <div dir="rtl" className="equiti-home min-h-screen overflow-x-hidden bg-[#ffffff] text-[#172126]">
       <Navbar />
 
       <main>
@@ -24,7 +24,7 @@ export default function HomePage() {
                 أهم الأسواق الآن
               </h2>
 
-              <p className="mt-3 text-sm leading-7 text-[#68757a]">
+              <p className="mt-3 text-sm leading-7 text-[#4f5d63]">
                 تابع حركة أبرز الأصول والأسعار والتغيرات اليومية من مكان واحد.
               </p>
             </div>
@@ -35,7 +35,7 @@ export default function HomePage() {
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-[#e4ebeb] bg-[#f8fafa]">
-            <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 border-b border-[#e4ebeb] px-5 py-4 text-xs font-semibold text-[#718087]">
+            <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 border-b border-[#e4ebeb] px-5 py-4 text-xs font-semibold text-[#526168]">
               <span>الأصل</span>
               <span>السعر</span>
               <span>التغير 24س</span>
@@ -60,7 +60,7 @@ export default function HomePage() {
 
                   <div>
                     <div className="text-sm font-bold text-[#172126]">{name}</div>
-                    <div className="mt-0.5 text-[11px] text-[#7b898e]">
+                    <div className="mt-0.5 text-[11px] text-[#526168]">
                       {symbol}/USDT
                     </div>
                   </div>
@@ -78,7 +78,7 @@ export default function HomePage() {
                   {change}
                 </span>
 
-                <span className="text-sm text-[#68757a]">{volume}</span>
+                <span className="text-sm text-[#4f5d63]">{volume}</span>
               </div>
             ))}
           </div>
@@ -97,7 +97,7 @@ export default function HomePage() {
               >
                 <div className="h-1 w-12 rounded-full bg-[#00a39b]" />
                 <h3 className="mt-5 text-lg font-extrabold text-[#172126]">{title}</h3>
-                <p className="mt-3 text-sm leading-7 text-[#68757a]">
+                <p className="mt-3 text-sm leading-7 text-[#4f5d63]">
                   {description}
                 </p>
               </div>
@@ -119,7 +119,7 @@ export default function HomePage() {
                 كل ما تحتاجه لمتابعة السوق في مكان واحد
               </h2>
 
-              <p className="mt-5 text-sm leading-8 text-[#58676d] sm:text-base">
+              <p className="mt-5 text-sm leading-8 text-[#46545b] sm:text-base">
                 من متابعة الأسعار إلى دراسة حركة السوق واكتشاف الفرص، تم تصميم
                 عرب تريد لتكون واجهة مالية حديثة وسهلة الاستخدام.
               </p>

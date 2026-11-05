@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 const pagesWithTheirOwnFooter = new Set([
   "/",
   "/about",
+  "/contact",
   "/licenses",
   "/markets",
   "/trading/spot",

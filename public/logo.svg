@@ -1,1 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 110"><rect width="420" height="110" rx="24" fill="#080b12"/><circle cx="55" cy="55" r="35" fill="#3b82f6"/><path d="M35 67 L47 54 L57 61 L76 38" fill="none" stroke="#080b12" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M68 38 H78 V48" fill="none" stroke="#080b12" stroke-width="7" stroke-linecap="round"/><text x="105" y="50" font-family="Arial, sans-serif" font-size="39" font-weight="700" letter-spacing="1" fill="#ffffff">EQUITI</text><text x="106" y="82" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#3b82f6">للتداول</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 110" role="img" aria-labelledby="title desc">
+  <title id="title">EQUITI Trade Hub</title>
+  <desc id="desc">EQUITI brand mark with teal trading chart icon</desc>
+  <rect width="420" height="110" rx="24" fill="#191C1F"/>
+  <circle cx="55" cy="55" r="35" fill="#00AFAA"/>
+  <path d="M35 67 L47 54 L57 61 L76 38" fill="none" stroke="#191C1F" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M68 38 H78 V48" fill="none" stroke="#191C1F" stroke-width="7" stroke-linecap="round"/>
+  <text x="105" y="50" font-family="Arial, Helvetica, sans-serif" font-size="39" font-weight="700" letter-spacing="1" fill="#FFFFFF">EQUITI</text>
+  <text x="106" y="82" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" letter-spacing="2" fill="#81D8D0">TRADE HUB</text>
+</svg>

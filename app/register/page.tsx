@@ -200,7 +200,7 @@ export default function RegisterPage() {
                   </div>
                   <h1 className="text-2xl font-bold sm:text-3xl">إنشاء حساب</h1>
                   <p className="mt-2 text-sm text-slate-400">
-                    انضم إلى عرب تريد وابدأ رحلتك في الأسواق
+                    انضم إلى EQUITI وابدأ رحلتك في الأسواق
                   </p>
                 </div>
 

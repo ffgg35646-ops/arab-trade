@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, BarChart3, RefreshCw, Search } from "lucide-react";
-import InternalNavbar from "@/components/InternalNavbar";
-import InternalSidebar from "@/components/InternalSidebar";
 
 type MarketPair = {
   symbol: string; baseAsset: string; quoteAsset: string; status: string;
@@ -92,78 +90,64 @@ export default function MarketsPage() {
   useEffect(() => { setPage(1); }, [search, quote, sort]);
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#050a13] text-white">
-      <InternalNavbar />
-      <div className="mx-auto flex max-w-[1700px]">
-        <InternalSidebar />
-        <section className="min-w-0 flex-1">
-    <main dir="rtl" className="min-h-screen bg-[#050a13] px-3 py-6 text-white sm:px-5 lg:px-8">
+    <main dir="rtl" className="markets-page member-markets-page min-h-screen bg-[#e5e7e8] px-3 py-6 text-[#20272b] sm:px-5 lg:px-8">
       <div className="mx-auto max-w-[1500px]">
         <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-xs font-bold text-cyan-300">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" /> Binance Spot · بيانات سوق عامة
-            </div>
             <h1 className="text-3xl font-black sm:text-4xl">الأسواق</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-400">
-              قائمة أزواج التداول الفوري المتاحة حاليًا في Binance، مع الأسعار والتغيّر خلال 24 ساعة وحجم التداول. اضغط على أي زوج لفتح صفحة التداول داخل عرب تريد.
-            </p>
+            
           </div>
-          <button type="button" onClick={() => void loadMarket(true)} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-200 hover:bg-white/[0.07]">
+          <button type="button" onClick={() => void loadMarket(true)} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#343c3f] px-4 py-3 text-sm font-semibold text-white hover:bg-[#414a4d]">
             <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} /> تحديث الأسواق
           </button>
         </div>
 
         <div className="mb-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5"><div className="text-xs text-slate-400">أزواج Spot المتاحة</div><div className="mt-2 text-2xl font-black tabular-nums">{pairs.length.toLocaleString("en-US")}</div></div>
-          <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5"><div className="text-xs text-slate-400">أزواج مرتفعة خلال 24 ساعة</div><div className="mt-2 text-2xl font-black text-emerald-400">{stats.gainers.toLocaleString("en-US")}</div></div>
-          <div className="rounded-2xl border border-white/10 bg-[#07101d] p-5"><div className="text-xs text-slate-400">عملات التسعير المتاحة</div><div className="mt-2 text-2xl font-black tabular-nums">{stats.quoteCount.toLocaleString("en-US")}</div></div>
+          <div className="markets-stat-card rounded-2xl border border-white/10 bg-[#30383b] p-5 text-white"><div className="text-xs text-[#cbd5d8]">أزواج Spot المتاحة</div><div className="mt-2 text-2xl font-black tabular-nums">{pairs.length.toLocaleString("en-US")}</div></div>
+          <div className="markets-stat-card rounded-2xl border border-white/10 bg-[#30383b] p-5 text-white"><div className="text-xs text-[#cbd5d8]">أزواج مرتفعة خلال 24 ساعة</div><div className="mt-2 text-2xl font-black text-emerald-400">{stats.gainers.toLocaleString("en-US")}</div></div>
+          <div className="markets-stat-card rounded-2xl border border-white/10 bg-[#30383b] p-5 text-white"><div className="text-xs text-[#cbd5d8]">عملات التسعير المتاحة</div><div className="mt-2 text-2xl font-black tabular-nums">{stats.quoteCount.toLocaleString("en-US")}</div></div>
         </div>
 
-        {error && <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300"><span>{error}</span><button type="button" onClick={() => void loadMarket(true)} className="rounded-lg border border-red-400/20 px-3 py-2 font-semibold">إعادة المحاولة</button></div>}
+        {error && <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-[#fff1f1] p-4 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => void loadMarket(true)} className="rounded-lg border border-red-400/20 px-3 py-2 font-semibold">إعادة المحاولة</button></div>}
 
-        <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#07101d]">
-          <div className="flex flex-col gap-3 border-b border-white/10 p-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-2">
+        <section className="markets-main-card overflow-hidden rounded-2xl border border-white/10 text-white">
+          <div className="markets-toolbar flex flex-col gap-3 border-b border-white/10 p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="markets-filters flex flex-wrap gap-2">
               {([["volume", "الأكثر تداولًا"], ["gainers", "الأكثر ارتفاعًا"], ["losers", "الأكثر انخفاضًا"], ["alphabetical", "ترتيب أبجدي"]] as [SortKey, string][]).map(([value, label]) => (
-                <button key={value} type="button" onClick={() => setSort(value)} className={"rounded-lg px-3 py-2 text-xs font-bold " + (sort === value ? "bg-cyan-400/10 text-cyan-300" : "text-slate-400 hover:bg-white/5 hover:text-white")}>{label}</button>
+                <button key={value} type="button" aria-pressed={sort === value} onClick={() => setSort(value)} className={"markets-filter-button rounded-lg px-3 py-2 text-xs font-bold" + (sort === value ? " is-active" : "")}>{label}</button>
               ))}
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <label className="relative block"><Search size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث عن زوج أو عملة..." className="w-full rounded-xl border border-white/10 bg-[#050a13] py-3 pr-9 pl-3 text-sm outline-none focus:border-cyan-400/40 sm:w-64" /></label>
-              <select aria-label="فلترة عملة التسعير" value={quote} onChange={(event) => setQuote(event.target.value)} className="rounded-xl border border-white/10 bg-[#050a13] px-3 py-3 text-sm text-slate-200 outline-none">
+              <label className="relative block"><Search size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#aeb9bd]" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث عن زوج أو عملة..." className="markets-search-control w-full rounded-xl py-3 pr-9 pl-3 text-sm outline-none sm:w-64" /></label>
+              <select aria-label="فلترة عملة التسعير" value={quote} onChange={(event) => setQuote(event.target.value)} className="markets-search-control rounded-xl px-3 py-3 text-sm outline-none">
                 <option value="ALL">كل عملات التسعير</option>{quotes.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 px-4 py-3 text-xs text-slate-500"><span>عدد النتائج: {filteredPairs.length.toLocaleString("en-US")}</span><span>{updatedAt ? "آخر تحديث: " + new Date(updatedAt).toLocaleTimeString("ar-EG") : "في انتظار بيانات السوق"}</span></div>
+          <div className="markets-meta-strip flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] px-4 py-3 text-xs"><span>عدد النتائج: {filteredPairs.length.toLocaleString("en-US")}</span><span>{updatedAt ? "آخر تحديث: " + new Date(updatedAt).toLocaleTimeString("ar-EG") : "في انتظار بيانات السوق"}</span></div>
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] text-sm">
-              <thead className="border-b border-white/5 bg-white/[0.015] text-xs text-slate-400"><tr>
+              <thead className="border-b border-white/[0.08] bg-[#394245] text-xs text-[#cbd5d8]"><tr>
                 <th className="px-4 py-4 text-right">زوج التداول</th><th className="px-4 py-4 text-left">آخر سعر</th><th className="px-4 py-4 text-left">التغير 24س</th><th className="px-4 py-4 text-left">أعلى 24س</th><th className="px-4 py-4 text-left">أدنى 24س</th><th className="px-4 py-4 text-left">حجم التداول</th><th className="px-4 py-4 text-left">الإجراء</th>
               </tr></thead>
               <tbody>
-                {loading && pairs.length === 0 ? [1,2,3,4,5,6,7].map((item) => <tr key={item} className="border-b border-white/5"><td colSpan={7} className="h-14" /></tr>) :
-                visiblePairs.length === 0 ? <tr><td colSpan={7} className="px-4 py-16 text-center text-slate-500">{error ? "بيانات السوق غير متاحة الآن." : "لا توجد أزواج تطابق البحث."}</td></tr> :
-                visiblePairs.map((item) => <tr key={item.symbol} className="border-b border-white/5 hover:bg-cyan-400/[0.035]">
-                  <td className="px-4 py-4"><Link href={"/protrade?symbol=" + item.symbol} className="font-bold text-white hover:text-cyan-300">{item.baseAsset}<span className="text-slate-500">/{item.quoteAsset}</span></Link><div className="mt-1 text-[10px] text-slate-600">Spot · {item.tradeCount.toLocaleString("en-US")} صفقة/24س</div></td>
+                {loading && pairs.length === 0 ? [1,2,3,4,5,6,7].map((item) => <tr key={item} className="border-b border-white/[0.08]"><td colSpan={7} className="h-14" /></tr>) :
+                visiblePairs.length === 0 ? <tr><td colSpan={7} className="px-4 py-16 text-center text-[#aeb9bd]">{error ? "بيانات السوق غير متاحة الآن." : "لا توجد أزواج تطابق البحث."}</td></tr> :
+                visiblePairs.map((item) => <tr key={item.symbol} className="markets-data-row border-b border-white/[0.08] hover:bg-[#394245]">
+                  <td className="px-4 py-4"><Link href={"/protrade?symbol=" + item.symbol} className="font-bold text-white hover:text-white">{item.baseAsset}<span className="text-[#aeb9bd]">/{item.quoteAsset}</span></Link><div className="mt-1 text-[10px] text-[#9ba8ad]">Spot · {item.tradeCount.toLocaleString("en-US")} صفقة/24س</div></td>
                   <td className="px-4 py-4 text-left font-mono tabular-nums">{price(item.lastPrice)}</td>
                   <td className={"px-4 py-4 text-left font-mono font-bold " + (item.priceChangePercent >= 0 ? "text-emerald-400" : "text-red-400")}><span className="inline-flex items-center gap-1">{item.priceChangePercent >= 0 ? <ArrowUp size={13} /> : <ArrowDown size={13} />}{item.priceChangePercent > 0 ? "+" : ""}{item.priceChangePercent.toFixed(2)}%</span></td>
-                  <td className="px-4 py-4 text-left font-mono text-slate-300">{price(item.highPrice)}</td><td className="px-4 py-4 text-left font-mono text-slate-300">{price(item.lowPrice)}</td>
-                  <td className="px-4 py-4 text-left font-mono text-slate-300">{compact(item.quoteVolume)} <span className="text-[10px] text-slate-600">{item.quoteAsset}</span></td>
-                  <td className="px-4 py-4 text-left"><Link href={"/protrade?symbol=" + item.symbol} className="inline-flex items-center gap-1 rounded-lg bg-cyan-400/10 px-3 py-2 text-xs font-bold text-cyan-300 hover:bg-cyan-400/20"><BarChart3 size={14} />تداول</Link></td>
+                  <td className="px-4 py-4 text-left font-mono text-[#e1e7e9]">{price(item.highPrice)}</td><td className="px-4 py-4 text-left font-mono text-[#e1e7e9]">{price(item.lowPrice)}</td>
+                  <td className="px-4 py-4 text-left font-mono text-[#e1e7e9]">{compact(item.quoteVolume)} <span className="text-[10px] text-[#9ba8ad]">{item.quoteAsset}</span></td>
+                  <td className="px-4 py-4 text-left"><Link href={"/protrade?symbol=" + item.symbol} className="inline-flex items-center gap-1 rounded-lg bg-[#485256] px-3 py-2 text-xs font-bold text-white hover:bg-[#596367]"><BarChart3 size={14} />تداول</Link></td>
                 </tr>)}
               </tbody>
             </table>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-4 py-4"><span className="text-xs text-slate-500">صفحة {Math.min(page, pages)} من {pages}</span><div className="flex items-center gap-2"><button type="button" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="rounded-lg border border-white/10 px-4 py-2 text-xs font-semibold disabled:opacity-30">السابق</button><button type="button" disabled={page >= pages} onClick={() => setPage((value) => Math.min(pages, value + 1))} className="rounded-lg border border-white/10 px-4 py-2 text-xs font-semibold disabled:opacity-30">التالي</button></div></div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-4 py-4"><span className="text-xs text-[#aeb9bd]">صفحة {Math.min(page, pages)} من {pages}</span><div className="flex items-center gap-2"><button type="button" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="rounded-lg border border-white/10 px-4 py-2 text-xs font-semibold disabled:opacity-30">السابق</button><button type="button" disabled={page >= pages} onClick={() => setPage((value) => Math.min(pages, value + 1))} className="rounded-lg border border-white/10 px-4 py-2 text-xs font-semibold disabled:opacity-30">التالي</button></div></div>
         </section>
-        <p className="mt-4 text-xs leading-6 text-slate-600">الأسعار والأحجام المعروضة بيانات سوق عامة من Binance Spot. تنفيذ الأوامر داخل عرب تريد يعتمد على دفتر أوامر المنصة الداخلي، وليس إرسال الأوامر إلى Binance.</p>
       </div>
     </main>
-        </section>
-      </div>
-    </div>
   );
 }

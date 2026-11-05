@@ -36,7 +36,7 @@ export default function AboutPage() {
 
             <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/5 px-4 py-2 text-xs font-semibold text-cyan-300">
               <BarChart3 size={15} />
-              عن عرب تريد
+              عن EQUITI
             </div>
 
             <h1 className="text-4xl font-black leading-tight md:text-6xl">
@@ -47,7 +47,7 @@ export default function AboutPage() {
             </h1>
 
             <p className="mt-7 text-base leading-8 text-slate-400 md:text-lg">
-              عرب تريد هي منصة عربية حديثة تهدف إلى تقديم تجربة احترافية
+              EQUITI هي منصة عربية حديثة تهدف إلى تقديم تجربة احترافية
               لمتابعة الأسواق والأصول الرقمية، من خلال واجهة واضحة وسريعة
               تجمع بين البيانات، التحليلات، وأدوات متابعة السوق في مكان واحد.
             </p>
@@ -92,7 +92,7 @@ export default function AboutPage() {
           <div className="mt-8 rounded-2xl border border-cyan-400/10 bg-cyan-400/[0.03] p-6">
             <h2 className="text-lg font-bold">رؤيتنا</h2>
             <p className="mt-3 text-sm leading-7 text-slate-500">
-              أن تصبح عرب تريد مساحة عربية متكاملة لفهم الأسواق ومتابعة
+              أن تصبح EQUITI مساحة عربية متكاملة لفهم الأسواق ومتابعة
               تحركات الأصول الرقمية، مع الحفاظ على تصميم عالمي وتجربة عربية
               بسيطة ومريحة.
             </p>
@@ -101,7 +101,7 @@ export default function AboutPage() {
         </section>
 
         <p className="mt-7 text-center text-xs text-slate-600">
-          عرب تريد — منصة عربية حديثة لعالم الأسواق والتداول
+          EQUITI — منصة عربية حديثة لعالم الأسواق والتداول
         </p>
 
       </div>

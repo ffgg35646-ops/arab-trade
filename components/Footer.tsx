@@ -110,16 +110,25 @@ export default function Footer({ showOnInternal = false }: { showOnInternal?: bo
                 <span className="inline-block border-b-2 border-sky-400/70 pb-1 sm:pb-2">{column.title}</span>
               </h3>
               <div className="flex flex-col gap-1 sm:gap-2.5">
-                {column.links.map(([label, href]) => (
-                  <Link
-                    key={label}
-                    href={href}
-                    className="group flex min-h-[26px] items-center justify-between gap-1 rounded-md sm:min-h-11 sm:gap-3 sm:rounded-xl border border-slate-700/70 bg-slate-900/65 px-1.5 py-1 text-[11px] font-semibold sm:px-3.5 sm:py-2.5 sm:text-sm text-slate-100 shadow-sm shadow-black/10 transition duration-200 hover:-translate-y-0.5 hover:border-sky-400/60 hover:bg-sky-400/10 hover:text-white hover:shadow-lg hover:shadow-sky-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
-                  >
-                    <span>{label}</span>
-                    <span aria-hidden="true" className="text-sky-300/70 transition group-hover:-translate-x-0.5 group-hover:text-sky-200">←</span>
-                  </Link>
-                ))}
+                {column.links.map(([label, href]) => {
+                  const active = pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
+                  return (
+                    <Link
+                      key={label}
+                      href={href}
+                      aria-current={active ? "page" : undefined}
+                      style={active ? {
+                        backgroundColor: "rgba(0, 111, 107, 0.35)",
+                        color: "#ffffff",
+                        borderColor: "rgba(0, 175, 170, 0.55)",
+                      } : undefined}
+                      className="group flex min-h-[26px] items-center justify-between gap-1 rounded-md sm:min-h-11 sm:gap-3 sm:rounded-xl border border-white/10 bg-[#050a13] px-1.5 py-1 text-[11px] font-semibold sm:px-3.5 sm:py-2.5 sm:text-sm text-white shadow-sm shadow-black/10 transition duration-200 hover:-translate-y-0.5 hover:border-[#00afaa]/60 hover:bg-[#006f6b]/25 hover:text-white hover:shadow-lg hover:shadow-sky-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00afaa]"
+                    >
+                      <span>{label}</span>
+                      <span aria-hidden="true" className="text-[#81d8d0] transition group-hover:-translate-x-0.5 group-hover:text-white">←</span>
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           ))}

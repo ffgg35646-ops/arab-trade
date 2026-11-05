@@ -1080,3 +1080,74 @@ main.arabtrade-auth-hero {
     #191c1f !important;
   color: #ffffff !important;
 }
+
+
+/* EQUITI BRAND CONTRAST FIX — teal surfaces must carry readable light text. */
+:root {
+  --at-brand-bg: #006f6b;
+  --at-brand-bg-hover: #005e5a;
+  --at-brand-text: #ffffff;
+  --at-brand-accent: #008f89;
+}
+
+/* Darken teal-filled controls and panels so white text meets readable contrast. */
+:is(
+  [class*="bg-[#00afaa]"],
+  [class*="bg-[#00a9a4]"],
+  [class*="bg-[#0d9488]"],
+  [class*="bg-teal-"],
+  [class*="bg-emerald-"],
+  [class*="bg-cyan-"],
+  [class*="bg-blue-"]
+) {
+  background-color: var(--at-brand-bg) !important;
+  color: var(--at-brand-text) !important;
+}
+
+/* Keep all text inside brand-filled elements bright, including inherited/dark utility text. */
+:is(
+  [class*="bg-[#00afaa]"],
+  [class*="bg-[#00a9a4]"],
+  [class*="bg-[#0d9488]"],
+  [class*="bg-teal-"],
+  [class*="bg-emerald-"],
+  [class*="bg-cyan-"],
+  [class*="bg-blue-"]
+) :is(
+  p, span, small, strong, b, label, a, button,
+  [class*="text-black"], [class*="text-gray-"], [class*="text-slate-"],
+  [class*="text-zinc-"], [class*="text-neutral-"], [class*="text-[#"]
+) {
+  color: #ffffff !important;
+}
+
+/* Improve small captions and helper copy when placed on a teal surface. */
+:is(
+  [class*="bg-[#00afaa]"],
+  [class*="bg-[#00a9a4]"],
+  [class*="bg-[#0d9488]"],
+  [class*="bg-teal-"],
+  [class*="bg-emerald-"],
+  [class*="bg-cyan-"],
+  [class*="bg-blue-"]
+) :is(.text-xs, .text-[10px], .text-[11px], .text-[12px], small) {
+  font-size: 0.8125rem !important;
+  line-height: 1.55 !important;
+  font-weight: 500;
+}
+
+/* Teal gradients use the same darker, accessible brand tone. */
+:is([class*="from-blue-"], [class*="from-cyan-"], [class*="from-teal-"], [class*="from-emerald-"]) {
+  --tw-gradient-from: #006f6b var(--tw-gradient-from-position) !important;
+}
+:is([class*="via-cyan-"], [class*="via-teal-"], [class*="via-emerald-"]) {
+  --tw-gradient-via: #00817b var(--tw-gradient-via-position) !important;
+}
+:is([class*="to-blue-"], [class*="to-cyan-"], [class*="to-teal-"], [class*="to-emerald-"]) {
+  --tw-gradient-to: #006f6b var(--tw-gradient-to-position) !important;
+}
+
+/* Brand-colored text remains a distinct accent on light surfaces. */
+.at-brand, .arabtrade-logo, .logo, .brand-logo {
+  color: var(--at-brand-accent) !important;
+}

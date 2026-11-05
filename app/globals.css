@@ -1502,6 +1502,22 @@ main.equiti-login-page .arabtrade-auth-chart {
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, .25) !important;
 }
 
+.arabtrade-about-glass-card {
+  background: linear-gradient(
+    135deg,
+    rgba(111, 122, 126, .94),
+    rgba(79, 90, 94, .92)
+  ) !important;
+  border: 1px solid rgba(255, 255, 255, .28) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(150%) !important;
+  backdrop-filter: blur(30px) saturate(150%) !important;
+  box-shadow:
+    0 26px 70px rgba(0, 0, 0, .42),
+    inset 0 1px 0 rgba(255, 255, 255, .16),
+    inset 0 0 0 1px rgba(255, 255, 255, .035) !important;
+}
+
+
 /* =========================================================
    EQUITI — graphite markets panel + gray filters / teal state
    ========================================================= */

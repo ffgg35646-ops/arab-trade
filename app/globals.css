@@ -1370,3 +1370,18 @@ main.privacy-page {
     padding: 1.125rem;
   }
 }
+
+
+/* EQUITI PUBLIC CANVASES — scoped overrides for the global main background rule. */
+.equiti-home {
+  background-color: #eef0f1 !important;
+}
+.equiti-home > main.equiti-home-content {
+  background-color: #eef0f1 !important;
+}
+main.markets-page {
+  background-color: #e9edef !important;
+}
+main.equiti-public-trading-page {
+  background-color: #e9edef !important;
+}

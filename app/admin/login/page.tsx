@@ -131,6 +131,8 @@ function AdminLoginContent() {
           maxWidth: 440,
           background:
             "rgba(48,56,59,.68)",
+          backgroundImage:
+            "linear-gradient(135deg,rgba(255,255,255,.055),rgba(255,255,255,.012))",
           border:
             "1px solid rgba(255,255,255,.14)",
           borderRadius: 22,
@@ -273,7 +275,7 @@ function AdminLoginContent() {
               border:
                 "1px solid rgba(255,255,255,.10)",
               background:
-                "#050a13",
+                "rgba(5,10,19,.66)",
               color: "#fff",
               outline: "none",
               fontSize: 14,

@@ -114,35 +114,18 @@ function AdminLoginContent() {
   return (
     <main
       dir="rtl"
-      style={{
-        minHeight: "100vh",
-        background:
-          "radial-gradient(circle at 14% 0%, rgba(0,175,170,.10), transparent 34rem), radial-gradient(circle at 92% 82%, rgba(129,216,208,.055), transparent 36rem), #191c1f",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        color: "#fff",
-      }}
+      className="arabtrade-auth-hero flex items-center justify-center px-4 py-10 text-white"
     >
-      <section
-        style={{
-          width: "100%",
-          maxWidth: 440,
-          background:
-            "rgba(48,56,59,.68)",
-          backgroundImage:
-            "linear-gradient(135deg,rgba(255,255,255,.055),rgba(255,255,255,.012))",
-          border:
-            "1px solid rgba(255,255,255,.14)",
-          borderRadius: 22,
-          padding: 30,
-          boxShadow:
-            "0 24px 60px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.05)",
-          backdropFilter:
-            "blur(40px) saturate(145%)",
-        }}
-      >
+      <div className="arabtrade-auth-coins" aria-hidden="true">
+        <span className="arabtrade-auth-coin">₿</span>
+        <span className="arabtrade-auth-coin">Ξ</span>
+        <span className="arabtrade-auth-coin">₿</span>
+        <span className="arabtrade-auth-coin">◎</span>
+        <span className="arabtrade-auth-coin">Ξ</span>
+      </div>
+      <div className="arabtrade-auth-lines" aria-hidden="true" />
+      <div className="arabtrade-auth-candles" aria-hidden="true" />
+      <section className="arabtrade-auth-glass-card relative z-10 w-full max-w-[440px] rounded-[32px] p-7 sm:p-8">
         <div
           style={{
             textAlign: "center",

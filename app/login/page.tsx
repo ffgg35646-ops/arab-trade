@@ -68,20 +68,27 @@ export default function LoginPage() {
   return (
     <>
       <Navbar />
-      <main className="equiti-login-page arabtrade-auth-bg text-white flex items-center justify-center px-4 py-10">
+      <main className="arabtrade-auth-hero flex items-center justify-center px-4 py-10 text-white">
+      <div className="arabtrade-auth-coins" aria-hidden="true">
+        <span className="arabtrade-auth-coin">₿</span>
+        <span className="arabtrade-auth-coin">Ξ</span>
+        <span className="arabtrade-auth-coin">₿</span>
+        <span className="arabtrade-auth-coin">◎</span>
+        <span className="arabtrade-auth-coin">Ξ</span>
+      </div>
+      <div className="arabtrade-auth-lines" aria-hidden="true" />
       <div className="arabtrade-auth-candles" aria-hidden="true" />
-      <div className="arabtrade-auth-chart" aria-hidden="true" />
 
       <div className="arabtrade-auth-content w-full max-w-md">
         <Link
           href="/"
-          className="mb-8 inline-flex items-center gap-2 text-sm text-[#58676d] hover:text-[#006f6b] transition"
+          className="mb-8 inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.025] px-4 py-2 text-sm text-slate-400 transition hover:border-cyan-400/20 hover:bg-cyan-400/[0.06] hover:text-cyan-300"
         >
           <ArrowRight size={17} />
           العودة للرئيسية
         </Link>
 
-        <div className="rounded-3xl border border-white/10 bg-[#07101d]/90 p-7 shadow-2xl backdrop-blur-xl">
+        <div className="rounded-[32px] border border-white/10 bg-[#07101d]/80 p-7 shadow-2xl backdrop-blur-2xl">
           <div className="mb-8 text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-400/20">
               <LockKeyhole className="text-blue-400" size={27} />

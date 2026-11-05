@@ -5,10 +5,10 @@ import Navbar from "@/components/Navbar";
 
 export default function HomePage() {
   return (
-    <div dir="rtl" className="equiti-home min-h-screen overflow-x-hidden bg-[#ffffff] text-[#172126]">
+    <div dir="rtl" className="equiti-home min-h-screen overflow-x-hidden bg-[#f1f3f4] text-[#172126]">
       <Navbar />
 
-      <main>
+      <main className="equiti-home-content">
         <Hero />
 
         <MarketTerminal />

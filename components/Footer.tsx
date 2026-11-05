@@ -83,16 +83,22 @@ export default function Footer({ showOnInternal = false }: { showOnInternal?: bo
             <div className="mt-3 flex items-center gap-2 sm:mt-5">
               {[
                 ["f", "#"],
-                ["✈", "#"],
+                ["telegram", "#"],
                 ["𝕏", "#"],
               ].map(([icon, href], index) => (
                 <a
                   key={index}
                   href={href}
-                  aria-label="Social link"
+                  aria-label={icon === "telegram" ? "Telegram" : icon === "f" ? "Facebook" : "X"}
                   className="flex h-7 w-7 sm:h-10 sm:w-10 items-center justify-center rounded-xl border border-slate-600/70 bg-slate-900/80 text-slate-200 transition hover:border-sky-400/70 hover:bg-sky-400/10 hover:text-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
                 >
-                  <span className="text-sm font-bold">{icon}</span>
+                  {icon === "telegram" ? (
+                    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 sm:h-5 sm:w-5" fill="currentColor">
+                      <path d="M11.944 0C5.347 0 0 5.347 0 11.944s5.347 11.944 11.944 11.944 11.944-5.347 11.944-11.944S18.541 0 11.944 0zm5.866 8.177-1.966 9.267c-.148.657-.537.817-1.087.508l-3.006-2.215-1.45 1.397c-.16.16-.294.294-.603.294l.214-3.06 5.568-5.03c.242-.214-.053-.334-.375-.12l-6.88 4.332-2.966-.925c-.644-.2-.657-.644.134-.952l11.588-4.466c.537-.2 1.006.12.83.97z" />
+                    </svg>
+                  ) : (
+                    <span className="text-sm font-bold">{icon}</span>
+                  )}
                 </a>
               ))}
             </div>

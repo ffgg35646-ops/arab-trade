@@ -999,3 +999,75 @@ main :is(.text-slate-500, .text-slate-600, .text-white\/40, .text-white\/45) {
   fill: #00afaa !important;
   stroke: #00afaa !important;
 }
+
+
+/* EQUITI LIGHT PAGE + CONTRAST-AWARE SURFACES */
+:root {
+  --background: #ffffff;
+  --foreground: #171b1f;
+  --at-bg: #ffffff;
+  --at-surface: #ffffff;
+  --at-surface-2: #f4f7f7;
+  --at-border: rgba(20, 30, 35, .12);
+  --arabtrade-background: #ffffff;
+  --arabtrade-surface: #ffffff;
+  --arabtrade-surface-2: #f4f7f7;
+  --arabtrade-border: rgba(20, 30, 35, .12);
+}
+
+html,
+body {
+  background: #ffffff !important;
+  color: #171b1f;
+}
+
+main {
+  background: #ffffff !important;
+  color: #171b1f;
+}
+
+/* Light cards and panels use dark readable typography. */
+.bg-white,
+.bg-gray-50,
+.bg-gray-100,
+.bg-gray-200,
+.at-surface,
+.at-surface-2 {
+  background-color: #ffffff !important;
+  color: #171b1f !important;
+  border-color: rgba(20, 30, 35, .12);
+}
+
+.bg-gray-50,
+.bg-gray-100,
+.bg-gray-200,
+.at-surface-2 {
+  background-color: #f4f7f7 !important;
+}
+
+:is(.bg-white,.bg-gray-50,.bg-gray-100,.bg-gray-200,.at-surface,.at-surface-2) :is(.text-white,.text-slate-50,.text-gray-50,.text-zinc-50,.text-neutral-50) {
+  color: #171b1f !important;
+}
+:is(.bg-white,.bg-gray-50,.bg-gray-100,.bg-gray-200,.at-surface,.at-surface-2) :is(.text-slate-100,.text-slate-200,.text-slate-300,.text-gray-100,.text-gray-200,.text-gray-300,.text-zinc-100,.text-zinc-200,.text-zinc-300,.text-neutral-100,.text-neutral-200,.text-neutral-300) {
+  color: #39434a !important;
+}
+
+/* Dark header/footer and explicitly dark panels retain white typography. */
+header,
+nav,
+footer,
+.arabtrade-auth-bg,
+.arabtrade-auth-hero {
+  color: #ffffff;
+}
+
+/* Scrollbars match the lighter page. */
+* {
+  scrollbar-color: rgba(20, 30, 35, .25) transparent;
+}
+*::-webkit-scrollbar-track {
+  background: #f4f7f7;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(20, 30, 35, .22);
+}

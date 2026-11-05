@@ -30,12 +30,12 @@ export default function Navbar() {
         <nav className="hidden items-center gap-2 lg:flex" aria-label="التنقل الرئيسي">
           {links.map((link) => {
             const active = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href + "/"));
-            return <Link key={link.href} href={link.href} className={`rounded-xl px-4 py-3 text-sm font-medium transition ${active ? "bg-blue-500/10 text-cyan-300" : "text-slate-300 hover:bg-white/5 hover:text-white"}`}>{link.label}</Link>;
+            return <Link key={link.href} href={link.href} className={`rounded-xl px-4 py-3 text-sm font-medium transition ${active ? "bg-[#006f6b]/35 text-white" : "text-slate-200 hover:bg-white/10 hover:text-white"}`}>{link.label}</Link>;
           })}
         </nav>
         <div className="hidden items-center gap-3 lg:flex">
-          <Link href="/login" className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-slate-200 transition hover:bg-white/5">تسجيل الدخول</Link>
-          <Link href="/register" className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500">إنشاء حساب</Link>
+          <Link href="/login" className="rounded-xl border border-white/20 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/10">تسجيل الدخول</Link>
+          <Link href="/register" className="rounded-xl bg-[#006f6b] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#005e5a]">إنشاء حساب</Link>
         </div>
         <button type="button" onClick={() => setOpen(v => !v)} className="shrink-0 rounded-xl border border-white/10 p-2 text-slate-200 lg:hidden" aria-label={open ? "إغلاق القائمة" : "فتح القائمة"}>
           {open ? <X size={21} /> : <Menu size={21} />}
@@ -44,11 +44,11 @@ export default function Navbar() {
       {open && <nav className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-white/10 bg-[#07101d] p-3 lg:hidden" aria-label="التنقل للأجهزة الصغيرة">
         {links.map((link) => {
           const active = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href + "/"));
-          return <Link key={link.href} href={link.href} onClick={() => setOpen(false)} className={`block rounded-xl px-4 py-3 text-sm transition ${active ? "bg-blue-500/10 text-cyan-300" : "text-slate-300 hover:bg-white/5"}`}>{link.label}</Link>;
+          return <Link key={link.href} href={link.href} onClick={() => setOpen(false)} className={`block rounded-xl px-4 py-3 text-sm transition ${active ? "bg-[#006f6b]/35 text-white" : "text-slate-200 hover:bg-white/10"}`}>{link.label}</Link>;
         })}
         <div className="mt-2 grid grid-cols-2 gap-2 border-t border-white/10 pt-3">
           <Link href="/login" onClick={() => setOpen(false)} className="rounded-xl border border-white/10 px-3 py-3 text-center text-sm text-slate-200">تسجيل الدخول</Link>
-          <Link href="/register" onClick={() => setOpen(false)} className="rounded-xl bg-blue-600 px-3 py-3 text-center text-sm font-semibold text-white">إنشاء حساب</Link>
+          <Link href="/register" onClick={() => setOpen(false)} className="rounded-xl bg-[#006f6b] px-3 py-3 text-center text-sm font-semibold text-white">إنشاء حساب</Link>
         </div>
       </nav>}
     </header>

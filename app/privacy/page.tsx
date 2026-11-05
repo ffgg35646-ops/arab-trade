@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 const sections = [
   {
@@ -64,32 +66,47 @@ const sections = [
 
 export default function PrivacyPage() {
   return (
-    <main dir="rtl" className="privacy-page min-h-screen text-white">
+    <>
+      <Navbar />
+      <main dir="rtl" className="arabtrade-auth-hero min-h-screen overflow-hidden px-4 py-28 text-white">
 
-      <div className="mx-auto max-w-5xl px-5 py-16">
+      <div className="arabtrade-auth-coins" aria-hidden="true">
+        <span className="arabtrade-auth-coin">₿</span>
+        <span className="arabtrade-auth-coin">Ξ</span>
+        <span className="arabtrade-auth-coin">₿</span>
+        <span className="arabtrade-auth-coin">◎</span>
+        <span className="arabtrade-auth-coin">Ξ</span>
+      </div>
+      <div className="arabtrade-auth-lines" aria-hidden="true" />
+      <div className="arabtrade-auth-candles" aria-hidden="true" />
+
+      <div className="relative z-10 mx-auto max-w-6xl">
+        <section className="rounded-[32px] border border-white/10 bg-[#07101d]/80 p-7 shadow-2xl backdrop-blur-2xl md:p-12 lg:p-16">
+
+      <div className="mx-auto max-w-5xl px-0 py-0">
 
         <Link
           href="/"
-          className="privacy-back-link text-sm transition"
+          className="mb-8 inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.025] px-4 py-2 text-sm text-slate-400 transition hover:border-cyan-400/20 hover:bg-cyan-400/[0.06] hover:text-cyan-300 text-sm transition"
         >
           ← العودة للرئيسية
         </Link>
 
         <div className="mt-10">
-          <div className="privacy-eyebrow text-sm font-semibold">
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/5 px-4 py-2 text-xs font-semibold text-cyan-300">
             قانوني
           </div>
 
-          <h1 className="privacy-title mt-3 text-4xl font-bold">
+          <h1 className="mt-3 text-4xl font-black leading-tight md:text-6xl">
             سياسة الخصوصية
           </h1>
 
-          <p className="privacy-intro mt-4 text-sm leading-7">
+          <p className="mt-7 max-w-3xl text-base leading-8 text-slate-400 md:text-lg">
             توضح هذه السياسة كيفية التعامل مع المعلومات والبيانات عند استخدام
             منصة عرب تريد وخدماتها.
           </p>
 
-          <div className="privacy-updated mt-4 inline-flex rounded-lg px-4 py-2 text-xs">
+          <div className="mt-5 inline-flex rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2 text-xs text-slate-400">
             آخر تحديث: 2026
           </div>
         </div>
@@ -98,27 +115,31 @@ export default function PrivacyPage() {
           {sections.map((section) => (
             <section
               key={section.title}
-              className="privacy-card rounded-2xl p-6 transition"
+              className="rounded-2xl border border-white/10 bg-white/[0.025] p-6 transition hover:border-white/15"
             >
-              <h2 className="privacy-card-title text-lg font-bold">
+              <h2 className="text-lg font-bold text-white">
                 {section.title}
               </h2>
 
-              <p className="privacy-card-text mt-4 text-sm leading-8">
+              <p className="mt-4 text-sm leading-8 text-slate-400">
                 {section.text}
               </p>
             </section>
           ))}
         </div>
 
-        <div className="privacy-contact-box mt-8 rounded-2xl p-6">
-          <p className="privacy-contact-text text-sm leading-8">
+        <div className="mt-8 rounded-2xl border border-cyan-400/10 bg-cyan-400/[0.03] p-6">
+          <p className="text-sm leading-8 text-slate-400">
             إذا كانت لديك أسئلة تتعلق بالخصوصية أو بطريقة التعامل مع بيانات
             الحساب، يمكنك التواصل معنا من خلال صفحة تواصل معنا.
           </p>
         </div>
 
+        </div>
+        </section>
       </div>
-    </main>
+      </main>
+      <Footer />
+    </>
   );
 }

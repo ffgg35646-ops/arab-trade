@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 
 const slides = [
   {
-    image: "/home/slider-new-1.jpeg",
+    image: "/home/equiti-slider-01.jpeg",
     label: "EQUITI TRADE HUB",
     title: "رؤية أوضح لعالم الأسواق",
     text: "تابع الأسواق واكتشف الأدوات التي تساعدك على فهم حركة الأصول.",
   },
   {
-    image: "/home/slider-new-2.png",
+    image: "/home/equiti-slider-02.png",
     label: "تجربة متكاملة",
     title: "كل ما تحتاجه في مكان واحد",
     text: "واجهة تجمع متابعة الأسواق وأدوات التداول وتجربة استخدام سلسة.",

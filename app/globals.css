@@ -1599,3 +1599,129 @@ main.markets-page .markets-main-card > div:last-child button:disabled {
 }
 
 /* Fresh main push to retry the connected deployment hook. */
+ 
+/* EQUITI INTERNAL WORKSPACE — public-site palette and shared chrome */
+.equiti-dashboard-shell {
+  --equiti-workspace-canvas: #e5e7e8;
+  --equiti-workspace-surface: #30383b;
+  --equiti-workspace-surface-raised: #343c3f;
+  --equiti-workspace-inset: #262d30;
+  --equiti-workspace-border: rgba(255, 255, 255, .12);
+  --equiti-workspace-accent: #006f6b;
+  background: var(--equiti-workspace-canvas) !important;
+  color: #172126;
+}
+
+.equiti-dashboard-shell > div {
+  background-color: var(--equiti-workspace-canvas) !important;
+}
+
+.equiti-dashboard-shell main {
+  min-height: 100%;
+  background-color: var(--equiti-workspace-canvas) !important;
+  color: #172126 !important;
+}
+
+/* All workspace cards use the graphite surfaces from the public home page. */
+.equiti-dashboard-shell main [class*="bg-[#07101d]"],
+.equiti-dashboard-shell main [class*="bg-[#08111e]"],
+.equiti-dashboard-shell main [class*="bg-[#0b1422]"],
+.equiti-dashboard-shell main [class*="bg-[#0c1726]"] {
+  background-color: var(--equiti-workspace-surface) !important;
+  color: #f8fafc !important;
+}
+
+.equiti-dashboard-shell main [class*="bg-[#050a13]"]:not([class*="min-h-screen"]) {
+  background-color: var(--equiti-workspace-inset) !important;
+}
+
+.equiti-dashboard-shell main [class*="bg-gradient-to"] {
+  background: var(--equiti-workspace-surface) !important;
+}
+
+.equiti-dashboard-shell main [class~="bg-white"],
+.equiti-dashboard-shell main [class~="bg-gray-50"],
+.equiti-dashboard-shell main [class~="bg-gray-100"] {
+  background-color: var(--equiti-workspace-surface) !important;
+  color: #f8fafc !important;
+}
+
+.equiti-dashboard-shell main [class~="bg-slate-50"],
+.equiti-dashboard-shell main [class~="bg-slate-100"] {
+  background-color: var(--equiti-workspace-surface-raised) !important;
+  color: #f8fafc !important;
+}
+
+/* Text and borders that belonged to the old white withdrawal screen. */
+.equiti-dashboard-shell main [class*="text-slate-900"],
+.equiti-dashboard-shell main [class*="text-slate-800"],
+.equiti-dashboard-shell main [class*="text-gray-900"],
+.equiti-dashboard-shell main [class*="text-gray-800"],
+.equiti-dashboard-shell main [class*="text-emerald-700"] {
+  color: #f8fafc !important;
+}
+
+.equiti-dashboard-shell main [class*="border-slate-200"],
+.equiti-dashboard-shell main [class*="border-slate-300"],
+.equiti-dashboard-shell main [class*="divide-slate-100"],
+.equiti-dashboard-shell main [class*="divide-slate-200"] {
+  border-color: var(--equiti-workspace-border) !important;
+}
+
+.equiti-dashboard-shell main input,
+.equiti-dashboard-shell main select,
+.equiti-dashboard-shell main textarea {
+  background-color: var(--equiti-workspace-inset) !important;
+  border-color: rgba(255, 255, 255, .16) !important;
+  color: #ffffff !important;
+}
+
+.equiti-dashboard-shell main input::placeholder,
+.equiti-dashboard-shell main textarea::placeholder {
+  color: #cbd5d8 !important;
+  opacity: 1;
+}
+
+/* Reuse the same deep teal action color as the public navigation and buttons. */
+.equiti-dashboard-shell main button[class*="bg-blue-"],
+.equiti-dashboard-shell main a[class*="bg-blue-"],
+.equiti-dashboard-shell main button[class*="bg-emerald-700"],
+.equiti-dashboard-shell main a[class*="bg-emerald-700"] {
+  background-color: var(--equiti-workspace-accent) !important;
+  border-color: #00afaa !important;
+  color: #ffffff !important;
+}
+
+.equiti-dashboard-shell > div > aside {
+  background: var(--equiti-workspace-surface) !important;
+  border-color: var(--equiti-workspace-border) !important;
+}
+
+.equiti-dashboard-shell aside [aria-current="page"] {
+  background: rgba(0, 111, 107, .38) !important;
+  color: #ffffff !important;
+}
+
+/* The account header and footer retain the same glass/ink treatment as public pages. */
+.equiti-dashboard-shell > header {
+  background: rgba(5, 10, 19, .82) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, .10) !important;
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+}
+
+.equiti-dashboard-shell > footer {
+  background: #050a13 !important;
+}
+
+/* Decorative auth-grid backgrounds are not needed inside the account workspace. */
+.equiti-dashboard-shell main.arabtrade-auth-hero {
+  background: var(--equiti-workspace-canvas) !important;
+}
+.equiti-dashboard-shell main.arabtrade-auth-hero::before,
+.equiti-dashboard-shell main.arabtrade-auth-hero::after,
+.equiti-dashboard-shell main.arabtrade-auth-hero .arabtrade-auth-coins,
+.equiti-dashboard-shell main.arabtrade-auth-hero .arabtrade-auth-lines,
+.equiti-dashboard-shell main.arabtrade-auth-hero .arabtrade-auth-candles {
+  display: none !important;
+}

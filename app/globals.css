@@ -1385,3 +1385,46 @@ main.markets-page {
 main.equiti-public-trading-page {
   background-color: #e9edef !important;
 }
+
+
+/* EQUITI — unified gray public surfaces and clean section transitions */
+.equiti-home {
+  background: #e5e7e8 !important;
+}
+.equiti-home > header {
+  border-bottom-color: rgba(0, 175, 170, .28) !important;
+  box-shadow: 0 6px 22px rgba(26, 38, 42, .10);
+}
+.equiti-home > main.equiti-home-content {
+  background: #e5e7e8 !important;
+}
+.equiti-home #contact {
+  position: relative;
+  border-top: 1px solid #bcc5c8;
+  box-shadow: 0 -8px 24px rgba(35, 45, 50, .08);
+}
+.equiti-home #contact::before {
+  content: "";
+  display: block;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(0,111,107,.28) 18%, rgba(188,197,200,.8) 50%, rgba(0,111,107,.28) 82%, transparent 100%);
+}
+main.markets-page,
+main.equiti-public-trading-page {
+  background-color: #e5e7e8 !important;
+}
+.equiti-public-trading-terminal {
+  background: #30383b !important;
+}
+.equiti-public-trading-terminal [class*="bg-[#07101d]"] {
+  background-color: #343c3f !important;
+}
+.equiti-public-trading-terminal [class*="bg-[#050a13]"] {
+  background-color: #262d30 !important;
+}
+.equiti-public-trading-terminal [class*="bg-[#060c15]"] {
+  background-color: #2b3336 !important;
+}
+.equiti-public-trading-terminal :is([class*="border-white/"], [class*="border-cyan-400/"]) {
+  border-color: rgba(255,255,255,.12);
+}

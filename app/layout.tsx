@@ -5,8 +5,8 @@ import GlobalSuccessToast from "@/components/GlobalSuccessToast";
 import GlobalFooter from "@/components/GlobalFooter";
 
 export const metadata: Metadata = {
-  title: "EQUITI للتداول",
-  description: "EQUITI للتداول والاستثمار.",
+  title: "EQUITI TRADE HUB",
+  description: "EQUITI TRADE HUB — منصة التداول.",
   icons: {
     icon: "/icon.svg",
   },

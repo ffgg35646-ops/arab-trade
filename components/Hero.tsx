@@ -75,7 +75,7 @@ export default function Hero() {
               </span>
             </h1>
 
-            <p className="mt-6 max-w-xl text-base leading-8 text-white/50 sm:text-lg">
+            <p className="mt-6 max-w-xl text-base leading-8 text-white/85 sm:text-lg">
               منصة عربية حديثة لمتابعة الأسواق والعملات الرقمية،
               مع بيانات مباشرة وأدوات تساعدك على فهم حركة السوق.
             </p>
@@ -92,7 +92,7 @@ export default function Hero() {
             <div className="mt-10 grid max-w-xl grid-cols-3 gap-3">
               <div className="rounded-2xl border border-white/[0.07] bg-[#07101d]/[0.025] p-4">
                 <div className="text-xl font-black text-white">100+</div>
-                <div className="mt-1 text-[11px] text-white/35">أصل رقمي</div>
+                <div className="mt-1 text-[11px] text-white/75">أصل رقمي</div>
               </div>
               <div className="rounded-2xl border border-white/[0.07] bg-[#07101d]/[0.025] p-4">
                 <div className="text-xl font-black text-white">مباشر</div>

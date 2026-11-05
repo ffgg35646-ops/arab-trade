@@ -114,7 +114,7 @@ function AdminLoginContent() {
   return (
     <main
       dir="rtl"
-      className="arabtrade-auth-hero flex items-center justify-center px-4 py-10 text-white"
+      className="arabtrade-auth-hero equiti-admin-login-page relative flex min-h-screen w-full items-center justify-center px-4 py-10 text-white"
     >
       <div className="arabtrade-auth-coins" aria-hidden="true">
         <span className="arabtrade-auth-coin">₿</span>

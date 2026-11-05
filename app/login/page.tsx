@@ -68,14 +68,14 @@ export default function LoginPage() {
   return (
     <>
       <Navbar />
-      <main className="arabtrade-auth-bg text-white flex items-center justify-center px-4 py-10">
+      <main className="equiti-login-page arabtrade-auth-bg text-white flex items-center justify-center px-4 py-10">
       <div className="arabtrade-auth-candles" aria-hidden="true" />
       <div className="arabtrade-auth-chart" aria-hidden="true" />
 
       <div className="arabtrade-auth-content w-full max-w-md">
         <Link
           href="/"
-          className="mb-8 inline-flex items-center gap-2 text-sm text-slate-400 hover:text-cyan-400 transition"
+          className="mb-8 inline-flex items-center gap-2 text-sm text-[#58676d] hover:text-[#006f6b] transition"
         >
           <ArrowRight size={17} />
           العودة للرئيسية

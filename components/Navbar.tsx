@@ -30,7 +30,7 @@ export default function Navbar() {
         <nav className="hidden items-center gap-2 lg:flex" aria-label="التنقل الرئيسي">
           {links.map((link) => {
             const active = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href + "/"));
-            return <Link key={link.href} href={link.href} className={`rounded-xl px-4 py-3 text-sm font-medium transition ${active ? "bg-[#006f6b]/35 text-white" : "text-slate-200 hover:bg-white/10 hover:text-white"}`}>{link.label}</Link>;
+            return <Link key={link.href} href={link.href} style={active ? { backgroundColor: "rgba(0, 111, 107, 0.35)", color: "#ffffff" } : undefined} className={`rounded-xl px-4 py-3 text-sm font-medium transition ${active ? "" : "text-slate-200 hover:bg-white/10 hover:text-white"}`} >{link.label}</Link>;
           })}
         </nav>
         <div className="hidden items-center gap-3 lg:flex">
@@ -44,7 +44,7 @@ export default function Navbar() {
       {open && <nav className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-white/10 bg-[#07101d] p-3 lg:hidden" aria-label="التنقل للأجهزة الصغيرة">
         {links.map((link) => {
           const active = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href + "/"));
-          return <Link key={link.href} href={link.href} onClick={() => setOpen(false)} className={`block rounded-xl px-4 py-3 text-sm transition ${active ? "bg-[#006f6b]/35 text-white" : "text-slate-200 hover:bg-white/10"}`}>{link.label}</Link>;
+          return <Link key={link.href} href={link.href} onClick={() => setOpen(false)} style={active ? { backgroundColor: "rgba(0, 111, 107, 0.35)", color: "#ffffff" } : undefined} className={`block rounded-xl px-4 py-3 text-sm transition ${active ? "" : "text-slate-200 hover:bg-white/10"}`} >{link.label}</Link>;
         })}
         <div className="mt-2 grid grid-cols-2 gap-2 border-t border-white/10 pt-3">
           <Link href="/login" onClick={() => setOpen(false)} className="rounded-xl border border-white/10 px-3 py-3 text-center text-sm text-slate-200">تسجيل الدخول</Link>

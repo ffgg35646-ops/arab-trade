@@ -8,7 +8,7 @@ import { InternalDashboardChromeContext } from "@/components/InternalDashboardCh
 
 export default function InternalDashboardLayout({ children }: { children: ReactNode }) {
   return (
-    <div dir="rtl" className="min-h-screen bg-[#050a13] text-white">
+    <div dir="rtl" className="equiti-dashboard-shell min-h-screen bg-[#e5e7e8] text-white">
       <InternalNavbar />
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-[1700px]">
         <InternalSidebar />

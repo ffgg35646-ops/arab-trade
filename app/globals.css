@@ -1071,3 +1071,12 @@ footer,
 *::-webkit-scrollbar-thumb {
   background: rgba(20, 30, 35, .22);
 }
+
+
+/* Keep the intentionally dark About and Contact hero sections readable on the light site. */
+main.arabtrade-auth-hero {
+  background:
+    radial-gradient(circle at 50% 20%, rgba(0, 175, 170, 0.13), transparent 35%),
+    #191c1f !important;
+  color: #ffffff !important;
+}

@@ -74,7 +74,7 @@ export default function TeamPage() {
           <div className="absolute inset-0 opacity-[0.12]" style={{ backgroundImage: "linear-gradient(rgba(129,216,208,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(129,216,208,.12) 1px, transparent 1px)", backgroundSize: "64px 64px" }} />
         </div>
 
-        <div className="relative z-10 mx-auto max-w-7xl rounded-[32px] border border-white/10 bg-[#07101d]/80 p-5 shadow-2xl backdrop-blur-2xl sm:p-8 lg:p-12">
+        <section className="relative z-10 mx-auto max-w-6xl rounded-[32px] border border-white/10 bg-[#24282b]/95 p-7 shadow-2xl backdrop-blur-2xl md:p-12 lg:p-16">
           <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#00afaa]/25 bg-[#00afaa]/[0.08] px-4 py-2 text-xs font-bold text-[#81d8d0]">
               <Users2 size={15} />
@@ -190,7 +190,7 @@ export default function TeamPage() {
               <Link href="/contact" className="mt-7 inline-flex items-center gap-3 rounded-xl bg-[#00afaa] px-6 py-3.5 text-sm font-extrabold text-[#101719] transition hover:bg-[#81d8d0]">تواصل مع فريقنا <ArrowLeft size={17} /></Link>
             </div>
           </section>
-        </div>
+        </section>
       </main>
       <Footer />
     </>

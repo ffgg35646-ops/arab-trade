@@ -10,6 +10,7 @@ const links = [
   { href: "/markets", label: "الأسواق" },
   { href: "/trading/spot", label: "التداول" },
   { href: "/about", label: "عن الموقع" },
+  { href: "/team", label: "فريق العمل" },
   { href: "/contact", label: "تواصل معنا" },
 ];
 

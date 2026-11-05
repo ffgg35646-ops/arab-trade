@@ -56,11 +56,11 @@ export default function Hero() {
       dir="rtl"
       className="relative overflow-hidden border-t border-[#c7ced0] bg-[#e5e7e8] px-4 pb-8 pt-5 sm:px-6 lg:px-8"
     >
-      <div className="arabtrade-crypto-bg" aria-hidden="true">
-        <div className="arabtrade-trade-arrows" />
+      <div className="EQUITI-crypto-bg" aria-hidden="true">
+        <div className="EQUITI-trade-arrows" />
       </div>
 
-      <div className="arabtrade-hero-content mx-auto max-w-[1500px]">
+      <div className="EQUITI-hero-content mx-auto max-w-[1500px]">
         <div className="grid min-h-[560px] items-center gap-8 overflow-hidden rounded-[30px] border border-white/10 bg-[#30383b] p-4 text-white shadow-[0_18px_48px_rgba(20,30,35,.18)] sm:p-7 lg:grid-cols-[1fr_1.05fr] lg:p-10">
           <div className="relative z-10 order-2 max-w-2xl lg:order-1">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#00afaa]/40 bg-[#006f6b]/25 px-4 py-2 text-xs font-bold text-white">

@@ -56,14 +56,25 @@ export default function TeamPage() {
   return (
     <>
       <Navbar />
-      <main dir="rtl" className="relative min-h-screen overflow-hidden bg-[#191c1f] px-4 pb-20 pt-12 text-white sm:px-6 lg:px-8">
+      <main dir="rtl" className="arabtrade-auth-hero min-h-screen overflow-hidden px-4 py-20 text-white sm:px-6 lg:px-8">
+
+      <div className="arabtrade-auth-coins" aria-hidden="true">
+        <span className="arabtrade-auth-coin">₿</span>
+        <span className="arabtrade-auth-coin">Ξ</span>
+        <span className="arabtrade-auth-coin">₿</span>
+        <span className="arabtrade-auth-coin">◎</span>
+        <span className="arabtrade-auth-coin">Ξ</span>
+      </div>
+      <div className="arabtrade-auth-lines" aria-hidden="true" />
+      <div className="arabtrade-auth-candles" aria-hidden="true" />
+
         <div aria-hidden="true" className="pointer-events-none absolute inset-0">
           <div className="absolute -right-24 top-20 h-80 w-80 rounded-full bg-[#00afaa]/10 blur-[110px]" />
           <div className="absolute -left-24 top-[520px] h-96 w-96 rounded-full bg-[#81d8d0]/[0.07] blur-[120px]" />
           <div className="absolute inset-0 opacity-[0.12]" style={{ backgroundImage: "linear-gradient(rgba(129,216,208,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(129,216,208,.12) 1px, transparent 1px)", backgroundSize: "64px 64px" }} />
         </div>
 
-        <div className="relative mx-auto max-w-7xl">
+        <div className="relative z-10 mx-auto max-w-7xl rounded-[32px] border border-white/10 bg-[#07101d]/80 p-5 shadow-2xl backdrop-blur-2xl sm:p-8 lg:p-12">
           <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#00afaa]/25 bg-[#00afaa]/[0.08] px-4 py-2 text-xs font-bold text-[#81d8d0]">
               <Users2 size={15} />
@@ -74,7 +85,7 @@ export default function TeamPage() {
             </Link>
           </div>
 
-          <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[#24282b] p-7 shadow-2xl shadow-black/20 sm:p-10 lg:p-14">
+          <section className="relative overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.025] p-7 shadow-2xl shadow-black/20 sm:p-10 lg:p-14">
             <div className="relative z-10 grid items-center gap-10 lg:grid-cols-[1.05fr_.95fr]">
               <div>
                 <p className="text-xs font-black tracking-[.18em] text-[#81d8d0]">EQUITI TRADE HUB · OUR PEOPLE</p>
@@ -116,7 +127,7 @@ export default function TeamPage() {
 
             <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {pillars.map(({ icon: Icon, title, text }) => (
-                <article key={title} className="rounded-[24px] border border-white/[0.08] bg-[#24282b] p-6 transition duration-300 hover:-translate-y-1 hover:border-[#00afaa]/35 hover:shadow-xl hover:shadow-black/20">
+                <article key={title} className="rounded-[24px] border border-white/[0.08] bg-white/[0.025] p-6 transition duration-300 hover:-translate-y-1 hover:border-[#00afaa]/35 hover:shadow-xl hover:shadow-black/20">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#00afaa]/20 bg-[#00afaa]/10 text-[#81d8d0]"><Icon size={23} /></div>
                   <h3 className="mt-6 text-lg font-extrabold">{title}</h3>
                   <p className="mt-3 text-sm leading-8 text-white/55">{text}</p>
@@ -157,7 +168,7 @@ export default function TeamPage() {
 
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {teamImages.map((item, index) => (
-                <figure key={item.src} className="group relative aspect-[4/5] overflow-hidden rounded-[26px] border border-white/10 bg-[#24282b]">
+                <figure key={item.src} className="group relative aspect-[4/5] overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.025]">
                   <Image src={item.src} alt={item.alt} fill sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 280px" className="object-cover transition duration-700 group-hover:scale-105" />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#101719]/90 via-transparent to-transparent" />
                   <figcaption className="absolute inset-x-0 bottom-0 p-5">

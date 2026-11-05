@@ -87,7 +87,7 @@ function Candles({ prices }: { prices: number[] }) {
 
   if (!candles.length) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-white/30">
+      <div className="flex h-full items-center justify-center text-sm text-[#748087]">
         جاري التحميل...
       </div>
     );
@@ -102,7 +102,7 @@ function Candles({ prices }: { prices: number[] }) {
 
   return (
     <div className="relative h-full w-full">
-      <div className="absolute inset-0 flex flex-col justify-between text-[10px] text-white/25">
+      <div className="absolute inset-0 flex flex-col justify-between text-[10px] text-[#7b858a]">
         {Array.from({ length: 7 }).map((_, i) => (
           <div key={i} className="border-t border-white/[0.045] pt-1">
             ${price(max - (range / 6) * i)}
@@ -153,7 +153,7 @@ function Candles({ prices }: { prices: number[] }) {
         })}
       </div>
 
-      <div className="absolute bottom-0 left-12 right-0 flex justify-between border-t border-white/[0.05] pt-2 text-[10px] text-white/25">
+      <div className="absolute bottom-0 left-12 right-0 flex justify-between border-t border-[#d1d7d9] pt-2 text-[10px] text-[#7b858a]">
         <span>7 أيام</span>
         <span>5 أيام</span>
         <span>3 أيام</span>
@@ -207,18 +207,18 @@ export default function MarketTerminal() {
   return (
     <section
       dir="rtl"
-      className="w-full bg-[#050a13] px-3 py-8 sm:px-5 lg:px-8"
+      className="w-full bg-[#e5e7e8] px-3 py-8 sm:px-5 lg:px-8"
     >
-      <div className="mx-auto max-w-[1500px] overflow-hidden rounded-2xl border border-white/[0.08] bg-[#07101d] shadow-2xl shadow-black/40">
+      <div className="mx-auto max-w-[1500px] overflow-hidden rounded-2xl border border-[#c4cbce] bg-[#d6dcde] shadow-[0_16px_42px_rgba(35,45,50,0.09)]">
 
         {/* Top Bar */}
-        <div className="border-b border-white/[0.08] bg-[#07101d]">
+        <div className="border-b border-[#c4cbce] bg-[#d6dcde]">
           <div className="flex min-h-[72px] flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6">
 
             <div className="relative">
               <button
                 onClick={() => setOpenPair(!openPair)}
-                className="flex min-w-[190px] items-center gap-3 rounded-xl border border-white/10 bg-[#07101d]/[0.035] px-4 py-2.5 text-right transition hover:bg-[#07101d]/[0.07]"
+                className="flex min-w-[190px] items-center gap-3 rounded-xl border border-[#c4cbce] bg-[#e8ebec] px-4 py-2.5 text-right transition hover:bg-[#dfe4e5]"
               >
                 {selected && (
                   <img
@@ -229,20 +229,20 @@ export default function MarketTerminal() {
                 )}
 
                 <div className="flex-1">
-                  <div className="text-sm font-black text-white">
+                  <div className="text-sm font-black text-[#172126]">
                     {selectedPair[1]}/USDT
                   </div>
-                  <div className="text-[10px] text-white/35">
+                  <div className="text-[10px] text-[#6c797f]">
                     {selectedPair[2]}
                   </div>
                 </div>
 
-                <span className="text-white/40">⌄</span>
+                <span className="text-[#657279]">⌄</span>
               </button>
 
               {openPair && (
-                <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 overflow-hidden rounded-xl border border-white/10 bg-[#07101d] shadow-2xl">
-                  <div className="border-b border-white/10 px-4 py-3 text-xs font-bold text-white/40">
+                <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 overflow-hidden rounded-xl border border-[#c4cbce] bg-[#d6dcde] shadow-2xl">
+                  <div className="border-b border-[#c4cbce] px-4 py-3 text-xs font-bold text-[#657279]">
                     اختر زوج التداول
                   </div>
 
@@ -257,7 +257,7 @@ export default function MarketTerminal() {
                             setSelectedId(id);
                             setOpenPair(false);
                           }}
-                          className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-right transition hover:bg-[#07101d]/[0.06]"
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-right transition hover:bg-[#dfe4e5]"
                         >
                           {coin && (
                             <img
@@ -268,16 +268,16 @@ export default function MarketTerminal() {
                           )}
 
                           <div className="flex-1">
-                            <div className="text-sm font-bold text-white">
+                            <div className="text-sm font-bold text-[#172126]">
                               {symbol}/USDT
                             </div>
-                            <div className="text-[10px] text-white/30">
+                            <div className="text-[10px] text-[#748087]">
                               {name}
                             </div>
                           </div>
 
                           {coin && (
-                            <span className="text-xs text-white/60">
+                            <span className="text-xs text-[#526168]">
                               ${price(coin.current_price)}
                             </span>
                           )}
@@ -292,10 +292,10 @@ export default function MarketTerminal() {
             {selected && (
               <div className="flex items-center gap-5">
                 <div>
-                  <div className="text-[10px] text-white/35">
+                  <div className="text-[10px] text-[#6c797f]">
                     السعر الحالي
                   </div>
-                  <div className="mt-1 text-xl font-black tracking-tight text-white sm:text-2xl">
+                  <div className="mt-1 text-xl font-black tracking-tight text-[#172126] sm:text-2xl">
                     ${price(selected.current_price)}
                   </div>
                 </div>
@@ -315,7 +315,7 @@ export default function MarketTerminal() {
 
             <div className="hidden items-center gap-2 lg:flex">
               <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-              <span className="text-xs text-white/40">
+              <span className="text-xs text-[#657279]">
                 السوق مباشر
               </span>
             </div>
@@ -323,7 +323,7 @@ export default function MarketTerminal() {
         </div>
 
         {/* Mini ticker */}
-        <div className="overflow-hidden border-b border-white/[0.06] bg-[#050a13]/20">
+        <div className="overflow-hidden border-b border-[#cbd2d4] bg-[#e1e5e6]">
           <div className="flex min-w-max gap-2 px-3 py-2">
             {tickerCoins.map((coin) => {
               const positive =
@@ -333,13 +333,13 @@ export default function MarketTerminal() {
                 <button
                   key={coin.id}
                   onClick={() => setSelectedId(coin.id)}
-                  className="flex items-center gap-2 rounded-lg border border-white/[0.05] bg-[#07101d]/[0.025] px-3 py-1.5 hover:bg-[#07101d]/[0.06]"
+                  className="flex items-center gap-2 rounded-lg border border-[#d1d7d9] bg-[#e3e7e8] px-3 py-1.5 hover:bg-[#dfe4e5]"
                 >
-                  <span className="text-[11px] font-bold text-white">
+                  <span className="text-[11px] font-bold text-[#172126]">
                     {coin.symbol.toUpperCase()}
                   </span>
 
-                  <span className="text-[11px] text-white/60">
+                  <span className="text-[11px] text-[#526168]">
                     ${price(coin.current_price)}
                   </span>
 
@@ -362,9 +362,9 @@ export default function MarketTerminal() {
         <div className="grid lg:grid-cols-[1fr_280px]">
 
           {/* Chart */}
-          <div className="min-w-0 border-l border-white/[0.07]">
+          <div className="min-w-0 border-l border-[#cbd2d4]">
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-3 sm:px-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#cbd2d4] px-4 py-3 sm:px-6">
               <div className="flex items-center gap-1">
                 {["1د", "5د", "15د", "1س", "4س", "1ي"].map(
                   (range, index) => (
@@ -372,8 +372,8 @@ export default function MarketTerminal() {
                       key={range}
                       className={
                         index === 3
-                          ? "rounded-md bg-[#07101d]/10 px-3 py-1.5 text-[11px] font-bold text-white"
-                          : "rounded-md px-3 py-1.5 text-[11px] text-white/35 hover:bg-[#07101d]/[0.05] hover:text-white"
+                          ? "rounded-md bg-[#dce1e2] px-3 py-1.5 text-[11px] font-bold text-[#172126]"
+                          : "rounded-md px-3 py-1.5 text-[11px] text-[#6c797f] hover:bg-[#e2e6e7] hover:text-[#172126]"
                       }
                     >
                       {range}
@@ -382,7 +382,7 @@ export default function MarketTerminal() {
                 )}
               </div>
 
-              <div className="text-xs text-white/30">
+              <div className="text-xs text-[#748087]">
                 حركة السوق
               </div>
             </div>
@@ -393,7 +393,7 @@ export default function MarketTerminal() {
                   prices={selected.sparkline_in_7d?.price || []}
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-sm text-white/30">
+                <div className="flex h-full items-center justify-center text-sm text-[#748087]">
                   جاري تحميل السوق...
                 </div>
               )}
@@ -401,39 +401,39 @@ export default function MarketTerminal() {
 
             {/* Stats */}
             {selected && (
-              <div className="grid grid-cols-2 border-t border-white/[0.07] sm:grid-cols-4">
-                <div className="border-l border-white/[0.07] p-4">
-                  <div className="text-[10px] text-white/30">
+              <div className="grid grid-cols-2 border-t border-[#cbd2d4] sm:grid-cols-4">
+                <div className="border-l border-[#cbd2d4] p-4">
+                  <div className="text-[10px] text-[#748087]">
                     أعلى 24 ساعة
                   </div>
-                  <div className="mt-1 text-sm font-bold text-white">
+                  <div className="mt-1 text-sm font-bold text-[#172126]">
                     ${price(selected.high_24h)}
                   </div>
                 </div>
 
-                <div className="border-l border-white/[0.07] p-4">
-                  <div className="text-[10px] text-white/30">
+                <div className="border-l border-[#cbd2d4] p-4">
+                  <div className="text-[10px] text-[#748087]">
                     أقل 24 ساعة
                   </div>
-                  <div className="mt-1 text-sm font-bold text-white">
+                  <div className="mt-1 text-sm font-bold text-[#172126]">
                     ${price(selected.low_24h)}
                   </div>
                 </div>
 
-                <div className="border-l border-white/[0.07] p-4">
-                  <div className="text-[10px] text-white/30">
+                <div className="border-l border-[#cbd2d4] p-4">
+                  <div className="text-[10px] text-[#748087]">
                     حجم التداول
                   </div>
-                  <div className="mt-1 text-sm font-bold text-white">
+                  <div className="mt-1 text-sm font-bold text-[#172126]">
                     ${compact(selected.total_volume)}
                   </div>
                 </div>
 
                 <div className="p-4">
-                  <div className="text-[10px] text-white/30">
+                  <div className="text-[10px] text-[#748087]">
                     القيمة السوقية
                   </div>
-                  <div className="mt-1 text-sm font-bold text-white">
+                  <div className="mt-1 text-sm font-bold text-[#172126]">
                     ${compact(selected.market_cap)}
                   </div>
                 </div>
@@ -442,12 +442,12 @@ export default function MarketTerminal() {
           </div>
 
           {/* Pair Panel */}
-          <aside className="bg-[#07101d]">
-            <div className="border-b border-white/[0.07] px-5 py-4">
-              <div className="text-sm font-bold text-white">
+          <aside className="bg-[#d6dcde]">
+            <div className="border-b border-[#cbd2d4] px-5 py-4">
+              <div className="text-sm font-bold text-[#172126]">
                 أزواج التداول
               </div>
-              <div className="mt-1 text-[10px] text-white/30">
+              <div className="mt-1 text-[10px] text-[#748087]">
                 اختر الأصل الذي تريد متابعته
               </div>
             </div>
@@ -463,8 +463,8 @@ export default function MarketTerminal() {
                     onClick={() => setSelectedId(id)}
                     className={`mb-1 flex w-full items-center gap-3 rounded-xl p-3 text-right transition ${
                       active
-                        ? "bg-[#07101d]/[0.08]"
-                        : "hover:bg-[#07101d]/[0.04]"
+                        ? "bg-[#d6dcde]/[0.08]"
+                        : "hover:bg-[#d6dcde]/[0.04]"
                     }`}
                   >
                     {coin && (
@@ -476,17 +476,17 @@ export default function MarketTerminal() {
                     )}
 
                     <div className="flex-1">
-                      <div className="text-xs font-bold text-white">
+                      <div className="text-xs font-bold text-[#172126]">
                         {symbol}/USDT
                       </div>
-                      <div className="mt-0.5 text-[10px] text-white/30">
+                      <div className="mt-0.5 text-[10px] text-[#748087]">
                         {name}
                       </div>
                     </div>
 
                     {coin && (
                       <div className="text-left">
-                        <div className="text-xs font-bold text-white">
+                        <div className="text-xs font-bold text-[#172126]">
                           ${price(coin.current_price)}
                         </div>
 

@@ -1748,7 +1748,7 @@ main.markets-page .markets-main-card > div:last-child button:disabled {
 .equiti-dashboard-shell,
 .equiti-admin-shell {
   --equiti-workspace-canvas: #191c1f;
-  --equiti-workspace-surface: rgba(7, 16, 29, .80);
+  --equiti-workspace-surface: rgba(36, 40, 43, .95);
   --equiti-workspace-surface-raised: rgba(36, 40, 43, .76);
   --equiti-workspace-inset: rgba(5, 10, 19, .66);
   --equiti-workspace-border: rgba(255, 255, 255, .10);

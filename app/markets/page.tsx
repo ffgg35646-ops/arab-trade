@@ -32,7 +32,7 @@ export default function MarketsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
-  const pageSize = 100;
+  const pageSize = 10;
 
   async function loadMarket(manual = false) {
     if (manual) setRefreshing(true);
@@ -94,9 +94,6 @@ export default function MarketsPage() {
       <div className="mx-auto max-w-[1500px]">
         <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-xs font-bold text-[#4b555a]">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" /> Binance Spot · بيانات سوق عامة
-            </div>
             <h1 className="text-3xl font-black sm:text-4xl">الأسواق</h1>
             
           </div>

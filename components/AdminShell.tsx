@@ -132,7 +132,7 @@ export default function AdminShell({
   ];
 
   return (
-    <div dir="rtl" className="min-h-screen bg-[#050a13] text-white">
+    <div dir="rtl" className="equiti-admin-shell min-h-screen bg-[#e5e7e8] text-white">
       <aside className="fixed right-0 top-0 z-40 hidden h-screen w-[248px] overflow-y-auto border-l border-slate-800 bg-[#07101d] lg:block">
         <div className="border-b border-slate-800 p-4">
           <div className="text-xl font-black">ArabTrade</div>

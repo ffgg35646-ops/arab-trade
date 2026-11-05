@@ -1852,8 +1852,8 @@ main.markets-page .markets-main-card > div:last-child button:disabled {
 
 /* Dashboard markets page: keep the exact public markets canvas and graphite cards. */
 .equiti-dashboard-shell main.member-markets-page {
-  background: #e5e7e8 !important;
-  color: #20272b !important;
+  background: transparent !important;
+  color: #f8fafc !important;
 }
 .equiti-dashboard-shell main.member-markets-page .markets-stat-card {
   background: #30383b !important;

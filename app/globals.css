@@ -1370,3 +1370,17 @@ main.privacy-page {
     padding: 1.125rem;
   }
 }
+
+
+/* EQUITI PUBLIC PAGES — soft cool-gray canvas, intentionally distinct from white panels.
+   Scoped to Home, Markets and the public Trading terminal only. */
+.equiti-home {
+  background-color: #f1f3f4 !important;
+}
+.equiti-home-content {
+  background-color: #f1f3f4 !important;
+}
+main.markets-page,
+main.equiti-public-trading-page {
+  background-color: #eef1f2 !important;
+}

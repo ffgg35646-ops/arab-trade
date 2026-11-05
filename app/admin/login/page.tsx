@@ -130,15 +130,15 @@ function AdminLoginContent() {
           width: "100%",
           maxWidth: 440,
           background:
-            "rgba(7,16,29,.92)",
+            "rgba(48,56,59,.64)",
           border:
-            "1px solid rgba(255,255,255,.08)",
+            "1px solid rgba(255,255,255,.14)",
           borderRadius: 22,
           padding: 30,
           boxShadow:
             "0 25px 80px rgba(0,0,0,.45)",
           backdropFilter:
-            "blur(16px)",
+            "blur(30px) saturate(145%)",
         }}
       >
         <div

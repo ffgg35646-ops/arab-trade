@@ -30,7 +30,7 @@ export default function AboutPage() {
           العودة إلى الصفحة الرئيسية
         </Link>
 
-        <section className="arabtrade-about-glass-card rounded-[32px] p-7 md:p-12 lg:p-16">
+        <section className="arabtrade-auth-glass-card rounded-[32px] p-7 md:p-12 lg:p-16">
 
           <div className="max-w-3xl">
 

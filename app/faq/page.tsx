@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 const questions = [
   {
@@ -29,9 +31,24 @@ const questions = [
 
 export default function FAQPage() {
   return (
-    <main dir="rtl" className="min-h-screen bg-[#050a13] text-white">
+    <>
+      <Navbar />
+      <main dir="rtl" className="arabtrade-auth-hero min-h-screen overflow-hidden px-4 py-28 text-white">
 
-      <div className="mx-auto max-w-5xl px-5 py-16">
+      <div className="arabtrade-auth-coins" aria-hidden="true">
+        <span className="arabtrade-auth-coin">₿</span>
+        <span className="arabtrade-auth-coin">Ξ</span>
+        <span className="arabtrade-auth-coin">₿</span>
+        <span className="arabtrade-auth-coin">◎</span>
+        <span className="arabtrade-auth-coin">Ξ</span>
+      </div>
+      <div className="arabtrade-auth-lines" aria-hidden="true" />
+      <div className="arabtrade-auth-candles" aria-hidden="true" />
+
+      <div className="relative z-10 mx-auto max-w-6xl">
+        <section className="rounded-[32px] border border-white/10 bg-[#07101d]/80 p-7 shadow-2xl backdrop-blur-2xl md:p-12 lg:p-16">
+
+      <div className="mx-auto max-w-5xl px-0 py-0">
 
         <Link
           href="/"
@@ -49,7 +66,7 @@ export default function FAQPage() {
             الأسئلة الشائعة
           </h1>
 
-          <p className="mt-4 max-w-2xl text-sm leading-8 text-slate-500">
+          <p className="mt-4 max-w-2xl text-sm leading-8 text-slate-400">
             إجابات مختصرة عن أكثر الأسئلة المتعلقة بالمنصة والأسواق
             وتجربة التداول.
           </p>
@@ -59,7 +76,7 @@ export default function FAQPage() {
           {questions.map((item) => (
             <div
               key={item.q}
-              className="rounded-2xl border border-white/10 bg-[#07101d] p-6"
+              className="rounded-2xl border border-white/10 bg-white/[0.025] p-6"
             >
               <h2 className="text-base font-bold">
                 {item.q}
@@ -72,7 +89,11 @@ export default function FAQPage() {
           ))}
         </div>
 
+        </div>
+        </section>
       </div>
-    </main>
+      </main>
+      <Footer />
+    </>
   );
 }

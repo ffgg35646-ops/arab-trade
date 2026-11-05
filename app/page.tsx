@@ -5,7 +5,7 @@ import Navbar from "@/components/Navbar";
 
 export default function HomePage() {
   return (
-    <div dir="rtl" className="equiti-home min-h-screen overflow-x-hidden bg-[#eef0f1] text-[#172126]">
+    <div dir="rtl" className="equiti-home min-h-screen overflow-x-hidden bg-[#e5e7e8] text-[#172126]">
       <Navbar />
 
       <main className="equiti-home-content">
@@ -29,13 +29,13 @@ export default function HomePage() {
               </p>
             </div>
 
-            <button className="w-fit rounded-xl border border-[#dce5e5] bg-white px-4 py-2 text-sm font-bold text-[#344248] transition hover:bg-[#f3f7f7]">
+            <button className="w-fit rounded-xl border border-[#cbd2d4] bg-[#dfe3e4] px-4 py-2 text-sm font-bold text-[#344248] transition hover:bg-[#f3f7f7]">
               عرض جميع الأسواق
             </button>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-[#e4ebeb] bg-[#f8fafa]">
-            <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 border-b border-[#e4ebeb] px-5 py-4 text-xs font-semibold text-[#526168]">
+          <div className="overflow-hidden rounded-2xl border border-[#c7ced0] bg-[#d8dddf]">
+            <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 border-b border-[#c7ced0] px-5 py-4 text-xs font-semibold text-[#526168]">
               <span>الأصل</span>
               <span>السعر</span>
               <span>التغير 24س</span>
@@ -51,7 +51,7 @@ export default function HomePage() {
             ].map(([name, symbol, price, change, volume]) => (
               <div
                 key={symbol}
-                className="grid grid-cols-[1.5fr_1fr_1fr_1fr] items-center gap-4 border-b border-[#e9eeee] bg-white/70 px-5 py-5 last:border-0 hover:bg-[#f1f7f6]"
+                className="grid grid-cols-[1.5fr_1fr_1fr_1fr] items-center gap-4 border-b border-[#d0d6d8] bg-[#e7eaeb] px-5 py-5 last:border-0 hover:bg-[#dfe4e5]"
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e5f4f2] text-xs font-black text-[#008f89]">
@@ -93,7 +93,7 @@ export default function HomePage() {
             ].map(([title, description]) => (
               <div
                 key={title}
-                className="border-t border-[#e3ebea] bg-transparent px-2 py-7 first:border-t-0 sm:px-5"
+                className="rounded-2xl border border-[#cbd2d4] bg-[#dce1e2] px-6 py-7 shadow-sm"
               >
                 <div className="h-1 w-12 rounded-full bg-[#00a39b]" />
                 <h3 className="mt-5 text-lg font-extrabold text-[#172126]">{title}</h3>
@@ -109,7 +109,7 @@ export default function HomePage() {
           id="about"
           className="mx-auto max-w-7xl px-4 pb-20 lg:px-8"
         >
-          <div className="relative overflow-hidden border-y border-[#dce9e7] bg-[#f1f7f6] px-6 py-12 sm:px-12 sm:py-16">
+          <div className="relative overflow-hidden rounded-[28px] border border-[#c7ced0] bg-[#d8dddf] shadow-sm px-6 py-12 sm:px-12 sm:py-16">
             <div className="max-w-3xl">
               <div className="text-xs font-bold tracking-wide text-[#008f89]">
                 منصة واحدة • تجربة متكاملة

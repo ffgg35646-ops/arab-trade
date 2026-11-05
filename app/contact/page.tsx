@@ -74,7 +74,7 @@ export default async function ContactPage() {
               <p className="mt-7 max-w-xl text-base leading-8 text-slate-400">
                 سواء كان لديك استفسار حول المنصة، أو تحتاج إلى مساعدة في
                 استخدام إحدى الخدمات، أو ترغب في مشاركة اقتراح يساعدنا على
-                تطوير عرب تريد، يمكنك التواصل معنا في أي وقت.
+                تطوير EQUITI، يمكنك التواصل معنا في أي وقت.
               </p>
 
               <p className="mt-4 max-w-xl text-sm leading-7 text-slate-500">
@@ -205,7 +205,7 @@ export default async function ContactPage() {
         </section>
 
         <p className="mt-7 text-center text-xs text-slate-600">
-          عرب تريد — منصة عربية حديثة لعالم الأسواق والتداول
+          EQUITI — منصة عربية حديثة لعالم الأسواق والتداول
         </p>
 
       </div>

@@ -117,7 +117,7 @@ function AdminLoginContent() {
       style={{
         minHeight: "100vh",
         background:
-          "radial-gradient(circle at top,#0b1c34 0%,#050a13 45%,#03060b 100%)",
+          "radial-gradient(circle at 14% 0%, rgba(0,175,170,.10), transparent 34rem), radial-gradient(circle at 92% 82%, rgba(129,216,208,.055), transparent 36rem), #191c1f",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -130,15 +130,15 @@ function AdminLoginContent() {
           width: "100%",
           maxWidth: 440,
           background:
-            "rgba(48,56,59,.64)",
+            "rgba(48,56,59,.68)",
           border:
             "1px solid rgba(255,255,255,.14)",
           borderRadius: 22,
           padding: 30,
           boxShadow:
-            "0 25px 80px rgba(0,0,0,.45)",
+            "0 24px 60px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.05)",
           backdropFilter:
-            "blur(30px) saturate(145%)",
+            "blur(40px) saturate(145%)",
         }}
       >
         <div
@@ -156,8 +156,10 @@ function AdminLoginContent() {
               display: "grid",
               placeItems: "center",
               background:
-                "linear-gradient(135deg,#1677ff,#0aa7ff)",
+                "linear-gradient(145deg,rgba(129,216,208,.18),rgba(0,111,107,.12))",
               fontWeight: 900,
+              border: "1px solid rgba(129,216,208,.22)",
+              color: "#c4e5e1",
               fontSize: 21,
             }}
           >
@@ -171,7 +173,7 @@ function AdminLoginContent() {
               marginBottom: 7,
             }}
           >
-            ArabTrade
+            EQUITI
           </div>
 
           <h1
@@ -232,7 +234,7 @@ function AdminLoginContent() {
               border:
                 "1px solid rgba(255,255,255,.10)",
               background:
-                "#050a13",
+                "rgba(5,10,19,.66)",
               color: "#fff",
               outline: "none",
               fontSize: 14,
@@ -307,7 +309,7 @@ function AdminLoginContent() {
               padding:
                 "14px 16px",
               background:
-                "linear-gradient(135deg,#1677ff,#0b8fff)",
+                "linear-gradient(135deg,#007d77,#00615d)",
               color: "#fff",
               fontWeight: 900,
               fontSize: 14,
@@ -339,7 +341,7 @@ function AdminLoginContent() {
             style={{
               fontSize: 12,
               color:
-                "rgba(255,255,255,.55)",
+                "#a9c4c1",
               textDecoration: "none",
             }}
           >

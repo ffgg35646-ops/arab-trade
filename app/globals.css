@@ -1282,3 +1282,91 @@ main.arabtrade-auth-hero {
 ) {
   color: #ffffff !important;
 }
+
+
+/* =========================================================
+   EQUITI PRIVACY PAGE — FULL TEAL THEME WITH HIGH CONTRAST
+   Scoped only to /privacy; does not recolor other pages.
+   ========================================================= */
+main.privacy-page {
+  min-height: 100vh;
+  color: #f4fffd !important;
+  background:
+    radial-gradient(circle at 88% 7%, rgba(130, 255, 235, .18), transparent 27%),
+    radial-gradient(circle at 8% 75%, rgba(45, 212, 191, .16), transparent 30%),
+    linear-gradient(145deg, #007a73 0%, #00635e 48%, #06464a 100%) !important;
+}
+
+.privacy-page .privacy-back-link {
+  color: #c4fff5 !important;
+  font-weight: 700;
+  text-decoration: none;
+}
+.privacy-page .privacy-back-link:hover {
+  color: #ffffff !important;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.privacy-page .privacy-eyebrow {
+  color: #9effef !important;
+  letter-spacing: .04em;
+}
+.privacy-page .privacy-title {
+  color: #ffffff !important;
+  text-shadow: 0 2px 18px rgba(0, 30, 30, .18);
+}
+.privacy-page .privacy-intro {
+  color: #e4fffa !important;
+  font-weight: 500;
+}
+
+.privacy-page .privacy-updated {
+  color: #eafffb !important;
+  background: rgba(0, 38, 42, .34) !important;
+  border: 1px solid rgba(158, 255, 239, .42) !important;
+}
+
+.privacy-page .privacy-card {
+  color: #f4fffd !important;
+  background: rgba(2, 38, 43, .48) !important;
+  border: 1px solid rgba(126, 255, 235, .28) !important;
+  box-shadow: 0 14px 36px rgba(0, 25, 30, .13);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.privacy-page .privacy-card:hover {
+  border-color: rgba(158, 255, 239, .62) !important;
+  background: rgba(2, 43, 47, .58) !important;
+}
+.privacy-page .privacy-card-title {
+  color: #a6fff0 !important;
+  line-height: 1.6;
+}
+.privacy-page .privacy-card-text {
+  color: #effffb !important;
+  font-weight: 500;
+  line-height: 2.05;
+}
+
+.privacy-page .privacy-contact-box {
+  color: #ffffff !important;
+  background: linear-gradient(120deg, rgba(0, 45, 49, .72), rgba(0, 91, 84, .62)) !important;
+  border: 1px solid rgba(158, 255, 239, .68) !important;
+  box-shadow: 0 16px 40px rgba(0, 25, 30, .2);
+}
+.privacy-page .privacy-contact-text {
+  color: #ffffff !important;
+  font-weight: 600;
+  line-height: 2.05;
+}
+
+@media (max-width: 640px) {
+  .privacy-page .privacy-card,
+  .privacy-page .privacy-contact-box {
+    border-radius: 1rem;
+  }
+  .privacy-page .privacy-card {
+    padding: 1.125rem;
+  }
+}

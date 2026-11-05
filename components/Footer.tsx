@@ -83,14 +83,14 @@ export default function Footer({ showOnInternal = false }: { showOnInternal?: bo
             </p>
             <div className="mt-3 flex items-center gap-2 sm:mt-5">
               {[
-                ["f", "#"],
-                ["telegram", "#"],
-                ["𝕏", "#"],
+                ["f", "/contact"],
+                ["telegram", "/contact"],
+                ["𝕏", "/contact"],
               ].map(([icon, href], index) => (
-                <a
+                <Link
                   key={index}
                   href={href}
-                  aria-label={icon === "telegram" ? "Telegram" : icon === "f" ? "Facebook" : "X"}
+                  aria-label={icon === "telegram" ? "Telegram - اتصل بنا" : icon === "f" ? "Facebook - اتصل بنا" : "X - اتصل بنا"}
                   className="flex h-7 w-7 sm:h-10 sm:w-10 items-center justify-center rounded-xl border border-slate-600/70 bg-slate-900/80 text-slate-200 transition hover:border-sky-400/70 hover:bg-sky-400/10 hover:text-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
                 >
                   {icon === "telegram" ? (
@@ -100,7 +100,7 @@ export default function Footer({ showOnInternal = false }: { showOnInternal?: bo
                   ) : (
                     <span className="text-sm font-bold">{icon}</span>
                   )}
-                </a>
+                </Link>
               ))}
             </div>
           </div>

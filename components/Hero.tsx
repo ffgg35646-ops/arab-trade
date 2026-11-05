@@ -68,7 +68,7 @@ export default function Hero() {
               الأسواق تعمل الآن
             </div>
 
-            <h1 className="text-4xl font-black leading-[1.12] tracking-tight text-[#172126] sm:text-5xl lg:text-7xl">
+            <h1 className="text-4xl font-black leading-[1.12] tracking-tight text-white sm:text-5xl lg:text-7xl">
               تداول
               <span className="block bg-gradient-to-l from-[#006f6b] via-[#008f89] to-[#53666a] bg-clip-text text-transparent">
                 بذكاء

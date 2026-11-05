@@ -291,7 +291,7 @@ function InternalNavbarContent() {
                 pathname,
                 "/dashboard"
               )
-                ? "bg-blue-500/10 text-cyan-300"
+                ? "bg-[#006f6b]/35 text-white"
                 : "text-slate-300 hover:bg-white/5 hover:text-white"
             }`}
           >
@@ -305,7 +305,7 @@ function InternalNavbarContent() {
                 pathname,
                 "/dashboard/markets"
               )
-                ? "bg-blue-500/10 text-cyan-300"
+                ? "bg-[#006f6b]/35 text-white"
                 : "text-slate-300 hover:bg-white/5 hover:text-white"
             }`}
           >
@@ -316,7 +316,7 @@ function InternalNavbarContent() {
             href="/protrade"
             className={`rounded-xl px-3 py-2 text-sm transition ${
               isActive(pathname, "/protrade")
-                ? "bg-blue-500/10 text-cyan-300"
+                ? "bg-[#006f6b]/35 text-white"
                 : "text-slate-300 hover:bg-white/5 hover:text-white"
             }`}
           >
@@ -327,7 +327,7 @@ function InternalNavbarContent() {
             href="/dashboard/packages"
             className={`rounded-xl px-3 py-2 text-sm transition ${
               isActive(pathname, "/dashboard/packages")
-                ? "bg-blue-500/10 text-cyan-300"
+                ? "bg-[#006f6b]/35 text-white"
                 : "text-slate-300 hover:bg-white/5 hover:text-white"
             }`}
           >
@@ -403,7 +403,7 @@ function InternalNavbarContent() {
                 pathname,
                 "/dashboard/notifications"
               )
-                ? "border-blue-400/20 bg-blue-500/10 text-cyan-300"
+                ? "border-blue-400/20 bg-[#006f6b]/35 text-white"
                 : "border-white/10 text-slate-300 hover:bg-white/5 hover:text-white"
             }`}
             aria-label="الإشعارات"
@@ -429,7 +429,7 @@ function InternalNavbarContent() {
                 pathname,
                 "/dashboard/assets/deposit"
               )
-                ? "border-blue-400/20 bg-blue-500/10 text-cyan-300"
+                ? "border-blue-400/20 bg-[#006f6b]/35 text-white"
                 : "border-white/10 text-slate-300 hover:bg-white/5 hover:text-white"
             }`}
             aria-label="الإيداع"
@@ -445,7 +445,7 @@ function InternalNavbarContent() {
                 pathname,
                 "/dashboard/account"
               )
-                ? "border-blue-400/20 bg-blue-500/10 text-cyan-300"
+                ? "border-blue-400/20 bg-[#006f6b]/35 text-white"
                 : "border-white/10 text-slate-300 hover:bg-white/5 hover:text-white"
             }`}
             aria-label="الحساب"

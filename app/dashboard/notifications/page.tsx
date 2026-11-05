@@ -124,16 +124,16 @@ export default function NotificationsPage() {
 
         <main
           dir="rtl"
-          className="min-w-0 flex-1 bg-[#050a13] text-white"
+          className="min-w-0 flex-1 bg-[#191c1f] text-white"
         >
           <div className="mx-auto w-full max-w-4xl p-4 md:p-6 lg:p-8">
-            <section className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#07101d] to-[#0b1628]">
+            <section className="overflow-hidden rounded-2xl border border-white/[0.10] bg-[#30383b]">
               <div className="flex items-center justify-between border-b border-white/10 p-5">
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <Bell
                       size={22}
-                      className="text-cyan-300"
+                      className="text-[#91aaa7]"
                     />
 
                     {unreadCount > 0 ? (
@@ -185,15 +185,17 @@ export default function NotificationsPage() {
                       type="button"
                       key={item._id}
                       onClick={() => void openNotification(item)}
-                      className={`flex w-full items-start gap-4 border-b border-white/5 p-6 text-right transition hover:bg-cyan-400/[0.04] ${
-                        item.read ? "opacity-60" : ""
+                      className={`flex w-full items-start gap-4 border-b border-white/[0.06] p-6 text-right transition ${
+                        item.read
+                          ? "bg-transparent opacity-65 hover:bg-white/[0.025]"
+                          : "bg-[#343d3f]/60 hover:bg-[#3b4648]"
                       }`}
                     >
                       <div
                         className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
                           item.read
                             ? "bg-slate-700"
-                            : "bg-cyan-400"
+                            : "bg-[#82a7a2]"
                         }`}
                       />
 

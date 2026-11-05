@@ -1874,3 +1874,22 @@ main.markets-page .markets-main-card > div:last-child button:disabled {
   background: #262d30 !important;
   color: #e7edef !important;
 }
+
+/* ADMIN LOGIN — force the same full-page graphite canvas as the public auth pages. */
+html:has(main.equiti-admin-login-page),
+body:has(main.equiti-admin-login-page) {
+  background: #191c1f !important;
+  background-color: #191c1f !important;
+  color: #ffffff !important;
+}
+main.equiti-admin-login-page,
+main.arabtrade-auth-hero.equiti-admin-login-page {
+  min-height: 100vh !important;
+  width: 100% !important;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(0, 175, 170, .13), transparent 35%),
+    #191c1f !important;
+  background-color: #191c1f !important;
+  color: #ffffff !important;
+  isolation: isolate;
+}

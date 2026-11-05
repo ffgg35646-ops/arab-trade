@@ -9,6 +9,9 @@ const pagesWithTheirOwnFooter = new Set([
   "/team",
   "/contact",
   "/licenses",
+  "/faq",
+  "/terms",
+  "/privacy",
   "/markets",
   "/trading/spot",
 ]);

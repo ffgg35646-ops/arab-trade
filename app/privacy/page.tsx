@@ -64,32 +64,32 @@ const sections = [
 
 export default function PrivacyPage() {
   return (
-    <main dir="rtl" className="min-h-screen bg-[#050a13] text-white">
+    <main dir="rtl" className="privacy-page min-h-screen text-white">
 
       <div className="mx-auto max-w-5xl px-5 py-16">
 
         <Link
           href="/"
-          className="text-sm text-cyan-400 transition hover:text-cyan-300"
+          className="privacy-back-link text-sm transition"
         >
           ← العودة للرئيسية
         </Link>
 
         <div className="mt-10">
-          <div className="text-sm font-semibold text-cyan-400">
+          <div className="privacy-eyebrow text-sm font-semibold">
             قانوني
           </div>
 
-          <h1 className="mt-3 text-4xl font-bold">
+          <h1 className="privacy-title mt-3 text-4xl font-bold">
             سياسة الخصوصية
           </h1>
 
-          <p className="mt-4 text-sm leading-7 text-slate-500">
+          <p className="privacy-intro mt-4 text-sm leading-7">
             توضح هذه السياسة كيفية التعامل مع المعلومات والبيانات عند استخدام
             منصة عرب تريد وخدماتها.
           </p>
 
-          <div className="mt-4 inline-flex rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2 text-xs text-slate-500">
+          <div className="privacy-updated mt-4 inline-flex rounded-lg px-4 py-2 text-xs">
             آخر تحديث: 2026
           </div>
         </div>
@@ -98,21 +98,21 @@ export default function PrivacyPage() {
           {sections.map((section) => (
             <section
               key={section.title}
-              className="rounded-2xl border border-white/10 bg-[#07101d] p-6 transition hover:border-white/15"
+              className="privacy-card rounded-2xl p-6 transition"
             >
-              <h2 className="text-lg font-bold text-white">
+              <h2 className="privacy-card-title text-lg font-bold">
                 {section.title}
               </h2>
 
-              <p className="mt-4 text-sm leading-8 text-slate-400">
+              <p className="privacy-card-text mt-4 text-sm leading-8">
                 {section.text}
               </p>
             </section>
           ))}
         </div>
 
-        <div className="mt-8 rounded-2xl border border-cyan-400/10 bg-cyan-400/[0.03] p-6">
-          <p className="text-sm leading-8 text-slate-400">
+        <div className="privacy-contact-box mt-8 rounded-2xl p-6">
+          <p className="privacy-contact-text text-sm leading-8">
             إذا كانت لديك أسئلة تتعلق بالخصوصية أو بطريقة التعامل مع بيانات
             الحساب، يمكنك التواصل معنا من خلال صفحة تواصل معنا.
           </p>

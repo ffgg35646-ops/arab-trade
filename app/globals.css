@@ -1428,3 +1428,15 @@ main.equiti-public-trading-page {
 .equiti-public-trading-terminal :is([class*="border-white/"], [class*="border-cyan-400/"]) {
   border-color: rgba(255,255,255,.12);
 }
+
+
+/* Hero copy sits on a light gray card; the photo caption stays white. */
+.equiti-home .arabtrade-hero-content > div > div:first-child :is(h1, h2, h3, p, label, small, a, strong, b) {
+  color: #172126 !important;
+}
+.equiti-home .arabtrade-hero-content > div > div:first-child button:first-child {
+  color: #ffffff !important;
+}
+.equiti-home .arabtrade-hero-content > div > div:first-child button:nth-child(2) {
+  color: #344248 !important;
+}

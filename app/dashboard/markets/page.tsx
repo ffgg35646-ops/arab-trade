@@ -32,7 +32,7 @@ export default function MarketsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
-  const pageSize = 100;
+  const pageSize = 10;
 
   async function loadMarket(manual = false) {
     if (manual) setRefreshing(true);

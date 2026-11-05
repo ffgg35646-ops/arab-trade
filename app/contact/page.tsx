@@ -2,7 +2,6 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
-export const dynamic = "force-dynamic";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import {
   ArrowRight,
@@ -13,16 +12,21 @@ import {
 } from "lucide-react";
 
 export default async function ContactPage() {
-  const settings = await getPlatformSettings();
+  // The public contact page must remain usable if the settings database is slow.
+  // Keep a short server-side fallback instead of blocking the whole page indefinitely.
+  let settings: Awaited<ReturnType<typeof getPlatformSettings>> | null = null;
+  try {
+    settings = await Promise.race([
+      getPlatformSettings(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
+    ]);
+  } catch {
+    settings = null;
+  }
 
-  const telegram =
-    settings.support?.telegram || "";
-
-  const facebook =
-    settings.support?.facebook || "";
-
-  const email =
-    settings.support?.email || "";
+  const telegram = settings?.support?.telegram || "";
+  const facebook = settings?.support?.facebook || "";
+  const email = settings?.support?.email || "";
 
   return (
     <>

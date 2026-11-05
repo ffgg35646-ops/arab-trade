@@ -1112,13 +1112,13 @@ export default function ProTradeTerminal() {
 
           <div className="border-b border-white/[0.06] bg-[#060c15]">
             <div className="flex h-12 items-center justify-between border-b border-white/[0.06] px-4">
-              <h3 className="text-sm font-semibold">آخر صفقات السوق</h3>
+              <h3 className="text-sm font-semibold text-white">آخر صفقات السوق</h3>
               <span className="text-[10px] text-slate-500">
                 السعر / الكمية / الوقت
               </span>
             </div>
 
-            <div className="grid grid-cols-3 px-4 py-2 text-[10px] text-slate-500">
+            <div className="grid grid-cols-3 px-4 py-2 text-[10px] text-white">
               <span>السعر</span>
               <span className="text-right">الكمية</span>
               <span className="text-right">الوقت</span>
@@ -1136,12 +1136,12 @@ export default function ProTradeTerminal() {
                   >
                     <span
                       className={
-                        isBuy ? "text-emerald-400" : isSell ? "text-rose-400" : "text-slate-400"
+                        isBuy ? "text-emerald-400" : isSell ? "text-rose-400" : "text-white"
                       }
                     >
                       {fmt(trade.price, 4)}
                     </span>
-                    <span className="text-right text-slate-300">
+                    <span className="text-right text-white">
                       {fmt(trade.quantity, 6)}
                     </span>
                     <span className="text-right text-slate-500">

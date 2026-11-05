@@ -112,7 +112,7 @@ function InternalSidebarContent() {
                             aria-current={active(href) ? "page" : undefined}
                             className={`block rounded-md px-3 py-2 text-xs transition ${
                               active(href)
-                                ? "bg-blue-500/15 font-semibold text-cyan-300"
+                                ? "bg-[#006f6b]/35 font-semibold text-white"
                                 : "text-slate-500 hover:bg-white/5 hover:text-slate-200"
                             }`}
                           >
@@ -132,7 +132,7 @@ function InternalSidebarContent() {
                   aria-current={sectionActive ? "page" : undefined}
                   className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${
                     sectionActive
-                      ? "bg-blue-500/15 font-semibold text-cyan-300"
+                      ? "bg-[#006f6b]/35 font-semibold text-white"
                       : "text-slate-400 hover:bg-white/5 hover:text-white"
                   }`}
                 >

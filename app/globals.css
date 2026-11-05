@@ -1739,3 +1739,112 @@ main.markets-page .markets-main-card > div:last-child button:disabled {
 ) {
   color: #cbd5d8 !important;
 }
+
+
+/* =========================================================
+   EQUITI — unified glass workspace for member + admin areas
+   Mirrors the smoky glass panels used on About / Team.
+   ========================================================= */
+.equiti-dashboard-shell,
+.equiti-admin-shell {
+  --equiti-workspace-canvas: #191c1f;
+  --equiti-workspace-surface: rgba(7, 16, 29, .80);
+  --equiti-workspace-surface-raised: rgba(36, 40, 43, .76);
+  --equiti-workspace-inset: rgba(5, 10, 19, .66);
+  --equiti-workspace-border: rgba(255, 255, 255, .10);
+  --equiti-workspace-accent: #006f6b;
+  background:
+    radial-gradient(circle at 14% 0%, rgba(0, 175, 170, .11), transparent 34rem),
+    radial-gradient(circle at 92% 28%, rgba(129, 216, 208, .065), transparent 36rem),
+    #191c1f !important;
+  color: #f8fafc !important;
+}
+
+/* Page canvases stay graphite; the glass effect belongs to the content cards. */
+.equiti-dashboard-shell > div,
+.equiti-dashboard-shell main,
+.equiti-dashboard-shell div[class*="min-h-screen"][class*="bg-[#050a13]"],
+.equiti-admin-shell > main {
+  background: transparent !important;
+  color: #f8fafc !important;
+}
+
+/* The large and medium content panels share About's translucent navy glass. */
+.equiti-dashboard-shell main :is(div, section, article, a)[class*="rounded-2xl"][class*="border"][class*="bg-[#"],
+.equiti-dashboard-shell main :is(div, section, article, a)[class*="rounded-3xl"][class*="border"][class*="bg-[#"],
+.equiti-dashboard-shell main :is(div, section, article, a)[class*="rounded-[24px]"][class*="border"][class*="bg-[#"],
+.equiti-dashboard-shell main :is(div, section, article, a)[class*="rounded-xl"][class*="border"][class*="bg-[#"],
+.equiti-admin-shell > main :is(div, section, article, a)[class*="rounded-2xl"][class*="border"][class*="bg-[#"],
+.equiti-admin-shell > main :is(div, section, article, a)[class*="rounded-3xl"][class*="border"][class*="bg-[#"],
+.equiti-admin-shell > main :is(div, section, article, a)[class*="rounded-[24px]"][class*="border"][class*="bg-[#"],
+.equiti-admin-shell > main :is(div, section, article, a)[class*="rounded-xl"][class*="border"][class*="bg-[#"] {
+  background: var(--equiti-workspace-surface) !important;
+  background-image: none !important;
+  border-color: var(--equiti-workspace-border) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(120%);
+  backdrop-filter: blur(40px) saturate(120%);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, .18);
+}
+
+/* Sub-panels retain a lighter translucent layer instead of opaque gray. */
+.equiti-dashboard-shell main [class*="bg-white/["],
+.equiti-admin-shell > main [class*="bg-white/["] {
+  background-color: rgba(255, 255, 255, .035) !important;
+  border-color: rgba(255, 255, 255, .09) !important;
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+
+/* Dark form controls remain distinct and readable inside the glass panels. */
+.equiti-dashboard-shell main :is(input, select, textarea),
+.equiti-admin-shell > main :is(input, select, textarea) {
+  background-color: var(--equiti-workspace-inset) !important;
+  border-color: rgba(255, 255, 255, .16) !important;
+  color: #ffffff !important;
+}
+
+.equiti-dashboard-shell main :is(input, textarea)::placeholder,
+.equiti-admin-shell > main :is(input, textarea)::placeholder {
+  color: #aebbc0 !important;
+  opacity: 1;
+}
+
+/* Keep navigation chrome dark and translucent without changing its behavior. */
+.equiti-dashboard-shell > header,
+.equiti-admin-shell > main > .sticky {
+  background: rgba(5, 10, 19, .84) !important;
+  border-color: rgba(255, 255, 255, .10) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(125%);
+  backdrop-filter: blur(20px) saturate(125%);
+  color: #ffffff !important;
+}
+
+.equiti-dashboard-shell > div > aside,
+.equiti-admin-shell > aside {
+  background: rgba(7, 16, 29, .90) !important;
+  border-color: rgba(255, 255, 255, .10) !important;
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+
+.equiti-dashboard-shell aside [aria-current="page"],
+.equiti-admin-shell aside a[class*="bg-blue-600"] {
+  background: rgba(0, 111, 107, .36) !important;
+  color: #ffffff !important;
+}
+
+/* Table headers and row separators remain legible over the glass surface. */
+.equiti-dashboard-shell main table thead,
+.equiti-admin-shell > main table thead {
+  background: rgba(255, 255, 255, .045) !important;
+  border-color: rgba(255, 255, 255, .10) !important;
+}
+
+.equiti-dashboard-shell main table :is(th, td),
+.equiti-admin-shell > main table :is(th, td) {
+  border-color: rgba(255, 255, 255, .09) !important;
+}
+
+.equiti-dashboard-shell > footer {
+  background: rgba(5, 10, 19, .92) !important;
+}

@@ -1725,3 +1725,17 @@ main.markets-page .markets-main-card > div:last-child button:disabled {
 .equiti-dashboard-shell main.arabtrade-auth-hero .arabtrade-auth-candles {
   display: none !important;
 }
+
+/* Keep labels on converted legacy light cards readable against graphite. */
+.equiti-dashboard-shell main :is(
+  [class~="bg-white"],
+  [class~="bg-gray-50"],
+  [class~="bg-gray-100"],
+  [class~="bg-slate-50"],
+  [class~="bg-slate-100"]
+) :is(
+  .text-slate-400, .text-slate-500, .text-slate-600,
+  .text-gray-400, .text-gray-500, .text-gray-600
+) {
+  color: #cbd5d8 !important;
+}

@@ -88,7 +88,7 @@ export default function LoginPage() {
           العودة للرئيسية
         </Link>
 
-        <div className="rounded-[32px] border border-white/10 bg-[#07101d]/80 p-7 shadow-2xl backdrop-blur-2xl">
+        <div className="arabtrade-auth-glass-card rounded-[32px] p-7">
           <div className="mb-8 text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-400/20">
               <LockKeyhole className="text-blue-400" size={27} />

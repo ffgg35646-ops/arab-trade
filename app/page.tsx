@@ -24,18 +24,18 @@ export default function HomePage() {
                 أهم الأسواق الآن
               </h2>
 
-              <p className="mt-3 text-sm leading-7 text-[#4f5d63]">
+              <p className="mt-3 text-sm leading-7 text-[#cbd5d8]">
                 تابع حركة أبرز الأصول والأسعار والتغيرات اليومية من مكان واحد.
               </p>
             </div>
 
-            <button className="w-fit rounded-xl border border-[#cbd2d4] bg-[#dfe3e4] px-4 py-2 text-sm font-bold text-[#344248] transition hover:bg-[#f3f7f7]">
+            <button className="w-fit rounded-xl border border-white/10 bg-[#343c3f] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#414a4d]">
               عرض جميع الأسواق
             </button>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-[#c7ced0] bg-[#d8dddf]">
-            <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 border-b border-[#c7ced0] px-5 py-4 text-xs font-semibold text-[#526168]">
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#30383b] text-white">
+            <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 border-b border-white/10 px-5 py-4 text-xs font-semibold text-[#cbd5d8]">
               <span>الأصل</span>
               <span>السعر</span>
               <span>التغير 24س</span>
@@ -51,7 +51,7 @@ export default function HomePage() {
             ].map(([name, symbol, price, change, volume]) => (
               <div
                 key={symbol}
-                className="grid grid-cols-[1.5fr_1fr_1fr_1fr] items-center gap-4 border-b border-[#d0d6d8] bg-[#e7eaeb] px-5 py-5 last:border-0 hover:bg-[#dfe4e5]"
+                className="grid grid-cols-[1.5fr_1fr_1fr_1fr] items-center gap-4 border-b border-white/[0.07] bg-[#343c3f] px-5 py-5 text-white last:border-0 hover:bg-[#3b4447]"
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e5f4f2] text-xs font-black text-[#008f89]">
@@ -59,14 +59,14 @@ export default function HomePage() {
                   </div>
 
                   <div>
-                    <div className="text-sm font-bold text-[#172126]">{name}</div>
-                    <div className="mt-0.5 text-[11px] text-[#526168]">
+                    <div className="text-sm font-bold text-white">{name}</div>
+                    <div className="mt-0.5 text-[11px] text-[#cbd5d8]">
                       {symbol}/USDT
                     </div>
                   </div>
                 </div>
 
-                <span className="text-sm font-semibold text-[#26343a]">{price}</span>
+                <span className="text-sm font-semibold text-white">{price}</span>
 
                 <span
                   className={`text-sm font-bold ${
@@ -78,7 +78,7 @@ export default function HomePage() {
                   {change}
                 </span>
 
-                <span className="text-sm text-[#4f5d63]">{volume}</span>
+                <span className="text-sm text-[#cbd5d8]">{volume}</span>
               </div>
             ))}
           </div>
@@ -93,11 +93,11 @@ export default function HomePage() {
             ].map(([title, description]) => (
               <div
                 key={title}
-                className="rounded-2xl border border-[#cbd2d4] bg-[#dce1e2] px-6 py-7 shadow-sm"
+                className="rounded-2xl border border-white/10 bg-[#30383b] px-6 py-7 text-white shadow-sm"
               >
                 <div className="h-1 w-12 rounded-full bg-[#00a39b]" />
-                <h3 className="mt-5 text-lg font-extrabold text-[#172126]">{title}</h3>
-                <p className="mt-3 text-sm leading-7 text-[#4f5d63]">
+                <h3 className="mt-5 text-lg font-extrabold text-white">{title}</h3>
+                <p className="mt-3 text-sm leading-7 text-[#cbd5d8]">
                   {description}
                 </p>
               </div>
@@ -109,17 +109,17 @@ export default function HomePage() {
           id="about"
           className="mx-auto max-w-7xl px-4 pb-20 lg:px-8"
         >
-          <div className="relative overflow-hidden rounded-[28px] border border-[#c7ced0] bg-[#d8dddf] shadow-sm px-6 py-12 sm:px-12 sm:py-16">
+          <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#30383b] text-white shadow-sm px-6 py-12 sm:px-12 sm:py-16">
             <div className="max-w-3xl">
               <div className="text-xs font-bold tracking-wide text-[#008f89]">
                 منصة واحدة • تجربة متكاملة
               </div>
 
-              <h2 className="mt-4 text-3xl font-black leading-tight text-[#172126] sm:text-4xl">
+              <h2 className="mt-4 text-3xl font-black leading-tight text-white sm:text-4xl">
                 كل ما تحتاجه لمتابعة السوق في مكان واحد
               </h2>
 
-              <p className="mt-5 text-sm leading-8 text-[#46545b] sm:text-base">
+              <p className="mt-5 text-sm leading-8 text-[#cbd5d8] sm:text-base">
                 من متابعة الأسعار إلى دراسة حركة السوق واكتشاف الفرص، تم تصميم
                 عرب تريد لتكون واجهة مالية حديثة وسهلة الاستخدام.
               </p>

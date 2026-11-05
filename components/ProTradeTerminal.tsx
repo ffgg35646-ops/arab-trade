@@ -961,10 +961,10 @@ export default function ProTradeTerminal() {
   return (
     <main
       dir="rtl"
-      className={internalShell ? "min-h-screen bg-[#050a13] text-white" : "equiti-public-trading-page min-h-screen bg-[#e9edef] p-2 text-white sm:p-4"}
+      className={internalShell ? "min-h-screen bg-[#050a13] text-white" : "equiti-public-trading-page min-h-screen bg-[#e5e7e8] p-2 text-white sm:p-4"}
     >
       {internalShell ? <InternalNavbar /> : null}
-      <div className={internalShell ? "mx-auto flex max-w-[1700px]" : "mx-auto w-full max-w-[1700px] overflow-hidden rounded-2xl border border-[#d4dcde] bg-[#050a13] shadow-[0_16px_48px_rgba(20,30,35,0.12)]"}>
+      <div className={internalShell ? "mx-auto flex max-w-[1700px]" : "equiti-public-trading-terminal mx-auto w-full max-w-[1700px] overflow-hidden rounded-2xl border border-[#c4cbce] bg-[#30383b] shadow-[0_16px_48px_rgba(20,30,35,0.12)]"}>
         {internalShell ? <InternalSidebar /> : null}
         <div className="min-w-0 flex-1">
       <div className="border-b border-white/[0.06] bg-[#07101d]">
@@ -1093,7 +1093,7 @@ export default function ProTradeTerminal() {
       <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_330px]">
         <div className="min-w-0">
           <div className="grid grid-cols-1 border-b border-white/[0.06] lg:grid-cols-[minmax(0,1fr)_310px]">
-            <div className="border-l border-white/[0.06]">
+            <div className="equiti-trading-chart border-l border-white/[0.06]">
               <div className="flex h-12 items-center justify-between border-b border-white/[0.06] px-4">
                 <span className="text-[10px] text-slate-500">بيانات السوق المرجعي لحظيًا</span>
               </div>

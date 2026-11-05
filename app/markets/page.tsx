@@ -113,7 +113,7 @@ export default function MarketsPage() {
           <div className="rounded-2xl border border-white/10 bg-[#30383b] p-5 text-white"><div className="text-xs text-[#cbd5d8]">عملات التسعير المتاحة</div><div className="mt-2 text-2xl font-black tabular-nums">{stats.quoteCount.toLocaleString("en-US")}</div></div>
         </div>
 
-        {error && <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300"><span>{error}</span><button type="button" onClick={() => void loadMarket(true)} className="rounded-lg border border-red-400/20 px-3 py-2 font-semibold">إعادة المحاولة</button></div>}
+        {error && <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-[#fff1f1] p-4 text-sm text-red-800"><span>{error}</span><button type="button" onClick={() => void loadMarket(true)} className="rounded-lg border border-red-400/20 px-3 py-2 font-semibold">إعادة المحاولة</button></div>}
 
         <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#30383b] text-white">
           <div className="flex flex-col gap-3 border-b border-white/10 p-4 lg:flex-row lg:items-center lg:justify-between">

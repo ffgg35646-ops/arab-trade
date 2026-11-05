@@ -1848,3 +1848,29 @@ main.markets-page .markets-main-card > div:last-child button:disabled {
 .equiti-dashboard-shell > footer {
   background: rgba(5, 10, 19, .92) !important;
 }
+
+
+/* Dashboard markets page: keep the exact public markets canvas and graphite cards. */
+.equiti-dashboard-shell main.member-markets-page {
+  background: #e5e7e8 !important;
+  color: #20272b !important;
+}
+.equiti-dashboard-shell main.member-markets-page .markets-stat-card {
+  background: #30383b !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, .10) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+.equiti-dashboard-shell main.member-markets-page .markets-main-card {
+  background: #30383b !important;
+  color: #f8fafc !important;
+}
+.equiti-dashboard-shell main.member-markets-page .markets-toolbar {
+  background: #343c3f !important;
+}
+.equiti-dashboard-shell main.member-markets-page .markets-meta-strip {
+  background: #262d30 !important;
+  color: #e7edef !important;
+}

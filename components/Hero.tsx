@@ -63,7 +63,7 @@ export default function Hero() {
       <div className="arabtrade-hero-content mx-auto max-w-[1500px]">
         <div className="grid min-h-[560px] items-center gap-8 overflow-hidden rounded-[30px] border border-[#c4cbce] bg-[#d7dcde] p-4 shadow-[0_18px_48px_rgba(35,45,50,.10)] sm:p-7 lg:grid-cols-[1fr_1.05fr] lg:p-10">
           <div className="relative z-10 order-2 max-w-2xl lg:order-1">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#00afaa]/25 bg-[#00afaa]/[0.08] px-4 py-2 text-xs font-bold text-[#006f6b]">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#b7d8d3] bg-[#d9ecea] px-4 py-2 text-xs font-bold text-[#006f6b]">
               <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
               الأسواق تعمل الآن
             </div>

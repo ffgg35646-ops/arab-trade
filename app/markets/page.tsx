@@ -90,7 +90,7 @@ export default function MarketsPage() {
   useEffect(() => { setPage(1); }, [search, quote, sort]);
 
   return (
-    <main dir="rtl" className="min-h-screen bg-[#050a13] px-3 py-6 text-white sm:px-5 lg:px-8">
+    <main dir="rtl" className="markets-page min-h-screen bg-[#eef1f2] px-3 py-6 text-white sm:px-5 lg:px-8">
       <div className="mx-auto max-w-[1500px]">
         <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
           <div>

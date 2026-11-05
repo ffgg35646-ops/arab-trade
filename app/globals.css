@@ -1157,6 +1157,10 @@ main.arabtrade-auth-hero {
 :is(
   [class*="bg-[#050a13]"],
   [class*="bg-[#07101d]"],
+  [class*="bg-[#08111e]"],
+  [class*="bg-[#0b1422]"],
+  [class*="bg-[#0c1726]"],
+  [class*="bg-[#07101b]"],
   [class*="bg-[#191c1f]"],
   [class*="bg-[#24282b]"],
   [class*="bg-[#2a2e31]"],
@@ -1188,6 +1192,10 @@ main.arabtrade-auth-hero {
 :is(
   [class*="bg-[#050a13]"],
   [class*="bg-[#07101d]"],
+  [class*="bg-[#08111e]"],
+  [class*="bg-[#0b1422]"],
+  [class*="bg-[#0c1726]"],
+  [class*="bg-[#07101b]"],
   [class*="bg-[#191c1f]"],
   [class*="bg-[#24282b]"],
   [class*="bg-[#2a2e31]"],
@@ -1203,6 +1211,10 @@ main.arabtrade-auth-hero {
 :is(
   [class*="bg-[#050a13]"],
   [class*="bg-[#07101d]"],
+  [class*="bg-[#08111e]"],
+  [class*="bg-[#0b1422]"],
+  [class*="bg-[#0c1726]"],
+  [class*="bg-[#07101b]"],
   [class*="bg-[#191c1f]"],
   [class*="bg-[#24282b]"],
   [class*="bg-[#2a2e31]"],
@@ -1232,6 +1244,10 @@ main.arabtrade-auth-hero {
 :is(
   [class*="bg-[#050a13]"],
   [class*="bg-[#07101d]"],
+  [class*="bg-[#08111e]"],
+  [class*="bg-[#0b1422]"],
+  [class*="bg-[#0c1726]"],
+  [class*="bg-[#07101b]"],
   [class*="bg-[#191c1f]"],
   [class*="bg-[#24282b]"],
   [class*="bg-[#2a2e31]"],
@@ -1430,13 +1446,45 @@ main.equiti-public-trading-page {
 }
 
 
-/* Hero copy sits on a light gray card; the photo caption stays white. */
-.equiti-home .arabtrade-hero-content > div > div:first-child :is(h1, h2, h3, p, label, small, a, strong, b) {
-  color: #172126 !important;
-}
-.equiti-home .arabtrade-hero-content > div > div:first-child button:first-child {
+/* The graphite homepage hero card uses white copy throughout. */
+.equiti-home .arabtrade-hero-content > div > div:first-child {
   color: #ffffff !important;
 }
-.equiti-home .arabtrade-hero-content > div > div:first-child button:nth-child(2) {
-  color: #344248 !important;
+.equiti-home .arabtrade-hero-content > div > div:first-child :is(h1, h2, h3, p, label, small, a, strong, b, span, button) {
+  color: #ffffff !important;
+}
+
+
+/* EQUITI PAGE CANVASES — match the homepage gray without recoloring its cards. */
+main.equiti-login-page {
+  background: #e5e7e8 !important;
+  color: #172126 !important;
+}
+main.equiti-login-page::before,
+main.equiti-login-page::after,
+main.equiti-login-page .arabtrade-auth-candles,
+main.equiti-login-page .arabtrade-auth-chart {
+  display: none !important;
+}
+
+/* Member dashboard: gray page canvas; keep navigation, footer and dark cards intact. */
+.equiti-dashboard-shell {
+  background-color: #e5e7e8 !important;
+}
+.equiti-dashboard-shell main,
+.equiti-dashboard-shell div[class*="min-h-screen"][class*="bg-[#050a13]"] {
+  background-color: #e5e7e8 !important;
+  color: #172126 !important;
+}
+
+/* Admin dashboard canvas uses the same homepage gray; its top bar stays dark. */
+.equiti-admin-shell {
+  background-color: #e5e7e8 !important;
+}
+.equiti-admin-shell > main {
+  background-color: #e5e7e8 !important;
+  color: #172126 !important;
+}
+.equiti-admin-shell > main > .sticky {
+  color: #ffffff !important;
 }

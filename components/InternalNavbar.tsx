@@ -272,11 +272,11 @@ function InternalNavbarContent() {
         <Link
           href="/dashboard"
           className="shrink-0"
-          aria-label="عرب تريد"
+          aria-label="EQUITI"
         >
           <img
             src="/logo.svg"
-            alt="عرب تريد"
+            alt="EQUITI"
             className="h-8 w-auto sm:h-9"
           />
         </Link>

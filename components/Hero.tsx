@@ -63,19 +63,19 @@ export default function Hero() {
       <div className="arabtrade-hero-content mx-auto max-w-[1500px]">
         <div className="grid min-h-[560px] items-center gap-8 overflow-hidden rounded-[30px] border border-white/10 bg-[#30383b] p-4 text-white shadow-[0_18px_48px_rgba(20,30,35,.18)] sm:p-7 lg:grid-cols-[1fr_1.05fr] lg:p-10">
           <div className="relative z-10 order-2 max-w-2xl lg:order-1">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#b7d8d3] bg-[#d9ecea] px-4 py-2 text-xs font-bold text-[#006f6b]">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#00afaa]/40 bg-[#006f6b]/25 px-4 py-2 text-xs font-bold text-white">
               <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
               الأسواق تعمل الآن
             </div>
 
             <h1 className="text-4xl font-black leading-[1.12] tracking-tight text-white sm:text-5xl lg:text-7xl">
               تداول
-              <span className="block bg-gradient-to-l from-[#006f6b] via-[#008f89] to-[#53666a] bg-clip-text text-transparent">
+              <span className="block text-white">
                 بذكاء
               </span>
             </h1>
 
-            <p className="mt-6 max-w-xl text-base leading-8 text-[#cbd5d8] sm:text-lg">
+            <p className="mt-6 max-w-xl text-base leading-8 text-white/90 sm:text-lg">
               منصة عربية حديثة لمتابعة الأسواق والعملات الرقمية،
               مع بيانات مباشرة وأدوات تساعدك على فهم حركة السوق.
             </p>
@@ -92,15 +92,15 @@ export default function Hero() {
             <div className="mt-10 grid max-w-xl grid-cols-3 gap-3">
               <div className="rounded-2xl border border-white/10 bg-[#394245] p-4">
                 <div className="text-xl font-black text-white">100+</div>
-                <div className="mt-1 text-[11px] text-[#cbd5d8]">أصل رقمي</div>
+                <div className="mt-1 text-[11px] text-white/85">أصل رقمي</div>
               </div>
               <div className="rounded-2xl border border-white/10 bg-[#394245] p-4">
                 <div className="text-xl font-black text-white">مباشر</div>
-                <div className="mt-1 text-[11px] text-[#b5c0c4]">بيانات السوق</div>
+                <div className="mt-1 text-[11px] text-white/85">بيانات السوق</div>
               </div>
               <div className="rounded-2xl border border-white/10 bg-[#394245] p-4">
                 <div className="text-xl font-black text-white">24/7</div>
-                <div className="mt-1 text-[11px] text-[#b5c0c4]">متابعة مستمرة</div>
+                <div className="mt-1 text-[11px] text-white/85">متابعة مستمرة</div>
               </div>
             </div>
           </div>
@@ -133,7 +133,7 @@ export default function Hero() {
               <h2 className="max-w-lg text-2xl font-black leading-tight text-white sm:text-3xl">
                 {slide.title}
               </h2>
-              <p className="mt-3 max-w-lg text-xs leading-6 text-white/55 sm:text-sm">
+              <p className="mt-3 max-w-lg text-xs leading-6 text-white/85 sm:text-sm">
                 {slide.text}
               </p>
             </div>

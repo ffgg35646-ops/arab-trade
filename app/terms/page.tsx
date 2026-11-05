@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 const sections = [
   {
@@ -89,9 +91,24 @@ const sections = [
 
 export default function TermsPage() {
   return (
-    <main dir="rtl" className="min-h-screen bg-[#050a13] text-white">
+    <>
+      <Navbar />
+      <main dir="rtl" className="arabtrade-auth-hero min-h-screen overflow-hidden px-4 py-28 text-white">
 
-      <div className="mx-auto max-w-5xl px-5 py-16">
+      <div className="arabtrade-auth-coins" aria-hidden="true">
+        <span className="arabtrade-auth-coin">₿</span>
+        <span className="arabtrade-auth-coin">Ξ</span>
+        <span className="arabtrade-auth-coin">₿</span>
+        <span className="arabtrade-auth-coin">◎</span>
+        <span className="arabtrade-auth-coin">Ξ</span>
+      </div>
+      <div className="arabtrade-auth-lines" aria-hidden="true" />
+      <div className="arabtrade-auth-candles" aria-hidden="true" />
+
+      <div className="relative z-10 mx-auto max-w-6xl">
+        <section className="rounded-[32px] border border-white/10 bg-[#07101d]/80 p-7 shadow-2xl backdrop-blur-2xl md:p-12 lg:p-16">
+
+      <div className="mx-auto max-w-5xl px-0 py-0">
 
         <Link
           href="/"
@@ -109,12 +126,12 @@ export default function TermsPage() {
             الشروط والأحكام
           </h1>
 
-          <p className="mt-4 max-w-3xl text-sm leading-8 text-slate-500">
+          <p className="mt-4 max-w-3xl text-sm leading-8 text-slate-400">
             تحدد هذه الشروط القواعد العامة لاستخدام منصة عرب تريد والخدمات
             والواجهات المتاحة من خلالها.
           </p>
 
-          <div className="mt-4 inline-flex rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2 text-xs text-slate-500">
+          <div className="mt-4 inline-flex rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2 text-xs text-slate-400">
             آخر تحديث: 2026
           </div>
         </div>
@@ -123,7 +140,7 @@ export default function TermsPage() {
           {sections.map((section) => (
             <section
               key={section.title}
-              className="rounded-2xl border border-white/10 bg-[#07101d] p-6 transition hover:border-white/15"
+              className="rounded-2xl border border-white/10 bg-white/[0.025] p-6 transition hover:border-white/15"
             >
               <h2 className="text-lg font-bold text-white">
                 {section.title}
@@ -148,7 +165,11 @@ export default function TermsPage() {
           </p>
         </div>
 
+        </div>
+        </section>
       </div>
-    </main>
+      </main>
+      <Footer />
+    </>
   );
 }

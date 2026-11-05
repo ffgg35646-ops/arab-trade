@@ -96,7 +96,7 @@ export default function LoginPage() {
 
             <h1 className="text-3xl font-bold">تسجيل الدخول</h1>
             <p className="mt-2 text-sm text-slate-400">
-              سجّل دخولك إلى حسابك في عرب تريد
+              سجّل دخولك إلى حسابك في EQUITI
             </p>
           </div>
 

@@ -90,17 +90,15 @@ export default function MarketsPage() {
   useEffect(() => { setPage(1); }, [search, quote, sort]);
 
   return (
-    <main dir="rtl" className="markets-page min-h-screen bg-[#e5e7e8] px-3 py-6 text-white sm:px-5 lg:px-8">
+    <main dir="rtl" className="markets-page min-h-screen bg-[#e5e7e8] px-3 py-6 text-[#20272b] sm:px-5 lg:px-8">
       <div className="mx-auto max-w-[1500px]">
         <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="mb-2 flex items-center gap-2 text-xs font-bold text-[#007a74]">
+            <div className="mb-2 flex items-center gap-2 text-xs font-bold text-[#4b555a]">
               <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" /> Binance Spot · بيانات سوق عامة
             </div>
             <h1 className="text-3xl font-black sm:text-4xl">الأسواق</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#cbd5d8]">
-              قائمة أزواج التداول الفوري المتاحة حاليًا في Binance، مع الأسعار والتغيّر خلال 24 ساعة وحجم التداول. اضغط على أي زوج لفتح صفحة التداول داخل عرب تريد.
-            </p>
+            
           </div>
           <button type="button" onClick={() => void loadMarket(true)} className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#343c3f] px-4 py-3 text-sm font-semibold text-white hover:bg-[#414a4d]">
             <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} /> تحديث الأسواق
@@ -119,11 +117,11 @@ export default function MarketsPage() {
           <div className="flex flex-col gap-3 border-b border-white/10 p-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap gap-2">
               {([["volume", "الأكثر تداولًا"], ["gainers", "الأكثر ارتفاعًا"], ["losers", "الأكثر انخفاضًا"], ["alphabetical", "ترتيب أبجدي"]] as [SortKey, string][]).map(([value, label]) => (
-                <button key={value} type="button" onClick={() => setSort(value)} className={"rounded-lg px-3 py-2 text-xs font-bold " + (sort === value ? "bg-cyan-400/10 text-cyan-300" : "text-[#cbd5d8] hover:bg-white/[0.06] hover:text-white")}>{label}</button>
+                <button key={value} type="button" onClick={() => setSort(value)} className={"rounded-lg px-3 py-2 text-xs font-bold " + (sort === value ? "bg-[#485256] text-white" : "text-[#cbd5d8] hover:bg-[#394245] hover:text-white")}>{label}</button>
               ))}
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <label className="relative block"><Search size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#aeb9bd]" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث عن زوج أو عملة..." className="w-full rounded-xl border border-white/10 bg-[#262d30] py-3 pr-9 pl-3 text-sm text-white outline-none focus:border-cyan-400/40 sm:w-64" /></label>
+              <label className="relative block"><Search size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#aeb9bd]" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ابحث عن زوج أو عملة..." className="w-full rounded-xl border border-white/10 bg-[#262d30] py-3 pr-9 pl-3 text-sm text-white outline-none focus:border-[#899397] sm:w-64" /></label>
               <select aria-label="فلترة عملة التسعير" value={quote} onChange={(event) => setQuote(event.target.value)} className="rounded-xl border border-white/10 bg-[#262d30] px-3 py-3 text-sm text-white outline-none">
                 <option value="ALL">كل عملات التسعير</option>{quotes.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
@@ -139,20 +137,19 @@ export default function MarketsPage() {
               <tbody>
                 {loading && pairs.length === 0 ? [1,2,3,4,5,6,7].map((item) => <tr key={item} className="border-b border-white/[0.08]"><td colSpan={7} className="h-14" /></tr>) :
                 visiblePairs.length === 0 ? <tr><td colSpan={7} className="px-4 py-16 text-center text-[#aeb9bd]">{error ? "بيانات السوق غير متاحة الآن." : "لا توجد أزواج تطابق البحث."}</td></tr> :
-                visiblePairs.map((item) => <tr key={item.symbol} className="border-b border-white/[0.08] hover:bg-cyan-400/[0.035]">
-                  <td className="px-4 py-4"><Link href={"/trading/spot?symbol=" + item.symbol} className="font-bold text-white hover:text-cyan-300">{item.baseAsset}<span className="text-[#aeb9bd]">/{item.quoteAsset}</span></Link><div className="mt-1 text-[10px] text-[#9ba8ad]">Spot · {item.tradeCount.toLocaleString("en-US")} صفقة/24س</div></td>
+                visiblePairs.map((item) => <tr key={item.symbol} className="border-b border-white/[0.08] hover:bg-[#394245]">
+                  <td className="px-4 py-4"><Link href={"/trading/spot?symbol=" + item.symbol} className="font-bold text-white hover:text-white">{item.baseAsset}<span className="text-[#aeb9bd]">/{item.quoteAsset}</span></Link><div className="mt-1 text-[10px] text-[#9ba8ad]">Spot · {item.tradeCount.toLocaleString("en-US")} صفقة/24س</div></td>
                   <td className="px-4 py-4 text-left font-mono tabular-nums">{price(item.lastPrice)}</td>
                   <td className={"px-4 py-4 text-left font-mono font-bold " + (item.priceChangePercent >= 0 ? "text-emerald-400" : "text-red-400")}><span className="inline-flex items-center gap-1">{item.priceChangePercent >= 0 ? <ArrowUp size={13} /> : <ArrowDown size={13} />}{item.priceChangePercent > 0 ? "+" : ""}{item.priceChangePercent.toFixed(2)}%</span></td>
                   <td className="px-4 py-4 text-left font-mono text-[#e1e7e9]">{price(item.highPrice)}</td><td className="px-4 py-4 text-left font-mono text-[#e1e7e9]">{price(item.lowPrice)}</td>
                   <td className="px-4 py-4 text-left font-mono text-[#e1e7e9]">{compact(item.quoteVolume)} <span className="text-[10px] text-[#9ba8ad]">{item.quoteAsset}</span></td>
-                  <td className="px-4 py-4 text-left"><Link href={"/trading/spot?symbol=" + item.symbol} className="inline-flex items-center gap-1 rounded-lg bg-cyan-400/10 px-3 py-2 text-xs font-bold text-cyan-300 hover:bg-cyan-400/20"><BarChart3 size={14} />تداول</Link></td>
+                  <td className="px-4 py-4 text-left"><Link href={"/trading/spot?symbol=" + item.symbol} className="inline-flex items-center gap-1 rounded-lg bg-[#485256] px-3 py-2 text-xs font-bold text-white hover:bg-[#596367]"><BarChart3 size={14} />تداول</Link></td>
                 </tr>)}
               </tbody>
             </table>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-4 py-4"><span className="text-xs text-[#aeb9bd]">صفحة {Math.min(page, pages)} من {pages}</span><div className="flex items-center gap-2"><button type="button" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="rounded-lg border border-white/10 px-4 py-2 text-xs font-semibold disabled:opacity-30">السابق</button><button type="button" disabled={page >= pages} onClick={() => setPage((value) => Math.min(pages, value + 1))} className="rounded-lg border border-white/10 px-4 py-2 text-xs font-semibold disabled:opacity-30">التالي</button></div></div>
         </section>
-        <p className="mt-4 text-xs leading-6 text-[#9ba8ad]">الأسعار والأحجام المعروضة بيانات سوق عامة من Binance Spot. تنفيذ الأوامر داخل عرب تريد يعتمد على دفتر أوامر المنصة الداخلي، وليس إرسال الأوامر إلى Binance.</p>
       </div>
     </main>
   );

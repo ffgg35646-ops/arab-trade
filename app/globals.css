@@ -1494,12 +1494,12 @@ main.equiti-login-page .arabtrade-auth-chart {
    ========================================================= */
 .arabtrade-auth-glass-card {
   /* Match the exact outer-panel tone used on the Privacy and Terms pages. */
-  background: rgba(7, 16, 29, .8) !important;
-  background-image: none !important;
-  border: 1px solid rgba(255, 255, 255, .10) !important;
+  background: rgba(48, 56, 59, .64) !important;
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, .055), rgba(255, 255, 255, .012)) !important;
+  border: 1px solid rgba(255, 255, 255, .14) !important;
   -webkit-backdrop-filter: blur(40px) !important;
   backdrop-filter: blur(40px) !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, .25) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .24), inset 0 1px 0 rgba(255, 255, 255, .05) !important;
 }
 
 
@@ -1748,8 +1748,8 @@ main.markets-page .markets-main-card > div:last-child button:disabled {
 .equiti-dashboard-shell,
 .equiti-admin-shell {
   --equiti-workspace-canvas: #191c1f;
-  --equiti-workspace-surface: rgba(36, 40, 43, .95);
-  --equiti-workspace-surface-raised: rgba(36, 40, 43, .76);
+  --equiti-workspace-surface: rgba(48, 56, 59, .68);
+  --equiti-workspace-surface-raised: rgba(58, 67, 70, .58);
   --equiti-workspace-inset: rgba(5, 10, 19, .66);
   --equiti-workspace-border: rgba(255, 255, 255, .10);
   --equiti-workspace-accent: #006f6b;
@@ -1781,8 +1781,8 @@ main.markets-page .markets-main-card > div:last-child button:disabled {
   background: var(--equiti-workspace-surface) !important;
   background-image: none !important;
   border-color: var(--equiti-workspace-border) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(120%);
-  backdrop-filter: blur(40px) saturate(120%);
+  -webkit-backdrop-filter: blur(40px) saturate(145%);
+  backdrop-filter: blur(40px) saturate(145%);
   box-shadow: 0 20px 48px rgba(0, 0, 0, .18);
 }
 

@@ -3,6 +3,7 @@ import {
   BarChart3,
   ClipboardList,
   Gift,
+  Headset,
   Home,
   ShieldCheck,
   Users,
@@ -54,6 +55,11 @@ export const dashboardNavigation: DashboardNavigationSection[] = [
     title: "الإحالة",
     href: "/dashboard/referral",
     icon: Users,
+  },
+  {
+    title: "الدعم",
+    href: "/dashboard/support",
+    icon: Headset,
   },
   {
     title: "الحساب",

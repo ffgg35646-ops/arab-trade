@@ -36,13 +36,7 @@ function InternalSidebarContent() {
       } transition-all duration-200`}
     >
       <div className="sticky top-16 flex h-[calc(100vh-4rem)] flex-col">
-        <div className="flex items-center justify-between border-b border-white/5 p-3">
-          {!collapsed && (
-            <span className="px-2 text-xs font-semibold text-slate-500">
-              مساحة الحساب
-            </span>
-          )}
-
+        <div className="equiti-sidebar-topbar flex items-center justify-between border-b border-white/5 p-3">
           <button
             type="button"
             onClick={() => setCollapsed((value) => !value)}

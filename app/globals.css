@@ -1945,11 +1945,19 @@ header.equiti-internal-navbar-frame,
   backdrop-filter: blur(18px) saturate(120%);
 }
 
-/* Internal sidebar top strip matches the sidebar's navy surface. */
-.equiti-dashboard-shell .equiti-sidebar-topbar {
-  background: rgba(7, 16, 29, .90) !important;
-  background-color: rgba(7, 16, 29, .90) !important;
-  border-bottom-color: rgba(255, 255, 255, .10) !important;
+/* Internal sidebar and its top strip share the graphite gray surface. */
+aside.equiti-internal-sidebar,
+.equiti-dashboard-shell > div > aside.equiti-internal-sidebar {
+  background: #30383b !important;
+  background-color: #30383b !important;
+  border-color: rgba(255, 255, 255, .12) !important;
+}
+
+aside.equiti-internal-sidebar .equiti-sidebar-topbar,
+.equiti-dashboard-shell aside.equiti-internal-sidebar .equiti-sidebar-topbar {
+  background: #30383b !important;
+  background-color: #30383b !important;
+  border-bottom-color: rgba(255, 255, 255, .12) !important;
 }
 
 /* EQUITI — gray glass title bars for internal deposit and withdrawal pages */

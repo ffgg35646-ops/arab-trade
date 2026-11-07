@@ -247,7 +247,7 @@ function InternalNavbarContent() {
   return (
     <header
       dir="rtl"
-      className="equiti-internal-navbar sticky top-3 z-50 mx-3 rounded-2xl border border-white/20 bg-white/10 shadow-lg shadow-black/10 backdrop-blur-2xl"
+      className="sticky top-0 z-50 border-b border-white/10 bg-[#050a13]/95 backdrop-blur-xl"
     >
       <div className="mx-auto flex h-16 max-w-[1700px] items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:px-6">
 
@@ -282,7 +282,7 @@ function InternalNavbarContent() {
         </Link>
 
         {/* Desktop navigation */}
-        <nav className="hidden items-center gap-1 xl:flex">
+        <nav className="equiti-internal-nav-links hidden items-center gap-1 xl:flex">
 
           <Link
             href="/dashboard"

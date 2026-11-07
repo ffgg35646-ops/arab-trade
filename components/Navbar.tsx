@@ -22,12 +22,12 @@ export default function Navbar() {
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) return null;
 
   return (
-    <header dir="rtl" className="equiti-public-navbar sticky top-3 z-50 mx-3 rounded-2xl border border-white/20 bg-white/10 shadow-lg shadow-black/10 backdrop-blur-2xl">
+    <header dir="rtl" className="sticky top-0 z-50 border-b border-white/10 bg-[#050a13]/95 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-[1500px] items-center justify-between gap-3 px-3 sm:h-20 sm:px-5">
         <Link href="/" className="shrink-0" onClick={() => setOpen(false)}>
           <img src="/logo.svg" alt="EQUITI للتداول" className="h-9 w-auto sm:h-11" />
         </Link>
-        <nav className="hidden items-center gap-2 lg:flex" aria-label="التنقل الرئيسي">
+        <nav className="equiti-public-nav-links hidden items-center gap-2 lg:flex" aria-label="التنقل الرئيسي">
           {links.map((link) => {
             const active = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href + "/"));
             return <Link key={link.href} href={link.href} style={active ? { backgroundColor: "rgba(0, 111, 107, 0.35)", color: "#ffffff" } : undefined} className={`rounded-xl px-4 py-3 text-sm font-medium transition ${active ? "" : "text-slate-200 hover:bg-white/10 hover:text-white"}`} >{link.label}</Link>;
@@ -41,7 +41,7 @@ export default function Navbar() {
           {open ? <X size={21} /> : <Menu size={21} />}
         </button>
       </div>
-      {open && <nav className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-white/10 bg-[#07101d] p-3 lg:hidden" aria-label="التنقل للأجهزة الصغيرة">
+      {open && <nav className="equiti-public-mobile-nav max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-white/10 p-3 lg:hidden" aria-label="التنقل للأجهزة الصغيرة">
         {links.map((link) => {
           const active = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href + "/"));
           return <Link key={link.href} href={link.href} onClick={() => setOpen(false)} style={active ? { backgroundColor: "rgba(0, 111, 107, 0.35)", color: "#ffffff" } : undefined} className={`block rounded-xl px-4 py-3 text-sm transition ${active ? "" : "text-slate-200 hover:bg-white/10"}`} >{link.label}</Link>;

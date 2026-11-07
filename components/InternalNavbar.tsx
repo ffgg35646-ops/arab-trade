@@ -247,7 +247,7 @@ function InternalNavbarContent() {
   return (
     <header
       dir="rtl"
-      className="sticky top-0 z-50 border-b border-white/10 bg-[#050a13]/95 backdrop-blur-xl"
+      className="equiti-internal-navbar-frame sticky top-0 z-50 border-b border-white/10 backdrop-blur-xl"
     >
       <div className="mx-auto flex h-16 max-w-[1700px] items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:px-6">
 

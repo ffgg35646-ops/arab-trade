@@ -22,7 +22,7 @@ export default function Navbar() {
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) return null;
 
   return (
-    <header dir="rtl" className="sticky top-3 z-50 mx-3 rounded-2xl border border-white/15 bg-white/[0.06] shadow-lg shadow-black/10 backdrop-blur-2xl">
+    <header dir="rtl" className="equiti-public-navbar sticky top-3 z-50 mx-3 rounded-2xl border border-white/20 bg-white/10 shadow-lg shadow-black/10 backdrop-blur-2xl">
       <div className="mx-auto flex h-16 max-w-[1500px] items-center justify-between gap-3 px-3 sm:h-20 sm:px-5">
         <Link href="/" className="shrink-0" onClick={() => setOpen(false)}>
           <img src="/logo.svg" alt="EQUITI للتداول" className="h-9 w-auto sm:h-11" />

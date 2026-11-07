@@ -1894,3 +1894,41 @@ header.equiti-internal-navbar,
   backdrop-filter: blur(20px) saturate(125%) !important;
   box-shadow: 0 8px 28px rgba(0, 0, 0, .10) !important;
 }
+ 
+/* EQUITI — match the internal trading card to the public trading page */
+main.equiti-internal-trading-page {
+  background: #e5e7e8 !important;
+}
+
+.equiti-internal-trading-terminal {
+  min-width: 0;
+  margin: .5rem;
+  overflow: hidden;
+  border: 1px solid #c4cbce;
+  border-radius: 1rem;
+  background: #30383b !important;
+  color: #f8fafc;
+  box-shadow: 0 16px 48px rgba(20, 30, 35, .12);
+}
+
+.equiti-internal-trading-terminal [class*="bg-[#07101d]"] {
+  background-color: #343c3f !important;
+}
+
+.equiti-internal-trading-terminal [class*="bg-[#050a13]"] {
+  background-color: #262d30 !important;
+}
+
+.equiti-internal-trading-terminal [class*="bg-[#060c15]"] {
+  background-color: #2b3336 !important;
+}
+
+.equiti-internal-trading-terminal :is([class*="border-white/"], [class*="border-cyan-400/"]) {
+  border-color: rgba(255, 255, 255, .12) !important;
+}
+
+@media (min-width: 640px) {
+  .equiti-internal-trading-terminal {
+    margin: 1rem;
+  }
+}

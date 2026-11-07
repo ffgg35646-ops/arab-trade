@@ -1,4 +1,4 @@
-import { AlertTriangle, BadgeCheck, Copy, Globe, LockKeyhole, Scale, Shield, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Check, Copy, Globe, LockKeyhole, Scale, Shield, ShieldCheck } from "lucide-react";
 
 const licenses = [
   {
@@ -106,11 +106,12 @@ export default function LicensesContent() {
                         </h3>
                         <p className="mt-2 text-sm leading-7 text-slate-400">{license.description}</p>
                       </div>
-                      {license.active && (
-                        <span className="mt-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-emerald-400/20 bg-emerald-500/10 px-2 py-1 text-xs font-bold text-emerald-300">
-                          نشط <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                        </span>
-                      )}
+                      <Check
+                        size={19}
+                        strokeWidth={3}
+                        className="mt-1 shrink-0 text-[#00afaa]"
+                        aria-label="علامة صح"
+                      />
                     </div>
                     <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#07101d]/60 px-4 py-3 text-sm text-slate-200">
                       <span>{license.numberLabel}: {license.number}</span>

@@ -4,32 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const internalColumns = [
-  {
-    title: "حسابك",
-    links: [
-      ["الرئيسية", "/dashboard"],
-      ["الأسواق", "/dashboard/markets"],
-      ["الباقات", "/dashboard/packages"],
-      ["سجل التداول", "/dashboard/trades"],
-    ],
-  },
-  {
-    title: "الدعم",
-    links: [
-      ["مركز الدعم", "/dashboard/support"],
-      ["الإشعارات", "/dashboard/notifications"],
-    ],
-  },
-  {
-    title: "الحساب والأمان",
-    links: [
-      ["التراخيص والأمان", "/dashboard/licenses"],
-      ["بيانات الحساب", "/dashboard/account"],
-    ],
-  },
-];
-
 const columns = [
   {
     title: "المنصة",
@@ -57,18 +31,16 @@ const columns = [
   },
 ];
 
-export default function Footer({ showOnInternal = false }: { showOnInternal?: boolean }) {
+export default function Footer() {
   const pathname = usePathname();
-  const visibleColumns = showOnInternal ? internalColumns : columns;
-  const homeHref = showOnInternal ? "/dashboard" : "/";
-  if (!showOnInternal && (pathname === "/dashboard" || pathname.startsWith("/dashboard/") || pathname === "/admin" || pathname.startsWith("/admin/") || pathname === "/protrade" || pathname.startsWith("/protrade/") || pathname === "/margin" || pathname.startsWith("/margin/") || pathname === "/futures" || pathname.startsWith("/futures/"))) return null;
+  if (pathname !== "/") return null;
 
   return (
     <footer className="border-t border-sky-400/15 bg-[#050a13]">
       <div className="mx-auto max-w-7xl px-2 py-5 sm:px-4 sm:py-12 lg:px-8">
         <div className="grid grid-cols-2 gap-x-2 gap-y-4 sm:gap-9 lg:grid-cols-[1.4fr_repeat(3,1fr)] lg:gap-8">
           <div className="col-span-2 lg:col-span-1">
-            <Link href={homeHref} className="inline-flex rounded-xl outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400">
+            <Link href="/" className="inline-flex rounded-xl outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400">
               <Image
                 src="/logo.svg"
                 alt="EQUITI للتداول"
@@ -104,7 +76,7 @@ export default function Footer({ showOnInternal = false }: { showOnInternal?: bo
               ))}
             </div>
           </div>
-          {visibleColumns.map((column) => (
+          {columns.map((column) => (
             <div key={column.title}>
               <h3 className="mb-2 text-xs sm:mb-4 sm:text-sm font-extrabold text-white">
                 <span className="inline-block border-b-2 border-sky-400/70 pb-1 sm:pb-2">{column.title}</span>

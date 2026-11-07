@@ -1944,3 +1944,10 @@ header.equiti-internal-navbar-frame,
   -webkit-backdrop-filter: blur(18px) saturate(120%);
   backdrop-filter: blur(18px) saturate(120%);
 }
+
+/* Internal sidebar top strip matches the sidebar's navy surface. */
+.equiti-dashboard-shell .equiti-sidebar-topbar {
+  background: rgba(7, 16, 29, .90) !important;
+  background-color: rgba(7, 16, 29, .90) !important;
+  border-bottom-color: rgba(255, 255, 255, .10) !important;
+}

@@ -263,7 +263,7 @@ export default function WithdrawalsPage() {
         <InternalSidebar />
         <main dir="rtl" className="min-h-screen w-full min-w-0 flex-1 bg-[#050a13] p-3 text-white sm:p-6">
           <div className="mx-auto w-full max-w-3xl space-y-5">
-          <header className="flex flex-wrap items-center justify-between gap-3">
+          <header className="equiti-payment-page-titlebar flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-black">السحب</h1>
               <p role="status" className="mt-1 text-xs text-slate-500">بيانات الطلبات والأرصدة تتحدث تلقائيًا.</p>

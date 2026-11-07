@@ -1951,3 +1951,16 @@ header.equiti-internal-navbar-frame,
   background-color: rgba(7, 16, 29, .90) !important;
   border-bottom-color: rgba(255, 255, 255, .10) !important;
 }
+
+/* EQUITI — gray glass title bars for internal deposit and withdrawal pages */
+.equiti-dashboard-shell header.equiti-payment-page-titlebar,
+header.equiti-payment-page-titlebar {
+  padding: .9rem 1.15rem;
+  border: 1px solid rgba(255, 255, 255, .12) !important;
+  border-radius: 1rem;
+  background: rgba(48, 56, 59, .76) !important;
+  background-color: rgba(48, 56, 59, .76) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(115%) !important;
+  backdrop-filter: blur(24px) saturate(115%) !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .12) !important;
+}

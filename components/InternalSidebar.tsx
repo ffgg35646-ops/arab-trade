@@ -31,7 +31,7 @@ function InternalSidebarContent() {
   return (
     <aside
       dir="rtl"
-      className={`hidden shrink-0 border-l border-white/10 bg-[#07101d] xl:block ${
+      className={`equiti-internal-sidebar hidden shrink-0 border-l border-white/10 bg-[#30383b] xl:block ${
         collapsed ? "w-[76px]" : "w-[240px]"
       } transition-all duration-200`}
     >

@@ -298,7 +298,7 @@ export default function DepositPage() {
         <InternalSidebar />
         <main dir="rtl" className="min-h-screen w-full min-w-0 flex-1 bg-[#050a13] p-3 text-white sm:p-6">
           <div className="mx-auto w-full max-w-3xl space-y-5">
-            <header className="flex flex-wrap items-center justify-between gap-3">
+            <header className="equiti-payment-page-titlebar flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-black tracking-tight sm:text-3xl">إيداع USDT</h1>
                 <p className="mt-1 text-sm text-slate-400">أدخل بيانات التحويل وأرسل الطلب للمراجعة.</p>

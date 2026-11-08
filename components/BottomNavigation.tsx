@@ -36,6 +36,8 @@ const items = [
 export default function BottomNavigation() {
   const pathname = usePathname();
   const internalWorkspace =
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
     pathname === "/dashboard" ||
     pathname.startsWith("/dashboard/") ||
     pathname === "/protrade" ||
@@ -48,10 +50,12 @@ export default function BottomNavigation() {
   if (internalWorkspace) return null;
 
   return (
-    <div
-      dir="rtl"
-      className="fixed inset-x-0 bottom-0 z-[60] px-3 pb-3 md:hidden"
-    >
+    <>
+      <div className="h-24 md:hidden" aria-hidden="true" />
+      <div
+        dir="rtl"
+        className="fixed inset-x-0 bottom-0 z-[60] px-3 pb-3 md:hidden"
+      >
       <nav className="mx-auto flex max-w-md items-center justify-around rounded-2xl border border-white/10 bg-[#07101d]/95 px-2 py-2 shadow-2xl shadow-black/50 backdrop-blur-xl">
         {items.map((item) => {
           const Icon = item.icon;
@@ -79,6 +83,7 @@ export default function BottomNavigation() {
           );
         })}
       </nav>
-    </div>
+      </div>
+    </>
   );
 }

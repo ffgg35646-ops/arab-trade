@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { Menu, X } from "lucide-react";
 
 type Counts = {
   deposits: number;
@@ -53,6 +54,7 @@ export default function AdminShell({
   const router = useRouter();
 
   const [busy, setBusy] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [counts, setCounts] = useState<Counts>({
     deposits: 0,
@@ -97,6 +99,7 @@ export default function AdminShell({
 
   useEffect(() => {
     setNotificationOpen(false);
+    setMobileNavOpen(false);
   }, [pathname]);
 
   async function logout() {
@@ -181,10 +184,20 @@ export default function AdminShell({
         </nav>
       </aside>
 
-      <main className="lg:mr-[248px]">
+      <main className="min-w-0 lg:mr-[248px]">
         <div className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#050a13]/95 px-3 py-2.5 backdrop-blur sm:px-4">
           <div className="flex items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-3">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(true)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-[#0b1422] text-slate-200 lg:hidden"
+                aria-label="فتح قائمة الإدارة"
+                aria-expanded={mobileNavOpen}
+                aria-controls="equiti-admin-mobile-navigation"
+              >
+                <Menu size={19} />
+              </button>
               {pathname !== "/admin" ? (
                 <Link
                   href="/admin"
@@ -255,6 +268,68 @@ export default function AdminShell({
 
         <div className="p-3 sm:p-4">{children}</div>
       </main>
+
+      {mobileNavOpen ? (
+        <div
+          className="fixed inset-0 z-[80] bg-black/65 lg:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        >
+          <aside
+            id="equiti-admin-mobile-navigation"
+            className="equiti-admin-mobile-drawer absolute right-0 top-0 flex h-full flex-col overflow-y-auto border-l border-white/10 bg-[#30383b] shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+            aria-label="قائمة الإدارة"
+          >
+            <div className="flex items-center justify-between border-b border-white/10 p-4">
+              <div>
+                <div className="text-lg font-black text-white">EQUITI</div>
+                <div className="mt-1 text-xs text-slate-400">لوحة الإدارة</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(false)}
+                className="rounded-xl border border-white/10 p-2 text-slate-200"
+                aria-label="إغلاق القائمة"
+              >
+                <X size={19} />
+              </button>
+            </div>
+            <nav className="flex-1 space-y-5 p-3">
+              {groups.map((group) => (
+                <div key={group.title}>
+                  <div className="mb-2 px-3 text-[11px] font-bold text-slate-400">{group.title}</div>
+                  <div className="space-y-1">
+                    {group.items.map((item) => {
+                      const active = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href + "/"));
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setMobileNavOpen(false)}
+                          aria-current={active ? "page" : undefined}
+                          className={`block rounded-xl px-3 py-3 text-sm font-bold transition ${active ? "bg-[#006f6b]/35 text-white" : "text-slate-200 hover:bg-white/5"}`}
+                        >
+                          {item.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </nav>
+            <div className="border-t border-white/10 p-3">
+              <button
+                type="button"
+                onClick={() => { setMobileNavOpen(false); void logout(); }}
+                disabled={busy}
+                className="w-full rounded-xl border border-red-400/20 bg-red-500/10 px-3 py-3 text-sm font-bold text-red-200 disabled:opacity-50"
+              >
+                تسجيل الخروج
+              </button>
+            </div>
+          </aside>
+        </div>
+      ) : null}
     </div>
   );
 }

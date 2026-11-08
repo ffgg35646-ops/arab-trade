@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
   ChevronDown,
+  Menu,
   CircleDollarSign,
   LogOut,
   Search,
@@ -249,7 +250,7 @@ function InternalNavbarContent() {
       dir="rtl"
       className="equiti-internal-navbar-frame sticky top-0 z-50 border-b border-white/10 backdrop-blur-xl"
     >
-      <div className="mx-auto flex h-16 max-w-[1700px] items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:px-6">
+      <div className="mx-auto flex h-16 w-full min-w-0 max-w-[1700px] items-center gap-2 px-2 sm:gap-3 sm:px-4 lg:px-6">
 
         {/* Mobile menu */}
         <button
@@ -259,13 +260,11 @@ function InternalNavbarContent() {
             setMobile((value) => !value);
           }}
           className="shrink-0 rounded-xl border border-white/10 p-2 text-slate-300 transition hover:bg-white/5 hover:text-white xl:hidden"
-          aria-label="القائمة"
+          aria-label={mobile ? "إغلاق القائمة" : "فتح القائمة"}
+          aria-expanded={mobile}
+          aria-controls="equiti-internal-mobile-navigation"
         >
-          {mobile ? (
-            <X size={19} />
-          ) : (
-            <ChevronDown size={19} />
-          )}
+          {mobile ? <X size={19} /> : <Menu size={19} />}
         </button>
 
         {/* Logo */}
@@ -277,7 +276,7 @@ function InternalNavbarContent() {
           <img
             src="/logo.svg"
             alt="EQUITI"
-            className="h-8 w-auto sm:h-9"
+            className="h-7 w-auto max-w-[108px] sm:h-9 sm:max-w-none"
           />
         </Link>
 
@@ -440,7 +439,7 @@ function InternalNavbarContent() {
 
           <Link
             href="/dashboard/account"
-            className={`rounded-xl border p-2.5 transition ${
+            className={`equiti-internal-account-action rounded-xl border p-2.5 transition ${
               isActive(
                 pathname,
                 "/dashboard/account"
@@ -472,8 +471,8 @@ function InternalNavbarContent() {
 
       {/* Mobile navigation uses the exact same route configuration as the desktop sidebar. */}
       {mobile && (
-        <div className="max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-white/10 bg-[#07101d] p-3 xl:hidden">
-          <nav aria-label="القائمة الرئيسية للحساب" className="space-y-1">
+        <div id="equiti-internal-mobile-navigation" className="equiti-internal-mobile-nav max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-white/10 bg-[#07101d] p-3 xl:hidden">
+          <nav aria-label="القائمة الرئيسية للحساب" className="w-full space-y-1">
             {dashboardNavigation.map((section) => {
               const Icon = section.icon;
               const sectionActive = section.href

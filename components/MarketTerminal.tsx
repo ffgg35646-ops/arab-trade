@@ -1,6 +1,6 @@
  "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Coin = {
   id: string;
@@ -87,8 +87,8 @@ function Candles({ prices }: { prices: number[] }) {
 
   if (!candles.length) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-[#aeb9bd]">
-        جاري التحميل...
+      <div className="relative h-full w-full overflow-hidden rounded-lg bg-[#30383b]" aria-label="منطقة الرسم البياني">
+        <div className="absolute inset-0 opacity-60" style={{ backgroundImage: "linear-gradient(to bottom, transparent calc(100% - 1px), rgba(255,255,255,.07) 100%), linear-gradient(to right, transparent calc(100% - 1px), rgba(255,255,255,.045) 100%)", backgroundSize: "100% 16.66%, 12.5% 100%" }} />
       </div>
     );
   }
@@ -166,32 +166,56 @@ function Candles({ prices }: { prices: number[] }) {
 export default function MarketTerminal() {
   const [coins, setCoins] = useState<Coin[]>([]);
   const [selectedId, setSelectedId] = useState("bitcoin");
-  const [loading, setLoading] = useState(true);
   const [openPair, setOpenPair] = useState(false);
-
-  async function loadMarket() {
-    try {
-      const response = await fetch("/api/market", {
-        cache: "no-store",
-      });
-
-      if (!response.ok) throw new Error();
-
-      const data = await response.json();
-      setCoins(data.coins || []);
-    } catch {
-      // Keep previous market data on temporary API failure.
-    } finally {
-      setLoading(false);
-    }
-  }
+  const sectionRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    loadMarket();
+    const section = sectionRef.current;
+    if (!section) return;
 
-    const timer = setInterval(loadMarket, 30000);
+    let cancelled = false;
+    let refreshTimer: ReturnType<typeof setInterval> | undefined;
 
-    return () => clearInterval(timer);
+    async function loadMarket() {
+      try {
+        const response = await fetch("/api/market", { cache: "no-store" });
+        if (!response.ok) throw new Error();
+        const data = await response.json();
+        if (!cancelled) setCoins(Array.isArray(data.coins) ? data.coins : []);
+      } catch {
+        // Keep the ready page visible if market data is temporarily unavailable.
+      }
+    }
+
+    const startLoading = () => {
+      void loadMarket();
+      refreshTimer = setInterval(() => {
+        if (document.visibilityState === "visible") void loadMarket();
+      }, 60000);
+    };
+
+    if (!("IntersectionObserver" in window)) {
+      startLoading();
+    } else {
+      const observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect();
+          startLoading();
+        }
+      }, { rootMargin: "260px 0px" });
+      observer.observe(section);
+
+      return () => {
+        cancelled = true;
+        observer.disconnect();
+        if (refreshTimer) clearInterval(refreshTimer);
+      };
+    }
+
+    return () => {
+      cancelled = true;
+      if (refreshTimer) clearInterval(refreshTimer);
+    };
   }, []);
 
   const selected = useMemo(
@@ -202,12 +226,13 @@ export default function MarketTerminal() {
   const selectedPair =
     pairs.find((pair) => pair[0] === selectedId) || pairs[0];
 
-  const tickerCoins = coins.slice(0, 30);
+  const tickerCoins = coins.slice(0, 12);
 
   return (
     <section
+      ref={sectionRef}
       dir="rtl"
-      className="w-full bg-[#e5e7e8] px-3 py-8 sm:px-5 lg:px-8"
+      className="w-full min-w-0 overflow-hidden bg-[#e5e7e8] px-3 py-6 sm:px-5 sm:py-8 lg:px-8"
     >
       <div className="mx-auto max-w-[1500px] overflow-hidden rounded-2xl border border-white/10 bg-[#30383b] shadow-[0_16px_42px_rgba(35,45,50,0.09)]">
 
@@ -218,7 +243,7 @@ export default function MarketTerminal() {
             <div className="relative">
               <button
                 onClick={() => setOpenPair(!openPair)}
-                className="flex min-w-[190px] items-center gap-3 rounded-xl border border-white/10 bg-[#3b4447] px-4 py-2.5 text-right transition hover:bg-[#dfe4e5]"
+                className="flex min-w-[155px] max-w-full items-center gap-3 rounded-xl border border-white/10 bg-[#3b4447] px-4 py-2.5 text-right transition hover:bg-[#dfe4e5]"
               >
                 {selected && (
                   <img
@@ -323,7 +348,7 @@ export default function MarketTerminal() {
         </div>
 
         {/* Mini ticker */}
-        <div className="overflow-hidden border-b border-white/[0.08] bg-[#343c3f]">
+        <div className="overflow-x-auto overscroll-x-contain border-b border-white/[0.08] bg-[#343c3f]" style={{ scrollbarWidth: "none" }}>
           <div className="flex min-w-max gap-2 px-3 py-2">
             {tickerCoins.map((coin) => {
               const positive =
@@ -387,16 +412,8 @@ export default function MarketTerminal() {
               </div>
             </div>
 
-            <div className="h-[390px] p-4 sm:h-[470px] sm:p-6">
-              {selected && !loading ? (
-                <Candles
-                  prices={selected.sparkline_in_7d?.price || []}
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-sm text-[#aeb9bd]">
-                  جاري تحميل السوق...
-                </div>
-              )}
+            <div className="h-[280px] min-w-0 p-2 sm:h-[390px] sm:p-4 lg:h-[470px] lg:p-6">
+              <Candles prices={selected?.sparkline_in_7d?.price || []} />
             </div>
 
             {/* Stats */}

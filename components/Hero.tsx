@@ -61,7 +61,7 @@ export default function Hero() {
       </div>
 
       <div className="EQUITI-hero-content mx-auto max-w-[1500px]">
-        <div className="grid min-h-[560px] items-center gap-8 overflow-hidden rounded-[30px] border border-white/10 bg-[#30383b] p-4 text-white shadow-[0_18px_48px_rgba(20,30,35,.18)] sm:p-7 lg:grid-cols-[1fr_1.05fr] lg:p-10">
+        <div className="grid min-h-[390px] items-center gap-5 overflow-hidden rounded-[24px] border border-white/10 bg-[#30383b] p-3 text-white shadow-[0_18px_48px_rgba(20,30,35,.18)] sm:min-h-[500px] sm:gap-8 sm:rounded-[30px] sm:p-7 lg:min-h-[560px] lg:grid-cols-[1fr_1.05fr] lg:p-10">
           <div className="relative z-10 order-2 max-w-2xl lg:order-1">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#00afaa]/40 bg-[#006f6b]/25 px-4 py-2 text-xs font-bold text-white">
               <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
@@ -89,8 +89,8 @@ export default function Hero() {
               </button>
             </div>
 
-            <div className="mt-10 grid max-w-xl grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-white/10 bg-[#394245] p-4">
+            <div className="mt-7 grid max-w-xl grid-cols-3 gap-2 sm:mt-10 sm:gap-3">
+              <div className="min-w-0 rounded-2xl border border-white/10 bg-[#394245] p-2.5 sm:p-4">
                 <div className="text-xl font-black text-white">100+</div>
                 <div className="mt-1 text-[11px] text-white/85">أصل رقمي</div>
               </div>
@@ -105,28 +105,17 @@ export default function Hero() {
             </div>
           </div>
 
-          <div className="relative order-1 h-[350px] overflow-hidden rounded-[24px] border border-[#c4cbce] bg-[#20282b] sm:h-[430px] lg:order-2 lg:h-[500px]">
-            {slides.map((item, index) => (
-              <div
-                key={item.image}
-                className={`absolute inset-0 transition-all duration-1000 ${
-                  index === active ? "scale-100 opacity-100" : "scale-110 opacity-0"
-                }`}
-              >
-                <img
-                  src={item.image}
-                  alt={item.title}
-                  className="h-full w-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#050a13] via-[#050a13]/35 to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-l from-blue-950/30 to-transparent" />
-              </div>
-            ))}
+          <div className="relative order-1 h-[230px] min-w-0 overflow-hidden rounded-2xl border border-[#c4cbce] bg-[#20282b] sm:h-[430px] sm:rounded-[24px] lg:order-2 lg:h-[500px]">
+            <div key={slide.image} className="absolute inset-0">
+              <img src={slide.image} alt={slide.title} loading={active === 0 ? "eager" : "lazy"} fetchPriority={active === 0 ? "high" : "auto"} decoding="async" className="h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#050a13] via-[#050a13]/35 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-l from-blue-950/30 to-transparent" />
+            </div>
 
             <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-blue-500/20 blur-[80px]" />
             <div className="absolute -bottom-20 -left-10 h-52 w-52 rounded-full bg-cyan-400/10 blur-[70px]" />
 
-            <div key={active} className="absolute bottom-0 right-0 left-0 p-6 sm:p-8">
+            <div key={active} className="absolute bottom-0 right-0 left-0 p-4 sm:p-8">
               <div className="mb-3 inline-flex rounded-lg border border-white/10 bg-[#050a13]/30 px-3 py-1.5 text-[10px] font-bold text-cyan-300 backdrop-blur-md">
                 {slide.label}
               </div>

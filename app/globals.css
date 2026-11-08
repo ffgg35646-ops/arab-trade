@@ -214,7 +214,7 @@ main > section:first-child {
 }
 
 /* لا تسمح لأي عنصر من الـHero بالدخول أسفل الـNavbar */
-header,
+header:not(.sticky),
 nav {
   position: relative;
   z-index: 100;
@@ -243,7 +243,7 @@ main > section:first-child {
    GLASS NAVBAR
    ========================================================= */
 
-header,
+header:not(.sticky),
 nav {
   position: relative;
   z-index: 100;
@@ -1878,7 +1878,6 @@ main.markets-page .markets-main-card > div:last-child button:disabled {
 /* Glass styling belongs to the navigation strip inside each header, not the outer header. */
 nav.equiti-public-nav-links,
 nav.equiti-internal-nav-links {
-  display: flex;
   align-items: center;
   border: 1px solid rgba(255, 255, 255, .14) !important;
   border-radius: .9rem;
@@ -2003,5 +2002,153 @@ header.equiti-payment-page-titlebar {
     width: 100%;
     min-width: 0;
     max-width: 28rem;
+  }
+}
+
+
+/* EQUITI — mobile-first layout guardrails and navigation containment. */
+@media (max-width: 1023px) {
+  nav.equiti-public-nav-links { display: none !important; }
+}
+@media (max-width: 1279px) {
+  nav.equiti-internal-nav-links { display: none !important; }
+}
+@media (max-width: 767px) {
+  html, body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  body { min-width: 0; }
+
+  .equiti-home,
+  .equiti-home-content,
+  .equiti-dashboard-shell,
+  .equiti-admin-shell,
+  .equiti-public-trading-terminal,
+  .equiti-internal-trading-terminal {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .equiti-home-content > *,
+  .equiti-home-content section,
+  .equiti-dashboard-shell main,
+  .equiti-admin-shell main,
+  .equiti-dashboard-shell main > *,
+  .equiti-admin-shell main > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .equiti-dashboard-shell main :is(.overflow-x-auto, .overflow-x-scroll),
+  .equiti-admin-shell main :is(.overflow-x-auto, .overflow-x-scroll),
+  .equiti-public-trading-terminal :is(.overflow-x-auto, .overflow-x-scroll),
+  .equiti-internal-trading-terminal :is(.overflow-x-auto, .overflow-x-scroll) {
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+  }
+
+  .equiti-home img,
+  .equiti-dashboard-shell main img,
+  .equiti-admin-shell main img { max-width: 100%; }
+
+  .equiti-public-mobile-nav,
+  .equiti-internal-mobile-nav {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .equiti-public-mobile-nav a,
+  .equiti-internal-mobile-nav a,
+  .equiti-internal-mobile-nav button { min-height: 44px; }
+
+  .equiti-internal-navbar-frame > div:first-child {
+    width: 100%;
+    min-width: 0;
+    gap: .4rem;
+    padding-inline: .625rem;
+  }
+
+  .equiti-internal-navbar-frame > div:first-child > a[aria-label="EQUITI"] {
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+
+  .equiti-internal-navbar-frame > div:first-child > a[aria-label="EQUITI"] img {
+    display: block;
+    width: auto;
+    max-width: 108px;
+    height: 27px;
+  }
+
+  .equiti-internal-navbar-frame > div:first-child > div.mr-auto {
+    min-width: 0;
+    gap: .25rem;
+  }
+
+  .equiti-home .EQUITI-hero-content,
+  .equiti-home .EQUITI-hero-content > div {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .equiti-home .EQUITI-hero-content > div { min-height: 0; }
+
+  .equiti-home #markets,
+  .equiti-home #trading,
+  .equiti-home #about {
+    width: 100%;
+    min-width: 0;
+    padding-inline: .75rem;
+  }
+
+  .equiti-home .markets-home-grid { min-width: 0; }
+
+  .equiti-public-trading-terminal,
+  .equiti-internal-trading-terminal { overflow: hidden; }
+
+  .equiti-admin-mobile-drawer {
+    width: min(19rem, 86vw);
+    max-width: 86vw;
+  }
+
+  .equiti-admin-shell main > .sticky > div { min-width: 0; }
+  .equiti-admin-shell main > .sticky h1 {
+    min-width: 0;
+    max-width: 42vw;
+  }
+  .equiti-admin-shell main > .sticky button { flex-shrink: 0; }
+  .equiti-admin-shell main { overflow-x: clip; }
+
+  .equiti-internal-trading-terminal { margin: .5rem; }
+
+  .equiti-internal-trading-terminal canvas,
+  .equiti-public-trading-terminal canvas,
+  .equiti-internal-trading-terminal svg,
+  .equiti-public-trading-terminal svg { max-width: 100%; }
+
+  .equiti-home .EQUITI-hero-content h1 {
+    font-size: clamp(2.1rem, 9vw, 3rem);
+  }
+}
+@media (max-width: 380px) {
+  .equiti-internal-navbar-frame > div:first-child > a[aria-label="EQUITI"] img {
+    max-width: 96px;
+    height: 25px;
+  }
+  .equiti-internal-account-action { display: none !important; }
+  .equiti-internal-navbar-frame > div:first-child > div.mr-auto { gap: .2rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
   }
 }

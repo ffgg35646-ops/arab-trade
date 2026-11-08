@@ -13,7 +13,7 @@ export default function HomePage() {
 
         <MarketTerminal />
 
-        <section id="markets" className="mx-auto max-w-7xl px-4 py-20 text-[#172126] lg:px-8">
+        <section id="markets" className="mx-auto max-w-7xl px-3 py-10 text-[#172126] sm:px-4 sm:py-20 lg:px-8">
           <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <div className="mb-2 text-xs font-bold text-[#008f89]">
@@ -35,7 +35,7 @@ export default function HomePage() {
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#30383b] text-white">
-            <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 border-b border-white/10 px-5 py-4 text-xs font-semibold text-[#cbd5d8]">
+            <div className="hidden grid-cols-[1.5fr_1fr_1fr_1fr] gap-4 border-b border-white/10 px-5 py-4 text-xs font-semibold text-[#cbd5d8] sm:grid">
               <span>الأصل</span>
               <span>السعر</span>
               <span>التغير 24س</span>
@@ -51,25 +51,25 @@ export default function HomePage() {
             ].map(([name, symbol, price, change, volume]) => (
               <div
                 key={symbol}
-                className="grid grid-cols-[1.5fr_1fr_1fr_1fr] items-center gap-4 border-b border-white/[0.07] bg-[#343c3f] px-5 py-5 text-white last:border-0 hover:bg-[#3b4447]"
+                className="grid min-w-0 grid-cols-2 items-center gap-x-2 gap-y-3 border-b border-white/[0.07] bg-[#343c3f] px-3 py-3 text-white last:border-0 hover:bg-[#3b4447] sm:grid-cols-[1.5fr_1fr_1fr_1fr] sm:gap-4 sm:px-5 sm:py-5"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e5f4f2] text-xs font-black text-[#008f89]">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#e5f4f2] text-xs font-black text-[#008f89]">
                     {symbol.slice(0, 2)}
                   </div>
 
                   <div>
-                    <div className="text-sm font-bold text-white">{name}</div>
+                    <div className="text-xs font-bold text-white sm:text-sm">{name}</div>
                     <div className="mt-0.5 text-[11px] text-[#cbd5d8]">
                       {symbol}/USDT
                     </div>
                   </div>
                 </div>
 
-                <span className="text-sm font-semibold text-white">{price}</span>
+                <span className="text-xs font-semibold text-white sm:text-sm">{price}</span>
 
                 <span
-                  className={`text-sm font-bold ${
+                  className={`text-xs font-bold sm:text-sm ${
                     change.startsWith("+")
                       ? "text-[#22c55e]"
                       : "text-[#ef4444]"
@@ -78,7 +78,7 @@ export default function HomePage() {
                   {change}
                 </span>
 
-                <span className="text-sm text-[#cbd5d8]">{volume}</span>
+                <span className="text-xs text-[#cbd5d8] sm:text-sm">{volume}</span>
               </div>
             ))}
           </div>

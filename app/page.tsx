@@ -24,7 +24,7 @@ export default function HomePage() {
                 أهم الأسواق الآن
               </h2>
 
-              <p className="mt-3 text-sm leading-7 text-[#cbd5d8]">
+              <p className="mt-3 text-sm leading-7 text-[#39434a]">
                 تابع حركة أبرز الأصول والأسعار والتغيرات اليومية من مكان واحد.
               </p>
             </div>

@@ -1972,3 +1972,36 @@ header.equiti-payment-page-titlebar {
   backdrop-filter: blur(24px) saturate(115%) !important;
   box-shadow: 0 12px 28px rgba(0, 0, 0, .12) !important;
 }
+
+/* EQUITI mobile viewport guard: prevent desktop-width overflow on phones. */
+@media (max-width: 767px) {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  body {
+    min-width: 0;
+  }
+
+  header,
+  main,
+  footer {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  main.arabtrade-auth-hero {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 1rem;
+  }
+
+  .arabtrade-auth-content {
+    width: 100%;
+    min-width: 0;
+    max-width: 28rem;
+  }
+}

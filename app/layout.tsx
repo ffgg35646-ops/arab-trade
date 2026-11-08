@@ -25,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl">
-      <body className="pb-24 md:pb-0">
+      <body>
         {children}
         <GlobalFooter />
         <GlobalSuccessToast />

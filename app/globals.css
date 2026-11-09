@@ -2178,3 +2178,18 @@ header.equiti-payment-page-titlebar {
   border-color: rgba(129, 216, 208, .42) !important;
   background-color: rgba(255, 255, 255, .095) !important;
 }
+
+/* EQUITI — remove the navy fill from the three gray-glass trading controls:
+   top trading-pair selector, limit-price field, and quantity field. */
+.equiti-dashboard-shell main .equiti-internal-trading-terminal .equiti-trading-glass-field :is(input, select) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* Native options in the top pair selector use graphite, not navy. */
+.equiti-internal-trading-terminal .equiti-trading-glass-field select option {
+  background-color: #30383b !important;
+  color: #f8fafc !important;
+}
+/* TRADE GLASS INPUT INTERIOR — TRANSPARENT */

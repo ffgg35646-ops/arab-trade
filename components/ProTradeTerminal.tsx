@@ -975,7 +975,7 @@ export default function ProTradeTerminal() {
             </div>
 
             <div>
-              <div className="flex items-center gap-2">
+              <div className="equiti-trading-glass-field flex items-center gap-2 px-3 py-1.5">
                 <select
                   value={symbol}
                   onChange={(e) => {
@@ -1258,7 +1258,7 @@ export default function ProTradeTerminal() {
             <label className="mb-2 block text-[11px] text-slate-500">
               {orderType === "market" ? (side === "buy" ? "أفضل سعر بيع في دفتر Binance" : "أفضل سعر شراء في دفتر Binance") : "سعر الأمر المحدد"}
             </label>
-            <div className="mb-4 flex h-11 items-center rounded-lg border border-white/[0.08] bg-[#050a13] px-3 focus-within:border-cyan-400/50">
+            <div className="equiti-trading-glass-field mb-4 flex h-11 items-center rounded-xl px-3">
               <input
                 value={orderType === "market" ? (marketExecutionPrice > 0 ? String(marketExecutionPrice) : "") : price}
                 onChange={(event) => setPrice(event.target.value)}
@@ -1270,7 +1270,7 @@ export default function ProTradeTerminal() {
               <span className="text-[11px] text-slate-500">{quoteAsset}</span>
             </div>
 
-            <div className="mb-3 flex h-11 items-center rounded-lg border border-white/[0.08] bg-[#050a13] px-3 focus-within:border-cyan-400/50">
+            <div className="equiti-trading-glass-field mb-3 flex h-11 items-center rounded-xl px-3">
               <input
                 value={quantity}
                 onChange={(event) => setQuantity(event.target.value)}

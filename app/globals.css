@@ -2155,6 +2155,14 @@ header.equiti-payment-page-titlebar {
 
 
 /* EQUITI — soft gray glass controls in the internal trading terminal only */
+.equiti-internal-trading-terminal .equiti-trading-fields-bar {
+  background: rgba(255, 255, 255, .075) !important;
+  background-color: rgba(255, 255, 255, .075) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(125%);
+  backdrop-filter: blur(22px) saturate(125%);
+  border-color: rgba(255, 255, 255, .13) !important;
+}
+
 .equiti-internal-trading-terminal .equiti-trading-glass-field {
   background: rgba(255, 255, 255, .075) !important;
   background-color: rgba(255, 255, 255, .075) !important;

@@ -2152,3 +2152,21 @@ header.equiti-payment-page-titlebar {
     transition-duration: .01ms !important;
   }
 }
+
+
+/* EQUITI — soft gray glass controls in the internal trading terminal only */
+.equiti-internal-trading-terminal .equiti-trading-glass-field {
+  background: rgba(255, 255, 255, .075) !important;
+  background-color: rgba(255, 255, 255, .075) !important;
+  border: 1px solid rgba(255, 255, 255, .13) !important;
+  border-radius: .9rem !important;
+  -webkit-backdrop-filter: blur(22px) saturate(125%) !important;
+  backdrop-filter: blur(22px) saturate(125%) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .045);
+  transition: background-color .18s ease, border-color .18s ease;
+}
+
+.equiti-internal-trading-terminal .equiti-trading-glass-field:focus-within {
+  border-color: rgba(129, 216, 208, .42) !important;
+  background-color: rgba(255, 255, 255, .095) !important;
+}

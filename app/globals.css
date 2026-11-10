@@ -2194,7 +2194,7 @@ header.equiti-payment-page-titlebar {
 }
 /* TRADE GLASS INPUT INTERIOR — TRANSPARENT */
 
-/* User mobile navigation: render as a visibly inset rounded panel. */
+/* User mobile navigation: rounded outer frame clips every edge; inner panel scrolls. */
 @media (max-width: 1279px) {
   .equiti-internal-mobile-nav {
     width: calc(100% - 1.5rem) !important;
@@ -2202,9 +2202,19 @@ header.equiti-payment-page-titlebar {
     margin: .75rem auto !important;
     border: 1px solid rgba(255, 255, 255, .14) !important;
     border-radius: 18px !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
+    overflow: hidden !important;
+    clip-path: inset(0 round 18px) !important;
+    isolation: isolate;
     background: #07101d !important;
     box-shadow: 0 16px 36px rgba(0, 0, 0, .28) !important;
+  }
+
+  .equiti-internal-mobile-nav-scroll {
+    max-height: calc(100dvh - 5.5rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: .75rem;
   }
 }

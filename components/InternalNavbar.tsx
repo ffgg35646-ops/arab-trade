@@ -471,7 +471,8 @@ function InternalNavbarContent() {
 
       {/* Mobile navigation uses the exact same route configuration as the desktop sidebar. */}
       {mobile && (
-        <div id="equiti-internal-mobile-navigation" className="equiti-internal-mobile-nav max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-white/10 bg-[#07101d] p-3 xl:hidden">
+        <div id="equiti-internal-mobile-navigation" className="equiti-internal-mobile-nav xl:hidden">
+          <div className="equiti-internal-mobile-nav-scroll">
           <nav aria-label="القائمة الرئيسية للحساب" className="w-full space-y-1">
             {dashboardNavigation.map((section) => {
               const Icon = section.icon;
@@ -555,6 +556,7 @@ function InternalNavbarContent() {
             <LogOut size={16} />
             تسجيل الخروج
           </button>
+          </div>
         </div>
       )}
     </header>

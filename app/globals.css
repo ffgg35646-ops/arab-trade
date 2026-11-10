@@ -2194,7 +2194,17 @@ header.equiti-payment-page-titlebar {
 }
 /* TRADE GLASS INPUT INTERIOR — TRANSPARENT */
 
-/* User mobile navigation: soften all four outer corners. */
-.equiti-internal-mobile-nav {
-  border-radius: 16px !important;
+/* User mobile navigation: render as a visibly inset rounded panel. */
+@media (max-width: 1279px) {
+  .equiti-internal-mobile-nav {
+    width: calc(100% - 1.5rem) !important;
+    max-width: 100% !important;
+    margin: .75rem auto !important;
+    border: 1px solid rgba(255, 255, 255, .14) !important;
+    border-radius: 18px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    background: #07101d !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, .28) !important;
+  }
 }

@@ -2193,3 +2193,8 @@ header.equiti-payment-page-titlebar {
   color: #f8fafc !important;
 }
 /* TRADE GLASS INPUT INTERIOR — TRANSPARENT */
+
+/* User mobile navigation: soften all four outer corners. */
+.equiti-internal-mobile-nav {
+  border-radius: 16px !important;
+}

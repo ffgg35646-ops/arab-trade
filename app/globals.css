@@ -2212,8 +2212,8 @@ header.equiti-payment-page-titlebar {
 
   .equiti-internal-mobile-nav-scroll,
   .equiti-internal-mobile-nav-scroll > nav {
-    background: #30383b !important;
-    background-color: #30383b !important;
+    background: transparent !important;
+    background-color: transparent !important;
   }
 
   .equiti-internal-mobile-nav-scroll {

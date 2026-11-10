@@ -551,7 +551,7 @@ function InternalNavbarContent() {
           <button
             type="button"
             onClick={logout}
-            className="mt-3 flex w-full items-center gap-2 rounded-xl px-3 py-3 text-right text-sm text-red-300 transition hover:bg-red-500/10"
+            className="equiti-internal-mobile-logout mt-1 flex w-full items-center gap-2 rounded-xl border-0 bg-transparent px-3 py-3 text-right text-sm text-red-300 transition hover:bg-white/5"
           >
             <LogOut size={16} />
             تسجيل الخروج

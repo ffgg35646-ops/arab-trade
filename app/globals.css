@@ -2194,19 +2194,26 @@ header.equiti-payment-page-titlebar {
 }
 /* TRADE GLASS INPUT INTERIOR — TRANSPARENT */
 
-/* User mobile navigation: rounded outer frame clips every edge; inner panel scrolls. */
+/* User mobile navigation: one graphite surface with strongly rounded, clipped corners. */
 @media (max-width: 1279px) {
   .equiti-internal-mobile-nav {
     width: calc(100% - 1.5rem) !important;
     max-width: 100% !important;
     margin: .75rem auto !important;
-    border: 1px solid rgba(255, 255, 255, .14) !important;
-    border-radius: 18px !important;
+    border: 1px solid rgba(255, 255, 255, .16) !important;
+    border-radius: 30px !important;
     overflow: hidden !important;
-    clip-path: inset(0 round 18px) !important;
+    clip-path: inset(0 round 30px) !important;
     isolation: isolate;
-    background: #07101d !important;
-    box-shadow: 0 16px 36px rgba(0, 0, 0, .28) !important;
+    background: #30383b !important;
+    background-color: #30383b !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, .22) !important;
+  }
+
+  .equiti-internal-mobile-nav-scroll,
+  .equiti-internal-mobile-nav-scroll > nav {
+    background: #30383b !important;
+    background-color: #30383b !important;
   }
 
   .equiti-internal-mobile-nav-scroll {
@@ -2216,5 +2223,14 @@ header.equiti-payment-page-titlebar {
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     padding: .75rem;
+  }
+
+  .equiti-internal-mobile-nav .equiti-internal-mobile-logout {
+    margin-top: .25rem !important;
+    border: 0 !important;
+    border-top: 0 !important;
+    background: #30383b !important;
+    background-color: #30383b !important;
+    box-shadow: none !important;
   }
 }

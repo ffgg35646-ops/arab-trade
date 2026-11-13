@@ -280,7 +280,7 @@ export default function RegisterPage() {
                             type="file"
                             accept="image/jpeg,image/png,image/webp"
                             required
-                            className="mt-3 block w-full text-xs text-slate-400 file:ml-3 file:rounded-lg file:border-0 file:bg-blue-500/15 file:px-3 file:py-2 file:font-semibold file:text-blue-200 hover:file:bg-blue-500/25"
+                            className="mt-3 block w-full text-xs text-slate-400 file:ml-3 file:appearance-none file:rounded-full file:border-0 file:bg-blue-500/15 file:px-4 file:py-2 file:font-semibold file:text-blue-200 file:cursor-pointer file:transition hover:file:bg-blue-500/25"
                             onChange={(e) => void updateIdentityFile(item.key, e.target.files?.[0] || null)}
                           />
                           {identityFiles[item.key] && (

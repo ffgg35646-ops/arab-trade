@@ -1493,8 +1493,8 @@ main.equiti-login-page .arabtrade-auth-chart {
    EQUITI — shared smoky gray glass cards for About / Auth
    ========================================================= */
 .arabtrade-auth-glass-card {
-  /* Match the exact outer-panel tone used on the Privacy and Terms pages. */
-  background: rgba(7, 16, 29, .8) !important;
+  /* Match the gray-glass hero card used for "فريق العمل / خبرات تصنع الفرق". */
+  background: rgba(39, 43, 46, .96) !important;
   background-image: none !important;
   border: 1px solid rgba(255, 255, 255, .10) !important;
   -webkit-backdrop-filter: blur(40px) !important;

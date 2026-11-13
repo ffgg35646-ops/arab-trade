@@ -84,7 +84,7 @@ export default function Footer() {
           {columns.map((column) => (
             <div key={column.title}>
               <h3 className="mb-2 text-xs sm:mb-4 sm:text-sm font-extrabold text-white">
-                <span className="inline-block border-b-2 border-sky-400/70 pb-1 sm:pb-2">{column.title}</span>
+                <span className="inline-block border-b-2 border-[#00afaa]/70 pb-1 sm:pb-2">{column.title}</span>
               </h3>
               <div className="flex flex-col gap-1 sm:gap-2.5">
                 {column.links.map(([label, href]) => {

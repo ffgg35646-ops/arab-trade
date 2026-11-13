@@ -31,7 +31,7 @@ export default function ForgotPasswordPage() {
           العودة للرئيسية
         </Link>
 
-        <div className="rounded-3xl border border-white/10 bg-[#07101d]/90 p-7 shadow-2xl backdrop-blur-xl">
+        <div className="arabtrade-auth-glass-card rounded-3xl p-7 shadow-2xl">
           <div className="mb-8 text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-500/10 border border-blue-400/20">
               <KeyRound className="text-blue-400" size={27} />
